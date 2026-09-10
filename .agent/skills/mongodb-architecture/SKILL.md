@@ -29,8 +29,24 @@ To maintain a clean architecture, MongoDB logic must never bleed into business l
 - **Rule:** Controllers and Services must NEVER import Mongoose models, `MongoClient`, or use MongoDB-specific operators (like `$set`, `$push`, `ObjectId`).
 - **Rule:** All database interactions are encapsulated inside **Repositories**. The Service passes pure JavaScript objects to the Repository; the Repository handles the MongoDB query and returns pure JavaScript objects back to the Service.
 
-# 5. Output Instructions
+# 5. Output Sanitization & ID Masking (Never Expose `_id`)
+- **Rule - No Mongo `_id` in API Responses**: Raw MongoDB `_id` (ObjectId) and `__v` must NEVER be exposed directly in public API endpoints or client payloads.
+- **Rule - Transform to `id` / Index**:
+  - Always map `_id` to standard `id` (string) or clean business identifier / sequential index in repository output or schema `toJSON` transforms.
+  - Delete `_id` and `__v` before returning documents to the service layer or controller:
+    ```javascript
+    schema.set("toJSON", {
+      transform: (doc, ret) => {
+        ret.id = ret._id.toString();
+        delete ret._id;
+        delete ret.__v;
+        return ret;
+      },
+    });
+    ```
+
+# 6. Output Instructions
 When asked to implement a MongoDB feature or model:
-1. **Schema/Model:** Provide the schema definition (e.g., Mongoose Schema or MongoDB Validation Schema), explicitly highlighting indexes, `tenantId` implementation, and relational references.
+1. **Schema/Model:** Provide the schema definition (e.g., Mongoose Schema or MongoDB Validation Schema), explicitly highlighting indexes, `tenantId` implementation, relational references, and `toJSON` transforms to mask `_id`.
 2. **Connection Logic (if requested):** Demonstrate the Singleton pattern for the DB connection.
-3. **Repository:** Provide the Repository class, showing how queries are abstracted away from the Service layer. Ensure `tenantId` isolation is respected in the queries.
+3. **Repository:** Provide the Repository class, showing how queries are abstracted away from the Service layer. Ensure `tenantId` isolation is respected in the queries and data is sanitized before returning.
