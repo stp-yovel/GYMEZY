@@ -1,0 +1,90 @@
+--- lib/data/mock_data.dart
++++ lib/data/mock_data.dart
+@@ -1,5 +1,8 @@
+ import '../models/gym.dart';
++import '../models/booking_item.dart';
++import 'package:flutter/material.dart';
++import '../theme/app_theme.dart';
+ 
+ class MockData {
+   static const List<Gym> gyms = [
+@@ -179,4 +182,78 @@
+       aboutText: "Active Life Fitness features ocean-facing workout zones with custom ventilation, professional pilates guides, and relaxing yoga routines.",
+     ),
+   ];
++
++  static final ValueNotifier<List<BookingItem>> bookingsNotifier = ValueNotifier<List<BookingItem>>([
++    BookingItem(
++      id: 'FSB123456',
++      customerId: 'CUST789012',
++      gymName: 'FitZone Gym',
++      gymLocation: 'Indiranagar, Bangalore',
++      gymImageUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=600&auto=format&fit=crop',
++      type: 'Gym Access',
++      sessionSubtitle: 'Gym Access • Per Session',
++      date: 'Tue, 21 May 2025',
++      time: '6:00 AM - 7:00 AM',
++      daysBooked: '1 Day (Single Session)',
++      amountPaid: 199.0,
++      paymentMode: 'UPI',
++      otp: '642189',
++      status: 'Upcoming',
++      icon: Icons.fitness_center_rounded,
++      accentColor: AppTheme.primaryColor,
++    ),
++    BookingItem(
++      id: 'YSB654321',
++      customerId: 'CUST789012',
++      gymName: 'Yoga Class',
++      gymLocation: 'FitZone Yoga Studio',
++      gymImageUrl: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?q=80&w=600&auto=format&fit=crop',
++      type: 'Yoga Class',
++      sessionSubtitle: 'Group Class',
++      date: 'Mon, 26 May - Fri, 30 May 2025',
++      time: 'Mon, Fri • 4:00 PM - 6:00 PM',
++      daysBooked: '5 Days Batch',
++      amountPaid: 2499.0,
++      paymentMode: 'UPI',
++      otp: '891423',
++      status: 'Upcoming',
++      icon: Icons.self_improvement_rounded,
++      accentColor: const Color(0xFF8B5CF6),
++    ),
++    BookingItem(
++      id: 'ZMB789012',
++      customerId: 'CUST789012',
++      gymName: 'Zumba Class',
++      gymLocation: 'PowerHouse Studio',
++      gymImageUrl: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=600&auto=format&fit=crop',
++      type: 'Zumba Class',
++      sessionSubtitle: 'Group Class',
++      date: 'Sat, 24 May 2025',
++      time: '7:00 AM - 8:00 AM',
++      daysBooked: '1 Day (Single Session)',
++      amountPaid: 249.0,
++      paymentMode: 'Card',
++      otp: '314958',
++      status: 'Upcoming',
++      icon: Icons.music_note_rounded,
++      accentColor: const Color(0xFFEC4899),
++    ),
++    BookingItem(
++      id: 'FSB998811',
++      customerId: 'CUST789012',
++      gymName: 'PowerHouse Gym',
++      gymLocation: 'Koramangala, Bangalore',
++      gymImageUrl: 'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?q=80&w=600&auto=format&fit=crop',
++      type: 'Gym Access',
++      sessionSubtitle: 'Gym Access • Weekly Plan',
++      date: 'Wed, 14 May 2025',
++      time: '7:00 AM - 8:30 AM',
++      daysBooked: '7 Days Pass',
++      amountPaid: 999.0,
++      paymentMode: 'UPI',
++      otp: '721094',
++      status: 'Completed',
++      icon: Icons.fitness_center_rounded,
++      accentColor: AppTheme.secondaryColor,
++    ),
++  ]);
+ }
