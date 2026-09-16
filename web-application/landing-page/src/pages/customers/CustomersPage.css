@@ -1273,50 +1273,7 @@
   color: #0d0f11;
 }
 
-/* How It Works */
-.customer-how-it-works {
-  padding: 80px 0;
-  background: #111417;
-}
 
-.how-steps-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 30px;
-  margin-top: 48px;
-}
-
-.how-step-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  padding: 36px 28px;
-  position: relative;
-}
-
-.step-number {
-  font-family: var(--font-title, 'Outfit', sans-serif);
-  font-size: 40px;
-  font-weight: 900;
-  color: var(--brand-color, #00BF62);
-  opacity: 0.85;
-  display: block;
-  margin-bottom: 12px;
-}
-
-.step-title {
-  font-family: var(--font-title, 'Outfit', sans-serif);
-  font-size: 20px;
-  font-weight: 700;
-  color: #ffffff;
-  margin-bottom: 10px;
-}
-
-.step-desc {
-  font-size: 14px;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.65);
-}
 
 /* ==========================================================================
    MOBILE APP SHOWCASE SECTION (PURE WHITE THEME)
@@ -1804,9 +1761,6 @@
   .search-submit-btn {
     width: 100%;
     justify-content: center;
-  }
-  .how-steps-grid {
-    grid-template-columns: 1fr;
   }
   .customer-benefits-grid,
   .featured-gyms-grid {
