@@ -174,7 +174,27 @@ export const AppBar = ({
     >
       {/* Left: Gym Logo, Gym Name & Branch */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <GymStoreLogo isDarkMode={isDarkMode} />
+        {currentGym?.logo ? (
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 'var(--radius-base)',
+              overflow: 'hidden',
+              border: `1.5px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.15)' : '#d6e4ff'}`,
+              flexShrink: 0,
+              backgroundColor: isDarkMode ? '#1e1e1e' : '#edf4fe',
+            }}
+          >
+            <img
+              src={currentGym.logo}
+              alt={currentGym?.name || 'Gym Logo'}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </div>
+        ) : (
+          <GymStoreLogo isDarkMode={isDarkMode} />
+        )}
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div className="app-bar-label" style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#627289', lineHeight: 1.15 }}>
             Gym Name

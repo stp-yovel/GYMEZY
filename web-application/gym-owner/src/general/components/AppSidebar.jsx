@@ -12,6 +12,7 @@ import {
   SettingOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../../theme/ThemeContext';
 import gymezyLogo from '../../assets/logo/gymezy.png';
@@ -33,9 +34,15 @@ export const DEFAULT_NAV_ITEMS = [
     roles: ['owner', 'admin', 'staff', 'frontdesk'],
   },
   {
+    key: '/owner/sections',
+    icon: <AppstoreOutlined />,
+    label: 'Sections & Batches',
+    roles: ['owner', 'admin'],
+  },
+  {
     key: '/owner/members',
     icon: <TeamOutlined />,
-    label: 'Members CRM',
+    label: 'Membership',
     roles: ['owner', 'admin', 'staff'],
   },
   {
@@ -45,27 +52,15 @@ export const DEFAULT_NAV_ITEMS = [
     roles: ['owner', 'admin', 'trainer', 'staff'],
   },
   {
-    key: '/owner/plans',
-    icon: <DollarOutlined />,
-    label: 'Membership Plans',
-    roles: ['owner', 'admin'],
-  },
-  {
-    key: '/owner/trainers',
+    key: '/owner/employees',
     icon: <UserSwitchOutlined />,
-    label: 'Trainers Roster',
-    roles: ['owner', 'admin'],
-  },
-  {
-    key: '/owner/analytics',
-    icon: <LineChartOutlined />,
-    label: 'Analytics & Reports',
+    label: 'Employees',
     roles: ['owner', 'admin'],
   },
   {
     key: '/owner/settings',
     icon: <SettingOutlined />,
-    label: 'Gym Profile Settings',
+    label: 'Gym Profile',
     roles: ['owner', 'admin'],
   },
 ];

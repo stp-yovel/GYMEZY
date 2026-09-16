@@ -1,0 +1,304 @@
+/* ==========================================================================
+   GYM PARTNER SHOWCASE SECTION COMPONENT
+   ========================================================================== */
+
+.progress-analytics-section {
+  padding: 100px 0;
+  background: var(--color-light-card, #ffffff);
+}
+
+.analytics-split-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: stretch;
+}
+
+/* Left Athlete Visual Container */
+.analytics-visual-col {
+  width: 100%;
+}
+
+.analytics-athlete-card {
+  position: relative;
+  width: 100%;
+  height: 520px;
+  border-radius: 32px;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
+}
+
+.analytics-athlete-bg-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 25%;
+}
+
+/* Top-Left Floating Brand Pill Card */
+.telemetry-brand-pill-card {
+  position: absolute;
+  top: 40px;
+  left: 24px;
+  background: var(--brand-color, #00BF62);
+  color: #080C14;
+  border-radius: 20px;
+  padding: 18px 22px;
+  width: auto;
+  min-width: 210px;
+  box-shadow: 0 12px 30px rgba(0, 191, 98, 0.35);
+  z-index: 5;
+}
+
+.telemetry-card-tag {
+  display: block;
+  font-family: var(--font-main, 'Inter', sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.95;
+  margin-bottom: 8px;
+  white-space: nowrap;
+}
+
+.telemetry-big-stat-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 12px;
+}
+
+.telemetry-big-number {
+  font-family: var(--font-title, 'Outfit', sans-serif);
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -1.5px;
+  color: #080C14;
+}
+
+.percent-mark {
+  font-size: 24px;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+.telemetry-sub-metric {
+  font-family: var(--font-main, 'Inter', sans-serif);
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  opacity: 0.95;
+  padding-bottom: 4px;
+  color: #080C14;
+}
+
+/* Bottom-Left White Routine Card */
+.telemetry-routine-card {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 18px 20px;
+  width: 290px;
+  max-width: calc(100% - 48px);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.16);
+  z-index: 5;
+}
+
+.routine-card-title {
+  font-family: var(--font-title, 'Outfit', sans-serif);
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 12px;
+}
+
+.routine-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.routine-chip {
+  padding: 5px 11px;
+  border-radius: 20px;
+  font-family: var(--font-main, 'Inter', sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  background: transparent;
+  white-space: nowrap;
+}
+
+.routine-chip.chip-active {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+.routine-progress-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.routine-progress-label {
+  font-family: var(--font-main, 'Inter', sans-serif);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.routine-progress-track {
+  width: 100%;
+  height: 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 2px;
+  overflow: hidden;
+}
+
+.routine-progress-fill {
+  height: 100%;
+  background: #000000;
+  border-radius: 16px;
+}
+
+/* Right Feature Card */
+.analytics-brand-feature-card {
+  background: var(--brand-color, #00BF62);
+  border-radius: 32px;
+  height: 520px;
+  padding: 48px 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  text-align: center;
+  color: #ffffff;
+  box-shadow: 0 18px 45px rgba(0, 191, 98, 0.3);
+}
+
+.feature-card-top-bar {
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+}
+
+.feature-card-main-content {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.feature-brand-headline {
+  font-family: var(--font-title, 'Outfit', sans-serif);
+  font-size: clamp(2rem, 3.2vw, 3rem);
+  font-weight: 800;
+  line-height: 1.15;
+  color: #ffffff;
+  letter-spacing: -0.8px;
+  margin: 0 auto;
+}
+
+.feature-card-divider-group {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 26px 0;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.divider-triangle-mark {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid rgba(255, 255, 255, 0.85);
+}
+
+.feature-brand-description {
+  font-family: var(--font-main, 'Inter', sans-serif);
+  font-size: 15px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0 auto;
+}
+
+.feature-card-discover-btn {
+  display: inline-block;
+  padding: 15px 38px;
+  background: #ffffff;
+  color: #0b0f19;
+  font-family: var(--font-main, 'Inter', sans-serif);
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  border-radius: 50px;
+  text-decoration: none;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+  transition: all 0.25s ease;
+}
+
+.feature-card-discover-btn:hover {
+  background: #0b0f19;
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+}
+
+@media (max-width: 1024px) {
+  .analytics-split-layout {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+  .analytics-athlete-card,
+  .analytics-brand-feature-card {
+    height: 480px;
+  }
+}
+
+@media (max-width: 768px) {
+  .progress-analytics-section {
+    padding: 70px 0;
+  }
+  .analytics-athlete-card {
+    height: 440px;
+  }
+  .analytics-brand-feature-card {
+    height: auto;
+    min-height: 420px;
+    padding: 36px 24px;
+  }
+  .telemetry-brand-pill-card {
+    top: 24px;
+    left: 16px;
+    min-width: 180px;
+    padding: 14px 18px;
+  }
+  .telemetry-big-number {
+    font-size: 38px;
+  }
+  .telemetry-routine-card {
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+    max-width: 290px;
+    padding: 14px 16px;
+  }
+}

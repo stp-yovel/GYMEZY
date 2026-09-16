@@ -529,11 +529,42 @@ html.dark .ant-input-affix-wrapper-focused {
   height: 100% !important;
 }
 
-/* Button Typography */
+/* Button Typography & Global High Contrast */
 .ant-btn {
   font-family: var(--font-primary);
   font-weight: var(--font-semibold);
   letter-spacing: var(--tracking-tight);
+}
+
+.ant-btn-primary {
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: #ffffff !important;
+}
+
+.ant-btn-primary:hover,
+.ant-btn-primary:focus {
+  background-color: var(--color-primary-hover) !important;
+  border-color: var(--color-primary-hover) !important;
+  color: #ffffff !important;
+}
+
+.ant-btn-primary:active {
+  background-color: var(--color-primary-active) !important;
+  border-color: var(--color-primary-active) !important;
+  color: #ffffff !important;
+}
+
+html.dark .ant-btn-default {
+  background-color: #141414;
+  border-color: #2e2e2e;
+  color: #ffffff;
+}
+
+html.dark .ant-btn-default:hover {
+  background-color: #1e1e1e;
+  border-color: #444444;
+  color: #ffffff;
 }
 
 /* ==========================================================================
@@ -652,4 +683,60 @@ html.dark .ant-input-affix-wrapper-focused {
 .rounded-8,
 .radius-8 {
   border-radius: var(--radius-base) !important;
+}
+
+/* ==========================================================================
+   ANT DESIGN TABLE OPAQUE STICKY / FIXED CELL DARK & LIGHT MODE FIXES
+   ========================================================================== */
+.ant-table-wrapper .ant-table-tbody > tr > td {
+  background-color: var(--bg-surface);
+}
+
+html.dark .ant-table-wrapper .ant-table-tbody > tr > td {
+  background-color: #0d1117 !important;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-right,
+.ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-right-first,
+.ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-right-last {
+  background-color: #fafafa !important;
+  z-index: 3 !important;
+}
+
+.ant-table-wrapper .ant-table-cell-fix-right,
+.ant-table-wrapper .ant-table-cell-fix-right-first,
+.ant-table-wrapper .ant-table-cell-fix-right-last,
+.ant-table-wrapper .ant-table-cell-fix-left,
+.ant-table-wrapper .ant-table-cell-fix-left-first,
+.ant-table-wrapper .ant-table-cell-fix-left-last {
+  background-color: #ffffff !important;
+  z-index: 2 !important;
+}
+
+html.dark .ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-right,
+html.dark .ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-right-first,
+html.dark .ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-right-last {
+  background-color: #161b22 !important;
+  z-index: 3 !important;
+}
+
+html.dark .ant-table-wrapper .ant-table-cell-fix-right,
+html.dark .ant-table-wrapper .ant-table-cell-fix-right-first,
+html.dark .ant-table-wrapper .ant-table-cell-fix-right-last,
+html.dark .ant-table-wrapper .ant-table-cell-fix-left,
+html.dark .ant-table-wrapper .ant-table-cell-fix-left-first,
+html.dark .ant-table-wrapper .ant-table-cell-fix-left-last {
+  background-color: #0d1117 !important;
+  z-index: 2 !important;
+}
+
+html.dark .ant-table-wrapper .ant-table-tbody > tr:hover > td,
+html.dark .ant-table-wrapper .ant-table-tbody > tr:hover > td.ant-table-cell-fix-right,
+html.dark .ant-table-wrapper .ant-table-tbody > tr:hover > td.ant-table-cell-fix-right-first {
+  background-color: #161b22 !important;
+}
+
+.ant-table-wrapper .ant-table-container {
+  overflow: hidden;
+  border-radius: var(--radius-base);
 }

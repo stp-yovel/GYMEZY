@@ -61,6 +61,8 @@ export const Login = () => {
       {/* Floating Day/Night Theme Switch */}
       <div
         onClick={toggleTheme}
+        role="button"
+        tabIndex={0}
         style={{
           position: 'fixed',
           top: 24,
@@ -83,12 +85,12 @@ export const Login = () => {
         <Switch
           size="small"
           checked={isDarkMode}
-          onChange={toggleTheme}
           checkedChildren={<MoonOutlined style={{ color: '#ffd700', fontSize: 10 }} />}
           unCheckedChildren={<SunOutlined style={{ color: '#fa8c16', fontSize: 10 }} />}
           style={{
             margin: 0,
             backgroundColor: isDarkMode ? '#1677ff' : '#cbd5e1',
+            pointerEvents: 'none',
           }}
         />
         <span

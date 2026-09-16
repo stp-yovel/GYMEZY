@@ -95,3 +95,58 @@ button {
   font-family: var(--font-heading);
   border-radius: var(--radius-button);
 }
+
+/* Universal Button Shadow Removal */
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.btn,
+.nav-cta-btn,
+.fitnova-primary-btn,
+.customer-download-btn,
+.customer-btn-download,
+.customer-btn-demo,
+.hero-cta-btn-primary,
+.hero-cta-btn-secondary,
+.owner-btn-primary,
+.owner-btn-secondary,
+.plan-cta-btn,
+.store-download-pill-btn,
+.pill-view-now-btn,
+.carousel-arrow-btn,
+.gym-book-btn,
+.promo-book-btn,
+.partner-primary-btn,
+.partner-outline-btn,
+.move-healthy-cta-btn,
+.fitnova-watch-video-pill {
+  box-shadow: none !important;
+}
+
+button:hover,
+input[type="button"]:hover,
+input[type="submit"]:hover,
+input[type="reset"]:hover,
+.btn:hover,
+.nav-cta-btn:hover,
+.fitnova-primary-btn:hover,
+.customer-download-btn:hover,
+.customer-btn-download:hover,
+.customer-btn-demo:hover,
+.hero-cta-btn-primary:hover,
+.hero-cta-btn-secondary:hover,
+.owner-btn-primary:hover,
+.owner-btn-secondary:hover,
+.plan-cta-btn:hover,
+.store-download-pill-btn:hover,
+.pill-view-now-btn:hover,
+.carousel-arrow-btn:hover,
+.gym-book-btn:hover,
+.promo-book-btn:hover,
+.partner-primary-btn:hover,
+.partner-outline-btn:hover,
+.move-healthy-cta-btn:hover,
+.fitnova-watch-video-pill:hover {
+  box-shadow: none !important;
+}

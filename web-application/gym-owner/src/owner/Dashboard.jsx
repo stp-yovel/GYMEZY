@@ -39,6 +39,7 @@ import {
   PlusOutlined,
   CalendarOutlined,
   DownOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../theme/ThemeContext';
 import { recordCheckIn, recordCheckOut } from '../redux/slices/gymSlice';
@@ -642,21 +643,21 @@ export const Dashboard = () => {
                   render: (status) => {
                     if (status === 'Checked In') {
                       return (
-                        <span style={{ color: 'var(--color-success)', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          ✓ Checked In
+                        <span style={{ color: 'var(--color-success)', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <CheckCircleFilled style={{ fontSize: 12 }} /> Checked In
                         </span>
                       );
                     }
                     if (status === 'Upcoming') {
                       return (
-                        <span style={{ color: 'var(--color-warning)', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          ⏱ Upcoming
+                        <span style={{ color: 'var(--color-warning)', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <ClockCircleOutlined style={{ fontSize: 12 }} /> Upcoming
                         </span>
                       );
                     }
                     return (
-                      <span style={{ color: 'var(--color-info)', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        ✓ Completed
+                      <span style={{ color: 'var(--color-info)', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <CheckCircleFilled style={{ fontSize: 12 }} /> Completed
                       </span>
                     );
                   },
@@ -848,7 +849,7 @@ export const Dashboard = () => {
                       <Button
                         size="small"
                         type={isExpiring ? 'primary' : 'default'}
-                        onClick={() => navigate('/owner/plans')}
+                        onClick={() => navigate('/owner/members')}
                         style={{
                           borderRadius: 'var(--radius-base)',
                           fontSize: 11,
@@ -945,7 +946,7 @@ export const Dashboard = () => {
           <Col xs={24} sm={12} lg={6}>
             <Card
               hoverable
-              onClick={() => navigate('/owner/trainers')}
+              onClick={() => navigate('/owner/employees')}
               style={{
                 backgroundColor: 'var(--bg-surface-elevated)',
                 borderColor: 'var(--border-color)',
@@ -991,7 +992,7 @@ export const Dashboard = () => {
           <Col xs={24} sm={12} lg={6}>
             <Card
               hoverable
-              onClick={() => navigate('/owner/trainers')}
+              onClick={() => navigate('/owner/employees')}
               style={{
                 backgroundColor: 'var(--bg-surface-elevated)',
                 borderColor: 'var(--border-color)',
@@ -1033,11 +1034,11 @@ export const Dashboard = () => {
             </Card>
           </Col>
 
-          {/* Action 4: Reports */}
+          {/* Action 4: Gym Profile */}
           <Col xs={24} sm={12} lg={6}>
             <Card
               hoverable
-              onClick={() => navigate('/owner/analytics')}
+              onClick={() => navigate('/owner/settings')}
               style={{
                 backgroundColor: 'var(--bg-surface-elevated)',
                 borderColor: 'var(--border-color)',
@@ -1063,14 +1064,14 @@ export const Dashboard = () => {
                       flexShrink: 0,
                     }}
                   >
-                    <LineChartOutlined />
+                    <SettingOutlined />
                   </div>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                      Reports
+                      Gym Profile
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
-                      View and download business reports
+                      Configure gym details and settings
                     </div>
                   </div>
                 </div>

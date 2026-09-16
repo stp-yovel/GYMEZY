@@ -1,0 +1,720 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ==========================================================================
+   DESIGN TOKENS & TYPOGRAPHY STANDARDS
+   ========================================================================== */
+:root {
+  /* Font Family Stacks */
+  --font-primary: 'Plus Jakarta Sans', 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Font Sizes */
+  --text-xs: 0.75rem;
+  /* 12px */
+  --text-sm: 0.875rem;
+  /* 14px */
+  --text-base: 1rem;
+  /* 16px */
+  --text-lg: 1.125rem;
+  /* 18px */
+  --text-xl: 1.25rem;
+  /* 20px */
+  --text-2xl: 1.5rem;
+  /* 24px */
+  --text-3xl: 1.875rem;
+  /* 30px */
+  --text-4xl: 2.25rem;
+  /* 36px */
+  --text-5xl: 3rem;
+  /* 48px */
+
+  /* Font Weights Central Tokens (Easily customizable here) */
+  --font-light: 300;
+  --font-regular: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 650;
+  --font-extrabold: 700;
+
+  /* Component Specific Semantic Weight Controls */
+  --font-weight-appbar-title: var(--font-semibold);
+  --font-weight-appbar-label: var(--font-medium);
+  --font-weight-appbar-subtext: var(--font-regular);
+  --font-weight-appbar-status: var(--font-semibold);
+  --font-weight-heading-h1: var(--font-bold);
+  --font-weight-heading-h2: var(--font-semibold);
+  --font-weight-heading-h3: var(--font-semibold);
+  --font-weight-card-title: var(--font-semibold);
+  --font-weight-btn: var(--font-medium);
+  --font-weight-table-header: var(--font-semibold);
+  --font-weight-stat-val: var(--font-bold);
+
+  /* ==========================================================================
+     COLOR TOKENS (LIGHT THEME DEFAULTS)
+     ========================================================================== */
+  /* Brand Primary */
+  --color-primary: #003882;
+  --color-primary-hover: #002b66;
+  --color-primary-active: #001f4d;
+  --color-primary-bg: #edf4fe;
+  --color-primary-border: #d6e4ff;
+
+  /* Functional Status Colors */
+  --color-success: #00bf62;
+  --color-success-bg: #eaf8ef;
+  --color-success-border: rgba(0, 191, 98, 0.25);
+
+  --color-info: #1677ff;
+  --color-info-bg: #edf4fe;
+  --color-info-border: rgba(22, 119, 255, 0.25);
+
+  --color-warning: #fa8c16;
+  --color-warning-bg: #fef4e8;
+  --color-warning-border: rgba(250, 140, 22, 0.25);
+
+  --color-danger: #e11d48;
+  --color-danger-bg: #fdeeed;
+  --color-danger-border: rgba(225, 29, 72, 0.25);
+
+  --color-purple: #722ed1;
+  --color-purple-bg: #f3effe;
+  --color-purple-border: rgba(114, 46, 209, 0.25);
+
+  /* Neutrals & Surfaces (Light) */
+  --bg-body: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-surface-subtle: #f1f5f9;
+  --border-color: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+
+  /* Border Radius System (Standardized 8px globally) */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-base: 8px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
+  --radius-full: 9999px;
+
+  /* Line Heights */
+  --leading-none: 1;
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* Letter Spacing */
+  --tracking-tighter: -0.04em;
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.05em;
+  --tracking-widest: 0.1em;
+
+  /* Base Setup */
+  font-family: var(--font-primary);
+  font-size: 16px;
+  line-height: var(--leading-normal);
+  color-scheme: light dark;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Global Reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  width: 100%;
+  font-family: var(--font-primary);
+  font-weight: var(--font-regular);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  background-color: var(--bg-body);
+  color: var(--text-primary);
+}
+
+/* ==========================================================================
+   DAY & NIGHT (PURE FULL-BLACK) THEME BACKGROUNDS & COLOR OVERRIDES
+   ========================================================================== */
+html.dark {
+  /* Brand Primary in Dark */
+  --color-primary: #1677ff;
+  --color-primary-hover: #4096ff;
+  --color-primary-active: #0958d9;
+  --color-primary-bg: rgba(0, 56, 130, 0.25);
+  --color-primary-border: rgba(0, 56, 130, 0.5);
+
+  /* Functional Status Colors in Dark */
+  --color-success: #00bf62;
+  --color-success-bg: rgba(0, 191, 98, 0.15);
+  --color-success-border: rgba(0, 191, 98, 0.3);
+
+  --color-info: #1677ff;
+  --color-info-bg: rgba(22, 119, 255, 0.15);
+  --color-info-border: rgba(22, 119, 255, 0.3);
+
+  --color-warning: #fa8c16;
+  --color-warning-bg: rgba(250, 140, 22, 0.15);
+  --color-warning-border: rgba(250, 140, 22, 0.3);
+
+  --color-danger: #f43f5e;
+  --color-danger-bg: rgba(244, 63, 94, 0.15);
+  --color-danger-border: rgba(244, 63, 94, 0.3);
+
+  --color-purple: #9254de;
+  --color-purple-bg: rgba(114, 46, 209, 0.15);
+  --color-purple-border: rgba(114, 46, 209, 0.3);
+
+  /* Neutrals & Surfaces (Pure Full Black in Dark) */
+  --bg-body: #000000;
+  --bg-surface: #0a0a0a;
+  --bg-surface-elevated: #0d0d0d;
+  --bg-surface-subtle: #141414;
+  --border-color: #1e1e1e;
+  --border-subtle: #1f1f1f;
+  --text-primary: #ffffff;
+  --text-secondary: #888888;
+  --text-muted: #666666;
+}
+
+html.dark,
+html.dark body {
+  background-color: var(--bg-body) !important;
+  color: var(--text-primary);
+}
+
+/* ==========================================================================
+   HEADINGS & TYPOGRAPHY HIERARCHY (CONTROLLED VIA INDEX.CSS)
+   ========================================================================== */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.ant-typography h1,
+.ant-typography h2,
+.ant-typography h3,
+.ant-typography-title {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-heading-h2);
+  letter-spacing: var(--tracking-tight);
+  color: inherit;
+  margin-bottom: 0.5em;
+}
+
+h1,
+.text-h1,
+h1.ant-typography {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-weight-heading-h1) !important;
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+}
+
+h2,
+.text-h2,
+h2.ant-typography {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-heading-h2) !important;
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+}
+
+h3,
+.text-h3,
+h3.ant-typography {
+  font-size: var(--text-xl);
+  font-weight: var(--font-weight-heading-h3) !important;
+  line-height: var(--leading-snug);
+}
+
+h4,
+.text-h4,
+h4.ant-typography {
+  font-size: var(--text-lg);
+  font-weight: var(--font-medium) !important;
+  line-height: var(--leading-snug);
+}
+
+p,
+span,
+label,
+input,
+button {
+  font-family: var(--font-primary);
+}
+
+/* ==========================================================================
+   STANDALONE TYPOGRAPHY UTILITY CLASSES
+   ========================================================================== */
+.font-display {
+  font-family: var(--font-display) !important;
+}
+
+.font-primary {
+  font-family: var(--font-primary) !important;
+}
+
+.font-mono {
+  font-family: var(--font-mono) !important;
+}
+
+.text-xs {
+  font-size: var(--text-xs) !important;
+}
+
+.text-sm {
+  font-size: var(--text-sm) !important;
+}
+
+.text-base {
+  font-size: var(--text-base) !important;
+}
+
+.text-lg {
+  font-size: var(--text-lg) !important;
+}
+
+.text-xl {
+  font-size: var(--text-xl) !important;
+}
+
+.text-2xl {
+  font-size: var(--text-2xl) !important;
+}
+
+.text-3xl {
+  font-size: var(--text-3xl) !important;
+}
+
+.font-light {
+  font-weight: var(--font-light) !important;
+}
+
+.font-regular {
+  font-weight: var(--font-regular) !important;
+}
+
+.font-medium {
+  font-weight: var(--font-medium) !important;
+}
+
+.font-semibold {
+  font-weight: var(--font-semibold) !important;
+}
+
+.font-bold {
+  font-weight: var(--font-bold) !important;
+}
+
+.font-extrabold {
+  font-weight: var(--font-extrabold) !important;
+}
+
+/* App Bar & Sidebar Central Typography Classes */
+.app-bar-gym-name {
+  font-weight: var(--font-weight-appbar-title) !important;
+}
+
+.app-bar-label {
+  font-weight: var(--font-weight-appbar-label) !important;
+}
+
+.app-bar-subtext {
+  font-weight: var(--font-weight-appbar-subtext) !important;
+}
+
+.app-bar-status {
+  font-weight: var(--font-weight-appbar-status) !important;
+}
+
+.app-sidebar-brand-title {
+  font-weight: var(--font-semibold) !important;
+}
+
+.font-light {
+  font-weight: var(--font-light) !important;
+}
+
+.font-regular {
+  font-weight: var(--font-regular) !important;
+}
+
+.font-medium {
+  font-weight: var(--font-medium) !important;
+}
+
+.font-semibold {
+  font-weight: var(--font-semibold) !important;
+}
+
+.font-bold {
+  font-weight: var(--font-bold) !important;
+}
+
+.font-extrabold {
+  font-weight: var(--font-extrabold) !important;
+}
+
+.font-extrabold {
+  font-weight: var(--font-extrabold) !important;
+}
+
+.tracking-tighter {
+  letter-spacing: var(--tracking-tighter) !important;
+}
+
+.tracking-tight {
+  letter-spacing: var(--tracking-tight) !important;
+}
+
+.tracking-normal {
+  letter-spacing: var(--tracking-normal) !important;
+}
+
+.tracking-wide {
+  letter-spacing: var(--tracking-wide) !important;
+}
+
+.tracking-wider {
+  letter-spacing: var(--tracking-wider) !important;
+}
+
+.tracking-widest {
+  letter-spacing: var(--tracking-widest) !important;
+}
+
+/* ==========================================================================
+   RESPONSIVE HELPERS
+   ========================================================================== */
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .show-mobile {
+    display: none !important;
+  }
+}
+
+/* ==========================================================================
+   CUSTOM SLEEK SCROLLBAR
+   ========================================================================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.35);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.65);
+}
+
+/* ==========================================================================
+   ANT DESIGN ELEVATIONS & FULL-BLACK ADJUSTMENTS
+   ========================================================================== */
+.ant-layout-header {
+  line-height: normal !important;
+}
+
+html.dark .ant-layout,
+html.dark .ant-layout-header,
+html.dark .ant-layout-sider {
+  background-color: #000000 !important;
+}
+
+.ant-table-thead>tr>th,
+html.dark .ant-table-thead>tr>th {
+  white-space: nowrap !important;
+  font-weight: var(--font-semibold);
+}
+
+.ant-table-cell,
+html.dark .ant-table-cell {
+  white-space: nowrap !important;
+}
+
+html.dark .ant-table {
+  background-color: transparent !important;
+  font-size: var(--text-sm);
+}
+
+html.dark .ant-table-cell {
+  background-color: transparent !important;
+  border-bottom: 1px solid #1a1a1a !important;
+}
+
+html.dark .ant-table-thead>tr>th {
+  background-color: #0d0d0d !important;
+  border-bottom: 1px solid #222222 !important;
+  color: #94a3b8 !important;
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+html.dark .ant-card {
+  background-color: #0d0d0d !important;
+  border-color: #222222 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+html.dark .ant-card-head {
+  border-bottom: 1px solid #1c1c1c !important;
+}
+
+html.dark .ant-modal-content {
+  background-color: #0e0e0e !important;
+  border: 1px solid #262626 !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+}
+
+html.dark .ant-modal-header {
+  background-color: transparent !important;
+}
+
+html.dark .ant-modal-title {
+  color: #ffffff !important;
+  font-family: var(--font-display);
+  font-weight: var(--font-bold);
+}
+
+html.dark .ant-input,
+html.dark .ant-input-affix-wrapper,
+html.dark .ant-select-selector {
+  background-color: #0d0d0d !important;
+  border-color: #222222 !important;
+  color: #ffffff !important;
+  font-size: var(--text-sm);
+}
+
+html.dark .ant-input:focus,
+html.dark .ant-input-affix-wrapper:focus,
+html.dark .ant-input-affix-wrapper-focused {
+  border-color: #1677ff !important;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.2) !important;
+}
+
+/* Layout Overrides */
+.ant-layout-sider-children {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+/* Button Typography & Global High Contrast */
+.ant-btn {
+  font-family: var(--font-primary);
+  font-weight: var(--font-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.ant-btn-primary {
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: #ffffff !important;
+}
+
+.ant-btn-primary:hover,
+.ant-btn-primary:focus {
+  background-color: var(--color-primary-hover) !important;
+  border-color: var(--color-primary-hover) !important;
+  color: #ffffff !important;
+}
+
+.ant-btn-primary:active {
+  background-color: var(--color-primary-active) !important;
+  border-color: var(--color-primary-active) !important;
+  color: #ffffff !important;
+}
+
+html.dark .ant-btn-default {
+  background-color: #141414;
+  border-color: #2e2e2e;
+  color: #ffffff;
+}
+
+html.dark .ant-btn-default:hover {
+  background-color: #1e1e1e;
+  border-color: #444444;
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   CENTRAL COLOR UTILITY CLASSES
+   ========================================================================== */
+.text-main {
+  color: var(--text-primary) !important;
+}
+
+.text-muted {
+  color: var(--text-secondary) !important;
+}
+
+.text-subtle {
+  color: var(--text-muted) !important;
+}
+
+.text-brand {
+  color: var(--color-primary) !important;
+}
+
+.text-success {
+  color: var(--color-success) !important;
+}
+
+.text-info {
+  color: var(--color-info) !important;
+}
+
+.text-warning {
+  color: var(--color-warning) !important;
+}
+
+.text-danger {
+  color: var(--color-danger) !important;
+}
+
+.text-purple {
+  color: var(--color-purple) !important;
+}
+
+.bg-body {
+  background-color: var(--bg-body) !important;
+}
+
+.bg-surface {
+  background-color: var(--bg-surface) !important;
+}
+
+.bg-surface-elevated {
+  background-color: var(--bg-surface-elevated) !important;
+}
+
+.bg-success-soft {
+  background-color: var(--color-success-bg) !important;
+}
+
+.bg-info-soft {
+  background-color: var(--color-info-bg) !important;
+}
+
+.bg-warning-soft {
+  background-color: var(--color-warning-bg) !important;
+}
+
+.bg-danger-soft {
+  background-color: var(--color-danger-bg) !important;
+}
+
+.bg-purple-soft {
+  background-color: var(--color-purple-bg) !important;
+}
+
+.border-main {
+  border-color: var(--border-color) !important;
+}
+
+.border-subtle {
+  border-color: var(--border-subtle) !important;
+}
+
+/* ==========================================================================
+   GLOBAL 8px BORDER-RADIUS ENFORCEMENT & UTILITIES
+   ========================================================================== */
+.ant-card,
+.ant-card-bordered,
+.ant-btn,
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-input-number,
+.ant-select-selector,
+.ant-picker,
+.ant-picker-dropdown .ant-picker-panel-container,
+.ant-modal-content,
+.ant-dropdown-menu,
+.ant-table,
+.ant-table-container,
+.ant-segmented,
+.ant-alert,
+.ant-popover-inner,
+.ant-tooltip-inner,
+.ant-drawer-content,
+.ant-notification-notice,
+.ant-message-notice-content,
+.stat-card,
+.quick-action-card,
+.overview-card {
+  border-radius: var(--radius-base) !important;
+}
+
+.ant-tag {
+  border-radius: var(--radius-sm) !important;
+}
+
+.rounded-base,
+.rounded-8,
+.radius-8 {
+  border-radius: var(--radius-base) !important;
+}
+
+/* ==========================================================================
+   ANT DESIGN TABLE STICKY COLUMN FIXES & HORIZONTAL SCROLL
+   ========================================================================== */
+.ant-table-wrapper {
+  width: 100%;
+  max-width: 100%;
+}
+
+.ant-table {
+  background: transparent !important;
+}
+
+.ant-table-cell-fix-right,
+.ant-table-cell-fix-left {
+  background-color: var(--bg-surface-elevated) !important;
+  z-index: 2 !important;
+}
+
+.ant-table-thead > tr > th.ant-table-cell-fix-right,
+.ant-table-thead > tr > th.ant-table-cell-fix-left {
+  background-color: var(--bg-surface-subtle) !important;
+  z-index: 3 !important;
+}
+
+[data-theme='dark'] .ant-table-cell-fix-right,
+[data-theme='dark'] .ant-table-cell-fix-left {
+  background-color: #141414 !important;
+}
+
+[data-theme='dark'] .ant-table-thead > tr > th.ant-table-cell-fix-right,
+[data-theme='dark'] .ant-table-thead > tr > th.ant-table-cell-fix-left {
+  background-color: #1f1f1f !important;
+}
