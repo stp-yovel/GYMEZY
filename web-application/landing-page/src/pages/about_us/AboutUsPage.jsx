@@ -2,59 +2,20 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import gymezyLogo from '../../assets/logo/gymezy.png';
+import heroBgImg from '../../assets/fitnova_hero_bg.jpg';
+import gymModelThumb from '../../assets/gym_model.jpg';
+import trainerImg from '../../assets/trainer.png';
 import './AboutUsPage.css';
 
 export default function AboutUsPage() {
-  const heroStats = [
-    {
-      num: '10,000+',
-      label: 'Happy Members',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-      )
-    },
-    {
-      num: '500+',
-      label: 'Partner Gyms',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-        </svg>
-      )
-    },
-    {
-      num: '25+',
-      label: 'Cities Across India',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-          <circle cx="12" cy="10" r="3" />
-        </svg>
-      )
-    },
-    {
-      num: '100+',
-      label: 'Fitness Experts',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 18h12M6 6h12M9 12h6" />
-          <circle cx="12" cy="12" r="9" />
-        </svg>
-      )
-    }
-  ];
-
   const valuesList = [
     {
-      id: 'trust',
-      title: 'Trust',
-      desc: 'Building reliable and transparent experiences for gyms and athletes.',
+      num: '01',
+      tag: 'UNRESTRICTED ACCESS',
+      title: 'Radical Freedom',
+      sub: 'Zero contracts. Train on your terms.',
+      desc: 'We eliminated the lock-in trap. Access premium gyms, CrossFit boxes, and boutique studios with single passes and total geographic flexibility.',
+      badge: '100% Contract-Free',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -63,63 +24,12 @@ export default function AboutUsPage() {
       )
     },
     {
-      id: 'innovation',
-      title: 'Innovation',
-      desc: 'Constantly improving technology for a smarter, frictionless tomorrow.',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
-          <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
-          <path d="M9 12H4s.55-3.03 2-4.5c1.62-1.63 5-2 5-2" />
-          <path d="M12 15v5s3.03-.55 4.5-2c1.63-1.62 2-5 2-5" />
-        </svg>
-      )
-    },
-    {
-      id: 'community',
-      title: 'Community',
-      desc: 'Stronger together, healthier always — empowering fitness families.',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-      )
-    },
-    {
-      id: 'impact',
-      title: 'Impact',
-      desc: 'Empowering local fitness centers and transforming individual lives.',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-          <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-          <path d="M4 22h16" />
-          <path d="M10 14.66V17c0 .55-.45 1-1 1H7v4h10v-4h-2c-.55 0-1-.45-1-1v-2.34" />
-          <path d="M18 4H6v7a6 6 0 0 0 12 0V4z" />
-        </svg>
-      )
-    }
-  ];
-
-  const whyGymezyList = [
-    {
-      title: 'Smart & Simple',
-      sub: 'All-in-one platform',
-      desc: 'Intuitive mobile discovery, instant digital QR pass booking, and zero friction for everyday workouts.',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <path d="m9 12 2 2 4-4" />
-        </svg>
-      )
-    },
-    {
-      title: 'Stronger Community',
-      sub: 'For Gyms & Members',
-      desc: 'Connecting thousands of dedicated athletes with verified neighborhood gyms, studios, and coaches.',
+      num: '02',
+      tag: 'LOCAL FIRST',
+      title: 'Empowering Gyms',
+      sub: 'Strengthening neighborhood fitness hubs.',
+      desc: 'We support local fitness centers and independent trainers by driving high-value walk-ins, maximizing floor capacity, and ensuring instant payouts.',
+      badge: 'Partner Growth',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -130,20 +40,12 @@ export default function AboutUsPage() {
       )
     },
     {
-      title: 'More Growth',
-      sub: 'Better Visibility',
-      desc: 'Helping gym owners maximize floor capacity, monetize off-peak hours, and welcome high-value walk-ins.',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-          <polyline points="17 6 23 6 23 12" />
-        </svg>
-      )
-    },
-    {
-      title: 'Built for India',
-      sub: 'Made for Everyone',
-      desc: 'Tailored specifically for Indian fitness culture with flexible daily passes and zero lock-in contracts.',
+      num: '03',
+      tag: 'INSTANT TECH',
+      title: 'Frictionless Experience',
+      sub: '1-Tap QR check-in & live floor meters.',
+      desc: 'From discovering nearby gyms with real-time crowd heatmaps to 10-second digital pass bookings, our smart app makes working out effortless.',
+      badge: '0.8s QR Check-in',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
@@ -152,176 +54,222 @@ export default function AboutUsPage() {
       )
     },
     {
-      title: 'Secure & Reliable',
-      sub: 'Your Data, Always',
-      desc: 'Bank-grade encrypted payments, instant OTP validation, and verified partner fitness centers.',
+      num: '04',
+      tag: 'VERIFIED & SAFE',
+      title: 'Uncompromising Trust',
+      sub: 'Certified coaches & verified equipment.',
+      desc: 'Every partner facility is rigorously audited for hygiene, machine quality, and trainer certifications, backed by encrypted secure payments.',
+      badge: '100% Verified Partners',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg>
       )
-    },
-    {
-      title: 'Made for Success',
-      sub: 'Together We Grow',
-      desc: 'Empowering athletes to achieve personal milestones while helping gym owners build sustainable businesses.',
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-          <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-          <path d="M4 22h16" />
-          <path d="M10 14.66V17c0 .55-.45 1-1 1H7v4h10v-4h-2c-.55 0-1-.45-1-1v-2.34" />
-          <path d="M18 4H6v7a6 6 0 0 0 12 0V4z" />
-        </svg>
-      )
     }
   ];
 
-  const ribbonMetrics = [
-    { num: '10,000+', label: 'Happy Members' },
-    { num: '500+', label: 'Partner Gyms' },
-    { num: '100K+', label: 'Bookings Completed' },
-    { num: '25+', label: 'Cities Across India' },
-    { num: '100+', label: 'Fitness Experts' },
-    { num: '4.8 ★', label: 'Average Rating' }
+  const athleteBenefits = [
+    {
+      title: 'Multi-Gym Freedom',
+      desc: 'Single pass unlocks weights, CrossFit, and cardio floors across the city with zero contracts.'
+    },
+    {
+      title: 'Hyperlocal Discovery',
+      desc: 'Find verified gyms nearby with live crowd levels, equipment lists, and AC/shower amenities.'
+    },
+    {
+      title: 'Certified Personal Trainers',
+      desc: 'Book verified 1-on-1 fitness coaches for single sessions or custom training blocks on demand.'
+    },
+    {
+      title: 'Instant QR Walk-ins',
+      desc: 'No front-desk paperwork. Purchase on your phone, scan the QR code at reception, and start lifting.'
+    }
+  ];
+
+  const ownerBenefits = [
+    {
+      title: 'Monetize Off-Peak Hours',
+      desc: 'Attract high-intent fitness seekers during slower morning and afternoon slots effortlessly.'
+    },
+    {
+      title: 'Zero Risk & Fast Payouts',
+      desc: 'Free partner onboarding with transparent automated weekly settlements directly to your bank.'
+    },
+    {
+      title: 'Turnkey Partner Dashboard',
+      desc: 'Real-time attendance logging, digital QR check-in scanning, and member analytics in one clean app.'
+    },
+    {
+      title: 'Hyperlocal Member Reach',
+      desc: 'Top search placement when local fitness enthusiasts look for gym passes and personal trainers nearby.'
+    }
   ];
 
   return (
     <div className="about-page-wrapper">
       {/* Universal Sticky Navbar */}
-      <Navbar ctaText="GET STARTED" ctaLink="/customers" />
+      <Navbar ctaText="EXPLORE PASSES" ctaLink="/customers" />
 
       {/* =================================================================
-          1. HERO SECTION (DARK LUXURY THEME)
+          1. HERO SECTION WITH FULL-BLEED RUNNER BACKGROUND (MATCHING LANDING PAGE)
           ================================================================= */}
-      <section className="about-hero-section">
-        <div className="section-container about-hero-grid">
-          {/* Left Column: Heading & Mission Summary */}
-          <div className="about-hero-left">
-            <span className="about-hero-tag">About GYMEZY</span>
+      <section className="about-hero-fullscreen" id="home">
+        {/* Full-bleed Background Image */}
+        <div className="about-hero-bg-layer">
+          <img
+            src="https://images.unsplash.com/photo-1540497077202-7c8a3999166f?auto=format&fit=crop&w=2000&q=80"
+            alt="Premium GYMEZY partner fitness club"
+            className="about-hero-bg-image"
+          />
+          <div className="about-hero-gradient-overlay" />
+        </div>
 
+        {/* Hero Content Area */}
+        <div className="about-hero-body">
+          {/* Bottom Left Main Headline & Subtitle */}
+          <div className="about-hero-bottom-left">
             <h1 className="about-hero-title">
-              Connecting People.
+              Connecting <span className="about-serif-italic">people,</span>
               <br />
-              <span className="about-title-accent">Empowering Fitness.</span>
+              <span className="about-serif-italic">empowering</span>
+              <br />
+              fitness
             </h1>
 
-            <p className="about-hero-desc">
+            <p className="about-hero-subtext">
               GYMEZY is India’s smart fitness platform that connects gyms, trainers, and fitness lovers in one seamless ecosystem. We simplify fitness so gyms grow and people stay on track with 100% freedom.
             </p>
 
-            {/* Quick Hero Stats Bar */}
-            <div className="about-hero-stats-row">
-              {heroStats.map((st, idx) => (
-                <div key={idx} className="hero-stat-badge">
-                  <div className="hero-stat-icon-wrap">
-                    {st.icon}
-                  </div>
-                  <div className="hero-stat-text-wrap">
-                    <span className="hero-stat-num">{st.num}</span>
-                    <span className="hero-stat-label">{st.label}</span>
-                  </div>
-                </div>
-              ))}
+            <div className="about-hero-cta-row">
+              <Link to="/customers" className="about-primary-btn lg-btn">
+                GET STARTED
+              </Link>
             </div>
           </div>
+        </div>
 
-          {/* Right Column: Premium Fitness Visual */}
-          <div className="about-hero-right">
-            <div className="about-hero-visual-card">
+        {/* Floating Watch Video Corner Pill */}
+        <div className="about-hero-watch-corner">
+          <a href="#story" className="about-watch-video-pill" aria-label="Watch Story">
+            <span className="about-watch-video-label">Watch Video</span>
+            <span className="about-watch-video-thumb">
               <img
-                src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1000&q=80"
-                alt="GYMEZY Fitness Coaches and Athletes"
-                className="about-hero-img"
+                src={gymModelThumb}
+                alt="Video thumbnail"
+                className="about-watch-video-avatar"
               />
-              <div className="about-hero-card-overlay">
-                <div className="hero-card-brand-badge">
-                  <span className="badge-dot" />
-                  <span>India's Smart Fitness Ecosystem</span>
-                </div>
-                <p className="hero-card-quote">"Flexibility is the future of fitness."</p>
-              </div>
-            </div>
-          </div>
+              <span className="about-watch-play-overlay">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="about-watch-play-icon">
+                  <polygon points="6 3 20 12 6 21 6 3" />
+                </svg>
+              </span>
+            </span>
+          </a>
         </div>
       </section>
 
       {/* =================================================================
-          2. OUR STORY & OUR MISSION / VISION (LIGHT THEME)
+          2. OUR STORY SECTION (DYNAMIC ANGLED SPLIT DESIGN)
           ================================================================= */}
-      <section className="about-story-mission-section" id="story">
+      <section className="about-story-split-section" id="story">
         <div className="section-container">
-          <div className="story-mission-grid">
-            {/* Left Card: Our Story */}
-            <div className="story-card">
-              <div className="card-top-icon-pill">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="story-svg-icon">
-                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-                </svg>
-                <h3 className="story-card-heading">Our Story</h3>
+          <div className="story-split-layout">
+            {/* Left Column: Angled Parallelogram Visuals with Checkerboard Pattern */}
+            <div className="story-visuals-col">
+              <div className="story-angled-cards-wrapper">
+                {/* Photo 1 */}
+                <div className="story-angled-card card-one">
+                  <img
+                    src="https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=800&q=80"
+                    alt="Athlete training with dumbbells"
+                    className="story-angled-img"
+                  />
+                </div>
+
+                {/* Accent Ribbon Tab behind Photo 2 */}
+                <div className="story-accent-tab" />
+
+                {/* Photo 2 */}
+                <div className="story-angled-card card-two">
+                  <img
+                    src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80"
+                    alt="Fitness trainer guiding seated athlete"
+                    className="story-angled-img"
+                  />
+                </div>
               </div>
 
-              <div className="story-card-body">
-                <p>
-                  GYMEZY was born from a simple idea – to make fitness accessible, organized, and rewarding for everyone across India.
-                </p>
-                <p>
-                  We saw a persistent gap between quality fitness centers and workout enthusiasts trapped in rigid annual contracts. So we built GYMEZY – a platform that brings gyms, certified trainers, and athletes together in the most seamless way possible.
-                </p>
-              </div>
-
-              <div className="story-card-footer">
-                <div className="story-skyline-graphic" />
-                <div className="story-signature-quote">
-                  <span>Stronger Gyms.</span>
-                  <span className="quote-accent"> Stronger India.</span>
+              {/* Checkerboard Decorative Pattern */}
+              <div className="story-checkerboard-graphic">
+                <div className="checker-row">
+                  <span className="c-box b-dark" />
+                  <span className="c-box b-light" />
+                  <span className="c-box b-dark" />
+                  <span className="c-box b-light" />
+                  <span className="c-box b-dark" />
+                  <span className="c-box b-light" />
+                </div>
+                <div className="checker-row">
+                  <span className="c-box b-light" />
+                  <span className="c-box b-dark" />
+                  <span className="c-box b-light" />
+                  <span className="c-box b-dark" />
+                  <span className="c-box b-light" />
+                  <span className="c-box b-dark" />
+                </div>
+                <div className="checker-row">
+                  <span className="c-box b-dark" />
+                  <span className="c-box b-light" />
+                  <span className="c-box b-dark" />
+                  <span className="c-box b-light" />
+                  <span className="c-box b-dark" />
+                  <span className="c-box b-light" />
                 </div>
               </div>
             </div>
 
-            {/* Right Card: Our Mission & Vision */}
-            <div className="mission-vision-card">
-              <div className="card-top-icon-pill">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mission-svg-icon">
-                  <circle cx="12" cy="12" r="10" />
-                  <circle cx="12" cy="12" r="6" />
-                  <circle cx="12" cy="12" r="2" />
-                </svg>
-                <h3 className="story-card-heading">Our Mission &amp; Vision</h3>
+            {/* Right Column: Heading, Desc, Mission Quote Card & CTA */}
+            <div className="story-content-col">
+
+              <h2 className="story-headline">
+                Born to Connect
+                <br />
+                <span className="title-serif-italic">Every Gym Around You</span>
+              </h2>
+
+              <p className="story-paragraph">
+                GYMEZY started with a simple vision: fitness shouldn't be trapped behind rigid contracts or locked into just one facility. We set out to unite every neighborhood gym, elite fitness center, and certified personal trainer into one intuitive app—giving you the ultimate freedom to train anywhere, anytime.
+              </p>
+
+              {/* Mission Quote Card */}
+              <div className="story-quote-card">
+                <div className="quote-watermark-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
+                  </svg>
+                </div>
+                <p className="quote-card-text">
+                  "We built GYMEZY so anyone can open the app, find the best nearby gym in seconds, book a day pass or trainer session, and walk right in. No paperwork, no lock-ins—just seamless fitness."
+                </p>
               </div>
 
-              <div className="mission-blocks-wrap">
-                {/* Mission Item */}
-                <div className="mission-item-block">
-                  <div className="item-icon-badge badge-mission">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="m9 12 2 2 4-4" />
-                    </svg>
-                  </div>
-                  <div className="item-content-text">
-                    <h4 className="item-title">Our Mission</h4>
-                    <p className="item-desc">
-                      To empower gyms with smart digital technology and help people achieve their fitness goals every day with total freedom and flexibility.
-                    </p>
-                  </div>
-                </div>
+              {/* Bottom Actions: Learn More Button & Profile Info */}
+              <div className="story-bottom-row">
+                <Link to="/customers" className="story-learn-btn">
+                  <span>Explore Gyms & Passes</span>
+                </Link>
 
-                {/* Vision Item */}
-                <div className="mission-item-block">
-                  <div className="item-icon-badge badge-vision">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  </div>
-                  <div className="item-content-text">
-                    <h4 className="item-title">Our Vision</h4>
-                    <p className="item-desc">
-                      To become India’s most trusted fitness platform and build a healthier, more active, and stronger nation.
-                    </p>
+                <div className="story-author-profile">
+                  <img
+                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"
+                    alt="GYMEZY Team"
+                    className="story-author-avatar"
+                  />
+                  <div className="story-author-info">
+                    <span className="author-name">GYMEZY Team</span>
+                    <span className="author-role">Founding Mission</span>
                   </div>
                 </div>
               </div>
@@ -331,27 +279,38 @@ export default function AboutUsPage() {
       </section>
 
       {/* =================================================================
-          3. OUR VALUES SECTION (LIGHT THEME)
+          3. OUR CORE VALUES (ARCHITECTURAL DARK BENTO GRID)
           ================================================================= */}
       <section className="about-values-section">
         <div className="section-container">
-          <div className="section-centered-header">
-            <div className="values-header-divider">
-              <span className="divider-line" />
-              <h2 className="values-main-heading">Our Values</h2>
-              <span className="divider-line" />
-            </div>
-            <p className="values-sub-desc">The core principles guiding everything we build at GYMEZY.</p>
+          <div className="section-centered-header dark-header">
+            <h2 className="values-main-heading">
+              The Pillars That <span className="title-serif-italic">Drive GYMEZY</span>
+            </h2>
+            <p className="values-sub-desc">
+              Four non-negotiable standards shaping how we connect athletes, certified coaches, and gym owners.
+            </p>
           </div>
 
-          <div className="about-values-grid">
+          <div className="about-values-bento-grid">
             {valuesList.map(val => (
-              <div key={val.id} className="value-card">
-                <div className="value-icon-circle">
-                  {val.icon}
+              <div key={val.num} className="value-bento-card">
+                <span className="value-watermark-num">{val.num}</span>
+                <div className="value-card-top-row">
+                  <div className="value-icon-badge">{val.icon}</div>
+                  <span className="value-category-tag">{val.tag}</span>
                 </div>
                 <h3 className="value-card-title">{val.title}</h3>
+                <p className="value-card-subtitle">{val.sub}</p>
                 <p className="value-card-desc">{val.desc}</p>
+                <div className="value-card-footer">
+                  <span className="value-highlight-pill">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="check-mini-icon">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    {val.badge}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
@@ -359,94 +318,155 @@ export default function AboutUsPage() {
       </section>
 
       {/* =================================================================
-          4. WHY GYMEZY SECTION (LIGHT THEME - 6 CARD GRID)
+          4. WHY GYMEZY SECTION (DUAL-PERSONA ECOSYSTEM SHOWCASE)
           ================================================================= */}
       <section className="about-why-section">
         <div className="section-container">
           <div className="section-centered-header">
             <h2 className="why-section-title">
-              Why <span className="title-brand-accent">GYMEZY?</span>
+              One Platform. <span className="title-serif-italic">Double The Power.</span>
             </h2>
-            <div className="title-underline-pill" />
             <p className="why-section-desc">
-              Designed from the ground up to empower both everyday athletes and passionate fitness center owners.
+              Engineered specifically to eliminate friction for trainees and scale sustainable revenue for gym owners.
             </p>
           </div>
 
-          <div className="why-features-grid">
-            {whyGymezyList.map((item, idx) => (
-              <div key={idx} className="why-feature-card">
-                <div className="why-icon-box">
-                  {item.icon}
+          <div className="why-dual-ecosystem-grid">
+            {/* Persona Card 1: For Athletes */}
+            <div className="why-persona-panel athlete-panel">
+              <div className="panel-header">
+                <div className="panel-persona-badge">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="persona-svg-icon">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  <span>FOR FITNESS SEEKERS</span>
                 </div>
-                <h3 className="why-card-title">{item.title}</h3>
-                <span className="why-card-sub">{item.sub}</span>
-                <p className="why-card-desc">{item.desc}</p>
+                <h3 className="panel-headline">Workout on Your Own Terms</h3>
+                <p className="panel-subhead">Total freedom of choice across premier gyms in your city.</p>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* =================================================================
-          5. METRIC HIGHLIGHTS RIBBON (DEEP NAVY / ACCENT)
-          ================================================================= */}
-      <section className="about-ribbon-section">
-        <div className="section-container">
-          <div className="ribbon-metrics-grid">
-            {ribbonMetrics.map((met, idx) => (
-              <div key={idx} className="ribbon-metric-item">
-                <span className="ribbon-num">{met.num}</span>
-                <span className="ribbon-label">{met.label}</span>
+              <div className="panel-features-list">
+                {athleteBenefits.map((item, i) => (
+                  <div key={i} className="panel-feature-row">
+                    <div className="feature-marker-dot" />
+                    <div className="feature-text-block">
+                      <h4 className="feature-title">{item.title}</h4>
+                      <p className="feature-desc">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* =================================================================
-          6. PRE-FOOTER CALL TO ACTION BANNER
-          ================================================================= */}
-      <section className="about-cta-banner-section">
-        <div className="section-container">
-          <div className="about-cta-card">
-            <div className="cta-left-content">
-              <h2 className="cta-main-title">Let's Build a Stronger Fitness Future</h2>
-              <p className="cta-main-desc">
-                Join thousands of gyms and fitness enthusiasts who trust GYMEZY every day.
-              </p>
-
-              <div className="cta-checkpoints-row">
-                <div className="cta-check-item">
-                  <span className="cta-check-dot">✓</span>
-                  <span>Smarter Gyms</span>
-                </div>
-                <div className="cta-check-item">
-                  <span className="cta-check-dot">✓</span>
-                  <span>Stronger Communities</span>
-                </div>
-                <div className="cta-check-item">
-                  <span className="cta-check-dot">✓</span>
-                  <span>Better Fitness for All</span>
-                </div>
+              <div className="panel-footer-action">
+                <Link to="/customers" className="panel-cta-btn athlete-cta">
+                  <span>Explore Passes & Nearby Gyms</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="panel-btn-arrow">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </Link>
               </div>
             </div>
 
-            <div className="cta-buttons-wrap">
-              <Link to="/customers" className="cta-btn-primary">
-                <span>Get Started</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="cta-arrow-icon">
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
-                </svg>
-              </Link>
-              <a href="#contact" className="cta-btn-secondary">
-                <span>Contact Us</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="cta-arrow-icon">
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
-                </svg>
-              </a>
+            {/* Center Trainer Visual */}
+            <div className="why-center-visual-col">
+              <div className="why-trainer-img-wrapper">
+                <img
+                  src={trainerImg}
+                  alt="GYMEZY Fitness Athletes"
+                  className="why-center-trainer-img"
+                />
+              </div>
+            </div>
+
+            {/* Persona Card 2: For Gym Owners */}
+            <div className="why-persona-panel owner-panel">
+              <div className="panel-header">
+                <div className="panel-persona-badge owner-badge">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="persona-svg-icon">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                  <span>FOR GYM & STUDIO OWNERS</span>
+                </div>
+                <h3 className="panel-headline">Scale Footfall & Maximize Revenue</h3>
+                <p className="panel-subhead">Transform empty equipment slots into predictable, recurring profit.</p>
+              </div>
+
+              <div className="panel-features-list">
+                {ownerBenefits.map((item, i) => (
+                  <div key={i} className="panel-feature-row">
+                    <div className="feature-marker-dot owner-dot" />
+                    <div className="feature-text-block">
+                      <h4 className="feature-title">{item.title}</h4>
+                      <p className="feature-desc">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="panel-footer-action">
+                <Link to="/gym-owners" className="panel-cta-btn owner-cta">
+                  <span>List Your Gym on GYMEZY</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="panel-btn-arrow">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+
+      {/* =================================================================
+          6. NEWSLETTER BANNER (LANDING PAGE VIP NEWSLETTER BANNER)
+          ================================================================= */}
+      <section className="vip-newsletter-section">
+        <div className="section-container">
+          <div className="newsletter-banner-box">
+            {/* Left Athlete Photo Card */}
+            <div className="newsletter-photo-container">
+              <img
+                src="https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=800&q=80"
+                alt="Athlete dumbbell training"
+                className="newsletter-athlete-img"
+              />
+            </div>
+
+            {/* Right Content */}
+            <div className="newsletter-content-group">
+              {/* Tag Pills */}
+              <div className="newsletter-tags-row">
+                <span className="newsletter-tag-outline">Stay Updated</span>
+                <span className="newsletter-tag-solid">GYMEZY Alerts</span>
+              </div>
+
+              {/* Headline with luxury serif italics */}
+              <h2 className="newsletter-headline">
+                Get the latest <span className="newsletter-serif-italic">Gym Openings</span>, flash{' '}
+                <span className="newsletter-serif-italic">Pass Discounts</span>, and expert fitness tips!
+              </h2>
+
+              {/* Form Input with send button */}
+              <form className="newsletter-form-wrapper" onSubmit={(e) => e.preventDefault()}>
+                <div className="newsletter-input-container">
+                  <input
+                    type="email"
+                    placeholder="Enter your email address..."
+                    className="newsletter-pill-input"
+                    required
+                  />
+                  <button type="submit" className="newsletter-send-circle-btn" aria-label="Subscribe">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                    </svg>
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

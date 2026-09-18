@@ -119,7 +119,7 @@
   display: inline-block;
   padding: 12px 26px;
   background: var(--brand-color, #00BF62);
-  color: #0d0f11;
+  color: #ffffff;
   font-family: var(--font-main, 'Inter', sans-serif);
   font-size: 12.5px;
   font-weight: 800;
@@ -136,7 +136,7 @@
   background: var(--brand-color-hover, #00df73);
   transform: translateY(-2px);
   box-shadow: none;
-  color: #0d0f11;
+  color: #ffffff;
 }
 
 @media (max-width: 768px) {

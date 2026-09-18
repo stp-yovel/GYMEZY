@@ -13,7 +13,11 @@
 
 /* Hero Section - Split Layout matching GYMEZY Dark Luxury Brand */
 .owner-hero-split-section {
-  padding: 130px 0 110px;
+  width: 100vw;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: 100px 0 60px;
   background: #090e17;
   color: #ffffff;
   position: relative;

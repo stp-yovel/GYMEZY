@@ -88,7 +88,11 @@
    CUSTOMER HERO SECTION (3-COLUMN SPLIT: VALUE PROP, ATHLETE MODEL, IPHONE APP)
    ========================================================================== */
 .customer-hero-split-section {
-  padding: 80px 0 70px;
+  width: 100vw;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: 100px 0 60px;
   position: relative;
   overflow: hidden;
   background: radial-gradient(circle at 50% 15%, rgba(0, 191, 98, 0.12) 0%, #080c14 65%);

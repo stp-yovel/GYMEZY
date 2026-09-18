@@ -69,6 +69,13 @@
   padding: 0;
 }
 
+.section-container {
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
 body {
   font-family: var(--font-primary);
   background-color: var(--color-light-bg);
@@ -147,6 +154,23 @@ input[type="reset"]:hover,
 .partner-primary-btn:hover,
 .partner-outline-btn:hover,
 .move-healthy-cta-btn:hover,
+.join-ready-primary-btn,
+.join-ready-primary-btn:hover,
+.newsletter-send-circle-btn,
+.newsletter-send-circle-btn:hover,
 .fitnova-watch-video-pill:hover {
   box-shadow: none !important;
+}
+
+/* Universal Brand Typography Utilities */
+.title-serif-italic,
+.title-italic-accent,
+.fitnova-serif-italic,
+.about-serif-italic,
+.newsletter-serif-italic,
+.join-serif-italic {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--color-secondary, #00BF62) !important;
 }
