@@ -1,0 +1,182 @@
+.vip-newsletter-section {
+  padding: 80px 0;
+  background: var(--color-light-card, #f8fafc);
+}
+
+.newsletter-banner-box {
+  background: var(--brand-dark, #0d1217);
+  border-radius: 36px;
+  padding: 28px 44px 28px 28px;
+  display: flex;
+  align-items: center;
+  gap: 48px;
+  color: var(--color-dark-text, #ffffff);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Left Athlete Photo */
+.newsletter-photo-container {
+  width: 260px;
+  height: 290px;
+  min-width: 260px;
+  border-radius: 26px;
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.newsletter-athlete-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+  transition: transform 0.45s ease;
+}
+
+.newsletter-photo-container:hover .newsletter-athlete-img {
+  transform: scale(1.05);
+}
+
+/* Right Content Column */
+.newsletter-content-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.newsletter-tags-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.newsletter-tag-outline {
+  display: inline-block;
+  padding: 5px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 20px;
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-dark-text, #ffffff);
+  background: transparent;
+}
+
+.newsletter-tag-solid {
+  display: inline-block;
+  padding: 5px 16px;
+  background: #ffffff;
+  color: #000000;
+  border-radius: 20px;
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.newsletter-headline {
+  font-family: var(--font-title, 'Urbanist', sans-serif);
+  font-size: clamp(1.8rem, 2.8vw, 2.6rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+  margin-bottom: 24px;
+  max-width: 680px;
+}
+
+.newsletter-serif-italic {
+  font-family: var(--font-serif-italic, 'Instrument Serif', Georgia, serif);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--brand-color, #00BF62) !important;
+}
+
+/* Actions Row with Both Modal Buttons */
+.newsletter-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.newsletter-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 26px;
+  border-radius: 9999px;
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-weight: 700;
+  font-size: 14.5px;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.newsletter-cta-btn.athlete-btn {
+  background: var(--brand-color, #00BF62);
+  color: #ffffff;
+  box-shadow: 0 4px 18px rgba(0, 191, 98, 0.3);
+}
+
+.newsletter-cta-btn.athlete-btn:hover {
+  background: #00d970;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 191, 98, 0.42);
+}
+
+.newsletter-cta-btn.owner-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.newsletter-cta-btn.owner-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 992px) {
+  .newsletter-banner-box {
+    flex-direction: column;
+    padding: 32px 24px;
+    gap: 28px;
+    text-align: center;
+  }
+
+  .newsletter-photo-container {
+    width: 100%;
+    max-width: 360px;
+    height: 240px;
+  }
+
+  .newsletter-tags-row {
+    justify-content: center;
+  }
+
+  .newsletter-headline {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .newsletter-actions-row {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 540px) {
+  .newsletter-actions-row {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .newsletter-cta-btn {
+    width: 100%;
+  }
+}

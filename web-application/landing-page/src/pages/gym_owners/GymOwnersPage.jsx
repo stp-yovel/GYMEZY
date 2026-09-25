@@ -1,10 +1,11 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import gymezyLogo from '../../assets/logo/gymezy.png';
 import Navbar from '../../components/Navbar';
 import GymPartnerShowcase from '../../components/GymPartnerShowcase';
 import PartnerPricingPlans from '../../components/PartnerPricingPlans';
+import Footer from '../../components/Footer';
+import { openLeadModal } from '../../utils/modalUtils';
 import './GymOwnersPage.css';
 
 export default function GymOwnersPage() {
@@ -19,7 +20,10 @@ export default function GymOwnersPage() {
     >
       <div className="gym-owners-page-wrapper">
         {/* Top Navbar */}
-        <Navbar ctaText="LIST YOUR GYM" ctaLink="#contact" />
+        <Navbar
+          ctaText="LIST YOUR GYM"
+          onCtaClick={() => openLeadModal({ category: 'demo', plan: 'Gym Listing' })}
+        />
 
         {/* Hero Section */}
         <section className="owner-hero-split-section">
@@ -75,7 +79,11 @@ export default function GymOwnersPage() {
               </ul>
 
               <div className="hero-split-buttons">
-                <a href="#contact" className="hero-btn-primary">
+                <button
+                  type="button"
+                  className="hero-btn-primary"
+                  onClick={() => openLeadModal({ category: 'demo', plan: 'Gym Owner Demo' })}
+                >
                   <svg className="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                     <line x1="16" y1="2" x2="16" y2="6" />
@@ -83,7 +91,7 @@ export default function GymOwnersPage() {
                     <line x1="3" y1="10" x2="21" y2="10" />
                   </svg>
                   <span>Request Live Demo</span>
-                </a>
+                </button>
               </div>
             </div>
 
@@ -447,63 +455,7 @@ export default function GymOwnersPage() {
         <PartnerPricingPlans ctaLink="#contact" />
 
         {/* Footer */}
-        <footer className="site-footer" id="contact">
-          <div className="section-container">
-            <div className="footer-links-grid">
-              <div className="footer-brand-col">
-                <div className="fitnova-logo footer-logo">
-                  <img src={gymezyLogo} alt="GYMEZY Logo" className="fitnova-logo-img footer-logo-img" />
-                  <span className="fitnova-logo-text">GYMEZY</span>
-                </div>
-                <p className="footer-brand-desc">
-                  GYMEZY connects fitness enthusiasts with top-rated gyms, certified trainers, and flexible passes across your city with zero lock-in contracts.
-                </p>
-              </div>
-
-              <div className="footer-nav-col">
-                <h4 className="footer-col-header">Explore</h4>
-                <Link to="/">Home</Link>
-                <a href="/#about">About GYMEZY</a>
-                <Link to="/customers">For Customers</Link>
-                <Link to="/gym-owners">For Gym Owners</Link>
-                <a href="/#app">Mobile App</a>
-              </div>
-
-              <div className="footer-nav-col">
-                <h4 className="footer-col-header">Partnerships</h4>
-                <Link to="/gym-owners">For Gym Owners</Link>
-                <Link to="/gym-owners">Partner Pricing Plans</Link>
-                <Link to="/gym-owners">Front-Desk Scanner</Link>
-                <Link to="/gym-owners">GMS Operations</Link>
-              </div>
-
-              <div className="footer-nav-col footer-contact-col">
-                <h4 className="footer-col-header">Contact &amp; Office</h4>
-                <div className="footer-contact-item-stacked">
-                  <span className="contact-col-label">Registered office:</span>
-                  <span className="contact-col-val">Office location</span>
-                </div>
-                <div className="footer-contact-item-stacked">
-                  <span className="contact-col-label">Phone Number:</span>
-                  <span className="contact-col-val">
-                    <a href="tel:9150955071">9150955071</a> / <a href="tel:9884881983">9884881983</a>
-                  </span>
-                </div>
-                <div className="footer-contact-item-stacked">
-                  <span className="contact-col-label">Email:</span>
-                  <span className="contact-col-val">
-                    <a href="mailto:praveen.k@gymezy.com">praveen.k@gymezy.com</a>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="footer-bottom-copyright">
-              <span>© {new Date().getFullYear()} GYMEZY Fitness Network. All rights reserved.</span>
-              <span>Empowering athletes, gyms, and coaches everywhere.</span>
-            </div>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </ConfigProvider>
   );

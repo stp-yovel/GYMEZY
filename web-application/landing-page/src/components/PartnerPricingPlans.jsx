@@ -1,18 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { openLeadModal } from '../utils/modalUtils';
 import './PartnerPricingPlans.css';
 
 export default function PartnerPricingPlans({
   ctaLink = '#contact'
 }) {
-  const [billingCycle, setBillingCycle] = useState('monthly');
-
-  const pricingPlans = [
+  const partnerPlans = [
     {
       id: 'free-listing',
       name: 'Free Listing',
       badge: 'Starter',
-      price: 'Free',
-      period: 'lifetime free',
       desc: 'Get your gym listed on the GYMEZY directory for basic brand discovery by local fitness seekers.',
       features: [
         { text: 'Basic Gym Discovery Profile', included: true },
@@ -29,8 +26,6 @@ export default function PartnerPricingPlans({
       id: 'gms',
       name: 'GMS Software',
       badge: 'Operations',
-      price: billingCycle === 'monthly' ? '₹999' : '₹799',
-      period: billingCycle === 'monthly' ? 'per month' : 'per mo (billed yearly)',
       desc: 'Complete standalone gym management software to digitize your everyday floor and staff operations.',
       features: [
         { text: 'Mobile App & Web Admin Dashboard', included: true },
@@ -48,8 +43,6 @@ export default function PartnerPricingPlans({
       id: 'app-listing',
       name: 'App Listing',
       badge: 'Marketplace',
-      price: billingCycle === 'monthly' ? '₹1,499' : '₹1,199',
-      period: billingCycle === 'monthly' ? 'per month' : 'per mo (billed yearly)',
       desc: 'Boost your walk-ins and direct inquiries by getting listed on the GYMEZY Consumer App marketplace.',
       features: [
         { text: 'Featured GYMEZY Marketplace Listing', included: true },
@@ -67,8 +60,6 @@ export default function PartnerPricingPlans({
       id: 'hybrid',
       name: 'Hybrid Partner',
       badge: 'Most Popular',
-      price: billingCycle === 'monthly' ? '₹1,999' : '₹1,599',
-      period: billingCycle === 'monthly' ? 'per month' : 'per mo (billed yearly)',
       desc: 'The complete end-to-end powerhouse combining standalone GMS tools with full marketplace exposure.',
       features: [
         { text: 'Full GMS ERP + Mobile Staff App', included: true },
@@ -87,34 +78,17 @@ export default function PartnerPricingPlans({
     <section className="pricing-modern-section" id="pricing">
       <div className="section-container">
         <div className="section-centered-header">
-          <span className="section-category-pill">Partner Subscription Plans</span>
+          <span className="section-category-pill">Partner Plans</span>
           <h2 className="section-heading-lg">
             Choose the Right Plan For <span className="title-italic-accent">Your Gym</span>
           </h2>
           <p className="section-sub-desc">
-            Flexible subscription tiers designed for fitness business owners: from free discovery and standalone GMS operations to high-growth marketplace listing and all-in-one hybrid packages.
+            Tailored partnership models designed for fitness business owners: from free directory discovery and standalone GMS operations to high-growth marketplace listing and all-in-one hybrid packages.
           </p>
-
-          <div className="billing-toggle-wrapper">
-            <button
-              type="button"
-              className={`billing-btn ${billingCycle === 'monthly' ? 'active' : ''}`}
-              onClick={() => setBillingCycle('monthly')}
-            >
-              Monthly Billing
-            </button>
-            <button
-              type="button"
-              className={`billing-btn ${billingCycle === 'yearly' ? 'active' : ''}`}
-              onClick={() => setBillingCycle('yearly')}
-            >
-              Annual Billing <span className="discount-tag">Save 20%</span>
-            </button>
-          </div>
         </div>
 
         <div className="pricing-cards-grid">
-          {pricingPlans.map((plan) => (
+          {partnerPlans.map((plan) => (
             <div
               key={plan.id}
               className={`pricing-card-box ${plan.popular ? 'highlighted-pro' : ''}`}
@@ -122,11 +96,8 @@ export default function PartnerPricingPlans({
               {plan.popular && <div className="popular-badge-ribbon">{plan.badge}</div>}
 
               <div className="pricing-card-head">
+                <span className="plan-tier-badge">{plan.badge}</span>
                 <h3 className="plan-name-title">{plan.name}</h3>
-                <div className="plan-price-group">
-                  <span className="plan-price-val">{plan.price}</span>
-                  <span className="plan-price-period">({plan.period})</span>
-                </div>
                 <p className="plan-desc-text">{plan.desc}</p>
               </div>
 
@@ -146,12 +117,13 @@ export default function PartnerPricingPlans({
                 ))}
               </ul>
 
-              <a
-                href={ctaLink}
+              <button
+                type="button"
                 className={`plan-select-btn ${plan.popular ? 'btn-popular' : ''}`}
+                onClick={() => openLeadModal({ category: 'demo', plan: plan.name })}
               >
                 {plan.ctaText}
-              </a>
+              </button>
             </div>
           ))}
         </div>

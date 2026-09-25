@@ -1,0 +1,364 @@
+/* ==========================================================================
+   LAUNCHING SOON EDITORIAL SECTION (TRANSPARENT FROSTED OVERLAY)
+   ========================================================================== */
+
+.launching-editorial-section {
+  position: relative;
+  width: 100%;
+  background: #ffffff;
+  padding: 80px 0 60px 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+
+.launching-editorial-wrapper {
+  position: relative;
+  background: #ffffff;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+}
+
+/* Top-Right Decorative Emerald Accent Block */
+.launching-top-amber-accent {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 32%;
+  height: 52px;
+  background: #00bf62;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   MAIN 2-COLUMN GRID CONTAINER
+   ========================================================================== */
+.launching-grid-container {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  align-items: stretch;
+  min-height: 580px;
+  position: relative;
+  z-index: 2;
+}
+
+/* ==========================================================================
+   LEFT COLUMN (Content Top + Green Dock Bottom)
+   ========================================================================== */
+.launching-left-wrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #ffffff;
+  position: relative;
+  z-index: 3;
+}
+
+.launching-content-col {
+  padding: 60px 60px 40px 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  flex: 1;
+}
+
+.launching-eyebrow-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #00bf62;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.launching-headline {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(2.8rem, 4.5vw, 4.2rem);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -1.5px;
+  color: #080c14;
+  margin-bottom: 24px;
+}
+
+.launching-headline-accent {
+  color: #00bf62;
+}
+
+.launching-description {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #64748b;
+  max-width: 440px;
+  margin-bottom: 36px;
+}
+
+.launching-description em {
+  font-style: italic;
+  font-weight: 700;
+  color: #080c14;
+}
+
+/* Action Area & Buttons */
+.launching-cta-block {
+  width: 100%;
+  max-width: 420px;
+}
+
+.launching-boxed-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 34px;
+  background: #080c14;
+  color: #ffffff;
+  border: 1.8px solid #080c14;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.launching-boxed-btn:hover {
+  background: #00bf62;
+  color: #080c14;
+  border-color: #00bf62;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 191, 98, 0.3);
+}
+
+/* Inline subscription form */
+.launching-inline-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.launching-inline-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1.8px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 14px;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+  color: #0f172a;
+  transition: border-color 0.2s ease;
+}
+
+.launching-inline-input:focus {
+  border-color: #00bf62;
+}
+
+.active-submit {
+  background: #00bf62;
+  color: #080c14;
+  border-color: #00bf62;
+  padding: 12px 24px;
+}
+
+.active-submit:hover {
+  background: #00df73;
+  border-color: #00df73;
+}
+
+.launching-success-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  background: rgba(0, 191, 98, 0.12);
+  border: 1px solid rgba(0, 191, 98, 0.4);
+  color: #008f48;
+  font-weight: 700;
+  font-size: 13.5px;
+  border-radius: 4px;
+}
+
+/* Left Dock: Solid Emerald Green Box */
+.launching-dock-left {
+  background: #00bf62;
+  color: #080c14;
+  padding: 34px 36px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 110px;
+}
+
+.launching-dock-heading {
+  font-family: 'Outfit', sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  color: #080c14;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+/* ==========================================================================
+   RIGHT COLUMN (Full-Height Photo + Transparent Frosted Overlay)
+   ========================================================================== */
+.launching-right-wrapper {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  height: 100%;
+  min-height: 580px;
+}
+
+.launching-photo-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #080c14;
+}
+
+.launching-hero-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.launching-editorial-wrapper:hover .launching-hero-photo {
+  transform: scale(1.03);
+}
+
+/* Transparent Frosted Milestone Overlay (Docked over the bottom of the photo) */
+.launching-dock-right {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 12, 20, 0.35) 0%,
+    rgba(8, 12, 20, 0.72) 40%,
+    rgba(8, 12, 20, 0.88) 100%
+  );
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  padding: 30px 40px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 32px;
+  min-height: 110px;
+  align-items: center;
+  z-index: 4;
+}
+
+.launching-milestone-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.milestone-date {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #00bf62;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.milestone-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.3px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.milestone-desc {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #cbd5e1;
+  margin: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN
+   ========================================================================== */
+@media (max-width: 992px) {
+  .launching-grid-container {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .launching-content-col {
+    padding: 50px 30px 40px 30px;
+  }
+
+  .launching-right-wrapper {
+    min-height: 480px;
+  }
+
+  .launching-dock-left {
+    padding: 24px 30px;
+    min-height: auto;
+  }
+
+  .launching-dock-right {
+    position: relative;
+    padding: 30px;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    border-left: none;
+    background: rgba(8, 12, 20, 0.9);
+  }
+
+  .launching-top-amber-accent {
+    width: 45%;
+  }
+}
+
+@media (max-width: 640px) {
+  .launching-editorial-section {
+    padding: 40px 0 30px 0;
+  }
+
+  .launching-headline {
+    font-size: 2.4rem;
+  }
+
+  .launching-content-col {
+    padding: 36px 20px 30px 20px;
+  }
+
+  .launching-right-wrapper {
+    min-height: 420px;
+  }
+
+  .launching-dock-right {
+    padding: 24px 20px;
+  }
+
+  .launching-inline-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .launching-boxed-btn {
+    width: 100%;
+  }
+}

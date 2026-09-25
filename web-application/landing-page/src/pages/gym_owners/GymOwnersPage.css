@@ -164,9 +164,13 @@
   padding: 14px 28px;
   background: #00BF62;
   color: #080C14;
+  font-family: inherit;
   font-size: 14px;
   font-weight: 800;
   border-radius: 50px;
+  border: none;
+  outline: none;
+  cursor: pointer;
   text-decoration: none;
   box-shadow: none;
   transition: all 0.25s ease;
@@ -810,126 +814,8 @@
 }
 
 /* ==========================================================================
-   FOOTER (EXACT MATCH TO MAIN LANDING PAGE)
+   FOOTER (Handled strictly by Footer component styles)
    ========================================================================== */
-
-.site-footer {
-  background: var(--color-light-card, #ffffff);
-  border-top: 1px solid var(--brand-border, #e2e8f0);
-  padding: 70px 0 36px 0;
-}
-
-.footer-links-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  gap: 40px;
-  margin-bottom: 50px;
-}
-
-.fitnova-logo.footer-logo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  text-decoration: none;
-}
-
-.footer-logo-img {
-  height: 38px;
-  width: auto;
-  object-fit: contain;
-  display: block;
-  filter: none !important;
-}
-
-.fitnova-logo.footer-logo .fitnova-logo-text {
-  font-family: var(--font-title, 'Outfit', sans-serif);
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  color: var(--brand-text, #0f172a);
-}
-
-.footer-brand-desc {
-  font-size: 13.5px;
-  color: var(--brand-muted, #64748b);
-  line-height: 1.65;
-  max-width: 300px;
-  margin-top: 14px;
-}
-
-.footer-col-header {
-  font-family: var(--font-title, 'Outfit', sans-serif);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--brand-text, #0f172a);
-  margin-bottom: 18px;
-}
-
-.footer-nav-col {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.footer-nav-col a {
-  font-size: 13.5px;
-  color: var(--brand-muted, #64748b);
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-
-.footer-nav-col a:hover {
-  color: var(--brand-color, #00bf62);
-}
-
-.footer-contact-col {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.footer-contact-item-stacked {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--brand-muted, #64748b);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.contact-col-label {
-  font-weight: 700;
-  color: var(--brand-text, #0f172a);
-  font-size: 13px;
-}
-
-.contact-col-val {
-  color: var(--brand-muted, #64748b);
-  font-size: 13.5px;
-}
-
-.contact-col-val a {
-  color: var(--brand-color, #00bf62);
-  text-decoration: none;
-  font-weight: 600;
-  transition: color 0.2s ease;
-}
-
-.contact-col-val a:hover {
-  color: var(--brand-color-hover, #00df73);
-  text-decoration: underline;
-}
-
-.footer-bottom-copyright {
-  border-top: 1px solid var(--brand-border, #e2e8f0);
-  padding-top: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12.5px;
-  color: var(--brand-muted, #64748b);
-}
 
 /* ==========================================================================
    RESPONSIVE QUERIES

@@ -1,10 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import './App.css';
 import LandingPage from './pages/landing_page';
 import CustomersPage from './pages/customers';
 import GymOwnersPage from './pages/gym_owners';
 import AboutUsPage from './pages/about_us';
+import TrainersPage from './pages/trainers';
+import LeadCaptureModal from './components/LeadCaptureModal';
+import UserLeadCaptureModal from './components/UserLeadCaptureModal';
 
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
@@ -24,6 +27,54 @@ function ScrollToTop() {
 }
 
 export default function App() {
+  // Gym Owners / Trainers Lead Modal State
+  const [modalState, setModalState] = useState({
+    isOpen: false,
+    category: 'demo',
+    plan: ''
+  });
+
+  // User / Member Launch Offer Modal State
+  const [userModalState, setUserModalState] = useState({
+    isOpen: false,
+    offerTag: 'Launch Offer (50% Off)'
+  });
+
+  useEffect(() => {
+    const handleOpenEvent = (e) => {
+      const { category = 'demo', plan = '' } = e.detail || {};
+      setModalState({
+        isOpen: true,
+        category,
+        plan
+      });
+    };
+
+    const handleOpenUserEvent = (e) => {
+      const { offerTag = 'Launch Offer (50% Off)' } = e.detail || {};
+      setUserModalState({
+        isOpen: true,
+        offerTag
+      });
+    };
+
+    window.addEventListener('gymezy:open-lead-modal', handleOpenEvent);
+    window.addEventListener('gymezy:open-user-lead-modal', handleOpenUserEvent);
+
+    return () => {
+      window.removeEventListener('gymezy:open-lead-modal', handleOpenEvent);
+      window.removeEventListener('gymezy:open-user-lead-modal', handleOpenUserEvent);
+    };
+  }, []);
+
+  const handleCloseModal = () => {
+    setModalState((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  const handleCloseUserModal = () => {
+    setUserModalState((prev) => ({ ...prev, isOpen: false }));
+  };
+
   return (
     <BrowserRouter>
       <ScrollToTop />
@@ -33,9 +84,25 @@ export default function App() {
           <Route path="/about" element={<AboutUsPage />} />
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/gym-owners" element={<GymOwnersPage />} />
+          <Route path="/trainers" element={<TrainersPage />} />
           <Route path="*" element={<LandingPage />} />
         </Routes>
       </div>
+
+      {/* Gym Owners & Trainers Partner Lead Capture Modal */}
+      <LeadCaptureModal
+        isOpen={modalState.isOpen}
+        onClose={handleCloseModal}
+        initialCategory={modalState.category}
+        defaultPlan={modalState.plan}
+      />
+
+      {/* User / Member Launch Offer Registration Modal */}
+      <UserLeadCaptureModal
+        isOpen={userModalState.isOpen}
+        onClose={handleCloseUserModal}
+        offerTag={userModalState.offerTag}
+      />
     </BrowserRouter>
   );
 }

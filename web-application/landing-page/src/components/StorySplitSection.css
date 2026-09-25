@@ -1,0 +1,275 @@
+.about-story-split-section {
+  padding: 110px 0 90px;
+  background: #ffffff;
+  position: relative;
+  overflow: hidden;
+}
+
+.story-split-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 72px;
+  align-items: center;
+}
+
+/* Left Column: Angled Parallelogram Cards */
+.story-visuals-col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.story-angled-cards-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.story-angled-card {
+  position: relative;
+  width: 230px;
+  height: 440px;
+  transform: skewX(-8deg);
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+  background: #0f172a;
+}
+
+.story-angled-card.card-two {
+  margin-top: 30px;
+}
+
+.story-angled-img {
+  width: 140%;
+  height: 100%;
+  object-fit: cover;
+  transform: skewX(8deg) translateX(-12%);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.story-accent-tab {
+  position: absolute;
+  right: -8px;
+  top: 20%;
+  width: 28px;
+  height: 65%;
+  background: #00bf62;
+  border-radius: 0;
+  transform: skewX(-8deg);
+  z-index: 1;
+}
+
+/* Checkerboard Pattern Graphic */
+.story-checkerboard-graphic {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 150px;
+  margin-top: 18px;
+  margin-left: 10px;
+}
+
+.checker-row {
+  display: flex;
+  gap: 4px;
+}
+
+.c-box {
+  width: 20px;
+  height: 14px;
+  border-radius: 0;
+}
+
+.c-box.b-dark {
+  background: #0f172a;
+}
+
+.c-box.b-light {
+  background: #e2e8f0;
+}
+
+/* Right Content Column */
+.story-content-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.story-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 20px;
+}
+
+.story-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00bf62;
+}
+
+.story-headline {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(2.3rem, 4vw, 3.4rem);
+  font-weight: 800;
+  line-height: 1.15;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  margin-bottom: 20px;
+}
+
+.story-paragraph {
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: #64748b;
+  margin-bottom: 28px;
+  max-width: 580px;
+}
+
+/* Mission Quote Card */
+.story-quote-card {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 28px 34px;
+  margin-bottom: 34px;
+  width: 100%;
+  max-width: 600px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+}
+
+.quote-watermark-icon {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  width: 52px;
+  height: 52px;
+  color: #e2e8f0;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.quote-card-text {
+  position: relative;
+  z-index: 1;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: #1e293b;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Bottom Actions Row: Button + Coach Profile */
+.story-bottom-row {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.story-learn-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #00bf62;
+  color: #ffffff;
+  font-size: 0.98rem;
+  font-weight: 700;
+  padding: 14px 28px;
+  border-radius: 999px;
+  text-decoration: none;
+  box-shadow: none !important;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.story-learn-btn:hover {
+  background: #00d66f;
+  transform: translateY(-2px);
+  color: #ffffff;
+}
+
+.story-btn-arrow {
+  width: 16px;
+  height: 16px;
+}
+
+.story-author-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.story-author-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e2e8f0;
+}
+
+.story-author-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.author-name {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.author-role {
+  font-size: 0.82rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* Responsive Styles */
+@media (max-width: 992px) {
+  .story-split-layout {
+    grid-template-columns: 1fr;
+    gap: 56px;
+  }
+
+  .story-visuals-col {
+    align-items: center;
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .story-angled-cards-wrapper {
+    gap: 12px;
+  }
+
+  .story-angled-card {
+    width: 145px;
+    height: 290px;
+    border-radius: 0;
+  }
+
+  .story-bottom-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .story-learn-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

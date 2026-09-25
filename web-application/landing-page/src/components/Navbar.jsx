@@ -3,7 +3,11 @@ import { Link, useLocation } from 'react-router-dom';
 import gymezyLogo from '../assets/logo/gymezy.png';
 import './Navbar.css';
 
-export default function Navbar({ ctaText = 'EXPLORE PASSES', ctaLink = '/#pricing' }) {
+export default function Navbar({
+  ctaText = 'EXPLORE PASSES',
+  ctaLink = '/#pricing',
+  onCtaClick
+}) {
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
 
@@ -65,11 +69,25 @@ export default function Navbar({ ctaText = 'EXPLORE PASSES', ctaLink = '/#pricin
           >
             For Gym Owners
           </Link>
+          <Link
+            to="/trainers"
+            className={`fitnova-nav-link ${location.pathname === '/trainers' ? 'active' : ''}`}
+          >
+            For Trainers
+          </Link>
         </nav>
 
         {/* CTA Button */}
         <div className="fitnova-nav-cta">
-          {ctaLink.startsWith('/#') || ctaLink.startsWith('#') ? (
+          {onCtaClick ? (
+            <button
+              type="button"
+              className="fitnova-primary-btn"
+              onClick={onCtaClick}
+            >
+              {ctaText}
+            </button>
+          ) : ctaLink.startsWith('/#') || ctaLink.startsWith('#') ? (
             <a href={ctaLink} className="fitnova-primary-btn">
               {ctaText}
             </a>

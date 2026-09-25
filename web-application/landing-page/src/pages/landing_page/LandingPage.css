@@ -5,16 +5,24 @@
 
 :root {
   /* Brand Tokens Mapped to index.css */
-  --brand-color: var(--color-secondary); /* #00BF62 */
+  --brand-color: var(--color-secondary);
+  /* #00BF62 */
   --brand-color-hover: #009e50;
-  --brand-navy: var(--color-primary); /* #003882 */
-  --brand-dark: var(--color-dark-bg); /* #121212 */
-  --brand-card-dark: var(--color-dark-card); /* #1E1E1E */
-  --brand-light-bg: var(--color-light-bg); /* #F8FAFC */
-  --brand-border: var(--color-light-border); /* #E2E8F0 */
-  --brand-text: var(--color-light-text); /* #0F172A */
-  --brand-muted: var(--color-light-subtitle); /* #64748B */
-  
+  --brand-navy: var(--color-primary);
+  /* #003882 */
+  --brand-dark: var(--color-dark-bg);
+  /* #121212 */
+  --brand-card-dark: var(--color-dark-card);
+  /* #1E1E1E */
+  --brand-light-bg: var(--color-light-bg);
+  /* #F8FAFC */
+  --brand-border: var(--color-light-border);
+  /* #E2E8F0 */
+  --brand-text: var(--color-light-text);
+  /* #0F172A */
+  --brand-muted: var(--color-light-subtitle);
+  /* #64748B */
+
   --font-main: var(--font-primary);
   --font-title: var(--font-heading);
   --font-serif-italic: 'Playfair Display', Georgia, serif;
@@ -82,13 +90,11 @@
 .fitnova-hero-gradient-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    rgba(18, 18, 18, 0.95) 0%,
-    rgba(18, 18, 18, 0.8) 35%,
-    rgba(18, 18, 18, 0.4) 65%,
-    rgba(18, 18, 18, 0.65) 100%
-  );
+  background: linear-gradient(90deg,
+      rgba(18, 18, 18, 0.95) 0%,
+      rgba(18, 18, 18, 0.8) 35%,
+      rgba(18, 18, 18, 0.4) 65%,
+      rgba(18, 18, 18, 0.65) 100%);
 }
 
 /* --- Top Navbar (Sticky with Floating Light Glassmorphic Pill on Scroll) --- */
@@ -315,15 +321,19 @@
   margin-left: 0;
   background-image: url('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80');
 }
+
 .client-avatar.a2 {
   background-image: url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80');
 }
+
 .client-avatar.a3 {
   background-image: url('https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80');
 }
+
 .client-avatar.a4 {
   background-image: url('https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80');
 }
+
 .client-avatar.a5 {
   background-image: url('https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80');
 }
@@ -389,8 +399,15 @@
 }
 
 @keyframes floatBubble {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 .fitnova-bubble-img {
@@ -619,20 +636,16 @@
 .move-card-overlay-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.1) 0%,
-    rgba(0, 0, 0, 0.2) 50%,
-    rgba(0, 0, 0, 0.85) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(0, 0, 0, 0.1) 0%,
+      rgba(0, 0, 0, 0.2) 50%,
+      rgba(0, 0, 0, 0.85) 100%);
 }
 
 .move-card-overlay-gradient.sm-gradient {
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.7) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.7) 100%);
 }
 
 .move-card-top-arrow {
@@ -780,8 +793,6 @@
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: #f0fdf4;
-  border: 1px solid #dcfce7;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -791,12 +802,7 @@
   transition: all 0.25s ease;
 }
 
-.app-feature-item:hover .app-feature-icon-badge {
-  background: #dcfce7;
-  border-color: var(--brand-color);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 191, 98, 0.15);
-}
+
 
 .app-feature-svg-icon {
   width: 22px;
@@ -1021,262 +1027,13 @@
    3. PHILOSOPHY SECTION (ASYMMETRIC CAROUSEL MOCKUP)
    ========================================================================== */
 
+/* ==========================================================================
+   4. PHILOSOPHY / BELIEVE SECTION (Handled by PhilosophyCarousel component)
+   ========================================================================== */
+
 .philosophy-section {
   padding: 90px 0;
   background: var(--color-light-card);
-}
-
-.philosophy-header-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 36px;
-  gap: 20px;
-}
-
-.philosophy-title {
-  font-family: var(--font-title);
-  font-size: clamp(2rem, 3.4vw, 2.8rem);
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.8px;
-  color: var(--brand-text);
-  margin: 0;
-}
-
-.carousel-nav-arrows {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.carousel-arrow-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 1.5px solid var(--brand-border);
-  background: var(--color-light-card);
-  color: var(--brand-text);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-}
-
-.carousel-arrow-btn svg {
-  width: 18px;
-  height: 18px;
-}
-
-.carousel-arrow-btn:hover,
-.carousel-arrow-btn.active {
-  background: var(--brand-dark);
-  border-color: var(--brand-dark);
-  color: var(--color-dark-text);
-}
-
-.carousel-arrow-btn.inactive {
-  opacity: 0.5;
-  cursor: default;
-}
-
-/* Asymmetric Grid Layout */
-.philosophy-asymmetric-grid {
-  display: grid;
-  grid-template-columns: 1fr 1.22fr;
-  gap: 26px;
-  align-items: stretch;
-}
-
-.asymmetric-card-featured {
-  position: relative;
-  height: 480px;
-  border-radius: 26px;
-  overflow: hidden;
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.08);
-  background-color: #121517;
-}
-
-.asymmetric-right-column {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 26px;
-}
-
-.asymmetric-right-cards-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 22px;
-  height: 330px;
-}
-
-.asymmetric-card-sm {
-  position: relative;
-  height: 100%;
-  border-radius: 22px;
-  overflow: hidden;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06);
-  background-color: #121517;
-}
-
-.asymmetric-card-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.45s ease;
-}
-
-.asymmetric-card-featured:hover .asymmetric-card-img,
-.asymmetric-card-sm:hover .asymmetric-card-img {
-  transform: scale(1.04);
-}
-
-/* Floating Bottom Pill Overlay */
-.floating-card-pill-overlay {
-  position: absolute;
-  bottom: 18px;
-  left: 18px;
-  right: 18px;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(12px);
-  padding: 10px 14px 10px 24px;
-  border-radius: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  z-index: 5;
-}
-
-.floating-card-pill-overlay.sm-pill {
-  bottom: 12px;
-  left: 12px;
-  right: 12px;
-  padding: 7px 8px 7px 16px;
-}
-
-.pill-card-title {
-  font-family: var(--font-title);
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--brand-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.floating-card-pill-overlay.sm-pill .pill-card-title {
-  font-size: 13px;
-}
-
-.pill-view-now-btn {
-  display: inline-block;
-  padding: 9px 20px;
-  background: var(--brand-color);
-  color: var(--color-dark-text);
-  font-family: var(--font-main);
-  font-size: 12.5px;
-  font-weight: 700;
-  border-radius: var(--radius-pill);
-  text-decoration: none;
-  white-space: nowrap;
-  box-shadow: 0 4px 14px rgba(0, 191, 98, 0.35);
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.pill-view-now-btn:hover {
-  background: var(--brand-color-hover);
-  transform: translateY(-1px);
-}
-
-.floating-card-pill-overlay.sm-pill .pill-view-now-btn {
-  padding: 6px 14px;
-  font-size: 11.5px;
-}
-
-.asymmetric-card-sm.clickable-card {
-  cursor: pointer;
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease;
-}
-
-.asymmetric-card-sm.clickable-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.14);
-}
-
-.asymmetric-card-sm.clickable-card:active {
-  transform: scale(0.98);
-}
-
-/* Smooth Swapping Animations */
-.swap-fade-anim {
-  animation: cardImgCrossFade 0.5s cubic-bezier(0.25, 1, 0.5, 1) both;
-}
-
-@keyframes cardImgCrossFade {
-  0% {
-    opacity: 0.25;
-    transform: scale(1.05);
-    filter: blur(3px);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-    filter: blur(0);
-  }
-}
-
-.swap-pill-anim {
-  animation: cardPillSlide 0.45s cubic-bezier(0.25, 1, 0.5, 1) both;
-}
-
-@keyframes cardPillSlide {
-  0% {
-    opacity: 0.3;
-    transform: translateY(8px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Mission Statement Block */
-.philosophy-mission-block {
-  padding: 8px 0;
-  min-height: 70px;
-  display: flex;
-  align-items: center;
-}
-
-.philosophy-mission-text {
-  font-family: var(--font-main);
-  font-size: 20px;
-  font-weight: 500;
-  color: var(--brand-text);
-  line-height: 1.55;
-  letter-spacing: -0.2px;
-  max-width: 600px;
-  margin: 0;
-}
-
-.key-fade-anim {
-  animation: missionFadeIn 0.45s cubic-bezier(0.25, 1, 0.5, 1) both;
-}
-
-@keyframes missionFadeIn {
-  0% {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 /* ==========================================================================
@@ -2099,205 +1856,61 @@
 
 .join-ready-btn-wrapper {
   display: flex;
+  align-items: center;
   justify-content: center;
-}
-
-.join-ready-primary-btn {
-  display: inline-block;
-  padding: 15px 36px;
-  background: var(--brand-color);
-  color: var(--color-dark-text);
-  font-family: var(--font-main);
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  border-radius: 30px;
-  text-decoration: none;
-  box-shadow: none !important;
-  transition: all 0.25s ease;
-}
-
-.join-ready-primary-btn:hover {
-  background: var(--brand-color-hover);
-  transform: translateY(-2px);
-  box-shadow: none !important;
-}
-
-/* ==========================================================================
-   9. FOOTER
-   ========================================================================== */
-
-.site-footer {
-  background: var(--color-light-card);
-  border-top: 1px solid var(--brand-border);
-  padding: 70px 0 36px 0;
-}
-
-.footer-top-banner {
-  background: var(--brand-light-bg);
-  border: 1px solid var(--brand-border);
-  border-radius: var(--radius-button);
-  padding: 28px 36px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 50px;
-  gap: 24px;
-}
-
-.footer-top-title {
-  font-family: var(--font-title);
-  font-size: 17.5px;
-  font-weight: 700;
-  color: var(--brand-text);
-  margin-bottom: 4px;
-}
-
-.footer-top-sub {
-  font-size: 13px;
-  color: var(--brand-muted);
-  margin: 0;
-}
-
-.footer-links-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  gap: 40px;
-  margin-bottom: 50px;
-}
-
-.footer-brand-desc {
-  font-size: 13.5px;
-  color: var(--brand-muted);
-  line-height: 1.65;
-  max-width: 300px;
-  margin-top: 14px;
-}
-
-.footer-col-header {
-  font-family: var(--font-title);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--brand-text);
-  margin-bottom: 18px;
-}
-
-.footer-nav-col {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.footer-nav-col a {
-  font-size: 13.5px;
-  color: var(--brand-muted);
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-
-.footer-nav-col a:hover {
-  color: var(--brand-color);
-}
-
-.footer-contact-col {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.footer-contact-item-stacked {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--brand-muted, #64748b);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.contact-col-label {
-  font-weight: 700;
-  color: var(--brand-text, #0f172a);
-  font-size: 13px;
-}
-
-.contact-col-val {
-  color: var(--brand-muted, #64748b);
-  font-size: 13.5px;
-}
-
-.contact-col-val a {
-  color: var(--brand-color, #00BF62);
-  text-decoration: none;
-  font-weight: 600;
-  transition: color 0.2s ease;
-}
-
-.contact-col-val a:hover {
-  color: var(--brand-color-hover, #00df73);
-  text-decoration: underline;
-}
-
-.office-contact-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
-.contact-label {
-  font-weight: 700;
-  color: var(--brand-text, #0f172a);
-}
-
-.contact-val {
-  color: inherit;
-}
-
-.contact-link {
-  color: var(--brand-color, #00BF62);
-  text-decoration: none;
-  font-weight: 600;
-  transition: color 0.2s ease, text-decoration 0.2s ease;
-}
-
-.contact-link:hover {
-  color: var(--brand-color-hover, #00df73);
-  text-decoration: underline;
-}
-
-.contact-slash {
-  color: var(--brand-muted, #94a3b8);
-  margin: 0 2px;
-}
-
-.office-contact-divider {
-  color: var(--brand-muted, #cbd5e1);
-  opacity: 0.6;
-}
-
-@media (max-width: 768px) {
-  .footer-office-contact-strip {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 14px 16px;
-  }
-  .office-contact-divider {
-    display: none;
-  }
-}
-
-.footer-bottom-copyright {
-  border-top: 1px solid var(--brand-border);
-  padding-top: 22px;
-  display: flex;
+.join-ready-primary-btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  font-size: 12.5px;
-  color: var(--brand-muted);
+  justify-content: center;
+  padding: 16px 36px;
+  background: var(--brand-color, #00bf62);
+  color: #ffffff;
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border-radius: 9999px;
+  text-decoration: none;
+  box-shadow: 0 10px 25px -4px rgba(0, 191, 98, 0.4) !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+.join-ready-primary-btn:hover {
+  background: #00d970;
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px -4px rgba(0, 191, 98, 0.55) !important;
+}
+
+.join-ready-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 36px;
+  background: var(--brand-navy, #003882);
+  color: #ffffff;
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  border-radius: 9999px;
+  text-decoration: none;
+  box-shadow: 0 10px 25px -4px rgba(0, 56, 130, 0.3) !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.join-ready-secondary-btn:hover {
+  background: #0047a5;
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px -4px rgba(0, 56, 130, 0.45) !important;
+}
+
+/* ==========================================================================
+   9. FOOTER (Handled strictly by Footer component styles)
+   ========================================================================== */
 
 /* ==========================================================================
    GYM OWNER & TRAINER FULL-WIDTH SECTIONS
@@ -2590,6 +2203,7 @@
   .fitnova-hero-right-nodes {
     display: none;
   }
+
   .move-healthy-layout,
   .philosophy-asymmetric-grid,
   .analytics-split-layout,
@@ -2597,50 +2211,64 @@
     grid-template-columns: 1fr;
     gap: 36px;
   }
+
   .phone-mockup-showcase-container {
     max-width: 380px;
     margin: 0 auto;
   }
+
   .mobile-app-info-col {
     align-items: center;
     text-align: center;
   }
+
   .mobile-app-description {
     text-align: center;
   }
+
   .mobile-app-features-grid {
     align-items: center;
   }
+
   .app-feature-item {
     text-align: left;
     max-width: 440px;
   }
+
   .app-download-buttons-group {
     justify-content: center;
   }
+
   .app-social-proof-row {
     justify-content: center;
   }
+
   .move-healthy-cards-grid {
     height: 480px;
   }
+
   .asymmetric-card-featured {
     height: 400px;
   }
+
   .analytics-athlete-card,
   .analytics-brand-feature-card {
     height: 480px;
   }
+
   .services-grid-container,
   .pricing-cards-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+
   .owner-features-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+
   .trainer-features-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+
   .owner-cta-banner,
   .trainer-cta-banner {
     flex-direction: column;
@@ -2648,6 +2276,7 @@
     align-items: center;
     padding: 32px 24px;
   }
+
   .footer-links-grid {
     grid-template-columns: 1fr 1fr;
     gap: 36px;
@@ -2658,98 +2287,123 @@
   .fitnova-nav-links {
     display: none;
   }
+
   .fitnova-navbar {
     top: 12px;
     width: calc(100% - 24px);
   }
+
   .fitnova-nav-container {
     padding: 10px 18px;
   }
+
   .fitnova-primary-btn {
     padding: 10px 18px;
     font-size: 11.5px;
   }
+
   .fitnova-hero-section {
     height: auto;
     min-height: 100vh;
     padding-bottom: 40px;
   }
+
   .fitnova-hero-body {
     padding: 0 20px 40px 20px;
   }
+
   .fitnova-hero-title {
     font-size: clamp(2.4rem, 8vw, 3.4rem);
     line-height: 1.1;
   }
+
   .fitnova-hero-subtext {
     font-size: 15px;
     margin-bottom: 26px;
   }
+
   .fitnova-sticky-video-widget {
     bottom: 80px;
     right: 28px;
   }
+
   .fitnova-watch-video-pill {
     padding: 5px 6px 5px 14px;
     gap: 8px;
   }
+
   .watch-video-label {
     font-size: 12.5px;
   }
+
   .watch-video-thumb-circle {
     width: 32px;
     height: 32px;
   }
+
   .phone-mockup-showcase-container {
     max-width: 300px;
     margin: 0 auto;
   }
+
   .phone-mockup-card-wrapper {
     padding: 10px;
   }
+
   .move-healthy-cards-grid {
     grid-template-columns: 1fr;
     height: auto;
     gap: 20px;
   }
+
   .move-card-main-featured {
     height: 380px;
   }
+
   .move-card-right-col {
     height: auto;
     gap: 16px;
   }
+
   .move-card-photo-box {
     height: 240px;
   }
+
   .asymmetric-right-cards-row {
     grid-template-columns: 1fr;
     height: auto;
     gap: 20px;
   }
+
   .asymmetric-card-sm {
     height: 260px;
   }
+
   .philosophy-mission-text {
     font-size: 17px;
   }
+
   .analytics-athlete-card {
     height: 460px;
   }
+
   .analytics-brand-feature-card {
     height: auto;
     min-height: 420px;
     padding: 36px 24px;
   }
+
   .telemetry-brand-pill-card {
     top: 50px;
     left: 16px;
     width: 190px;
     padding: 14px 18px;
   }
+
   .telemetry-big-number {
     font-size: 40px;
   }
+
   .telemetry-routine-card {
     bottom: 16px;
     left: 16px;
@@ -2758,60 +2412,75 @@
     max-width: 290px;
     padding: 16px 18px;
   }
+
   .services-grid-container,
   .pricing-cards-grid {
     grid-template-columns: 1fr;
   }
+
   .owner-features-grid,
   .trainer-features-grid {
     grid-template-columns: 1fr;
   }
+
   .gym-owner-fullwidth-section,
   .trainers-fullwidth-section {
     padding: 70px 0;
   }
+
   .newsletter-banner-box {
     flex-direction: column;
     padding: 28px 20px;
     gap: 28px;
     text-align: center;
   }
+
   .newsletter-photo-container {
     width: 100%;
     max-width: 320px;
     height: 240px;
   }
+
   .newsletter-tags-row {
     justify-content: center;
   }
+
   .newsletter-headline {
     margin-bottom: 22px;
   }
+
   .newsletter-form-wrapper {
     margin: 0 auto;
     width: 100%;
   }
+
   .join-ready-cta-section {
     padding: 70px 0;
   }
+
   .join-ready-headline {
     font-size: 2.2rem;
   }
+
   .join-ready-subtitle {
     font-size: 15px;
     margin-bottom: 28px;
   }
+
   .join-ready-primary-btn {
     padding: 13px 28px;
     font-size: 12px;
   }
+
   .footer-top-banner {
     flex-direction: column;
     text-align: center;
   }
+
   .footer-links-grid {
     grid-template-columns: 1fr;
   }
+
   .footer-bottom-copyright {
     flex-direction: column;
     gap: 10px;
@@ -2823,38 +2492,45 @@
   .fitnova-client-badge-wrapper {
     top: 90px;
   }
+
   .fitnova-client-top-pill {
     padding: 7px 12px;
   }
+
   .fitnova-client-text {
     font-size: 10px;
   }
+
   .fitnova-hero-title {
     font-size: 2.2rem;
   }
+
   .fitnova-hero-subtext {
     font-size: 14px;
   }
+
   .billing-toggle-wrapper {
     flex-direction: column;
     width: 100%;
   }
+
   .billing-btn {
     width: 100%;
     text-align: center;
   }
+
   .app-download-buttons-group {
     flex-direction: column;
     width: 100%;
   }
+
   .store-download-pill-btn {
     width: 100%;
     justify-content: center;
   }
+
   .owner-action-btn,
   .trainer-action-btn {
     width: 100%;
   }
 }
-
-

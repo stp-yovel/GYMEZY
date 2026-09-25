@@ -1,0 +1,238 @@
+/* ==========================================================================
+   DUAL ECOSYSTEM SHOWCASE SECTION ("One Platform. Double The Power.")
+   Strictly synchronized with GYMEZY Global Typography & Design Tokens
+   ========================================================================== */
+
+.about-why-section {
+  padding: 100px 0;
+  background: #ffffff;
+  position: relative;
+}
+
+.why-section-title {
+  font-family: var(--font-title, 'Urbanist', 'Plus Jakarta Sans', sans-serif);
+  font-size: clamp(2.2rem, 3.8vw, 3.2rem);
+  font-weight: 700;
+  color: var(--brand-text, #0f172a);
+  letter-spacing: -0.8px;
+  line-height: 1.15;
+  margin: 0 0 12px 0;
+}
+
+.title-serif-italic {
+  font-family: var(--font-serif-italic, 'Playfair Display', Georgia, serif);
+  font-style: italic;
+  font-weight: 600;
+  color: var(--brand-color, #00bf62);
+}
+
+.why-section-desc {
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--brand-muted, #64748b);
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+.why-dual-ecosystem-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px 1fr;
+  align-items: stretch;
+  gap: 36px;
+  margin-top: 55px;
+}
+
+/* Center Trainer Visual */
+.why-center-visual-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.why-trainer-img-wrapper {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.why-center-trainer-img {
+  width: 100%;
+  height: auto;
+  max-height: 560px;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 36px rgba(0, 0, 0, 0.1));
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.why-persona-panel {
+  background: #ffffff;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  padding: 0;
+}
+
+.panel-header {
+  min-height: 145px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.panel-persona-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--brand-color, #00bf62);
+  margin-bottom: 14px;
+  text-transform: uppercase;
+}
+
+.panel-persona-badge.owner-badge {
+  color: var(--brand-navy, #003882);
+}
+
+.persona-svg-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.panel-headline {
+  font-family: var(--font-title, 'Urbanist', 'Plus Jakarta Sans', sans-serif);
+  font-size: clamp(1.5rem, 2.1vw, 1.85rem);
+  font-weight: 700;
+  color: var(--brand-text, #0f172a);
+  line-height: 1.25;
+  letter-spacing: -0.5px;
+  margin: 0 0 8px 0;
+}
+
+.panel-subhead {
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 14px;
+  color: var(--brand-muted, #64748b);
+  line-height: 1.55;
+  margin: 0 0 24px 0;
+}
+
+.panel-features-list {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 1;
+  gap: 18px;
+  margin-bottom: 30px;
+}
+
+.panel-feature-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.feature-marker-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--brand-color, #00bf62);
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.feature-marker-dot.owner-dot {
+  background: var(--brand-navy, #003882);
+}
+
+.feature-text-block {
+  flex: 1;
+}
+
+.feature-title {
+  font-family: var(--font-title, 'Urbanist', 'Plus Jakarta Sans', sans-serif);
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--brand-text, #0f172a);
+  letter-spacing: -0.2px;
+  margin: 0 0 4px 0;
+}
+
+.feature-desc {
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #64748b;
+  margin: 0;
+}
+
+.panel-footer-action {
+  margin-top: auto;
+}
+
+.panel-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  padding: 15px 28px;
+  border-radius: 9999px;
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.2px;
+  text-decoration: none;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: none !important;
+}
+
+.athlete-cta {
+  background: var(--brand-color, #00bf62);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 191, 98, 0.25) !important;
+}
+
+.athlete-cta:hover {
+  background: var(--brand-color-hover, #009e50);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 191, 98, 0.38) !important;
+}
+
+.owner-cta {
+  background: var(--brand-navy, #003882);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 56, 130, 0.25) !important;
+}
+
+.owner-cta:hover {
+  background: #002b66;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 56, 130, 0.38) !important;
+}
+
+/* Responsive Rules */
+@media (max-width: 1024px) {
+  .why-dual-ecosystem-grid {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+
+  .panel-header {
+    min-height: auto;
+  }
+
+  .why-center-visual-col {
+    max-width: 280px;
+    margin: 0 auto;
+    order: -1;
+  }
+}

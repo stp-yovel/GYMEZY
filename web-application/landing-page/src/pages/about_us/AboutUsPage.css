@@ -695,15 +695,9 @@
   transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.why-trainer-img-wrapper:hover .why-center-trainer-img {
-  transform: scale(1.04);
-}
 
 .why-persona-panel {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 20px;
-  padding: 40px 34px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -711,17 +705,8 @@
   transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-.athlete-panel:hover {
-  transform: translateY(-4px);
-  border-color: #00bf62;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.06);
-}
 
-.owner-panel:hover {
-  transform: translateY(-4px);
-  border-color: #003882;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.06);
-}
+
 
 .panel-glow-accent {
   display: none;
@@ -735,18 +720,12 @@
   font-weight: 800;
   letter-spacing: 1.1px;
   color: #00bf62;
-  background: rgba(0, 191, 98, 0.08);
-  border: 1px solid rgba(0, 191, 98, 0.2);
-  padding: 6px 14px;
-  border-radius: 999px;
   margin-bottom: 20px;
   text-transform: uppercase;
 }
 
 .panel-persona-badge.owner-badge {
   color: #003882;
-  background: rgba(0, 56, 130, 0.08);
-  border-color: rgba(0, 56, 130, 0.2);
 }
 
 .persona-svg-icon {

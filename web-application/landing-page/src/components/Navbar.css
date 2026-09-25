@@ -116,7 +116,9 @@
 }
 
 .fitnova-primary-btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 12px 26px;
   background: var(--brand-color, #00BF62);
   color: #ffffff;
@@ -126,6 +128,9 @@
   letter-spacing: 0.8px;
   text-transform: uppercase;
   border-radius: var(--radius-button, 16px);
+  border: none;
+  outline: none;
+  cursor: pointer;
   text-decoration: none;
   box-shadow: none;
   transition: all 0.25s ease;

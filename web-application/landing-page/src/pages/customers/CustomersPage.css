@@ -308,15 +308,15 @@
   width: 285px;
   background: #000000;
   border: 7px solid transparent;
-  background-image: 
-    linear-gradient(#080c14, #080c14), 
+  background-image:
+    linear-gradient(#080c14, #080c14),
     linear-gradient(145deg, #ffffff 0%, #cbd5e1 30%, #94a3b8 60%, #e2e8f0 85%, #64748b 100%);
   background-origin: border-box;
   background-clip: padding-box, border-box;
   border-radius: 44px;
-  box-shadow: 
-    0 30px 80px rgba(0, 0, 0, 0.95), 
-    0 0 0 1px rgba(255, 255, 255, 0.35), 
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.95),
+    0 0 0 1px rgba(255, 255, 255, 0.35),
     0 0 45px rgba(0, 191, 98, 0.15);
   z-index: 10;
 }
@@ -768,6 +768,7 @@
     grid-template-columns: 1fr 1fr;
     gap: 36px;
   }
+
   .customer-hero-center {
     display: none;
   }
@@ -778,29 +779,35 @@
     grid-template-columns: 1fr;
     gap: 40px;
   }
+
   .customer-hero-left {
     align-items: center;
     text-align: center;
   }
+
   .customer-hero-pill {
     align-self: center;
   }
+
   .customer-hero-main-title {
     font-size: 34px;
   }
+
   .customer-checklist {
     align-items: flex-start;
   }
+
   .customer-hero-btn-group {
     justify-content: center;
   }
+
   .customer-phone-mockup {
     margin: 0 auto;
   }
 }
 
 /* ==========================================================================
-   PHILOSOPHY SECTION ("At GYMEZY, we believe" - PURE WHITE THEME)
+   PHILOSOPHY SECTION ("At GYMEZY, we believe" - Handled by PhilosophyCarousel component)
    ========================================================================== */
 .philosophy-section {
   padding: 90px 0;
@@ -808,217 +815,6 @@
   border-top: 1px solid #e2e8f0;
   border-bottom: 1px solid #e2e8f0;
   color: #0f172a;
-}
-
-.philosophy-header-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 36px;
-  gap: 20px;
-}
-
-.philosophy-title {
-  font-family: var(--font-title, 'Outfit', sans-serif);
-  font-size: clamp(2rem, 3.4vw, 2.8rem);
-  font-weight: 800;
-  line-height: 1.2;
-  letter-spacing: -0.8px;
-  color: #0f172a;
-  margin: 0;
-}
-
-.title-italic-accent {
-  font-family: 'Playfair Display', Georgia, serif;
-  font-style: italic;
-  font-weight: 400;
-  color: #00BF62;
-}
-
-.carousel-nav-arrows {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.carousel-arrow-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 1.5px solid #e2e8f0;
-  background: #ffffff;
-  color: #0f172a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: none;
-  transition: all 0.2s ease;
-}
-
-.carousel-arrow-btn svg {
-  width: 18px;
-  height: 18px;
-}
-
-.carousel-arrow-btn:hover,
-.carousel-arrow-btn.active {
-  background: #00BF62;
-  border-color: #00BF62;
-  color: #080C14;
-}
-
-/* Asymmetric Grid Layout */
-.philosophy-asymmetric-grid {
-  display: grid;
-  grid-template-columns: 1fr 1.22fr;
-  gap: 26px;
-  align-items: stretch;
-}
-
-.asymmetric-card-featured {
-  position: relative;
-  height: 480px;
-  border-radius: 26px;
-  overflow: hidden;
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.1);
-  background-color: #f1f5f9;
-}
-
-.asymmetric-right-column {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.asymmetric-right-cards-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 22px;
-  height: 330px;
-}
-
-.asymmetric-card-sm {
-  position: relative;
-  height: 100%;
-  border-radius: 22px;
-  overflow: hidden;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
-  background-color: #f1f5f9;
-  cursor: pointer;
-}
-
-.asymmetric-card-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.45s ease;
-}
-
-.asymmetric-card-featured:hover .asymmetric-card-img,
-.asymmetric-card-sm:hover .asymmetric-card-img {
-  transform: scale(1.04);
-}
-
-/* Floating Bottom Pill Overlay */
-.floating-card-pill-overlay {
-  position: absolute;
-  bottom: 18px;
-  left: 18px;
-  right: 18px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  backdrop-filter: blur(12px);
-  padding: 10px 14px 10px 22px;
-  border-radius: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  z-index: 5;
-}
-
-.floating-card-pill-overlay.sm-pill {
-  bottom: 12px;
-  left: 12px;
-  right: 12px;
-  padding: 7px 8px 7px 16px;
-}
-
-.pill-card-title {
-  font-family: var(--font-title, 'Outfit', sans-serif);
-  font-size: 15px;
-  font-weight: 700;
-  color: #0f172a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.floating-card-pill-overlay.sm-pill .pill-card-title {
-  font-size: 12.5px;
-}
-
-.pill-view-now-btn {
-  display: inline-block;
-  padding: 8px 18px;
-  background: #00BF62;
-  color: #080C14;
-  font-family: var(--font-main, sans-serif);
-  font-size: 12px;
-  font-weight: 800;
-  border-radius: 30px;
-  text-decoration: none;
-  white-space: nowrap;
-  box-shadow: none;
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.pill-view-now-btn:hover {
-  background: #00df73;
-  transform: translateY(-2px);
-}
-
-.philosophy-mission-block {
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  padding: 8px 0;
-  box-shadow: none;
-}
-
-.philosophy-mission-text {
-  font-size: 15.5px;
-  line-height: 1.65;
-  color: #475569;
-  font-weight: 500;
-  margin: 0;
-  max-width: 620px;
-}
-
-@media (max-width: 900px) {
-  .philosophy-asymmetric-grid {
-    grid-template-columns: 1fr;
-  }
-  .asymmetric-card-featured {
-    height: 380px;
-  }
-  .asymmetric-right-cards-row {
-    height: 280px;
-  }
-}
-
-@media (max-width: 600px) {
-  .asymmetric-right-cards-row {
-    grid-template-columns: 1fr;
-    height: auto;
-    gap: 16px;
-  }
-  .asymmetric-card-sm {
-    height: 240px;
-  }
 }
 
 .section-category-pill {
@@ -1343,9 +1139,6 @@
 .app-feature-icon-badge {
   width: 44px;
   height: 44px;
-  border-radius: 12px;
-  background: #f0fdf4;
-  border: 1px solid #dcfce7;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1355,12 +1148,6 @@
   transition: all 0.25s ease;
 }
 
-.app-feature-item:hover .app-feature-icon-badge {
-  background: #dcfce7;
-  border-color: #00BF62;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 191, 98, 0.15);
-}
 
 .app-feature-svg-icon {
   width: 22px;
@@ -1543,12 +1330,15 @@
     gap: 48px;
     text-align: center;
   }
+
   .mobile-app-info-col {
     align-items: center;
   }
+
   .mobile-app-description {
     text-align: center;
   }
+
   .app-download-buttons-group {
     justify-content: center;
   }
@@ -1737,6 +1527,7 @@
 
 /* Responsive */
 @media (max-width: 1024px) {
+
   .customer-benefits-grid,
   .featured-gyms-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -1747,33 +1538,41 @@
   .customer-nav-links {
     display: none;
   }
+
   .customer-hero-title {
     font-size: 38px;
   }
+
   .customer-search-box {
     flex-direction: column;
     border-radius: 24px;
     padding: 16px;
     gap: 12px;
   }
+
   .search-divider {
     display: none;
   }
+
   .search-query-field {
     padding-left: 0;
   }
+
   .search-submit-btn {
     width: 100%;
     justify-content: center;
   }
+
   .customer-benefits-grid,
   .featured-gyms-grid {
     grid-template-columns: 1fr;
   }
+
   .customer-hero-trust-row {
     flex-direction: column;
     gap: 10px;
   }
+
   .trust-separator {
     display: none;
   }

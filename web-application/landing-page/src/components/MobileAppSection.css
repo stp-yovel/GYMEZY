@@ -1,0 +1,253 @@
+/* ==========================================================================
+   MOBILE APP SHOWCASE COMPONENT CSS
+   Strictly synchronized with GYMEZY Global Typography & Design Tokens
+   ========================================================================== */
+
+.mobile-app-section {
+  padding: 100px 0;
+  background: #ffffff;
+  position: relative;
+  overflow: hidden;
+  color: var(--brand-text, #0f172a);
+}
+
+.mobile-app-layout {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 56px;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+}
+
+.mobile-app-info-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.section-category-pill {
+  display: inline-block;
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand-color, #00bf62);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.mobile-app-heading {
+  font-family: var(--font-title, 'Urbanist', 'Plus Jakarta Sans', sans-serif);
+  font-size: clamp(2.2rem, 3.8vw, 3.2rem);
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--brand-text, #0f172a);
+  margin: 12px 0 16px 0;
+  letter-spacing: -0.6px;
+}
+
+.title-italic-accent {
+  font-family: var(--font-serif-italic, 'Playfair Display', Georgia, serif);
+  font-style: italic;
+  font-weight: 600;
+  color: var(--brand-color, #00bf62);
+}
+
+.mobile-app-description {
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--brand-muted, #64748b);
+  max-width: 540px;
+  margin-bottom: 32px;
+}
+
+.mobile-app-features-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 38px;
+  width: 100%;
+}
+
+.app-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.app-feature-icon-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--brand-color, #00bf62);
+  margin-top: 1px;
+  transition: all 0.25s ease;
+}
+
+.app-feature-svg-icon {
+  width: 22px;
+  height: 22px;
+  stroke: var(--brand-color, #00bf62);
+}
+
+.app-feature-text-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-feature-title {
+  font-family: var(--font-title, 'Urbanist', 'Plus Jakarta Sans', sans-serif);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--brand-text, #0f172a);
+  margin: 0;
+}
+
+.app-feature-sub {
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 13.5px;
+  color: var(--brand-muted, #64748b);
+  margin: 0;
+}
+
+/* Offer CTA Button */
+.mobile-app-cta-group {
+  margin-bottom: 28px;
+}
+
+.mobile-app-offer-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 36px;
+  background: var(--brand-color, #00bf62);
+  color: #ffffff;
+  border: none;
+  border-radius: 9999px;
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0 10px 25px -4px rgba(0, 191, 98, 0.4);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mobile-app-offer-btn:hover {
+  background: #00d970;
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px -4px rgba(0, 191, 98, 0.55);
+}
+
+/* Social Proof */
+.app-social-proof-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 13.5px;
+  color: var(--brand-muted, #64748b);
+}
+
+.app-stars-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #f59e0b;
+}
+
+.app-star {
+  font-size: 14px;
+}
+
+.app-rating-number {
+  color: var(--brand-text, #0f172a);
+  font-weight: 700;
+  margin-left: 4px;
+  font-size: 13px;
+}
+
+.app-proof-separator {
+  color: #cbd5e1;
+}
+
+.app-downloads-count {
+  font-weight: 600;
+  color: #475569;
+}
+
+/* Left Column: 3D Smartphone Mockup Showcase */
+.mobile-app-mockup-col {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.phone-mockup-showcase-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.phone-mockup-card-wrapper {
+  position: relative;
+  max-width: 530px;
+  width: 100%;
+}
+
+.phone-mockup-rendered-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: transparent;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.phone-mockup-rendered-img:hover {
+  transform: translateY(-8px) scale(1.02);
+}
+
+/* Responsive adjustments */
+@media (max-width: 960px) {
+  .mobile-app-layout {
+    grid-template-columns: 1fr;
+    gap: 48px;
+    text-align: center;
+  }
+
+  .mobile-app-info-col {
+    align-items: center;
+  }
+
+  .mobile-app-description {
+    max-width: 100%;
+  }
+
+  .mobile-app-features-grid {
+    align-items: center;
+  }
+
+  .app-feature-item {
+    text-align: left;
+    max-width: 380px;
+  }
+
+  .app-download-buttons-group {
+    justify-content: center;
+  }
+
+  .app-social-proof-row {
+    justify-content: center;
+  }
+}

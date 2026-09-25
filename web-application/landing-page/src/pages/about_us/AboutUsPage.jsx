@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
-import gymezyLogo from '../../assets/logo/gymezy.png';
-import heroBgImg from '../../assets/fitnova_hero_bg.jpg';
 import gymModelThumb from '../../assets/gym_model.jpg';
-import trainerImg from '../../assets/trainer.png';
+import StorySplitSection from '../../components/StorySplitSection';
+import DualEcosystemSection from '../../components/DualEcosystemSection';
+import GymAlertsBanner from '../../components/GymAlertsBanner';
+import Footer from '../../components/Footer';
+import { openLeadModal } from '../../utils/modalUtils';
 import './AboutUsPage.css';
 
 export default function AboutUsPage() {
@@ -69,44 +71,6 @@ export default function AboutUsPage() {
     }
   ];
 
-  const athleteBenefits = [
-    {
-      title: 'Multi-Gym Freedom',
-      desc: 'Single pass unlocks weights, CrossFit, and cardio floors across the city with zero contracts.'
-    },
-    {
-      title: 'Hyperlocal Discovery',
-      desc: 'Find verified gyms nearby with live crowd levels, equipment lists, and AC/shower amenities.'
-    },
-    {
-      title: 'Certified Personal Trainers',
-      desc: 'Book verified 1-on-1 fitness coaches for single sessions or custom training blocks on demand.'
-    },
-    {
-      title: 'Instant QR Walk-ins',
-      desc: 'No front-desk paperwork. Purchase on your phone, scan the QR code at reception, and start lifting.'
-    }
-  ];
-
-  const ownerBenefits = [
-    {
-      title: 'Monetize Off-Peak Hours',
-      desc: 'Attract high-intent fitness seekers during slower morning and afternoon slots effortlessly.'
-    },
-    {
-      title: 'Zero Risk & Fast Payouts',
-      desc: 'Free partner onboarding with transparent automated weekly settlements directly to your bank.'
-    },
-    {
-      title: 'Turnkey Partner Dashboard',
-      desc: 'Real-time attendance logging, digital QR check-in scanning, and member analytics in one clean app.'
-    },
-    {
-      title: 'Hyperlocal Member Reach',
-      desc: 'Top search placement when local fitness enthusiasts look for gym passes and personal trainers nearby.'
-    }
-  ];
-
   return (
     <div className="about-page-wrapper">
       {/* Universal Sticky Navbar */}
@@ -143,9 +107,14 @@ export default function AboutUsPage() {
             </p>
 
             <div className="about-hero-cta-row">
-              <Link to="/customers" className="about-primary-btn lg-btn">
+              <button
+                type="button"
+                onClick={() => openLeadModal({ category: 'partner', plan: 'About Us Hero Partner Onboarding' })}
+                className="about-primary-btn lg-btn"
+                style={{ border: 'none', outline: 'none', cursor: 'pointer' }}
+              >
                 GET STARTED
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -173,110 +142,7 @@ export default function AboutUsPage() {
       {/* =================================================================
           2. OUR STORY SECTION (DYNAMIC ANGLED SPLIT DESIGN)
           ================================================================= */}
-      <section className="about-story-split-section" id="story">
-        <div className="section-container">
-          <div className="story-split-layout">
-            {/* Left Column: Angled Parallelogram Visuals with Checkerboard Pattern */}
-            <div className="story-visuals-col">
-              <div className="story-angled-cards-wrapper">
-                {/* Photo 1 */}
-                <div className="story-angled-card card-one">
-                  <img
-                    src="https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&w=800&q=80"
-                    alt="Athlete training with dumbbells"
-                    className="story-angled-img"
-                  />
-                </div>
-
-                {/* Accent Ribbon Tab behind Photo 2 */}
-                <div className="story-accent-tab" />
-
-                {/* Photo 2 */}
-                <div className="story-angled-card card-two">
-                  <img
-                    src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80"
-                    alt="Fitness trainer guiding seated athlete"
-                    className="story-angled-img"
-                  />
-                </div>
-              </div>
-
-              {/* Checkerboard Decorative Pattern */}
-              <div className="story-checkerboard-graphic">
-                <div className="checker-row">
-                  <span className="c-box b-dark" />
-                  <span className="c-box b-light" />
-                  <span className="c-box b-dark" />
-                  <span className="c-box b-light" />
-                  <span className="c-box b-dark" />
-                  <span className="c-box b-light" />
-                </div>
-                <div className="checker-row">
-                  <span className="c-box b-light" />
-                  <span className="c-box b-dark" />
-                  <span className="c-box b-light" />
-                  <span className="c-box b-dark" />
-                  <span className="c-box b-light" />
-                  <span className="c-box b-dark" />
-                </div>
-                <div className="checker-row">
-                  <span className="c-box b-dark" />
-                  <span className="c-box b-light" />
-                  <span className="c-box b-dark" />
-                  <span className="c-box b-light" />
-                  <span className="c-box b-dark" />
-                  <span className="c-box b-light" />
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: Heading, Desc, Mission Quote Card & CTA */}
-            <div className="story-content-col">
-
-              <h2 className="story-headline">
-                Born to Connect
-                <br />
-                <span className="title-serif-italic">Every Gym Around You</span>
-              </h2>
-
-              <p className="story-paragraph">
-                GYMEZY started with a simple vision: fitness shouldn't be trapped behind rigid contracts or locked into just one facility. We set out to unite every neighborhood gym, elite fitness center, and certified personal trainer into one intuitive app—giving you the ultimate freedom to train anywhere, anytime.
-              </p>
-
-              {/* Mission Quote Card */}
-              <div className="story-quote-card">
-                <div className="quote-watermark-icon">
-                  <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
-                  </svg>
-                </div>
-                <p className="quote-card-text">
-                  "We built GYMEZY so anyone can open the app, find the best nearby gym in seconds, book a day pass or trainer session, and walk right in. No paperwork, no lock-ins—just seamless fitness."
-                </p>
-              </div>
-
-              {/* Bottom Actions: Learn More Button & Profile Info */}
-              <div className="story-bottom-row">
-                <Link to="/customers" className="story-learn-btn">
-                  <span>Explore Gyms & Passes</span>
-                </Link>
-
-                <div className="story-author-profile">
-                  <img
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"
-                    alt="GYMEZY Team"
-                    className="story-author-avatar"
-                  />
-                  <div className="story-author-info">
-                    <span className="author-name">GYMEZY Team</span>
-                    <span className="author-role">Founding Mission</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <StorySplitSection id="story" />
 
       {/* =================================================================
           3. OUR CORE VALUES (ARCHITECTURAL DARK BENTO GRID)
@@ -320,218 +186,17 @@ export default function AboutUsPage() {
       {/* =================================================================
           4. WHY GYMEZY SECTION (DUAL-PERSONA ECOSYSTEM SHOWCASE)
           ================================================================= */}
-      <section className="about-why-section">
-        <div className="section-container">
-          <div className="section-centered-header">
-            <h2 className="why-section-title">
-              One Platform. <span className="title-serif-italic">Double The Power.</span>
-            </h2>
-            <p className="why-section-desc">
-              Engineered specifically to eliminate friction for trainees and scale sustainable revenue for gym owners.
-            </p>
-          </div>
-
-          <div className="why-dual-ecosystem-grid">
-            {/* Persona Card 1: For Athletes */}
-            <div className="why-persona-panel athlete-panel">
-              <div className="panel-header">
-                <div className="panel-persona-badge">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="persona-svg-icon">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
-                  <span>FOR FITNESS SEEKERS</span>
-                </div>
-                <h3 className="panel-headline">Workout on Your Own Terms</h3>
-                <p className="panel-subhead">Total freedom of choice across premier gyms in your city.</p>
-              </div>
-
-              <div className="panel-features-list">
-                {athleteBenefits.map((item, i) => (
-                  <div key={i} className="panel-feature-row">
-                    <div className="feature-marker-dot" />
-                    <div className="feature-text-block">
-                      <h4 className="feature-title">{item.title}</h4>
-                      <p className="feature-desc">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="panel-footer-action">
-                <Link to="/customers" className="panel-cta-btn athlete-cta">
-                  <span>Explore Passes & Nearby Gyms</span>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="panel-btn-arrow">
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                    <polyline points="12 5 19 12 12 19" />
-                  </svg>
-                </Link>
-              </div>
-            </div>
-
-            {/* Center Trainer Visual */}
-            <div className="why-center-visual-col">
-              <div className="why-trainer-img-wrapper">
-                <img
-                  src={trainerImg}
-                  alt="GYMEZY Fitness Athletes"
-                  className="why-center-trainer-img"
-                />
-              </div>
-            </div>
-
-            {/* Persona Card 2: For Gym Owners */}
-            <div className="why-persona-panel owner-panel">
-              <div className="panel-header">
-                <div className="panel-persona-badge owner-badge">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="persona-svg-icon">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                    <polyline points="9 22 9 12 15 12 15 22" />
-                  </svg>
-                  <span>FOR GYM & STUDIO OWNERS</span>
-                </div>
-                <h3 className="panel-headline">Scale Footfall & Maximize Revenue</h3>
-                <p className="panel-subhead">Transform empty equipment slots into predictable, recurring profit.</p>
-              </div>
-
-              <div className="panel-features-list">
-                {ownerBenefits.map((item, i) => (
-                  <div key={i} className="panel-feature-row">
-                    <div className="feature-marker-dot owner-dot" />
-                    <div className="feature-text-block">
-                      <h4 className="feature-title">{item.title}</h4>
-                      <p className="feature-desc">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="panel-footer-action">
-                <Link to="/gym-owners" className="panel-cta-btn owner-cta">
-                  <span>List Your Gym on GYMEZY</span>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="panel-btn-arrow">
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                    <polyline points="12 5 19 12 12 19" />
-                  </svg>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-
+      <DualEcosystemSection id="why" />
 
       {/* =================================================================
-          6. NEWSLETTER BANNER (LANDING PAGE VIP NEWSLETTER BANNER)
+          6. NEWSLETTER / ALERTS BANNER
           ================================================================= */}
-      <section className="vip-newsletter-section">
-        <div className="section-container">
-          <div className="newsletter-banner-box">
-            {/* Left Athlete Photo Card */}
-            <div className="newsletter-photo-container">
-              <img
-                src="https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=800&q=80"
-                alt="Athlete dumbbell training"
-                className="newsletter-athlete-img"
-              />
-            </div>
-
-            {/* Right Content */}
-            <div className="newsletter-content-group">
-              {/* Tag Pills */}
-              <div className="newsletter-tags-row">
-                <span className="newsletter-tag-outline">Stay Updated</span>
-                <span className="newsletter-tag-solid">GYMEZY Alerts</span>
-              </div>
-
-              {/* Headline with luxury serif italics */}
-              <h2 className="newsletter-headline">
-                Get the latest <span className="newsletter-serif-italic">Gym Openings</span>, flash{' '}
-                <span className="newsletter-serif-italic">Pass Discounts</span>, and expert fitness tips!
-              </h2>
-
-              {/* Form Input with send button */}
-              <form className="newsletter-form-wrapper" onSubmit={(e) => e.preventDefault()}>
-                <div className="newsletter-input-container">
-                  <input
-                    type="email"
-                    placeholder="Enter your email address..."
-                    className="newsletter-pill-input"
-                    required
-                  />
-                  <button type="submit" className="newsletter-send-circle-btn" aria-label="Subscribe">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                    </svg>
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      </section>
+      <GymAlertsBanner id="newsletter" />
 
       {/* =================================================================
           7. COMMON SITE FOOTER
           ================================================================= */}
-      <footer className="site-footer" id="contact">
-        <div className="section-container">
-          <div className="footer-links-grid">
-            <div className="footer-brand-col">
-              <div className="fitnova-logo footer-logo">
-                <img src={gymezyLogo} alt="GYMEZY Logo" className="fitnova-logo-img footer-logo-img" />
-                <span className="fitnova-logo-text">GYMEZY</span>
-              </div>
-              <p className="footer-brand-desc">
-                GYMEZY connects fitness enthusiasts with top-rated gyms, certified trainers, and flexible passes across your city with zero lock-in contracts.
-              </p>
-            </div>
-
-            <div className="footer-nav-col">
-              <h4 className="footer-col-header">Explore</h4>
-              <Link to="/">Home</Link>
-              <Link to="/about">About GYMEZY</Link>
-              <Link to="/customers">For Customers</Link>
-              <Link to="/gym-owners">For Gym Owners</Link>
-              <a href="/#app">Mobile App</a>
-            </div>
-
-            <div className="footer-nav-col">
-              <h4 className="footer-col-header">Partnerships</h4>
-              <Link to="/gym-owners">For Gym Owners</Link>
-              <Link to="/gym-owners">Partner Pricing Plans</Link>
-              <Link to="/gym-owners">Front-Desk Scanner</Link>
-              <Link to="/gym-owners">GMS Operations</Link>
-            </div>
-
-            <div className="footer-nav-col footer-contact-col">
-              <h4 className="footer-col-header">Contact &amp; Office</h4>
-              <div className="footer-contact-item-stacked">
-                <span className="contact-col-label">Registered office:</span>
-                <span className="contact-col-val">Office location</span>
-              </div>
-              <div className="footer-contact-item-stacked">
-                <span className="contact-col-label">Phone Number:</span>
-                <span className="contact-col-val">
-                  <a href="tel:9150955071">9150955071</a> / <a href="tel:9884881983">9884881983</a>
-                </span>
-              </div>
-              <div className="footer-contact-item-stacked">
-                <span className="contact-col-label">Email:</span>
-                <span className="contact-col-val">
-                  <a href="mailto:praveen.k@gymezy.com">praveen.k@gymezy.com</a>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="footer-bottom-copyright">
-            <span>© {new Date().getFullYear()} GYMEZY Fitness Network. All rights reserved.</span>
-            <span>Empowering athletes, gyms, and coaches everywhere.</span>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

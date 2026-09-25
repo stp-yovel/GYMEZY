@@ -1,0 +1,186 @@
+/* ==========================================================================
+   UNIVERSAL FOOTER COMPONENT STYLES
+   ========================================================================== */
+
+.site-footer {
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  padding: 70px 0 36px 0;
+  color: #0f172a;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.footer-links-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1.2fr;
+  gap: 40px;
+  margin-bottom: 50px;
+}
+
+.footer-brand-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.footer-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.footer-logo-img {
+  height: 38px;
+  width: auto;
+  object-fit: contain;
+}
+
+.footer-logo-text {
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  color: #0f172a;
+}
+
+.footer-brand-desc {
+  font-size: 13.5px;
+  color: #64748b;
+  line-height: 1.65;
+  max-width: 320px;
+  margin-top: 14px;
+}
+
+.footer-col-header {
+  font-family: var(--font-title, 'Urbanist', 'Plus Jakarta Sans', sans-serif);
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 18px;
+  letter-spacing: -0.3px;
+}
+
+.footer-nav-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.footer-nav-col a {
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 14.5px;
+  font-weight: 500;
+  color: #64748b;
+  text-decoration: none;
+  display: inline-block;
+  width: fit-content;
+  padding: 3px 24px 3px 0;
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform, color;
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.28s ease;
+}
+
+.footer-nav-col a:hover {
+  color: var(--brand-color, #00bf62);
+  transform: translate3d(6px, 0, 0);
+  -webkit-transform: translate3d(6px, 0, 0);
+}
+
+.footer-contact-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.footer-contact-item-stacked {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #64748b;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contact-col-label {
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.contact-col-val {
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  color: #64748b;
+  font-size: 13.5px;
+}
+
+.contact-col-val a {
+  color: #64748b;
+  text-decoration: none;
+  transition: color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.contact-col-val a:hover {
+  color: var(--brand-color, #00bf62);
+}
+
+.footer-bottom-copyright {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #94a3b8;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.footer-craft-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.footer-crafted-by {
+  color: #7b8a9c;
+  font-weight: 500;
+  font-size: 13.5px;
+}
+
+.footer-softrate-brand {
+  color: #0f172a;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: -0.2px;
+}
+
+.footer-heart-svg {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+@media (max-width: 992px) {
+  .footer-links-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 36px;
+  }
+}
+
+@media (max-width: 640px) {
+  .footer-links-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .footer-bottom-copyright {
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
+  }
+}
