@@ -10,7 +10,7 @@ import DualEcosystemSection from '../../components/DualEcosystemSection';
 import MobileAppSection from '../../components/MobileAppSection';
 import GymAlertsBanner from '../../components/GymAlertsBanner';
 import Footer from '../../components/Footer';
-import { openLeadModal, openUserLeadModal } from '../../utils/modalUtils';
+import { openLeadModal, openUserLeadModal, openVideoModal } from '../../utils/modalUtils';
 
 export default function LandingPage() {
   const [activeService, setActiveService] = useState(0);
@@ -354,7 +354,12 @@ export default function LandingPage() {
 
         {/* Sticky Floating Watch Video Pill */}
         <div className="fitnova-sticky-video-widget">
-          <a href="#video-tour" className="fitnova-watch-video-pill" aria-label="Watch Video Preview">
+          <button
+            type="button"
+            className="fitnova-watch-video-pill"
+            onClick={() => openVideoModal({ video: 'reason' })}
+            aria-label="Watch GYMEZY Platform Video"
+          >
             <span className="watch-video-label">Watch Video</span>
             <div className="watch-video-thumb-circle">
               <img src={gymModelThumb} alt="Video preview thumbnail" />
@@ -364,7 +369,7 @@ export default function LandingPage() {
                 </svg>
               </div>
             </div>
-          </a>
+          </button>
         </div>
 
         {/* Ant Design FloatButton with Circular Progress Ring */}

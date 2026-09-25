@@ -8,6 +8,7 @@ import AboutUsPage from './pages/about_us';
 import TrainersPage from './pages/trainers';
 import LeadCaptureModal from './components/LeadCaptureModal';
 import UserLeadCaptureModal from './components/UserLeadCaptureModal';
+import VideoModal from './components/VideoModal';
 
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
@@ -40,6 +41,12 @@ export default function App() {
     offerTag: 'Launch Offer (50% Off)'
   });
 
+  // Video Player Modal State
+  const [videoModalState, setVideoModalState] = useState({
+    isOpen: false,
+    video: 'reason'
+  });
+
   useEffect(() => {
     const handleOpenEvent = (e) => {
       const { category = 'demo', plan = '' } = e.detail || {};
@@ -58,12 +65,22 @@ export default function App() {
       });
     };
 
+    const handleOpenVideoEvent = (e) => {
+      const { video = 'reason' } = e.detail || {};
+      setVideoModalState({
+        isOpen: true,
+        video
+      });
+    };
+
     window.addEventListener('gymezy:open-lead-modal', handleOpenEvent);
     window.addEventListener('gymezy:open-user-lead-modal', handleOpenUserEvent);
+    window.addEventListener('gymezy:open-video-modal', handleOpenVideoEvent);
 
     return () => {
       window.removeEventListener('gymezy:open-lead-modal', handleOpenEvent);
       window.removeEventListener('gymezy:open-user-lead-modal', handleOpenUserEvent);
+      window.removeEventListener('gymezy:open-video-modal', handleOpenVideoEvent);
     };
   }, []);
 
@@ -73,6 +90,10 @@ export default function App() {
 
   const handleCloseUserModal = () => {
     setUserModalState((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  const handleCloseVideoModal = () => {
+    setVideoModalState((prev) => ({ ...prev, isOpen: false }));
   };
 
   return (
@@ -102,6 +123,13 @@ export default function App() {
         isOpen={userModalState.isOpen}
         onClose={handleCloseUserModal}
         offerTag={userModalState.offerTag}
+      />
+
+      {/* GYMEZY Video Player Lightbox Modal */}
+      <VideoModal
+        isOpen={videoModalState.isOpen}
+        onClose={handleCloseVideoModal}
+        defaultVideo={videoModalState.video}
       />
     </BrowserRouter>
   );

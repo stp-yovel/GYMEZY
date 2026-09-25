@@ -6,7 +6,7 @@ import StorySplitSection from '../../components/StorySplitSection';
 import DualEcosystemSection from '../../components/DualEcosystemSection';
 import GymAlertsBanner from '../../components/GymAlertsBanner';
 import Footer from '../../components/Footer';
-import { openLeadModal } from '../../utils/modalUtils';
+import { openLeadModal, openVideoModal } from '../../utils/modalUtils';
 import './AboutUsPage.css';
 
 export default function AboutUsPage() {
@@ -121,7 +121,12 @@ export default function AboutUsPage() {
 
         {/* Floating Watch Video Corner Pill */}
         <div className="about-hero-watch-corner">
-          <a href="#story" className="about-watch-video-pill" aria-label="Watch Story">
+          <button
+            type="button"
+            className="about-watch-video-pill"
+            onClick={() => openVideoModal({ video: 'reason' })}
+            aria-label="Watch GYMEZY Story Video"
+          >
             <span className="about-watch-video-label">Watch Video</span>
             <span className="about-watch-video-thumb">
               <img
@@ -135,7 +140,7 @@ export default function AboutUsPage() {
                 </svg>
               </span>
             </span>
-          </a>
+          </button>
         </div>
       </section>
 

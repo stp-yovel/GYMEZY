@@ -1,0 +1,499 @@
+/* ==========================================================================
+   GYMEZY CINEMA VIDEO LIGHTBOX MODAL — EDGE-TO-EDGE FULL-BLEED DESIGN
+   ========================================================================== */
+
+.gymezy-video-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: videoBackdropFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes videoBackdropFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Edge-to-Edge Modal Card */
+.gymezy-video-modal-panel.edge-to-edge {
+  position: relative;
+  width: 100%;
+  max-width: 980px;
+  aspect-ratio: 16 / 9.6;
+  background: #000000;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.8), 0 0 50px rgba(0, 191, 98, 0.16);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: videoPanelScaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes videoPanelScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Full-bleed video viewport */
+.video-viewport-wrapper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #000000;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.video-full-bleed-element {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Side Navigation Swap Arrows (Hover on left/right edge) */
+.video-side-nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 15;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  outline: none;
+}
+
+.video-viewport-wrapper:hover .video-side-nav-arrow {
+  opacity: 0.85;
+}
+
+.video-side-nav-arrow:hover {
+  opacity: 1 !important;
+  background: rgba(0, 191, 98, 0.95);
+  color: #000000;
+  border-color: #00bf62;
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 0 20px rgba(0, 191, 98, 0.4);
+}
+
+.side-arrow-left {
+  left: 20px;
+}
+
+.side-arrow-right {
+  right: 20px;
+}
+
+/* Center Play/Pause Indicator (Minimal Frosted Glass) */
+.video-center-play-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 12;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.25s ease, border-color 0.25s ease;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.video-viewport-wrapper:hover .video-center-play-badge.is-paused {
+  transform: translate(-50%, -50%) scale(1.08);
+  background: rgba(0, 0, 0, 0.48);
+  border-color: rgba(255, 255, 255, 0.38);
+}
+
+.video-center-play-badge.is-animating {
+  animation: centerBadgePop 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes centerBadgePop {
+  0% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 0;
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   TOP BLACK GRADIENT OVERLAY
+   ========================================================================== */
+
+.video-overlay-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: linear-gradient(180deg,
+      rgba(0, 0, 0, 0.98) 0%,
+      rgba(0, 0, 0, 0.86) 45%,
+      rgba(0, 0, 0, 0.4) 80%,
+      transparent 100%);
+  padding: 18px 24px 34px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  pointer-events: auto;
+}
+
+/* Top Header Row */
+.video-overlay-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.video-overlay-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.video-overlay-logo {
+  height: 32px;
+  width: auto;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+.video-overlay-headline {
+  margin: 0;
+  font-family: var(--font-title, 'Outfit', sans-serif);
+  font-size: 17px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+}
+
+.video-overlay-close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e2e8f0;
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+}
+
+.video-overlay-close-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #ff6b6b;
+  transform: rotate(90deg) scale(1.08);
+}
+
+
+/* ==========================================================================
+   BOTTOM BLACK GRADIENT OVERLAY
+   ========================================================================== */
+
+.video-overlay-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.94) 0%,
+    rgba(0, 0, 0, 0.75) 45%,
+    transparent 100%
+  );
+  padding: 16px 24px 18px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+/* Custom Timeline Scrubber */
+.video-scrubber-container {
+  width: 100%;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.video-scrubber-track {
+  position: relative;
+  width: 100%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  overflow: hidden;
+  transition: height 0.2s ease;
+}
+
+.video-scrubber-container:hover .video-scrubber-track {
+  height: 6px;
+}
+
+.video-scrubber-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  bottom: 0;
+  background: #00bf62;
+  border-radius: 6px;
+  box-shadow: none;
+  transform-origin: left center;
+  transform: scaleX(0);
+  will-change: transform;
+}
+
+
+/* Bottom Controls & Actions Row */
+.video-overlay-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.video-controls-info-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 260px;
+}
+
+.video-control-icon-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.video-control-icon-btn:hover {
+  background: rgba(0, 191, 98, 0.2);
+  border-color: #00bf62;
+  color: #00bf62;
+  transform: scale(1.08);
+}
+
+.video-timestamp {
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.video-caption-text {
+  margin: 0;
+  font-family: var(--font-main, 'Plus Jakarta Sans', sans-serif);
+  font-size: 13px;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+/* Right Action Buttons */
+.video-controls-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.video-cta-btn-primary {
+  padding: 9px 20px;
+  background: #00bf62;
+  border: 1px solid #00bf62;
+  border-radius: 999px;
+  color: #000000;
+  font-family: var(--font-title, 'Outfit', sans-serif);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  box-shadow: 0 4px 14px rgba(0, 191, 98, 0.35);
+}
+
+.video-cta-btn-primary:hover {
+  background: #00df73;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 191, 98, 0.55);
+}
+
+.video-cta-btn-secondary {
+  padding: 9px 18px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  color: #ffffff;
+  font-family: var(--font-title, 'Outfit', sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.video-cta-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-2px);
+}
+
+/* ==========================================================================
+   RESPONSIVE OPTIMIZATIONS
+   ========================================================================== */
+
+@media (max-width: 900px) {
+  .gymezy-video-modal-panel.edge-to-edge {
+    aspect-ratio: auto;
+    min-height: 480px;
+  }
+
+  .video-caption-text {
+    display: none;
+  }
+
+  .video-overlay-top {
+    padding: 14px 18px 26px 18px;
+  }
+
+  .video-overlay-bottom {
+    padding: 26px 18px 16px 18px;
+  }
+}
+
+@media (max-width: 640px) {
+  .gymezy-video-modal-backdrop {
+    padding: 10px;
+  }
+
+  .gymezy-video-modal-panel.edge-to-edge {
+    border-radius: 18px;
+    min-height: 520px;
+  }
+
+  .video-overlay-top {
+    padding: 12px 14px 20px 14px;
+    gap: 10px;
+  }
+
+  .video-overlay-headline {
+    font-size: 14.5px;
+  }
+
+
+
+  .side-arrow-left {
+    left: 8px;
+  }
+
+  .side-arrow-right {
+    right: 8px;
+  }
+
+  .video-side-nav-arrow {
+    width: 36px;
+    height: 36px;
+  }
+
+  .video-overlay-bottom {
+    padding: 20px 14px 14px 14px;
+  }
+
+  .video-overlay-actions-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .video-controls-info-left {
+    justify-content: flex-start;
+  }
+
+  .video-controls-actions-right {
+    width: 100%;
+  }
+
+  .video-cta-btn-primary,
+  .video-cta-btn-secondary {
+    flex: 1;
+    text-align: center;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}

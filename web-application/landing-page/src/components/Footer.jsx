@@ -43,7 +43,9 @@ export default function Footer() {
             <h4 className="footer-col-header">Contact &amp; Office</h4>
             <div className="footer-contact-item-stacked">
               <span className="contact-col-label">Registered office:</span>
-              <span className="contact-col-val">Office location</span>
+              <span className="contact-col-val">
+                Second Floor, Mahalakshmi Nagar, Plot No 5, Jyothi Nagar, Moulivakkam, Kolathuvancheri, Tamil Nadu 600125
+              </span>
             </div>
             <div className="footer-contact-item-stacked">
               <span className="contact-col-label">Phone Number:</span>

@@ -23,8 +23,21 @@ export function openUserLeadModal({ offerTag = 'Launch Offer (50% Off)' } = {}) 
   window.dispatchEvent(event);
 }
 
+/**
+ * Global helper to trigger the GYMEZY Video Player Modal
+ * @param {Object} [options]
+ * @param {'intro' | 'reason'} [options.video='intro']
+ */
+export function openVideoModal({ video = 'reason' } = {}) {
+  const event = new CustomEvent('gymezy:open-video-modal', {
+    detail: { video }
+  });
+  window.dispatchEvent(event);
+}
+
 // Attach to window object for non-React callers or inline clicks
 if (typeof window !== 'undefined') {
   window.openGymezyLeadModal = openLeadModal;
   window.openGymezyUserModal = openUserLeadModal;
+  window.openGymezyVideoModal = openVideoModal;
 }
