@@ -39,10 +39,52 @@ export default function VideoModal({ isOpen, onClose, defaultVideo = 'reason' })
   const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [showCenterIcon, setShowCenterIcon] = useState(false);
+  const [showControls, setShowControls] = useState(true);
 
   const videoRef = useRef(null);
   const panelRef = useRef(null);
   const scrubberFillRef = useRef(null);
+  const hideTimeoutRef = useRef(null);
+
+  const resetHideTimer = () => {
+    setShowControls(true);
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+    }
+    if (isPlaying) {
+      hideTimeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 2500);
+    }
+  };
+
+  const handleMouseMove = () => {
+    resetHideTimer();
+  };
+
+  const handleMouseLeave = () => {
+    if (isPlaying) {
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+      setShowControls(false);
+    }
+  };
+
+  // Reset controls visibility when play/pause changes
+  useEffect(() => {
+    if (!isPlaying) {
+      setShowControls(true);
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    } else {
+      resetHideTimer();
+    }
+  }, [isPlaying]);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+    };
+  }, []);
 
   // Sync active video when defaultVideo changes or modal opens
   useEffect(() => {
@@ -50,6 +92,7 @@ export default function VideoModal({ isOpen, onClose, defaultVideo = 'reason' })
       setActiveVideoId(defaultVideo || 'reason');
       setIsPlaying(true);
       setIsLoading(true);
+      setShowControls(true);
     }
   }, [isOpen, defaultVideo]);
 
@@ -117,19 +160,24 @@ export default function VideoModal({ isOpen, onClose, defaultVideo = 'reason' })
   }, [activeVideoId, isOpen]);
 
   const handleClose = () => {
+    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
     if (videoRef.current) {
       videoRef.current.pause();
     }
     setIsPlaying(false);
+    setShowControls(true);
     if (onClose) onClose();
   };
 
   const handleSwap = () => {
+    resetHideTimer();
+    setIsLoading(true);
     setActiveVideoId((prev) => (prev === 'intro' ? 'reason' : 'intro'));
   };
 
   const togglePlayPause = (e) => {
     if (e) e.stopPropagation();
+    resetHideTimer();
     if (!videoRef.current) return;
 
     if (videoRef.current.paused) {
@@ -138,6 +186,7 @@ export default function VideoModal({ isOpen, onClose, defaultVideo = 'reason' })
     } else {
       videoRef.current.pause();
       setIsPlaying(false);
+      setShowControls(true);
     }
     setShowCenterIcon(true);
     setTimeout(() => setShowCenterIcon(false), 700);
@@ -206,8 +255,10 @@ export default function VideoModal({ isOpen, onClose, defaultVideo = 'reason' })
     >
       <div
         ref={panelRef}
-        className="gymezy-video-modal-panel edge-to-edge"
+        className={`gymezy-video-modal-panel edge-to-edge ${!showControls && isPlaying ? 'controls-hidden' : ''}`}
         onClick={(e) => e.stopPropagation()}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
       >
         {/* Full-Bleed Edge-to-Edge Video */}
         <div className="video-viewport-wrapper" onClick={togglePlayPause}>

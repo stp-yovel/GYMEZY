@@ -90,7 +90,7 @@
   justify-content: center;
   cursor: pointer;
   z-index: 15;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s ease, border-color 0.25s ease;
   opacity: 0;
   outline: none;
 }
@@ -238,6 +238,10 @@
   flex-direction: column;
   gap: 14px;
   pointer-events: auto;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
 
 /* Top Header Row */
@@ -315,6 +319,35 @@
   flex-direction: column;
   gap: 12px;
   pointer-events: auto;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+/* ==========================================================================
+   AUTO-HIDE CONTROLS ON MOUSE IDLE
+   ========================================================================== */
+
+.gymezy-video-modal-panel.controls-hidden .video-overlay-top {
+  opacity: 0;
+  transform: translateY(-16px);
+  pointer-events: none;
+}
+
+.gymezy-video-modal-panel.controls-hidden .video-overlay-bottom {
+  opacity: 0;
+  transform: translateY(16px);
+  pointer-events: none;
+}
+
+.gymezy-video-modal-panel.controls-hidden .video-side-nav-arrow {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+.gymezy-video-modal-panel.controls-hidden .video-viewport-wrapper {
+  cursor: none;
 }
 
 /* Custom Timeline Scrubber */
