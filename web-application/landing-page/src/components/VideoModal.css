@@ -116,6 +116,58 @@
   right: 20px;
 }
 
+/* Video Loading Spinner */
+.video-loading-backdrop {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 14;
+  pointer-events: none;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  animation: loadingFadeIn 0.2s ease forwards;
+}
+
+@keyframes loadingFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.video-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: #00bf62;
+  border-right-color: #00bf62;
+  animation: videoSpin 0.75s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
+}
+
+@keyframes videoSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 /* Center Play/Pause Indicator (Minimal Frosted Glass) */
 .video-center-play-badge {
   position: absolute;

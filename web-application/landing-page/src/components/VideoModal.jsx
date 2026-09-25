@@ -34,6 +34,7 @@ function formatTime(seconds) {
 export default function VideoModal({ isOpen, onClose, defaultVideo = 'reason' }) {
   const [activeVideoId, setActiveVideoId] = useState(defaultVideo || 'reason');
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
@@ -46,8 +47,9 @@ export default function VideoModal({ isOpen, onClose, defaultVideo = 'reason' })
   // Sync active video when defaultVideo changes or modal opens
   useEffect(() => {
     if (isOpen) {
-      setActiveVideoId(defaultVideo || 'intro');
+      setActiveVideoId(defaultVideo || 'reason');
       setIsPlaying(true);
+      setIsLoading(true);
     }
   }, [isOpen, defaultVideo]);
 
@@ -215,12 +217,20 @@ export default function VideoModal({ isOpen, onClose, defaultVideo = 'reason' })
             src={activeVideo.src}
             playsInline
             autoPlay
+            onLoadStart={() => setIsLoading(true)}
+            onWaiting={() => setIsLoading(true)}
+            onCanPlay={() => setIsLoading(false)}
+            onPlaying={() => {
+              setIsPlaying(true);
+              setIsLoading(false);
+            }}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={handleLoadedMetadata}
             onEnded={() => {
               setIsPlaying(false);
+              setIsLoading(false);
               if (scrubberFillRef.current) {
                 scrubberFillRef.current.style.transform = 'scaleX(1)';
               }
@@ -259,8 +269,15 @@ export default function VideoModal({ isOpen, onClose, defaultVideo = 'reason' })
             </svg>
           </button>
 
-          {/* Center Play/Pause Indicator (Shown when paused or on click) */}
-          {(!isPlaying || showCenterIcon) && (
+          {/* Center Loading Spinner */}
+          {isLoading && (
+            <div className="video-loading-backdrop" aria-label="Loading video">
+              <div className="video-loading-spinner" />
+            </div>
+          )}
+
+          {/* Center Play/Pause Indicator (Shown when paused or on click, not while loading) */}
+          {!isLoading && (!isPlaying || showCenterIcon) && (
             <div className={`video-center-play-badge ${!isPlaying ? 'is-paused' : 'is-animating'}`}>
               {isPlaying ? (
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
