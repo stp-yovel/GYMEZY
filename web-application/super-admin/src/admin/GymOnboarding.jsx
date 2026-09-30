@@ -62,6 +62,15 @@ import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { addGym } from '../redux/slices/gymSlice';
 import { useTheme } from '../theme/ThemeContext';
+import { apiClient } from '../services/apiClient';
+
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+  });
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -146,6 +155,7 @@ export const GymOnboarding = () => {
   // Success Celebration Modal State
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [createdGymSummary, setCreatedGymSummary] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Trainer Modal State
   const [isTrainerModalOpen, setIsTrainerModalOpen] = useState(false);
@@ -160,6 +170,7 @@ export const GymOnboarding = () => {
     ownerName: 'Vikramaditya Verma',
     phone: '9840123456',
     email: 'admin@titaniumfitness.com',
+    password: '',
     yearEstablished: '2021',
     gstNumber: '33AAACT1234F1Z5',
     panNumber: 'AAACT1234F',
@@ -339,62 +350,119 @@ export const GymOnboarding = () => {
   };
 
   // Handle Final Publish
-  const handleFinalPublish = () => {
-    const newGymPayload = {
-      id: formData.gymId || `GYM-${Math.floor(1000 + Math.random() * 9000)}`,
-      name: formData.gymName,
-      tagline: formData.tagline,
-      businessType: formData.businessType,
-      ownerName: formData.ownerName,
-      phone: formData.phone.startsWith('+91') ? formData.phone : `+91 ${formData.phone}`,
-      email: formData.email,
-      location: `${formData.area || formData.city}, ${formData.city}`,
-      fullAddress: formData.address,
-      city: formData.city,
-      state: formData.state,
-      pincode: formData.pincode,
-      geoCoordinates: { lat: formData.lat, lng: formData.lng },
-      openingHours: formData.is24Hours ? 'Open 24/7' : `${formData.weekdayOpen} - ${formData.weekdayClose}`,
-      singleSessionPrice: Number(formData.singleSessionPrice) || 199,
-      rating: 4.9,
-      reviewsCount: 0,
-      membersCount: 0,
-      monthlyRevenue: '₹ 0',
-      status: formData.initialApprovalStatus === 'Approved' ? 'Active' : 'Pending',
-      approvalStatus: formData.initialApprovalStatus || 'Approved',
-      subscriptionType: formData.subscriptionType || 'Hybrid',
-      subscriptionStatus: 'Active',
-      image: formData.coverPhoto,
-      tags: formData.tags,
-      badgeText: formData.badgeText,
-      aboutText: formData.aboutText,
-      facilities: formData.facilities,
-      amenities: formData.amenities,
-      workouts: formData.workouts,
-      trainers: formData.trainers,
-      pricingPlans: {
-        singleSession: Number(formData.singleSessionPrice) || 199,
-        weeklyPass: Number(formData.weeklyPassPrice) || 799,
-        fiveSessions: Number(formData.fiveSessionPrice) || 899,
-        monthly: Number(formData.monthlyPrice) || 1999,
-        quarterly: Number(formData.quarterlyPrice) || 4999,
-        halfYearly: Number(formData.halfYearlyPrice) || 8999,
-        annual: Number(formData.annualPrice) || 14999,
-      },
-      rules: formData.rules,
-      safety: formData.safetyMeasures,
-      bankDetails: {
-        accountHolder: formData.accountHolder,
-        bankName: formData.bankName,
-        accountNumber: formData.accountNumber,
-        ifsc: formData.ifscCode,
-        upiId: formData.upiId,
-      },
-    };
+  const handleFinalPublish = async () => {
+    if (!formData.password || formData.password.length < 6) {
+      message.error('Please create a partner owner login password (minimum 6 characters) in Step 1.');
+      setCurrentStep(1);
+      return;
+    }
 
-    dispatch(addGym(newGymPayload));
-    setCreatedGymSummary(newGymPayload);
-    setIsSuccessModalOpen(true);
+    setIsSubmitting(true);
+    try {
+      const newGymPayload = {
+        id: formData.gymId || `GYM-${Math.floor(1000 + Math.random() * 9000)}`,
+        name: formData.gymName,
+        gymName: formData.gymName,
+        tagline: formData.tagline,
+        businessType: formData.businessType,
+        ownerName: formData.ownerName,
+        phone: formData.phone.startsWith('+91') ? formData.phone : `+91 ${formData.phone}`,
+        email: formData.email,
+        password: formData.password,
+        location: `${formData.area || formData.city}, ${formData.city}`,
+        fullAddress: formData.address,
+        address: formData.address,
+        area: formData.area,
+        city: formData.city,
+        state: formData.state,
+        pincode: formData.pincode,
+        landmark: formData.landmark,
+        lat: formData.lat,
+        lng: formData.lng,
+        geoCoordinates: { lat: formData.lat, lng: formData.lng },
+        googleMapsUrl: formData.googleMapsUrl,
+        floorSpaceSqFt: Number(formData.floorSpaceSqFt) || 0,
+        maxFloorCapacity: Number(formData.maxFloorCapacity) || 0,
+        yearEstablished: formData.yearEstablished,
+        gstNumber: formData.gstNumber,
+        panNumber: formData.panNumber,
+        branches: formData.branches,
+        openingHours: {
+          weekdayOpen: formData.weekdayOpen,
+          weekdayClose: formData.weekdayClose,
+          weekendOpen: formData.weekendOpen,
+          weekendClose: formData.weekendClose,
+          isSplitShift: Boolean(formData.isSplitShift),
+          isOpenHolidays: formData.isOpenHolidays !== false,
+          is24Hours: Boolean(formData.is24Hours),
+        },
+        slotDurationMinutes: Number(formData.slotDurationMinutes) || 60,
+        maxSlotCapacity: Number(formData.maxSlotCapacity) || 25,
+        slotsMorning: formData.slotsMorning,
+        slotsEvening: formData.slotsEvening,
+        singleSessionPrice: Number(formData.singleSessionPrice) || 199,
+        rating: 4.9,
+        reviewsCount: 0,
+        membersCount: 0,
+        monthlyRevenue: '₹ 0',
+        status: formData.initialApprovalStatus === 'Approved' ? 'Active' : 'Pending',
+        approvalStatus: formData.initialApprovalStatus || 'Approved',
+        subscriptionType: formData.subscriptionType || 'Hybrid',
+        subscriptionStatus: 'Active',
+        commissionRate: Number(formData.commissionRate) || 10,
+        settlementCycle: formData.settlementCycle || 'Daily (T+1)',
+        coverPhoto: formData.coverPhoto,
+        image: formData.coverPhoto,
+        galleryPhotos: formData.galleryPhotos,
+        tags: formData.tags,
+        badgeText: formData.badgeText,
+        aboutText: formData.aboutText,
+        facilities: formData.facilities,
+        amenities: formData.amenities,
+        workouts: formData.workouts,
+        trainers: formData.trainers,
+        pricingPlans: {
+          singleSession: Number(formData.singleSessionPrice) || 199,
+          weeklyPass: Number(formData.weeklyPassPrice) || 799,
+          fiveSessions: Number(formData.fiveSessionPrice) || 899,
+          monthly: Number(formData.monthlyPrice) || 1999,
+          quarterly: Number(formData.quarterlyPrice) || 4999,
+          halfYearly: Number(formData.halfYearlyPrice) || 8999,
+          annual: Number(formData.annualPrice) || 14999,
+        },
+        rules: formData.rules,
+        safetyMeasures: formData.safetyMeasures,
+        freeCancellationHours: Number(formData.freeCancellationHours) || 2,
+        refundPercentage: Number(formData.refundPercentage) || 100,
+        rescheduleAllowedCount: Number(formData.rescheduleAllowedCount) || 2,
+        bankDetails: {
+          accountHolder: formData.accountHolder,
+          bankName: formData.bankName,
+          accountNumber: formData.accountNumber,
+          ifscCode: formData.ifscCode,
+          upiId: formData.upiId,
+        },
+        documents: {
+          gstCertificate: formData.gstCertificate || formData.businessCertificate || '',
+          panCard: formData.panCard || '',
+          tradeLicense: formData.tradeLicense || '',
+          bankProof: formData.bankProof || '',
+        },
+      };
+
+      const response = await apiClient.post('/gyms/onboard', newGymPayload);
+      const createdGym = response.data?.data?.gym || newGymPayload;
+
+      dispatch(addGym(createdGym));
+      setCreatedGymSummary(createdGym);
+      setIsSuccessModalOpen(true);
+      message.success(`Gym "${formData.gymName}" onboarded and live on GYMEZY!`);
+    } catch (err) {
+      const errMsg = err.response?.data?.message || err.message || 'Failed to onboard gym partner.';
+      message.error(errMsg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Handle Save & Exit
@@ -816,6 +884,18 @@ export const GymOnboarding = () => {
                     />
                   </Col>
 
+                  <Col xs={24} md={12}>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                      Partner Account Password *
+                    </div>
+                    <Input.Password
+                      placeholder="Create secure owner login password (min 6 chars)"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                    />
+                  </Col>
+
                   <Col xs={24} md={8}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
                       GSTIN (Optional)
@@ -865,8 +945,18 @@ export const GymOnboarding = () => {
                       borderRadius: 8,
                     }}
                     showUploadList={false}
-                    beforeUpload={() => {
-                      message.success('Business certificate uploaded successfully!');
+                    beforeUpload={async (file) => {
+                      try {
+                        const base64 = await fileToBase64(file);
+                        setFormData((prev) => ({
+                          ...prev,
+                          businessCertificate: base64,
+                          gstCertificate: base64,
+                        }));
+                        message.success(`Business document "${file.name}" attached!`);
+                      } catch {
+                        message.error('Failed to read document');
+                      }
                       return false;
                     }}
                   >
@@ -1961,6 +2051,7 @@ export const GymOnboarding = () => {
                   <Button
                     type="primary"
                     icon={<ThunderboltFilled />}
+                    loading={isSubmitting}
                     onClick={handleFinalPublish}
                     style={{
                       backgroundColor: '#16a34a',

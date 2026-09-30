@@ -28,12 +28,21 @@ export const sanitizeDocument = (item, index = null) => {
       continue;
     }
 
-    if (Array.isArray(value)) {
-      sanitized[key] = value.map((elem, elemIdx) =>
-        typeof elem === 'object' && elem !== null ? sanitizeDocument(elem, elemIdx + 1) : elem
-      );
-    } else if (value && typeof value === 'object' && !(value instanceof Date) && !(value instanceof RegExp)) {
-      sanitized[key] = sanitizeDocument(value);
+    if (value && typeof value === 'object') {
+      if (value instanceof Date || value instanceof RegExp) {
+        sanitized[key] = value;
+      } else if (value._bsontype === 'ObjectID' || value.constructor?.name === 'ObjectId') {
+        // Strip or convert Mongo ObjectIds based on key
+        if (key.endsWith('Id') || key.endsWith('ID')) {
+          sanitized[key] = value.toString();
+        }
+      } else if (Array.isArray(value)) {
+        sanitized[key] = value.map((elem, elemIdx) =>
+          typeof elem === 'object' && elem !== null ? sanitizeDocument(elem, elemIdx + 1) : elem
+        );
+      } else {
+        sanitized[key] = sanitizeDocument(value);
+      }
     } else {
       sanitized[key] = value;
     }
