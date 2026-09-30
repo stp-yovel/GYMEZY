@@ -175,6 +175,37 @@ Status codes, used precisely rather than defaulting everything to 200:
 
 **Errors should be centralized** (a single error-handling middleware/handler that controllers delegate to) rather than duplicated per-route, and production error responses must never leak stack traces, raw database errors, secrets, or filesystem paths — those are gifts to anyone probing the API.
 
+### Environment-Aware Error Response Protocol (Development vs Production)
+
+- **Development & Local Debug Mode (`NODE_ENV !== 'production'`)**:
+  - Full transparent error details for debugging.
+  - Returns exact error message, HTTP status code, validation errors array, and complete `stack` trace.
+  - Example Development Error Response:
+    ```json
+    {
+      "success": false,
+      "message": "Cast to ObjectId failed for value \"abc\" at path \"_id\"",
+      "statusCode": 400,
+      "stack": "CastError: Cast to ObjectId failed...\n    at model.Query.exec ..."
+    }
+    ```
+- **Production Mode (`NODE_ENV === 'production'`)**:
+  - **Operational Client Errors (4xx Status Codes: 400, 401, 403, 404, 409, 422)**:
+    - Return user-safe client message (e.g. "Validation failed", "Unauthorized access") and errors array.
+    - Stack traces are completely omitted.
+  - **Internal Server Errors & Unexpected Failures (5xx Status Codes)**:
+    - Mask all internal exceptions, database query errors, and server internals.
+    - Always return a generic safe message: `"Something went wrong. Please try again."`
+    - Full error details are logged securely to server logs (e.g. Winston/Morgan/Console) but never exposed to the client.
+    - Example Production 500 Response:
+      ```json
+      {
+        "success": false,
+        "message": "Something went wrong. Please try again.",
+        "statusCode": 500
+      }
+      ```
+
 ### MongoDB `_id` Sanitization & ID Masking
 
 - **Never expose raw MongoDB `_id` or `ObjectId` in API responses**: Internal database primary keys (`_id`) and version keys (`__v`) must never be leaked to the frontend or API clients.

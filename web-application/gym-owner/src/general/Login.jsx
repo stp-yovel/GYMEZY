@@ -240,21 +240,21 @@ export const Login = () => {
             layout="vertical"
             onFinish={handleLogin}
             initialValues={{
-              email: 'owner@fitzone.com',
-              password: 'FitZoneSecure@2025',
-              remember: true,
+              email: '',
+              password: '',
+              remember: false,
             }}
             size="large"
           >
             <Form.Item
-              label={<span style={{ color: isDarkMode ? '#cccccc' : '#334155', fontWeight: 600, fontSize: 13 }}>Email</span>}
+              label={<span style={{ color: isDarkMode ? '#cccccc' : '#334155', fontWeight: 600, fontSize: 13 }}>Email / Phone</span>}
               name="email"
-              rules={[{ required: true, message: 'Please enter your email' }]}
+              rules={[{ required: true, message: 'Please enter your email or phone number' }]}
               style={{ marginBottom: 20 }}
             >
               <Input
                 prefix={<UserOutlined style={{ color: '#1677ff' }} />}
-                placeholder="owner@fitzone.com"
+                placeholder="e.g. owner@gym.com or +91 9876543210"
                 style={{
                   height: 46,
                   borderRadius: 'var(--radius-base)',

@@ -1,39 +1,38 @@
-import express from 'express';
-import mongoose from 'mongoose';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import helmet from 'helmet';
-import morgan from 'morgan';
+import app from './src/app.js';
+import { ENV } from './src/config/env.js';
+import { connectDatabase } from './src/config/db.js';
 
-// Load environment variables
-dotenv.config();
+let server;
 
-const app = express();
-const PORT = process.env.PORT;
-const MONGODB_URI = process.env.MONGODB_URI ;
+// Initialize Database & Start Server
+const startServer = async () => {
+  try {
+    await connectDatabase();
 
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cors());
-app.use(helmet());
-app.use(morgan('dev'));
-
-// Basic route
-app.get('/', (req, res) => {
-  res.json({ message: 'GYMEZY API is running...' });
-});
-
-// Database connection and server start
-mongoose
-  .connect(MONGODB_URI)
-  .then(() => {
-    console.log('✅ Connected to MongoDB');
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+    server = app.listen(ENV.PORT, () => {
+      console.log(`🚀 GYMEZY API Server running on port ${ENV.PORT} [${ENV.NODE_ENV}]`);
+      console.log(`👉 Health check: http://localhost:${ENV.PORT}/api/v1/health`);
     });
-  })
-  .catch((error) => {
-    console.error('❌ Error connecting to MongoDB:', error.message);
+  } catch (error) {
+    console.error('❌ Server failed to start:', error.message);
     process.exit(1);
-  });
+  }
+};
+
+// Graceful shutdown handler
+const handleGracefulShutdown = (signal) => {
+  console.log(`\n🛑 Received ${signal}. Shutting down gracefully...`);
+  if (server) {
+    server.close(() => {
+      console.log('🔒 Closed HTTP server connections.');
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+};
+
+process.on('SIGTERM', () => handleGracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => handleGracefulShutdown('SIGINT'));
+
+startServer();

@@ -329,6 +329,14 @@ export default apiClient;
 
 ---
 
+# Zero Hardcoded Credentials & Fallbacks Policy
+
+- **No Hardcoded Fallback Emails/Usernames**: Never write `user?.email || 'admin@gymezy.com'` or fallback dummy names in UI components, headers, or state slices.
+- **No Mock Credentials in Form Initial Values**: Form `initialValues` must always start empty (`{ email: '', password: '', remember: false }`) with helpful placeholders.
+- **Dynamic State Only**: Render user details strictly from Redux state / backend responses. If not loaded, conditionally hide or show loading skeletons/placeholders.
+
+---
+
 # Application Flow Summary
 
 1. `index.js`: Wraps `<App />` with `<Provider store={store}>` and mounts to DOM.

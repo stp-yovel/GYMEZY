@@ -131,8 +131,10 @@ export const AppBar = ({
         key: 'profile-info',
         label: (
           <div style={{ padding: '6px 0' }}>
-            <div style={{ fontWeight: 600 }}>{currentUser?.name || 'Vikram Sethi'}</div>
-            <div style={{ fontSize: 12, color: '#888888' }}>{currentUser?.email || 'owner@fitzone.com'}</div>
+            <div style={{ fontWeight: 600 }}>{currentUser?.fullName || currentUser?.name || 'Gym Owner'}</div>
+            {currentUser?.email && (
+              <div style={{ fontSize: 12, color: '#888888' }}>{currentUser.email}</div>
+            )}
             <Tag color="blue" style={{ marginTop: 4, fontSize: 11 }}>
               {currentUser?.role ? currentUser.role.replace('_', ' ') : 'FITNESS CENTER OWNER'}
             </Tag>

@@ -18,32 +18,30 @@ import {
   SafetyCertificateFilled,
 } from '@ant-design/icons';
 import { useTheme } from '../theme/ThemeContext';
-import { loginSuccess } from '../redux/slices/authSlice';
+import { useAuth, useEnvironment } from '../hooks';
 import gymezyLogo from '../assets/logo/gymezy.png';
 import fitnessBg from '../assets/images/onboarding_1.jpg';
 
 export const Login = () => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
   const { isDarkMode, toggleTheme } = useTheme();
+  const { login, loading } = useAuth();
+  const { apiBaseUrl, currentEnv, isDebug } = useEnvironment();
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (values) => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      dispatch(
-        loginSuccess({
-          name: 'Chief Administrator',
-          email: values.email || 'admin@gymezy.com',
-          role: 'SUPER_ADMIN',
-          permissions: ['ALL'],
-        })
+  const handleLogin = async (values) => {
+    const identifier = values.email?.trim() || values.identifier?.trim();
+    const password = values.password;
+
+    const result = await login(identifier, password);
+    if (result.success) {
+      message.success(
+        `Welcome back, ${result.user?.fullName || 'Super Admin'}! Access granted.`
       );
-      message.success('Welcome back, Chief Admin! Super Admin Portal loaded.');
       navigate('/admin/dashboard');
-    }, 500);
+    } else {
+      message.error(result.error || 'Authentication failed. Please check your credentials.');
+    }
   };
 
   return (
@@ -245,21 +243,21 @@ export const Login = () => {
             layout="vertical"
             onFinish={handleLogin}
             initialValues={{
-              email: 'admin@gymezy.com',
-              password: 'SuperAdminMaster@2025',
-              remember: true,
+              email: '',
+              password: '',
+              remember: false,
             }}
             size="large"
           >
             <Form.Item
-              label={<span style={{ color: isDarkMode ? '#cccccc' : '#334155', fontWeight: 600, fontSize: 13 }}>Master Email</span>}
+              label={<span style={{ color: isDarkMode ? '#cccccc' : '#334155', fontWeight: 600, fontSize: 13 }}>Master Email / Phone</span>}
               name="email"
-              rules={[{ required: true, message: 'Please enter your master email' }]}
+              rules={[{ required: true, message: 'Please enter your master email or phone number' }]}
               style={{ marginBottom: 20 }}
             >
               <Input
                 prefix={<UserOutlined style={{ color: '#1677ff' }} />}
-                placeholder="admin@gymezy.com"
+                placeholder="e.g. admin@gymezy.com or +91 9150955071"
                 style={{
                   height: 46,
                   borderRadius: 'var(--radius-base)',
@@ -278,7 +276,7 @@ export const Login = () => {
             >
               <Input.Password
                 prefix={<LockOutlined style={{ color: '#1677ff' }} />}
-                placeholder="••••••••"
+                placeholder="Enter your password"
                 style={{
                   height: 46,
                   borderRadius: 'var(--radius-base)',
