@@ -51,7 +51,7 @@ export const Dashboard = () => {
   const dispatch = useDispatch();
   const { isDarkMode } = useTheme();
 
-  const { liveOccupancy, capacity, members, checkIns, gymProfile } = useSelector((state) => state.gym);
+  const { liveOccupancy, capacity, members, checkIns, bookings, gymProfile } = useSelector((state) => state.gym);
 
   const [quickOtp, setQuickOtp] = useState('');
   const [verifying, setVerifying] = useState(false);
@@ -72,8 +72,8 @@ export const Dashboard = () => {
         key: Date.now().toString(),
         passId: `FSB${Math.floor(100000 + Math.random() * 900000)}`,
         customerId: `CUST${Math.floor(100000 + Math.random() * 900000)}`,
-        memberName: quickOtp === '642189' ? 'Sam Kumar' : 'Arun Kumar',
-        type: 'Gym Access Single Pass',
+        memberName: `Pass Holder (${quickOtp})`,
+        type: 'Gym Access Pass',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         date: 'Today',
         otp: quickOtp,
@@ -81,7 +81,7 @@ export const Dashboard = () => {
         method: 'Turnstile Terminal',
       };
       dispatch(recordCheckIn(newEntry));
-      message.success(`Access Granted! Welcome ${newEntry.memberName}. Turnstile Gate 1 Unlocked.`);
+      message.success(`Access Granted! Turnstile Gate 1 Unlocked.`);
       setQuickOtp('');
     }, 500);
   };
@@ -265,10 +265,10 @@ export const Dashboard = () => {
                   Total Revenue
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', margin: '2px 0' }}>
-                  ₹1,72,450
+                  ₹{Number(gymProfile?.monthlyRevenue || 0).toLocaleString('en-IN')}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <ArrowUpOutlined style={{ fontSize: 11 }} /> 15% vs yesterday
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                  Monthly GMV
                 </div>
               </div>
             </div>
@@ -308,10 +308,10 @@ export const Dashboard = () => {
                   Member Revenue
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', margin: '2px 0' }}>
-                  ₹48,600
+                  ₹{(members || []).reduce((acc, m) => acc + (parseInt(String(m.amount || '').replace(/[^\d]/g, ''), 10) || 0), 0).toLocaleString('en-IN')}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <ArrowUpOutlined style={{ fontSize: 11 }} /> 12% vs yesterday
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                  Active Plan Subscriptions
                 </div>
               </div>
             </div>
@@ -351,10 +351,10 @@ export const Dashboard = () => {
                   App Booking Revenue
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', margin: '2px 0' }}>
-                  ₹1,23,850
+                  ₹{(checkIns || []).reduce((acc, b) => acc + (Number(b.price) || 0), 0).toLocaleString('en-IN')}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <ArrowUpOutlined style={{ fontSize: 11 }} /> 18% vs yesterday
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                  Direct GYMEZY App Passes
                 </div>
               </div>
             </div>
@@ -394,10 +394,10 @@ export const Dashboard = () => {
                   Total Active Users
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', margin: '2px 0' }}>
-                  632
+                  {gymProfile?.membersCount || (members || []).length || 0}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <ArrowUpOutlined style={{ fontSize: 11 }} /> 10% vs last month
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                  Registered Members
                 </div>
               </div>
             </div>
@@ -437,10 +437,10 @@ export const Dashboard = () => {
                   Members
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', margin: '2px 0' }}>
-                  336
+                  {(members || []).length}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <ArrowUpOutlined style={{ fontSize: 11 }} /> 8% vs last month
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                  Active Gym Passes
                 </div>
               </div>
             </div>
@@ -480,10 +480,10 @@ export const Dashboard = () => {
                   App Booking Number
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', margin: '2px 0' }}>
-                  296
+                  {(checkIns || []).length}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <ArrowUpOutlined style={{ fontSize: 11 }} /> 14% vs last month
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                  Completed Bookings
                 </div>
               </div>
             </div>
@@ -540,53 +540,8 @@ export const Dashboard = () => {
               pagination={false}
               size="middle"
               scroll={{ x: 'max-content' }}
-              dataSource={[
-                {
-                  key: '1',
-                  name: 'Arun Kumar',
-                  phone: '+91 98765 43210',
-                  avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop',
-                  time: '07:00 AM',
-                  type: 'App Booking',
-                  status: 'Checked In',
-                },
-                {
-                  key: '2',
-                  name: 'Priya Sharma',
-                  phone: '+91 91234 56789',
-                  avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=150&auto=format&fit=crop',
-                  time: '08:30 AM',
-                  type: 'Walk-in',
-                  status: 'Upcoming',
-                },
-                {
-                  key: '3',
-                  name: 'Vikram Singh',
-                  phone: '+91 99876 54321',
-                  avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop',
-                  time: '09:00 AM',
-                  type: 'App Booking',
-                  status: 'Checked In',
-                },
-                {
-                  key: '4',
-                  name: 'Neha Reddy',
-                  phone: '+91 90012 34567',
-                  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150&auto=format&fit=crop',
-                  time: '10:15 AM',
-                  type: 'Walk-in',
-                  status: 'Completed',
-                },
-                {
-                  key: '5',
-                  name: 'Karthik R',
-                  phone: '+91 98811 22334',
-                  avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=150&auto=format&fit=crop',
-                  time: '11:30 AM',
-                  type: 'App Booking',
-                  status: 'Upcoming',
-                },
-              ]}
+              dataSource={bookings || []}
+              locale={{ emptyText: 'No recent bookings recorded today' }}
               columns={[
                 {
                   title: 'Customer Name',
@@ -733,48 +688,8 @@ export const Dashboard = () => {
               pagination={false}
               size="middle"
               scroll={{ x: 'max-content' }}
-              dataSource={[
-                {
-                  key: '1',
-                  name: 'Arun Kumar',
-                  avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop',
-                  plan: 'Gold Plan (Monthly)',
-                  endDate: '20 Aug 2025',
-                  status: 'Active',
-                },
-                {
-                  key: '2',
-                  name: 'Priya Sharma',
-                  avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=150&auto=format&fit=crop',
-                  plan: 'Premium Plan (Quarterly)',
-                  endDate: '15 Sep 2025',
-                  status: 'Active',
-                },
-                {
-                  key: '3',
-                  name: 'Vikram Singh',
-                  avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop',
-                  plan: 'Gold Plan (Monthly)',
-                  endDate: '10 Aug 2025',
-                  status: 'Expiring Soon',
-                },
-                {
-                  key: '4',
-                  name: 'Neha Reddy',
-                  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150&auto=format&fit=crop',
-                  plan: 'Elite Plan (Yearly)',
-                  endDate: '05 Dec 2025',
-                  status: 'Active',
-                },
-                {
-                  key: '5',
-                  name: 'Karthik R',
-                  avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=150&auto=format&fit=crop',
-                  plan: 'Silver Plan (Monthly)',
-                  endDate: '18 Jul 2025',
-                  status: 'Expired',
-                },
-              ]}
+              dataSource={members || []}
+              locale={{ emptyText: 'No registered active members found' }}
               columns={[
                 {
                   title: 'Customer Name',
@@ -859,7 +774,7 @@ export const Dashboard = () => {
                           color: isExpiring ? '#ffffff' : 'var(--color-primary)',
                         }}
                       >
-                        {record.status === 'Active' && record.name === 'Neha Reddy' ? 'View' : 'Extend'}
+                        {record.status === 'Active' ? 'View' : 'Extend'}
                       </Button>
                     );
                   },

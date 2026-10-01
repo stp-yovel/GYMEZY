@@ -5,7 +5,10 @@ import sharp from 'sharp';
  */
 export const isBase64String = (str) => {
   if (typeof str !== 'string') return false;
-  return str.startsWith('data:') || /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(str.substring(0, 100));
+  return (
+    str.startsWith('data:') ||
+    /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(str.substring(0, 100))
+  );
 };
 
 /**
@@ -37,6 +40,32 @@ const extractBufferFromBase64 = (base64Str) => {
 };
 
 /**
+ * Generates formatted file name: {gymname}_{filename}
+ * Example: "Titanium Fitness Club", "pan" -> "titanium_fitness_club_pan"
+ *
+ * @param {string} gymName - Name of the gym
+ * @param {string} fileKey - Document/image descriptor (e.g. "pan", "gst_certificate", "cover", "trade_license")
+ * @param {string} [extension] - Optional file extension (e.g. "pdf", "webp")
+ * @returns {string} Formatted file name
+ */
+export const formatMediaFileName = (gymName = 'gym', fileKey = 'file', extension = '') => {
+  const sanitizedGym = (gymName || 'gym')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  const sanitizedKey = (fileKey || 'file')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  const ext = extension ? (extension.startsWith('.') ? extension : `.${extension}`) : '';
+  return `${sanitizedGym}_${sanitizedKey}${ext}`;
+};
+
+/**
  * Compresses an image to ultra-efficient WebP while preserving sharp visual readability
  * @param {string|Buffer} input - Base64 data URI or Buffer
  * @param {Object} options - Compression options
@@ -56,10 +85,10 @@ export const compressImageBase64 = async (input, options = {}) => {
 
     const maxWidth = options.maxWidth || 1600;
     const maxHeight = options.maxHeight || 1600;
-    const quality = options.quality || 78; // 78 gives pristine visual quality at ~10-15% of original JPEG/PNG size
+    const quality = options.quality || 78;
 
     const compressedBuffer = await sharp(buffer)
-      .rotate() // Auto-rotate according to EXIF orientation
+      .rotate()
       .resize({
         width: maxWidth,
         height: maxHeight,
@@ -75,7 +104,6 @@ export const compressImageBase64 = async (input, options = {}) => {
 
     return `data:image/webp;base64,${compressedBuffer.toString('base64')}`;
   } catch (err) {
-    // If sharp fails (e.g. unsupported format), return original input safely
     console.warn('Image compression warning, storing original:', err.message);
     return input;
   }
@@ -105,9 +133,44 @@ export const compressPdfBase64 = (input) => {
 };
 
 /**
+ * Formats, compresses, and structures a document or image file with the {gymname}_{filename} format
+ *
+ * @param {string} gymName - Name of the gym
+ * @param {string} fileKey - File category/name (e.g. "pan", "gst_certificate", "cover", "gallery_1")
+ * @param {string|Object} base64Input - Raw Base64 string or existing file object
+ * @returns {Promise<Object|null>} Structured file object with { fileName, fileData, mimeType, fileSizeKb, uploadedAt }
+ */
+export const formatAndCompressFile = async (gymName, fileKey, base64Input) => {
+  if (!base64Input) return null;
+
+  let rawData = typeof base64Input === 'object' && base64Input.fileData ? base64Input.fileData : base64Input;
+  if (typeof rawData !== 'string' || !rawData.trim()) return null;
+
+  const isPdf = isPdfData(rawData);
+  const ext = isPdf ? 'pdf' : 'webp';
+  const mimeType = isPdf ? 'application/pdf' : 'image/webp';
+
+  const compressedData = isPdf
+    ? compressPdfBase64(rawData)
+    : await compressImageBase64(rawData, { maxWidth: 1600, maxHeight: 1600, quality: 78 });
+
+  const fileName = formatMediaFileName(gymName, fileKey, ext);
+
+  // Approximate file size in KB
+  const sizeInBytes = Math.round((compressedData.length * 3) / 4);
+  const fileSizeKb = +(sizeInBytes / 1024).toFixed(2);
+
+  return {
+    fileName,
+    fileData: compressedData,
+    mimeType,
+    fileSizeKb,
+    uploadedAt: new Date(),
+  };
+};
+
+/**
  * Recursively compresses all image and PDF fields inside an object/array payload
- * @param {*} data - Request payload containing media
- * @returns {Promise<*>} Processed payload with compressed base64 media
  */
 export const compressMediaRecursively = async (data) => {
   if (!data) return data;
@@ -144,6 +207,8 @@ export const compressMediaRecursively = async (data) => {
 export default {
   compressImageBase64,
   compressPdfBase64,
+  formatMediaFileName,
+  formatAndCompressFile,
   compressMediaRecursively,
   isBase64String,
   isPdfData,

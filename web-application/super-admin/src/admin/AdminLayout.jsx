@@ -11,7 +11,7 @@ const { Content } = Layout;
 export const AdminLayout = () => {
   const { isDarkMode } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
-  const { isAuthenticated, loading, initialized, checkSession } = useAuth();
+  const { user, isAuthenticated, loading, initialized, checkSession } = useAuth();
 
   useEffect(() => {
     if (!initialized) {
@@ -41,8 +41,8 @@ export const AdminLayout = () => {
     );
   }
 
-  // Redirect to login if user is not authenticated
-  if (initialized && !isAuthenticated) {
+  // Redirect to login if user is not authenticated or not a SUPER_ADMIN
+  if (initialized && (!isAuthenticated || user?.role !== 'SUPER_ADMIN')) {
     return <Navigate to="/login" replace />;
   }
 

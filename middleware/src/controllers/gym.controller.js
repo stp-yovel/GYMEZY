@@ -1,25 +1,55 @@
 import mongoose from 'mongoose';
 import Gym from '../models/gym.model.js';
 import User, { USER_ROLES } from '../models/user.model.js';
+import Counter from '../models/counter.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 import { ApiError } from '../utils/apiError.js';
-import { compressImageBase64, compressPdfBase64, isPdfData } from '../utils/mediaCompressor.js';
+import {
+  formatAndCompressFile,
+} from '../utils/mediaCompressor.js';
+import {
+  sanitizeDocument,
+  transformListWithIndex,
+} from '../utils/responseTransformer.js';
 
 /**
- * Helper to compress document field (supports image or PDF)
+ * Helper to extract GPS coordinates from Google Maps URLs
  */
-const compressDocumentField = async (docStr) => {
-  if (!docStr) return '';
-  if (isPdfData(docStr)) {
-    return compressPdfBase64(docStr);
+const AT_COORDS_REGEX = /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/;
+const Q_COORDS_REGEX = /[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/;
+const D3D4_COORDS_REGEX = /!3d(-?\d+(?:\.\d+)?)[^!]*!4d(-?\d+(?:\.\d+)?)/;
+const LL_COORDS_REGEX = /(?:ll|loc:)(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/;
+
+const extractCoordinatesFromMapsUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+
+  const atMatch = AT_COORDS_REGEX.exec(url);
+  if (atMatch) {
+    return { lat: Number.parseFloat(atMatch[1]), lng: Number.parseFloat(atMatch[2]) };
   }
-  return compressImageBase64(docStr, { maxWidth: 1600, maxHeight: 1600, quality: 75 });
+
+  const qMatch = Q_COORDS_REGEX.exec(url);
+  if (qMatch) {
+    return { lat: Number.parseFloat(qMatch[1]), lng: Number.parseFloat(qMatch[2]) };
+  }
+
+  const d3d4Match = D3D4_COORDS_REGEX.exec(url);
+  if (d3d4Match) {
+    return { lat: Number.parseFloat(d3d4Match[1]), lng: Number.parseFloat(d3d4Match[2]) };
+  }
+
+  const llMatch = LL_COORDS_REGEX.exec(url);
+  if (llMatch) {
+    return { lat: Number.parseFloat(llMatch[1]), lng: Number.parseFloat(llMatch[2]) };
+  }
+
+  return null;
 };
 
 /**
  * POST /api/v1/gyms/onboard
- * New Gym Partner Onboarding with Owner Account Creation and Media Base64 Compression
+ * New Gym Partner Onboarding with Owner Account Creation and {gymname}_{filename} Media Base64 Compression
  */
 export const onboardGym = asyncHandler(async (req, res) => {
   const {
@@ -46,6 +76,7 @@ export const onboardGym = asyncHandler(async (req, res) => {
     googleMapsUrl,
     floorSpaceSqFt,
     maxFloorCapacity,
+    logo,
     coverPhoto,
     image,
     galleryPhotos,
@@ -123,8 +154,23 @@ export const onboardGym = asyncHandler(async (req, res) => {
   if (!finalPhone) {
     throw ApiError.badRequest('Phone number is required.');
   }
-  if (!password || password.length < 6) {
-    throw ApiError.badRequest('Owner password is required (minimum 6 characters).');
+  if (!password) {
+    throw ApiError.badRequest('Owner account password is required.');
+  }
+  if (password.length < 8 || password.length > 16) {
+    throw ApiError.badRequest('Password must be between 8 and 16 characters.');
+  }
+  if (!/[A-Z]/.test(password)) {
+    throw ApiError.badRequest('Password must contain at least 1 uppercase letter.');
+  }
+  if (!/[0-9]/.test(password)) {
+    throw ApiError.badRequest('Password must contain at least 1 number.');
+  }
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password)) {
+    throw ApiError.badRequest('Password must contain at least 1 special character.');
+  }
+  if (/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]|[^\x20-\x7E]/u.test(password)) {
+    throw ApiError.badRequest('Emoji characters and non-standard symbols are not allowed in password.');
   }
   if (!finalCity) {
     throw ApiError.badRequest('City is required.');
@@ -139,48 +185,56 @@ export const onboardGym = asyncHandler(async (req, res) => {
     throw ApiError.conflict('An account with this email address already exists.');
   }
 
-  // 3. Compress Media (Images & PDFs) with high quality
-  const primaryCover = coverPhoto || image || '';
-  const compressedCover = await compressImageBase64(primaryCover, { maxWidth: 1600, maxHeight: 1200, quality: 78 });
+  // 3. Compress Media (Images & PDFs) with high quality & {gymname}_{filename} formatting
+  const primaryLogo = logo || coverPhoto || image || '';
+  const structuredLogo = await formatAndCompressFile(finalGymName, 'logo', primaryLogo);
+  const structuredCover = structuredLogo;
 
   const rawGallery = Array.isArray(galleryPhotos) ? galleryPhotos : Array.isArray(images) ? images : [];
-  const compressedGallery = await Promise.all(
-    rawGallery.map((img) => compressImageBase64(img, { maxWidth: 1200, maxHeight: 900, quality: 75 }))
+  const structuredGallery = (
+    await Promise.all(
+      rawGallery.map((img, i) => formatAndCompressFile(finalGymName, `gallery_${i + 1}`, img))
+    )
+  ).filter(Boolean);
+
+  // Compress Trainer Images with {gymname}_trainer_{name} naming
+  const structuredTrainers = await Promise.all(
+    trainers.map(async (t) => {
+      const sanitizedTrainerName = (t.name || 'coach').toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      const trainerImg = await formatAndCompressFile(finalGymName, `trainer_${sanitizedTrainerName}`, t.image);
+      return {
+        name: t.name,
+        specialty: t.specialty || 'General Fitness',
+        experienceYears: Number(t.experienceYears) || 1,
+        rating: Number(t.rating) || 4.9,
+        monthlyFee: Number(t.monthlyFee) || 0,
+        image: trainerImg || {},
+      };
+    })
   );
 
-  // Compress Trainer Images
-  const compressedTrainers = await Promise.all(
-    trainers.map(async (t) => ({
-      name: t.name,
-      specialty: t.specialty || 'General Fitness',
-      experienceYears: Number(t.experienceYears) || 1,
-      rating: Number(t.rating) || 4.9,
-      monthlyFee: Number(t.monthlyFee) || 0,
-      image: await compressImageBase64(t.image, { maxWidth: 400, maxHeight: 400, quality: 80 }),
-    }))
-  );
-
-  // Compress Verification Documents (PDFs or Images)
+  // Compress Verification Documents (PDFs or Images) with {gymname}_{filename} format
   const docsInput = documents || {};
   const [
-    compressedGst,
-    compressedPan,
-    compressedTrade,
-    compressedBankProof,
-    compressedFireSafety,
-    compressedFssai,
+    structuredGst,
+    structuredPan,
+    structuredTrade,
+    structuredBankProof,
+    structuredFireSafety,
+    structuredFssai,
   ] = await Promise.all([
-    compressDocumentField(docsInput.gstCertificate || gstCertificate),
-    compressDocumentField(docsInput.panCard || panCard),
-    compressDocumentField(docsInput.tradeLicense || tradeLicense),
-    compressDocumentField(docsInput.bankProof || bankProof),
-    compressDocumentField(docsInput.fireSafetyCertificate || fireSafetyCertificate),
-    compressDocumentField(docsInput.fssaiCertificate || fssaiCertificate),
+    formatAndCompressFile(finalGymName, 'gst_certificate', docsInput.gstCertificate || gstCertificate),
+    formatAndCompressFile(finalGymName, 'pan', docsInput.panCard || panCard),
+    formatAndCompressFile(finalGymName, 'trade_license', docsInput.tradeLicense || tradeLicense),
+    formatAndCompressFile(finalGymName, 'bank_proof', docsInput.bankProof || bankProof),
+    formatAndCompressFile(finalGymName, 'fire_safety', docsInput.fireSafetyCertificate || fireSafetyCertificate),
+    formatAndCompressFile(finalGymName, 'fssai_certificate', docsInput.fssaiCertificate || fssaiCertificate),
   ]);
 
-  // Coordinates
-  const latitude = Number(lat) || 13.0827;
-  const longitude = Number(lng) || 80.2707;
+  // Coordinates (from direct lat/lng or parsed from googleMapsUrl)
+  const parsedCoords = extractCoordinatesFromMapsUrl(googleMapsUrl);
+  const latitude = Number(lat) || (parsedCoords ? parsedCoords.lat : 13.0827);
+  const longitude = Number(lng) || (parsedCoords ? parsedCoords.lng : 80.2707);
 
   // Pricing Structure
   const resolvedPricing = pricingPlans || {
@@ -214,8 +268,13 @@ export const onboardGym = asyncHandler(async (req, res) => {
     is24Hours: Boolean(is24Hours),
   };
 
-  // 4. Create Gym in MongoDB
+  // 4. Generate Sequential Partner ID via Counter Table
+  const partnerSeq = await Counter.getNextSequence('gym_partner_id');
+  const partnerId = `GYM${partnerSeq}`;
+
+  // 5. Create Gym in MongoDB
   const newGym = new Gym({
+    partnerId,
     name: finalGymName,
     tagline: tagline || '',
     slug: finalGymName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
@@ -241,17 +300,18 @@ export const onboardGym = asyncHandler(async (req, res) => {
     googleMapsUrl: googleMapsUrl || `https://maps.google.com/?q=${latitude},${longitude}`,
     floorSpaceSqFt: Number(floorSpaceSqFt) || 0,
     maxFloorCapacity: Number(maxFloorCapacity) || 0,
-    coverPhoto: compressedCover,
-    image: compressedCover,
-    galleryPhotos: compressedGallery,
-    images: compressedGallery,
+    logo: structuredLogo || {},
+    coverPhoto: structuredCover || {},
+    image: structuredLogo?.fileData || structuredCover?.fileData || '',
+    galleryPhotos: structuredGallery,
+    images: structuredGallery.map((g) => g.fileData),
     facilities: Array.isArray(facilities) ? facilities : [],
     amenities: Array.isArray(amenities) ? amenities : [],
     workouts: Array.isArray(workouts) ? workouts : [],
     tags: Array.isArray(tags) ? tags : [],
     badgeText: badgeText || 'Verified',
     aboutText: aboutText || '',
-    trainers: compressedTrainers,
+    trainers: structuredTrainers,
     openingHours: resolvedOpeningHours,
     slotDurationMinutes: Number(slotDurationMinutes) || 60,
     maxSlotCapacity: Number(maxSlotCapacity) || 25,
@@ -269,12 +329,12 @@ export const onboardGym = asyncHandler(async (req, res) => {
     settlementCycle: settlementCycle || 'Daily (T+1)',
     bankDetails: resolvedBankDetails,
     documents: {
-      gstCertificate: compressedGst,
-      panCard: compressedPan,
-      tradeLicense: compressedTrade,
-      bankProof: compressedBankProof,
-      fireSafetyCertificate: compressedFireSafety,
-      fssaiCertificate: compressedFssai,
+      gstCertificate: structuredGst || {},
+      panCard: structuredPan || {},
+      tradeLicense: structuredTrade || {},
+      bankProof: structuredBankProof || {},
+      fireSafetyCertificate: structuredFireSafety || {},
+      fssaiCertificate: structuredFssai || {},
     },
     status: status || 'Active',
     approvalStatus: approvalStatus || initialApprovalStatus || 'Approved',
@@ -300,21 +360,17 @@ export const onboardGym = asyncHandler(async (req, res) => {
   newGym.ownerId = gymOwnerUser._id;
   await newGym.save();
 
-  const responseGym = newGym.toObject();
+  const sanitizedGym = sanitizeDocument(newGym);
+  const sanitizedOwner = sanitizeDocument(gymOwnerUser);
 
-  return ApiResponse.success(
-    res,
-    201,
-    `Gym "${finalGymName}" and Partner Owner account onboarded successfully!`,
-    {
-      gym: responseGym,
-      owner: {
-        fullName: gymOwnerUser.fullName,
-        email: gymOwnerUser.email,
-        phone: gymOwnerUser.phone,
-        role: gymOwnerUser.role,
+  return res.status(201).json(
+    ApiResponse.created(
+      {
+        gym: sanitizedGym,
+        owner: sanitizedOwner,
       },
-    }
+      `Gym "${finalGymName}" and Partner Owner account onboarded successfully!`
+    )
   );
 });
 
@@ -341,6 +397,7 @@ export const getGyms = asyncHandler(async (req, res) => {
   }
   if (search) {
     query.$or = [
+      { partnerId: new RegExp(search, 'i') },
       { name: new RegExp(search, 'i') },
       { ownerName: new RegExp(search, 'i') },
       { city: new RegExp(search, 'i') },
@@ -361,28 +418,27 @@ export const getGyms = asyncHandler(async (req, res) => {
       .limit(limitNum),
   ]);
 
-  const sanitizedList = gyms.map((gym, index) => {
-    const obj = gym.toObject();
-    return {
-      ...obj,
-      id: skip + index + 1, // Sequential integer row index
-    };
-  });
+  const sanitizedList = transformListWithIndex(gyms, skip + 1);
 
-  return ApiResponse.success(res, 200, 'Gyms retrieved successfully', {
-    gyms: sanitizedList,
-    pagination: {
-      total: totalCount,
-      page: pageNum,
-      limit: limitNum,
-      pages: Math.ceil(totalCount / limitNum),
-    },
-  });
+  return res.status(200).json(
+    ApiResponse.success(
+      {
+        gyms: sanitizedList,
+        pagination: {
+          total: totalCount,
+          page: pageNum,
+          limit: limitNum,
+          pages: Math.ceil(totalCount / limitNum),
+        },
+      },
+      'Gyms retrieved successfully'
+    )
+  );
 });
 
 /**
  * GET /api/v1/gyms/:id
- * Retrieve a specific gym by its Mongo ID or slug
+ * Retrieve a specific gym by its Mongo ID, partnerId, or slug
  */
 export const getGymById = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -390,15 +446,20 @@ export const getGymById = asyncHandler(async (req, res) => {
   let gym;
   if (mongoose.Types.ObjectId.isValid(id)) {
     gym = await Gym.findById(id);
-  } else {
-    gym = await Gym.findOne({ slug: id });
+  }
+  if (!gym) {
+    gym = await Gym.findOne({
+      $or: [{ partnerId: id }, { slug: id }],
+    });
   }
 
   if (!gym) {
     throw ApiError.notFound('Gym not found.');
   }
 
-  return ApiResponse.success(res, 200, 'Gym details retrieved successfully', gym.toObject());
+  return res.status(200).json(
+    ApiResponse.success(sanitizeDocument(gym), 'Gym details retrieved successfully')
+  );
 });
 
 /**
@@ -409,7 +470,16 @@ export const updateGymStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status, approvalStatus, rejectionReason } = req.body;
 
-  const gym = await Gym.findById(id);
+  let gym;
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    gym = await Gym.findById(id);
+  }
+  if (!gym) {
+    gym = await Gym.findOne({
+      $or: [{ partnerId: id }, { slug: id }],
+    });
+  }
+
   if (!gym) {
     throw ApiError.notFound('Gym not found.');
   }
@@ -420,5 +490,41 @@ export const updateGymStatus = asyncHandler(async (req, res) => {
 
   await gym.save();
 
-  return ApiResponse.success(res, 200, `Gym status updated to ${gym.status} (${gym.approvalStatus})`, gym.toObject());
+  return res.status(200).json(
+    ApiResponse.success(sanitizeDocument(gym), `Gym status updated to ${gym.status} (${gym.approvalStatus})`)
+  );
+});
+
+/**
+ * DELETE /api/v1/gyms/:id
+ * Delete a gym and its associated owner account
+ */
+export const deleteGym = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  let gym;
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    gym = await Gym.findById(id);
+  }
+  if (!gym) {
+    gym = await Gym.findOne({
+      $or: [{ partnerId: id }, { slug: id }],
+    });
+  }
+
+  if (!gym) {
+    throw ApiError.notFound('Gym not found.');
+  }
+
+  const gymName = gym.name;
+  const ownerId = gym.ownerId;
+
+  await Gym.findByIdAndDelete(gym._id);
+  if (ownerId) {
+    await User.findByIdAndDelete(ownerId);
+  }
+
+  return res.status(200).json(
+    ApiResponse.success(null, `Gym "${gymName}" and associated partner account deleted successfully`)
+  );
 });

@@ -1,15 +1,72 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import apiClient from '../../services/apiClient';
+
+export const loginUser = createAsyncThunk(
+  'auth/loginUser',
+  async ({ identifier, password }, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.post('/auth/login', {
+        identifier: identifier.trim(),
+        password,
+        portal: 'gym-owner',
+        expectedRole: 'GYM_OWNER',
+      });
+
+      const responseData = response.data?.data || response.data || {};
+      const userRole = responseData.role || 'GYM_OWNER';
+
+      if (userRole !== 'GYM_OWNER' && userRole !== 'SUPER_ADMIN') {
+        localStorage.removeItem('gymezy_auth_token');
+        localStorage.removeItem('gymezy_user');
+        return rejectWithValue('Access denied: This portal is reserved for Gym Owners.');
+      }
+
+      const token = responseData.token;
+      const user = {
+        id: responseData.id || responseData._id,
+        name: responseData.fullName || responseData.name,
+        fullName: responseData.fullName || responseData.name,
+        email: responseData.email,
+        phone: responseData.phone,
+        role: userRole,
+        gymId: responseData.gym?.id || responseData.gymId,
+        gymName: responseData.gym?.name || responseData.gymName || 'My Gym',
+        branch: responseData.gym?.city || responseData.gym?.area || '',
+        gym: responseData.gym || null,
+      };
+
+      if (token) {
+        localStorage.setItem('gymezy_auth_token', token);
+      }
+      localStorage.setItem('gymezy_user', JSON.stringify(user));
+
+      return { user, token };
+    } catch (err) {
+      localStorage.removeItem('gymezy_auth_token');
+      localStorage.removeItem('gymezy_user');
+      return rejectWithValue(
+        err.response?.data?.message || err.message || 'Invalid email/phone or password'
+      );
+    }
+  }
+);
+
+const getInitialUser = () => {
+  try {
+    const raw = localStorage.getItem('gymezy_user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const token = localStorage.getItem('gymezy_auth_token');
+const initialUser = getInitialUser();
 
 const initialState = {
-  isAuthenticated: true, // Default to logged in as demo owner for immediate access, or false if logged out
-  user: {
-    name: 'Vikram Sethi',
-    email: 'owner@fitzone.com',
-    role: 'GYM_OWNER',
-    gymId: 'GYM-FZ-01',
-    gymName: 'FitZone Gym',
-    branch: 'Anna Nagar, Chennai',
-  },
+  isAuthenticated: Boolean(token && initialUser),
+  user: initialUser,
+  token: token || null,
   loading: false,
   error: null,
 };
@@ -20,18 +77,45 @@ export const authSlice = createSlice({
   reducers: {
     loginSuccess: (state, action) => {
       state.isAuthenticated = true;
-      state.user = action.payload;
+      state.user = action.payload.user || action.payload;
+      state.token = action.payload.token || state.token;
       state.error = null;
+      if (action.payload.token) {
+        localStorage.setItem('gymezy_auth_token', action.payload.token);
+      }
+      localStorage.setItem('gymezy_user', JSON.stringify(state.user));
     },
     logout: (state) => {
       state.isAuthenticated = false;
       state.user = null;
+      state.token = null;
+      state.error = null;
+      localStorage.removeItem('gymezy_auth_token');
+      localStorage.removeItem('gymezy_user');
     },
-    setError: (state, action) => {
-      state.error = action.payload;
+    clearError: (state) => {
+      state.error = null;
     },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(loginUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(loginUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.isAuthenticated = true;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        state.error = null;
+      })
+      .addCase(loginUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
   },
 });
 
-export const { loginSuccess, logout, setError } = authSlice.actions;
+export const { loginSuccess, logout, clearError } = authSlice.actions;
 export default authSlice.reducer;

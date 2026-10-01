@@ -166,10 +166,12 @@ userSchema.methods.generateAuthToken = function () {
   });
 };
 
-// Transform output JSON: Mask _id / id and remove sensitive fields
+// Transform output JSON: Mask _id to id and remove sensitive fields
 const sanitizeJsonTransform = (_doc, ret) => {
+  if (ret._id) {
+    ret.id = ret._id.toString();
+  }
   delete ret._id;
-  delete ret.id;
   delete ret.__v;
   delete ret.password;
   return ret;

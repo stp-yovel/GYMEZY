@@ -1,120 +1,93 @@
+import axios from 'axios';
 import { getApiBaseUrl, IS_DEBUG_MODE } from '../config/envConfig';
-import { getCookie } from '../utils/cookieUtils';
+import { getCookie, deleteCookie } from '../utils/cookieUtils';
 
 /**
- * Standardized API Client using Fetch API with credential support and auto BaseURL resolution
+ * Standardized Axios API Client instance with credentials and dynamic environment resolution
  */
-class ApiClient {
-  constructor() {
-    this.baseUrl = getApiBaseUrl();
-  }
+export const apiClient = axios.create({
+  baseURL: getApiBaseUrl(),
+  withCredentials: true, // Automatically pass secure HTTP-only cookies
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  },
+});
 
-  /**
-   * Helper to build fully qualified endpoint URL
-   */
-  buildUrl(endpoint) {
-    const base = getApiBaseUrl().replace(/\/+$/, '');
-    const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    return `${base}${path}`;
-  }
+/**
+ * Request Interceptor: Dynamic BaseURL resolution, JWT token transmission, and debug logging
+ */
+apiClient.interceptors.request.use(
+  (config) => {
+    // Dynamically update baseURL if environment or endpoint changes
+    config.baseURL = getApiBaseUrl();
 
-  /**
-   * Builds request headers with cookies, Bearer fallback, and Content-Type
-   */
-  buildHeaders(customHeaders = {}) {
-    const headers = {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      ...customHeaders,
-    };
-
-    // Attach Bearer token if present in client cookies as fallback
-    const clientToken = getCookie('authToken');
-    if (clientToken && !headers.Authorization) {
-      headers.Authorization = `Bearer ${clientToken}`;
+    // Attach Bearer token from cookie if available
+    const token = getCookie('authToken') || getCookie('token');
+    if (token && !config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-
-    return headers;
-  }
-
-  /**
-   * Internal request dispatcher
-   */
-  async request(endpoint, options = {}) {
-    const url = this.buildUrl(endpoint);
-    const config = {
-      ...options,
-      headers: this.buildHeaders(options.headers),
-      credentials: 'include', // Ensures HTTP-only auth cookies are passed
-    };
 
     if (IS_DEBUG_MODE) {
-      console.log(`📡 [API ${config.method || 'GET'}] ${url}`);
+      const fullUrl = `${config.baseURL.replace(/\/+$/, '')}/${(config.url || '').replace(/^\/+/, '')}`;
+      console.log(`[API REQUEST ${config.method?.toUpperCase()}] ${fullUrl}`, {
+        params: config.params,
+        data: config.data,
+      });
     }
 
-    try {
-      const response = await fetch(url, config);
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        const errorMessage =
-          data?.message ||
-          data?.error ||
-          `Request failed with status code ${response.status}`;
-
-        const apiError = new Error(errorMessage);
-        apiError.statusCode = response.status;
-        apiError.data = data;
-        apiError.errors = data?.errors || [];
-
-        if (IS_DEBUG_MODE) {
-          console.error(`❌ [API ERROR ${response.status}] ${url}:`, errorMessage, data);
-        }
-
-        throw apiError;
-      }
-
-      return data;
-    } catch (error) {
-      if (IS_DEBUG_MODE && !error.statusCode) {
-        console.error(`❌ [NETWORK ERROR] ${url}:`, error.message);
-      }
-      throw error;
+    return config;
+  },
+  (error) => {
+    if (IS_DEBUG_MODE) {
+      console.error('[API REQUEST ERROR]:', error);
     }
+    return Promise.reject(error);
   }
+);
 
-  get(endpoint, options = {}) {
-    return this.request(endpoint, { ...options, method: 'GET' });
+/**
+ * Response Interceptor: Unified error formatting, 401 session expiry handling, and debug logging
+ */
+apiClient.interceptors.response.use(
+  (response) => {
+    if (IS_DEBUG_MODE) {
+      console.log(`[API RESPONSE ${response.status}] ${response.config.url}`, response.data);
+    }
+    return response;
+  },
+  (error) => {
+    const statusCode = error.response?.status;
+
+    if (IS_DEBUG_MODE) {
+      console.error(
+        `[API RESPONSE ERROR ${statusCode || 'NETWORK'}]:`,
+        error.response?.data || error.message
+      );
+    }
+
+    // Auto-clean expired credentials on 401 Unauthorized for non-login endpoints
+    if (statusCode === 401 && !error.config?.url?.includes('/auth/login')) {
+      deleteCookie('authToken');
+    }
+
+    // Standardize error message presentation
+    const responseData = error.response?.data;
+    const formattedError = new Error(
+      responseData?.message ||
+      responseData?.error ||
+      error.message ||
+      'An unexpected network error occurred.'
+    );
+
+    formattedError.statusCode = statusCode || 500;
+    formattedError.data = responseData;
+    formattedError.response = error.response;
+    formattedError.isAxiosError = true;
+
+    return Promise.reject(formattedError);
   }
+);
 
-  post(endpoint, body, options = {}) {
-    return this.request(endpoint, {
-      ...options,
-      method: 'POST',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-  }
-
-  put(endpoint, body, options = {}) {
-    return this.request(endpoint, {
-      ...options,
-      method: 'PUT',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-  }
-
-  patch(endpoint, body, options = {}) {
-    return this.request(endpoint, {
-      ...options,
-      method: 'PATCH',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-  }
-
-  delete(endpoint, options = {}) {
-    return this.request(endpoint, { ...options, method: 'DELETE' });
-  }
-}
-
-export const apiClient = new ApiClient();
 export default apiClient;

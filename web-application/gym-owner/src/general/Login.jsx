@@ -17,7 +17,7 @@ import {
   ArrowRightOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../theme/ThemeContext';
-import { loginSuccess } from '../redux/slices/authSlice';
+import { loginUser } from '../redux/slices/authSlice';
 import gymezyLogo from '../assets/logo/gymezy.png';
 import fitnessBg from '../assets/images/onboarding_1.jpg';
 
@@ -28,23 +28,29 @@ export const Login = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = (values) => {
+  const handleLogin = async (values) => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      dispatch(
-        loginSuccess({
-          name: 'Vikram Sethi',
-          email: values.email || 'owner@fitzone.com',
-          role: 'GYM_OWNER',
-          gymId: 'GYM-FZ-01',
-          gymName: 'FitZone Gym',
-          branch: 'Anna Nagar, Chennai',
+    try {
+      const resultAction = await dispatch(
+        loginUser({
+          identifier: values.email,
+          password: values.password,
         })
       );
-      message.success('Welcome back, Vikram! Gym Owner Portal loaded.');
-      navigate('/owner/dashboard');
-    }, 500);
+
+      if (loginUser.fulfilled.match(resultAction)) {
+        const user = resultAction.payload.user;
+        message.success(`Welcome back, ${user.fullName || user.name || 'Partner'}! Gym Owner Portal loaded.`);
+        navigate('/owner/dashboard');
+      } else {
+        const errorMsg = resultAction.payload || 'Invalid email/phone or password.';
+        message.error(errorMsg);
+      }
+    } catch (err) {
+      message.error(err.message || 'Login failed. Please verify credentials and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

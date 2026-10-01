@@ -12,6 +12,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeContext';
 import { AppColors } from '../../theme/appTheme';
+import { useAuth } from '../../context/AuthContext';
 
 const RECENT_CHECKINS = [
   {
@@ -63,7 +64,8 @@ const RECENT_CHECKINS = [
 
 export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
   const { isDark } = useTheme();
-  const [capacity] = useState(42);
+  const { user, gym } = useAuth();
+  const [capacity] = useState(gym?.floorCapacity || 50);
 
   return (
     <ScrollView
@@ -102,7 +104,7 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
                   { color: isDark ? '#FFFFFF' : '#0F172A' },
                 ]}
               >
-                FitZone Arena
+                {gym?.name || user?.fullName || 'Gym Facility'}
               </Text>
               <View style={styles.verifiedBadge}>
                 <MaterialIcons name="verified" size={15} color={AppColors.secondaryColor} />
@@ -114,7 +116,7 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
                 { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' },
               ]}
             >
-              Anna Nagar, Chennai
+              {gym?.city ? (gym?.area ? `${gym.area}, ${gym.city}` : gym.city) : gym?.fullAddress || 'Partner Location'}
             </Text>
           </View>
         </View>

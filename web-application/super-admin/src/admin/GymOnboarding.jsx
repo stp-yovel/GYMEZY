@@ -6,57 +6,43 @@ import {
   Input,
   Select,
   Button,
-  Form,
   Upload,
   Typography,
   Space,
   message,
   Modal,
-  TimePicker,
-  Checkbox,
   Radio,
   Progress,
   Divider,
   Tag,
   InputNumber,
   Switch,
-  Avatar,
-  Table,
-  Rate,
   Tooltip,
+  Alert,
 } from 'antd';
 import {
   ShopOutlined,
   EnvironmentOutlined,
   PictureOutlined,
-  TeamOutlined,
-  AppstoreOutlined,
-  CalendarOutlined,
   CreditCardOutlined,
   CheckCircleOutlined,
+  CheckCircleFilled,
+  CloseCircleFilled,
+  ExclamationCircleFilled,
+  WarningOutlined,
   SaveOutlined,
   ArrowRightOutlined,
   ArrowLeftOutlined,
   InboxOutlined,
   SafetyCertificateFilled,
-  PlusOutlined,
   DeleteOutlined,
-  EditOutlined,
   CheckOutlined,
   StarFilled,
-  QrcodeOutlined,
-  PhoneOutlined,
-  MailOutlined,
-  BankOutlined,
-  EyeOutlined,
   ThunderboltFilled,
   CompassOutlined,
-  GlobalOutlined,
-  ClockCircleOutlined,
-  SafetyOutlined,
   FileProtectOutlined,
-  FireFilled,
-  RocketOutlined,
+  FilePdfOutlined,
+  MobileOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
@@ -81,12 +67,41 @@ const ONBOARDING_STEPS = [
   { id: 1, key: 'business', title: 'Business Info', icon: <ShopOutlined /> },
   { id: 2, key: 'location', title: 'Location & Hours', icon: <EnvironmentOutlined /> },
   { id: 3, key: 'facilities', title: 'Facilities & Photos', icon: <PictureOutlined /> },
-  { id: 4, key: 'trainers', title: 'Services & Trainers', icon: <TeamOutlined /> },
-  { id: 5, key: 'session', title: 'Session & Pricing', icon: <AppstoreOutlined /> },
-  { id: 6, key: 'rules', title: 'Rules & Safety', icon: <CalendarOutlined /> },
-  { id: 7, key: 'payment', title: 'Payout & Tier', icon: <CreditCardOutlined /> },
-  { id: 8, key: 'review', title: 'Review & Go Live', icon: <CheckCircleOutlined /> },
+  { id: 4, key: 'workouts', title: 'Workouts & Disciplines', icon: <ThunderboltFilled /> },
+  { id: 5, key: 'payment', title: 'Payout & Tier', icon: <CreditCardOutlined /> },
+  { id: 6, key: 'review', title: 'Review & Go Live', icon: <CheckCircleOutlined /> },
 ];
+
+const STEP_REQUIRED_FIELDS = {
+  1: [
+    { field: 'gymName', label: 'Gym / Studio Name' },
+    { field: 'ownerName', label: 'Owner / MD Name' },
+    { field: 'phone', label: 'Mobile Number' },
+    { field: 'email', label: 'Official Email' },
+    { field: 'password', label: 'Owner Login Password' },
+  ],
+  2: [
+    { field: 'address', label: 'Street Address' },
+    { field: 'area', label: 'Area / Locality' },
+    { field: 'city', label: 'City' },
+    { field: 'state', label: 'State' },
+    { field: 'pincode', label: '6-digit Pincode' },
+  ],
+  3: [
+    { field: 'floorSpaceSqFt', label: 'Floor Space (sq. ft.)' },
+    { field: 'maxFloorCapacity', label: 'Max Floor Capacity' },
+    { field: 'logo', label: 'Gym Logo' },
+    { field: 'facilities', label: 'Facilities (Min 1)' },
+  ],
+  4: [
+    { field: 'workouts', label: 'Workouts / Disciplines (Min 1)' },
+  ],
+  5: [
+    { field: 'accountHolder', label: 'Account Holder Name' },
+    { field: 'accountNumber', label: 'Bank Account Number' },
+    { field: 'ifscCode', label: 'Bank IFSC Code' },
+  ],
+};
 
 const FACILITY_OPTIONS = [
   'AC Gym',
@@ -135,58 +150,175 @@ const WORKOUT_OPTIONS = [
 
 const BADGE_OPTIONS = ['Trending', 'Top Rated', 'Verified SuperGym', 'Popular', 'Premium Club', '24/7 Access', 'CrossFit Ready'];
 
-const CITY_PRESETS = [
-  { city: 'Chennai', state: 'Tamil Nadu', lat: 13.0827, lng: 80.2707, area: 'Anna Nagar' },
-  { city: 'Bengaluru', state: 'Karnataka', lat: 12.9716, lng: 77.5946, area: 'Koramangala' },
-  { city: 'Mumbai', state: 'Maharashtra', lat: 19.0760, lng: 72.8777, area: 'Bandra West' },
-  { city: 'Pune', state: 'Maharashtra', lat: 18.5204, lng: 73.8567, area: 'Viman Nagar' },
-  { city: 'Hyderabad', state: 'Telangana', lat: 17.3850, lng: 78.4867, area: 'Hitec City' },
-  { city: 'Delhi-NCR', state: 'Delhi', lat: 28.6139, lng: 77.2090, area: 'Connaught Place' },
-  { city: 'Kolkata', state: 'West Bengal', lat: 22.5726, lng: 88.3639, area: 'Salt Lake' },
-];
+const AT_COORDS_REGEX = /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/;
+const Q_COORDS_REGEX = /[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/;
+const D3D4_COORDS_REGEX = /!3d(-?\d+(?:\.\d+)?)[^!]*!4d(-?\d+(?:\.\d+)?)/;
+const LL_COORDS_REGEX = /(?:ll|loc:)(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/;
+
+const extractCoordinatesFromMapsUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+
+  const atMatch = AT_COORDS_REGEX.exec(url);
+  if (atMatch) {
+    return { lat: Number.parseFloat(atMatch[1]), lng: Number.parseFloat(atMatch[2]) };
+  }
+
+  const qMatch = Q_COORDS_REGEX.exec(url);
+  if (qMatch) {
+    return { lat: Number.parseFloat(qMatch[1]), lng: Number.parseFloat(qMatch[2]) };
+  }
+
+  const d3d4Match = D3D4_COORDS_REGEX.exec(url);
+  if (d3d4Match) {
+    return { lat: Number.parseFloat(d3d4Match[1]), lng: Number.parseFloat(d3d4Match[2]) };
+  }
+
+  const llMatch = LL_COORDS_REGEX.exec(url);
+  if (llMatch) {
+    return { lat: Number.parseFloat(llMatch[1]), lng: Number.parseFloat(llMatch[2]) };
+  }
+
+  return null;
+};
+
+const reverseGeocodeCoordinates = async (lat, lng) => {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+      {
+        headers: {
+          'Accept-Language': 'en',
+        },
+      }
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    const addr = data.address || {};
+
+    const streetComponents = [
+      addr.building || addr.amenity || addr.house_name || addr.house_number,
+      addr.road || addr.street || addr.pedestrian || addr.footway,
+      addr.neighbourhood || addr.suburb || addr.residential,
+    ].filter(Boolean);
+
+    const fullStreet = streetComponents.length > 0
+      ? streetComponents.join(', ')
+      : (data.display_name ? data.display_name.split(',').slice(0, 2).join(', ').trim() : '');
+
+    const area = addr.suburb || addr.neighbourhood || addr.subdistrict || addr.city_district || addr.locality || '';
+    const city = addr.city || addr.town || addr.municipality || addr.village || addr.county || addr.state_district || '';
+    const state = addr.state || '';
+    const pincode = addr.postcode || '';
+
+    return {
+      address: fullStreet || data.display_name || '',
+      area,
+      city,
+      state,
+      pincode,
+    };
+  } catch {
+    return null;
+  }
+};
 
 export const GymOnboarding = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { isDarkMode } = useTheme();
   const [currentStep, setCurrentStep] = useState(1);
-  const [form] = Form.useForm();
 
   // Success Celebration Modal State
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [createdGymSummary, setCreatedGymSummary] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFetchingGps, setIsFetchingGps] = useState(false);
 
-  // Trainer Modal State
-  const [isTrainerModalOpen, setIsTrainerModalOpen] = useState(false);
-  const [trainerForm] = Form.useForm();
+  // Live Validation Errors and Touched State
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
 
-  // Comprehensive Form State Data across steps
+  const handleGetAddressByGps = async () => {
+    if (!navigator.geolocation) {
+      message.error('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    setIsFetchingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const parsed = await reverseGeocodeCoordinates(latitude, longitude);
+
+          setFormData((prev) => ({
+            ...prev,
+            lat: latitude,
+            lng: longitude,
+            googleMapsUrl: prev.googleMapsUrl || `https://maps.google.com/?q=${latitude},${longitude}`,
+            ...(parsed?.address ? { address: parsed.address } : {}),
+            ...(parsed?.area ? { area: parsed.area } : {}),
+            ...(parsed?.city ? { city: parsed.city } : {}),
+            ...(parsed?.state ? { state: parsed.state } : {}),
+            ...(parsed?.pincode ? { pincode: parsed.pincode } : {}),
+          }));
+
+          setErrors((prev) => {
+            const nextErrors = { ...prev };
+            if (parsed?.address) delete nextErrors.address;
+            if (parsed?.area) delete nextErrors.area;
+            if (parsed?.city) delete nextErrors.city;
+            if (parsed?.state) delete nextErrors.state;
+            if (parsed?.pincode) delete nextErrors.pincode;
+            return nextErrors;
+          });
+
+          message.success(`GPS coordinates and address loaded (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+        } catch {
+          message.error('Failed to parse address from GPS');
+        } finally {
+          setIsFetchingGps(false);
+        }
+      },
+      (geoError) => {
+        setIsFetchingGps(false);
+        message.error(geoError.message || 'Unable to retrieve location. Please check browser permissions.');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  // Comprehensive Form State Data across steps (Clean Zero/Empty Defaults)
   const [formData, setFormData] = useState({
     // Step 1: Business
-    gymName: 'Titanium Fitness Hub',
-    tagline: 'Unleash Your Ultimate Strength & Endurance',
+    gymName: '',
+    tagline: '',
     businessType: 'Private Limited',
-    ownerName: 'Vikramaditya Verma',
-    phone: '9840123456',
-    email: 'admin@titaniumfitness.com',
+    ownerName: '',
+    phone: '',
+    email: '',
     password: '',
-    yearEstablished: '2021',
-    gstNumber: '33AAACT1234F1Z5',
-    panNumber: 'AAACT1234F',
-    branches: '2',
-    gymId: 'GYM-' + Math.floor(1000 + Math.random() * 9000),
+    yearEstablished: '2026',
+    gstNumber: '',
+    panNumber: '',
+    branches: '1',
+    gymId: '',
+    businessCertificate: '',
+    businessCertificateName: '',
+    businessCertificateSize: '',
+    businessCertificateType: '',
+    gstCertificate: '',
 
     // Step 2: Location & Hours
-    address: 'Plot 78, 100 Feet Road, 4th Block, Anna Nagar West',
-    area: 'Anna Nagar West',
-    city: 'Chennai',
+    address: '',
+    area: '',
+    city: '',
     state: 'Tamil Nadu',
-    pincode: '600040',
-    landmark: 'Opposite Metro Pillar 142',
-    lat: 13.0850,
-    lng: 80.2101,
-    googleMapsUrl: 'https://maps.google.com/?q=13.0850,80.2101',
+    pincode: '',
+    landmark: '',
+    lat: 13.0827,
+    lng: 80.2707,
+    googleMapsUrl: '',
     weekdayOpen: '05:30 AM',
     weekdayClose: '10:30 PM',
     weekendOpen: '06:00 AM',
@@ -196,71 +328,44 @@ export const GymOnboarding = () => {
     is24Hours: false,
 
     // Step 3: Facilities, Photos & Space
-    floorSpaceSqFt: 5500,
-    maxFloorCapacity: 95,
-    coverPhoto: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=600&auto=format&fit=crop',
-    galleryPhotos: [
-      'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?q=80&w=400&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=400&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?q=80&w=400&auto=format&fit=crop',
-    ],
-    facilities: ['AC Gym', 'Locker Facility', 'Shower Available', 'Changing Room', 'Free Wi-Fi', 'Music System', 'Steam & Sauna', 'Dedicated Parking (2W/4W)', 'Turnstile Access Control'],
-    amenities: ['RO Drinking Water', 'Towel Service', 'Protein Shake Bar', 'Juice & Smoothie Bar', 'InBody BMI Scanner', 'First Aid Kit'],
-    tags: ['Top Rated', 'Unisex', 'AC Gym', 'Certified Trainers'],
-    badgeText: 'Trending',
-    aboutText: 'Titanium Fitness Hub is a high-octane workout facility outfitted with Hammer Strength plate-loaded machinery, Eleiko Olympic barbells, high-intensity turf zone, and certified strength coaches.',
+    floorSpaceSqFt: '',
+    maxFloorCapacity: '',
+    logo: '',
+    coverPhoto: '',
+    galleryPhotos: [],
+    facilities: [],
+    amenities: [],
+    tags: [],
+    badgeText: 'Verified',
+    aboutText: '',
 
     // Step 4: Workouts & Trainers
-    workouts: ['GYM / Strength', 'Cardio Fitness', 'HIIT (High Intensity)', 'CrossFit', 'Yoga & Mobility', 'Zumba & Dance'],
-    trainers: [
-      {
-        id: 'tr-1',
-        name: 'Karan Rathore',
-        specialty: 'Hypertrophy & Powerlifting',
-        experienceYears: 7,
-        rating: 4.9,
-        monthlyFee: 2500,
-        image: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?q=80&w=150&auto=format&fit=crop',
-      },
-      {
-        id: 'tr-2',
-        name: 'Pooja Hegde',
-        specialty: 'HIIT & Mobility Specialist',
-        experienceYears: 5,
-        rating: 4.8,
-        monthlyFee: 2000,
-        image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=150&auto=format&fit=crop',
-      },
-    ],
+    workouts: [],
+    trainers: [],
 
     // Step 5: Sessions & Pricing
-    singleSessionPrice: 199,
-    weeklyPassPrice: 799,
-    fiveSessionPrice: 899,
-    monthlyPrice: 1999,
-    quarterlyPrice: 4999,
-    halfYearlyPrice: 8999,
-    annualPrice: 14999,
+    singleSessionPrice: '',
+    weeklyPassPrice: '',
+    fiveSessionPrice: '',
+    monthlyPrice: '',
+    quarterlyPrice: '',
+    halfYearlyPrice: '',
+    annualPrice: '',
     slotDurationMinutes: 60,
     maxSlotCapacity: 25,
-    slotsMorning: ['06:00 - 07:00 AM', '07:00 - 08:00 AM', '08:00 - 09:00 AM', '09:00 - 10:00 AM'],
-    slotsEvening: ['05:00 - 06:00 PM', '06:00 - 07:00 PM', '07:00 - 08:00 PM', '08:00 - 09:00 PM'],
+    slotsMorning: [],
+    slotsEvening: [],
 
     // Step 6: Rules & Safety
     rules: [
       'Carry clean indoor training shoes',
       'Mandatory personal gym towel on workout benches',
       'Re-rack dumbbells and plates after set completion',
-      'Minimum entry age is 16 years',
-      'Valid photo ID proof required for digital check-in',
-      'No outside food permitted in the workout area',
     ],
     safetyMeasures: [
       'Daily multi-session equipment sanitization',
       'Certified First Aid & CPR staff available on floor',
       '24/7 CCTV surveillance coverage',
-      'Turnstile Dynamic QR scanner access control',
-      'Emergency exits and fire extinguishers installed',
     ],
     freeCancellationHours: 2,
     refundPercentage: 100,
@@ -270,91 +375,303 @@ export const GymOnboarding = () => {
     subscriptionType: 'Hybrid',
     commissionRate: 10,
     settlementCycle: 'Daily (T+1)',
-    accountHolder: 'Titanium Fitness Hub Pvt Ltd',
+    accountHolder: '',
     bankName: 'HDFC Bank',
-    accountNumber: '50200098765432',
-    ifscCode: 'HDFC0001234',
-    upiId: 'titaniumfitness@okhdfcbank',
-    termsAccepted: true,
-    slaAccepted: true,
+    accountNumber: '',
+    ifscCode: '',
+    upiId: '',
     initialApprovalStatus: 'Approved',
   });
 
   // Calculate Progress Pct
-  const progressPercent = Math.round((currentStep / 8) * 100);
+  const progressPercent = Math.round((currentStep / 6) * 100);
 
-  // Quick Preset Location Helper
-  const handleApplyPresetCity = (preset) => {
-    setFormData((prev) => ({
-      ...prev,
-      city: preset.city,
-      state: preset.state,
-      area: preset.area,
-      lat: preset.lat,
-      lng: preset.lng,
-      address: `Main Commercial Avenue, ${preset.area}`,
-      googleMapsUrl: `https://maps.google.com/?q=${preset.lat},${preset.lng}`,
-    }));
-    message.success(`Location coordinates preset to ${preset.city}!`);
+  // Single Field Validator
+  const validateField = (name, value, allData = formData) => {
+    let error = null;
+    const strVal = value !== undefined && value !== null ? String(value).trim() : '';
+
+    switch (name) {
+      // Step 1: Business
+      case 'gymName':
+        if (!strVal) error = 'Gym / Studio Name is required';
+        else if (strVal.length < 3) error = 'Gym Name must be at least 3 characters';
+        break;
+      case 'ownerName':
+        if (!strVal) error = 'Primary Owner / MD Name is required';
+        else if (strVal.length < 2) error = 'Owner Name must be at least 2 characters';
+        break;
+      case 'phone':
+        if (!strVal) {
+          error = 'Contact Mobile Number is required';
+        } else {
+          const cleanPhone = strVal.replace(/^\+91\s*|^91\s*/, '').replace(/\D/g, '');
+          if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+            error = 'Enter a valid 10-digit Indian mobile number (e.g. 9876543210)';
+          }
+        }
+        break;
+      case 'email':
+        if (!strVal) {
+          error = 'Official Email Address is required';
+        } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(strVal)) {
+          error = 'Please enter a valid email address (e.g. owner@gym.com)';
+        }
+        break;
+      case 'password': {
+        const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]|[^\x20-\x7E]/u;
+        if (!strVal) {
+          error = 'Account Password is required';
+        } else if (emojiRegex.test(strVal)) {
+          error = 'Emojis and non-standard characters are not allowed in password';
+        } else if (strVal.length < 8) {
+          error = 'Password must be at least 8 characters';
+        } else if (strVal.length > 16) {
+          error = 'Password cannot exceed 16 characters (max 16)';
+        } else if (!/[A-Z]/.test(strVal)) {
+          error = 'Password must contain at least 1 uppercase letter (A-Z)';
+        } else if (!/\d/.test(strVal)) {
+          error = 'Password must contain at least 1 number (0-9)';
+        } else if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(strVal)) {
+          error = 'Password must contain at least 1 symbol / special character';
+        }
+        break;
+      }
+      case 'gstNumber':
+        if (strVal && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i.test(strVal)) {
+          error = 'Invalid GSTIN format (e.g. 33AAAAA0000A1Z5)';
+        }
+        break;
+      case 'panNumber':
+        if (strVal && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i.test(strVal)) {
+          error = 'Invalid PAN format (e.g. ABCDE1234F)';
+        }
+        break;
+
+      // Step 2: Location & Hours
+      case 'address':
+        if (!strVal) error = 'Full Street Address is required';
+        else if (strVal.length < 5) error = 'Address must be at least 5 characters';
+        break;
+      case 'area':
+        if (!strVal) error = 'Area / Locality is required';
+        break;
+      case 'city':
+        if (!strVal) error = 'City is required';
+        break;
+      case 'state':
+        if (!strVal) error = 'State is required';
+        break;
+      case 'pincode':
+        if (!strVal) {
+          error = 'Pincode is required';
+        } else if (!/^[1-9][0-9]{5}$/.test(strVal)) {
+          error = 'Enter a valid 6-digit postal pincode (e.g. 600040)';
+        }
+        break;
+
+      // Step 3: Facilities, Photos & Space
+      case 'floorSpaceSqFt':
+        if (!value || Number(value) <= 0) error = 'Floor space (sq. ft.) is required and must be > 0';
+        break;
+      case 'maxFloorCapacity':
+        if (!value || Number(value) <= 0) error = 'Max floor capacity is required and must be > 0';
+        break;
+      case 'logo':
+      case 'coverPhoto':
+        if (!strVal) error = 'Gym brand logo is required (upload image or provide URL)';
+        break;
+      case 'facilities':
+        if (!Array.isArray(value) || value.length === 0) error = 'Please select at least 1 facility';
+        break;
+
+      // Step 4: Services & Workouts
+      case 'workouts':
+        if (!Array.isArray(value) || value.length === 0) error = 'Please select at least 1 fitness discipline';
+        break;
+
+      // Step 5: Payout & Subscription
+      case 'accountHolder':
+        if (!strVal) error = 'Bank account holder name is required';
+        break;
+      case 'accountNumber':
+        if (!strVal) {
+          error = 'Bank account number is required';
+        } else if (!/^\d{9,18}$/.test(strVal)) {
+          error = 'Enter a valid bank account number (9 to 18 digits)';
+        }
+        break;
+      case 'ifscCode':
+        if (!strVal) {
+          error = 'IFSC code is required';
+        } else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(strVal)) {
+          error = 'Enter a valid 11-character IFSC code (e.g. HDFC0001234)';
+        }
+        break;
+
+      default:
+        break;
+    }
+
+    return error;
   };
 
-  // Add Trainer Action
-  const handleAddTrainer = (values) => {
-    const newTrainer = {
-      id: `tr-${Date.now()}`,
-      name: values.name,
-      specialty: values.specialty,
-      experienceYears: Number(values.experienceYears) || 3,
-      rating: 4.9,
-      monthlyFee: Number(values.monthlyFee) || 2000,
-      image: values.image || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop',
+  // Live Field Change Handler
+  const handleFieldChange = (name, value) => {
+    const updatedData = { ...formData, [name]: value };
+    setFormData(updatedData);
+    setTouched((prev) => ({ ...prev, [name]: true }));
+
+    const fieldErr = validateField(name, value, updatedData);
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (fieldErr) {
+        next[name] = fieldErr;
+      } else {
+        delete next[name];
+      }
+      return next;
+    });
+  };
+
+  // Field Blur Handler
+  const handleFieldBlur = (name) => {
+    setTouched((prev) => ({ ...prev, [name]: true }));
+    const fieldErr = validateField(name, formData[name], formData);
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (fieldErr) {
+        next[name] = fieldErr;
+      } else {
+        delete next[name];
+      }
+      return next;
+    });
+  };
+
+  // Step Status Inspector
+  const getStepValidationStatus = (stepId, currentFormData = formData) => {
+    const fields = STEP_REQUIRED_FIELDS[stepId] || [];
+    const missing = [];
+
+    for (const { field, label } of fields) {
+      const err = validateField(field, currentFormData[field], currentFormData);
+      if (err) {
+        missing.push({ field, label, error: err });
+      }
+    }
+
+    return {
+      isValid: missing.length === 0,
+      missingCount: missing.length,
+      missingFields: missing,
     };
-    setFormData((prev) => ({
-      ...prev,
-      trainers: [...prev.trainers, newTrainer],
-    }));
-    setIsTrainerModalOpen(false);
-    trainerForm.resetFields();
-    message.success(`Trainer "${values.name}" added successfully!`);
   };
 
-  const handleRemoveTrainer = (id) => {
-    setFormData((prev) => ({
-      ...prev,
-      trainers: prev.trainers.filter((t) => t.id !== id),
-    }));
-    message.info('Trainer removed');
+  // Step Validator on Next
+  const validateStep = (stepNumber) => {
+    const fields = STEP_REQUIRED_FIELDS[stepNumber] || [];
+    const newErrors = {};
+    const newTouched = { ...touched };
+    let isValid = true;
+
+    for (const { field } of fields) {
+      newTouched[field] = true;
+      const err = validateField(field, formData[field], formData);
+      if (err) {
+        newErrors[field] = err;
+        isValid = false;
+      }
+    }
+
+    setTouched(newTouched);
+    setErrors((prev) => ({ ...prev, ...newErrors }));
+    return { isValid, errors: newErrors };
   };
 
-  // Handle Save & Next
+  // Global Check Across All 5 Data Steps
+  const getAllStepsValidationStatus = () => {
+    const statusMap = {};
+    let totalMissing = 0;
+    for (let s = 1; s <= 5; s++) {
+      const status = getStepValidationStatus(s);
+      statusMap[s] = status;
+      totalMissing += status.missingCount;
+    }
+    return {
+      statusMap,
+      totalMissing,
+      isAllValid: totalMissing === 0,
+    };
+  };
+
+  // Helper to render live error feedback underneath inputs
+  const renderFieldError = (fieldName) => {
+    if (touched[fieldName] && errors[fieldName]) {
+      return (
+        <div
+          style={{
+            color: '#ef4444',
+            fontSize: 12,
+            marginTop: 5,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            fontWeight: 600,
+            lineHeight: 1.3,
+          }}
+        >
+          <CloseCircleFilled style={{ color: '#ef4444', fontSize: 13, flexShrink: 0 }} />
+          <span>{errors[fieldName]}</span>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Helper to render success checkmark when valid
+  const renderFieldSuccess = (fieldName) => {
+    const val = formData[fieldName];
+    const isPopulated = Array.isArray(val) ? val.length > 0 : Boolean(val);
+    if (touched[fieldName] && !errors[fieldName] && isPopulated) {
+      return (
+        <Tooltip title="Valid entry">
+          <CheckCircleFilled style={{ color: '#16a34a', marginLeft: 6, fontSize: 13 }} />
+        </Tooltip>
+      );
+    }
+    return null;
+  };
+
+  // Handle Save & Next with Step Live Validation
   const handleSaveAndNext = () => {
-    form
-      .validateFields()
-      .then((values) => {
-        setFormData((prev) => ({ ...prev, ...values }));
-        if (currentStep < 8) {
-          setCurrentStep((prev) => prev + 1);
-          message.success(`Step ${currentStep} saved!`);
-        } else {
-          handleFinalPublish();
-        }
-      })
-      .catch(() => {
-        // In case of any un-focused field, proceed smoothly
-        if (currentStep < 8) {
-          setCurrentStep((prev) => prev + 1);
-        } else {
-          handleFinalPublish();
-        }
-      });
+    const { isValid, errors: stepErrors } = validateStep(currentStep);
+    if (!isValid) {
+      const errorCount = Object.keys(stepErrors).length;
+      message.error(
+        `Please fix the ${errorCount} required field${errorCount > 1 ? 's' : ''} in Step ${currentStep} before proceeding.`
+      );
+      return;
+    }
+
+    if (currentStep < 6) {
+      setCurrentStep((prev) => prev + 1);
+      message.success(`Step ${currentStep} verified & saved!`);
+    } else {
+      handleFinalPublish();
+    }
   };
 
-  // Handle Final Publish
+  // Handle Final Publish with Platform Validation
   const handleFinalPublish = async () => {
-    if (!formData.password || formData.password.length < 6) {
-      message.error('Please create a partner owner login password (minimum 6 characters) in Step 1.');
-      setCurrentStep(1);
-      return;
+    for (let step = 1; step <= 5; step++) {
+      const { isValid, missingFields } = getStepValidationStatus(step);
+      if (!isValid) {
+        validateStep(step);
+        message.error(`Step ${step} has incomplete fields (${missingFields.map((f) => f.label).join(', ')}). Redirecting...`);
+        setCurrentStep(step);
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -411,8 +728,9 @@ export const GymOnboarding = () => {
         subscriptionStatus: 'Active',
         commissionRate: Number(formData.commissionRate) || 10,
         settlementCycle: formData.settlementCycle || 'Daily (T+1)',
-        coverPhoto: formData.coverPhoto,
-        image: formData.coverPhoto,
+        logo: formData.logo || formData.coverPhoto,
+        coverPhoto: formData.logo || formData.coverPhoto,
+        image: formData.logo || formData.coverPhoto,
         galleryPhotos: formData.galleryPhotos,
         tags: formData.tags,
         badgeText: formData.badgeText,
@@ -471,6 +789,8 @@ export const GymOnboarding = () => {
     navigate('/admin/gyms');
   };
 
+  const validationSummary = getAllStepsValidationStatus();
+
   return (
     <div style={{ maxWidth: 1280, margin: '0 auto', paddingBottom: 40 }}>
       {/* 1. TOP TITLE & ACTIONS BAR */}
@@ -492,12 +812,24 @@ export const GymOnboarding = () => {
               color: isDarkMode ? '#ffffff' : '#0f172a',
               margin: 0,
               letterSpacing: '-0.3px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
             }}
           >
             New Gym Partner Onboarding
+            {validationSummary.isAllValid ? (
+              <Tag color="success" style={{ fontSize: 12, fontWeight: 700, borderRadius: 12, padding: '2px 10px' }}>
+                <CheckCircleFilled /> Ready to Launch
+              </Tag>
+            ) : (
+              <Tag color="warning" style={{ fontSize: 12, fontWeight: 700, borderRadius: 12, padding: '2px 10px' }}>
+                <WarningOutlined /> Live Validation Active
+              </Tag>
+            )}
           </h1>
           <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
-            Configure facilities, pricing packages, access control, and bank payout parameters.
+            Configure partner business details, location, facilities, trainers, and settlement parameters with live validation.
           </Text>
         </div>
 
@@ -544,7 +876,7 @@ export const GymOnboarding = () => {
             >
               GYM
             </div>
-            <span>{formData.gymName || 'New Gym'}</span>
+            <span>{formData.gymName || 'New Gym Partner'}</span>
           </div>
         </div>
       </div>
@@ -571,7 +903,10 @@ export const GymOnboarding = () => {
         >
           {ONBOARDING_STEPS.map((step) => {
             const isActive = step.id === currentStep;
-            const isCompleted = step.id < currentStep;
+            const stepStatus = getStepValidationStatus(step.id);
+            const isCompleted = step.id < currentStep && stepStatus.isValid;
+            const hasError = step.id < currentStep && !stepStatus.isValid;
+
             return (
               <div
                 key={step.key}
@@ -598,11 +933,13 @@ export const GymOnboarding = () => {
                     backgroundColor: isActive
                       ? '#4338ca'
                       : isCompleted
-                      ? '#16a34a'
-                      : isDarkMode
-                      ? '#1e293b'
-                      : '#f1f5f9',
-                    color: isActive || isCompleted ? '#ffffff' : isDarkMode ? '#64748b' : '#94a3b8',
+                        ? '#16a34a'
+                        : hasError
+                          ? '#ef4444'
+                          : isDarkMode
+                            ? '#1e293b'
+                            : '#f1f5f9',
+                    color: isActive || isCompleted || hasError ? '#ffffff' : isDarkMode ? '#64748b' : '#94a3b8',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -611,13 +948,21 @@ export const GymOnboarding = () => {
                     border: isActive
                       ? '3px solid rgba(79, 70, 229, 0.35)'
                       : isCompleted
-                      ? '3px solid rgba(22, 163, 74, 0.35)'
-                      : 'none',
+                        ? '3px solid rgba(22, 163, 74, 0.35)'
+                        : hasError
+                          ? '3px solid rgba(239, 68, 68, 0.35)'
+                          : 'none',
                     transition: 'all 0.2s ease',
                     marginBottom: 6,
                   }}
                 >
-                  {isCompleted ? <CheckOutlined style={{ fontSize: 12 }} /> : step.id}
+                  {isCompleted ? (
+                    <CheckOutlined style={{ fontSize: 12 }} />
+                  ) : hasError ? (
+                    <ExclamationCircleFilled style={{ fontSize: 12 }} />
+                  ) : (
+                    step.id
+                  )}
                 </div>
 
                 {/* Step Label */}
@@ -628,8 +973,10 @@ export const GymOnboarding = () => {
                     color: isActive
                       ? '#4338ca'
                       : isCompleted
-                      ? isDarkMode ? '#e2e8f0' : '#1e293b'
-                      : isDarkMode ? '#64748b' : '#94a3b8',
+                        ? isDarkMode ? '#e2e8f0' : '#1e293b'
+                        : hasError
+                          ? '#ef4444'
+                          : isDarkMode ? '#64748b' : '#94a3b8',
                     textAlign: 'center',
                     whiteSpace: 'nowrap',
                   }}
@@ -663,7 +1010,7 @@ export const GymOnboarding = () => {
                 Onboarding Progress
               </div>
               <div style={{ fontSize: 20, fontWeight: 900, color: isDarkMode ? '#ffffff' : '#0f172a', margin: '4px 0 10px 0' }}>
-                Step {currentStep} of 8
+                Step {currentStep} of 6
               </div>
 
               {/* Progress Bar */}
@@ -682,7 +1029,10 @@ export const GymOnboarding = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {ONBOARDING_STEPS.map((step) => {
                   const isActive = step.id === currentStep;
-                  const isCompleted = step.id < currentStep;
+                  const stepStatus = getStepValidationStatus(step.id);
+                  const isCompleted = stepStatus.isValid;
+                  const hasErrors = !stepStatus.isValid && Object.keys(touched).some((k) => (STEP_REQUIRED_FIELDS[step.id] || []).some((f) => f.field === k));
+
                   return (
                     <div
                       key={step.key}
@@ -690,7 +1040,7 @@ export const GymOnboarding = () => {
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 10,
+                        justifyContent: 'space-between',
                         padding: '8px 12px',
                         borderRadius: 8,
                         backgroundColor: isActive
@@ -700,42 +1050,61 @@ export const GymOnboarding = () => {
                         transition: 'all 0.2s ease',
                       }}
                     >
-                      <div
-                        style={{
-                          width: 22,
-                          height: 22,
-                          borderRadius: '50%',
-                          backgroundColor: isActive
-                            ? '#4338ca'
-                            : isCompleted
-                            ? '#16a34a'
-                            : isDarkMode
-                            ? '#1e293b'
-                            : '#e2e8f0',
-                          color: isActive || isCompleted ? '#ffffff' : '#64748b',
-                          fontSize: 11,
-                          fontWeight: 700,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        {isCompleted ? <CheckOutlined style={{ fontSize: 10 }} /> : step.id}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div
+                          style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: '50%',
+                            backgroundColor: isActive
+                              ? '#4338ca'
+                              : isCompleted
+                                ? '#16a34a'
+                                : hasErrors
+                                  ? '#ef4444'
+                                  : isDarkMode
+                                    ? '#1e293b'
+                                    : '#e2e8f0',
+                            color: isActive || isCompleted || hasErrors ? '#ffffff' : '#64748b',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {isCompleted ? <CheckOutlined style={{ fontSize: 10 }} /> : step.id}
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 13,
+                            fontWeight: isActive ? 800 : 600,
+                            color: isActive
+                              ? '#4338ca'
+                              : isCompleted
+                                ? isDarkMode ? '#e2e8f0' : '#334155'
+                                : isDarkMode ? '#64748b' : '#94a3b8',
+                          }}
+                        >
+                          {step.title}
+                        </span>
                       </div>
-                      <span
-                        style={{
-                          fontSize: 13,
-                          fontWeight: isActive ? 800 : 600,
-                          color: isActive
-                            ? '#4338ca'
-                            : isCompleted
-                            ? isDarkMode ? '#e2e8f0' : '#334155'
-                            : isDarkMode ? '#64748b' : '#94a3b8',
-                        }}
-                      >
-                        {step.title}
-                      </span>
+
+                      {/* Step Validation Tag */}
+                      {step.id < 8 && (
+                        <div>
+                          {isCompleted ? (
+                            <Tag color="success" style={{ margin: 0, fontSize: 10, borderRadius: 10, fontWeight: 700 }}>
+                              Ready
+                            </Tag>
+                          ) : stepStatus.missingCount > 0 && (
+                            <Tag color="default" style={{ margin: 0, fontSize: 10, borderRadius: 10 }}>
+                              {stepStatus.missingCount} pending
+                            </Tag>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -752,14 +1121,11 @@ export const GymOnboarding = () => {
                 border: `1px solid ${isDarkMode ? 'rgba(79, 70, 229, 0.25)' : '#e0e7ff'}`,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                 <SafetyCertificateFilled style={{ fontSize: 16, color: '#4338ca' }} />
                 <span style={{ fontSize: 12, fontWeight: 800, color: isDarkMode ? '#e0e7ff' : '#3730a3' }}>
                   GYMEZY Verification Standards
                 </span>
-              </div>
-              <div style={{ fontSize: 11, color: isDarkMode ? '#c7d2fe' : '#4f46e5', lineHeight: 1.4 }}>
-                Instant live pass integration with dynamic QR check-in & automated T+1 merchant settlements.
               </div>
             </div>
           </Card>
@@ -792,15 +1158,18 @@ export const GymOnboarding = () => {
 
                 <Row gutter={[16, 16]}>
                   <Col xs={24} md={12}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Gym / Studio Name *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      Gym / Studio Name * {renderFieldSuccess('gymName')}
                     </div>
                     <Input
                       placeholder="e.g. FitZone Premium Fitness"
                       value={formData.gymName}
-                      onChange={(e) => setFormData({ ...formData, gymName: e.target.value })}
+                      status={touched.gymName && errors.gymName ? 'error' : ''}
+                      onChange={(e) => handleFieldChange('gymName', e.target.value)}
+                      onBlur={() => handleFieldBlur('gymName')}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                     />
+                    {renderFieldError('gymName')}
                   </Col>
 
                   <Col xs={24} md={12}>
@@ -810,18 +1179,18 @@ export const GymOnboarding = () => {
                     <Input
                       placeholder="e.g. Sculpt Your Best Self"
                       value={formData.tagline}
-                      onChange={(e) => setFormData({ ...formData, tagline: e.target.value })}
+                      onChange={(e) => handleFieldChange('tagline', e.target.value)}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                     />
                   </Col>
 
                   <Col xs={24} md={8}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Business Entity Type *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      Business Entity Type * {renderFieldSuccess('businessType')}
                     </div>
                     <Select
                       value={formData.businessType}
-                      onChange={(v) => setFormData({ ...formData, businessType: v })}
+                      onChange={(v) => handleFieldChange('businessType', v)}
                       style={{ width: '100%', height: 40 }}
                     >
                       <Option value="Private Limited">Private Limited</Option>
@@ -833,15 +1202,18 @@ export const GymOnboarding = () => {
                   </Col>
 
                   <Col xs={24} md={8}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Primary Owner / MD Name *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      Primary Owner / MD Name * {renderFieldSuccess('ownerName')}
                     </div>
                     <Input
                       placeholder="e.g. Ramesh Kumar"
                       value={formData.ownerName}
-                      onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
+                      status={touched.ownerName && errors.ownerName ? 'error' : ''}
+                      onChange={(e) => handleFieldChange('ownerName', e.target.value)}
+                      onBlur={() => handleFieldBlur('ownerName')}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                     />
+                    {renderFieldError('ownerName')}
                   </Col>
 
                   <Col xs={24} md={8}>
@@ -850,7 +1222,7 @@ export const GymOnboarding = () => {
                     </div>
                     <Select
                       value={formData.yearEstablished}
-                      onChange={(v) => setFormData({ ...formData, yearEstablished: v })}
+                      onChange={(v) => handleFieldChange('yearEstablished', v)}
                       style={{ width: '100%', height: 40 }}
                     >
                       {Array.from({ length: 25 }, (_, i) => 2026 - i).map((y) => (
@@ -860,64 +1232,83 @@ export const GymOnboarding = () => {
                   </Col>
 
                   <Col xs={24} md={12}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Contact Mobile Number *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      Contact Mobile Number * {renderFieldSuccess('phone')}
                     </div>
                     <Input
-                      addonBefore="🇮🇳 +91"
+                      addonBefore="+91"
                       placeholder="9876543210"
                       value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      status={touched.phone && errors.phone ? 'error' : ''}
+                      onChange={(e) => handleFieldChange('phone', e.target.value)}
+                      onBlur={() => handleFieldBlur('phone')}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                     />
+                    {renderFieldError('phone')}
                   </Col>
 
                   <Col xs={24} md={12}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Official Email Address *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      Official Email Address * {renderFieldSuccess('email')}
                     </div>
                     <Input
                       placeholder="owner@gymezy.com"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      status={touched.email && errors.email ? 'error' : ''}
+                      onChange={(e) => handleFieldChange('email', e.target.value)}
+                      onBlur={() => handleFieldBlur('email')}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                     />
+                    {renderFieldError('email')}
                   </Col>
 
                   <Col xs={24} md={12}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Partner Account Password *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      Account Password * {renderFieldSuccess('password')}
                     </div>
                     <Input.Password
-                      placeholder="Create secure owner login password (min 6 chars)"
+                      placeholder="8-16 chars (1 caps, 1 number, 1 symbol, no emojis)"
                       value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      maxLength={16}
+                      status={touched.password && errors.password ? 'error' : ''}
+                      onChange={(e) => {
+                        const cleanVal = e.target.value.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]|[^\x20-\x7E]/gu, '');
+                        handleFieldChange('password', cleanVal);
+                      }}
+                      onBlur={() => handleFieldBlur('password')}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                     />
+                    {renderFieldError('password')}
                   </Col>
 
                   <Col xs={24} md={8}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      GSTIN (Optional)
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      GSTIN (Optional) {renderFieldSuccess('gstNumber')}
                     </div>
                     <Input
                       placeholder="33AAAAA0000A1Z5"
                       value={formData.gstNumber}
-                      onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value })}
+                      status={touched.gstNumber && errors.gstNumber ? 'error' : ''}
+                      onChange={(e) => handleFieldChange('gstNumber', e.target.value)}
+                      onBlur={() => handleFieldBlur('gstNumber')}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                     />
+                    {renderFieldError('gstNumber')}
                   </Col>
 
                   <Col xs={24} md={8}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      PAN Number
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      PAN Number (Optional) {renderFieldSuccess('panNumber')}
                     </div>
                     <Input
                       placeholder="AAAAA0000A"
                       value={formData.panNumber}
-                      onChange={(e) => setFormData({ ...formData, panNumber: e.target.value })}
+                      status={touched.panNumber && errors.panNumber ? 'error' : ''}
+                      onChange={(e) => handleFieldChange('panNumber', e.target.value)}
+                      onBlur={() => handleFieldBlur('panNumber')}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                     />
+                    {renderFieldError('panNumber')}
                   </Col>
 
                   <Col xs={24} md={8}>
@@ -927,7 +1318,7 @@ export const GymOnboarding = () => {
                     <Input
                       placeholder="e.g. 1"
                       value={formData.branches}
-                      onChange={(e) => setFormData({ ...formData, branches: e.target.value })}
+                      onChange={(e) => handleFieldChange('branches', e.target.value)}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                     />
                   </Col>
@@ -937,39 +1328,121 @@ export const GymOnboarding = () => {
                   <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
                     Business License / Registration Document (Optional)
                   </div>
-                  <Dragger
-                    style={{
-                      padding: '20px',
-                      background: isDarkMode ? '#141414' : '#fafafa',
-                      borderColor: isDarkMode ? '#333333' : '#d9d9d9',
-                      borderRadius: 8,
-                    }}
-                    showUploadList={false}
-                    beforeUpload={async (file) => {
-                      try {
-                        const base64 = await fileToBase64(file);
-                        setFormData((prev) => ({
-                          ...prev,
-                          businessCertificate: base64,
-                          gstCertificate: base64,
-                        }));
-                        message.success(`Business document "${file.name}" attached!`);
-                      } catch {
-                        message.error('Failed to read document');
-                      }
-                      return false;
-                    }}
-                  >
-                    <p style={{ margin: 0 }}>
-                      <InboxOutlined style={{ color: '#4338ca', fontSize: 28 }} />
-                    </p>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', margin: '4px 0 0 0' }}>
-                      Click or drag & drop business certificate / GST registration PDF
-                    </p>
-                    <p style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', margin: 0 }}>
-                      Supports PDF, JPG, PNG up to 10MB
-                    </p>
-                  </Dragger>
+
+                  {!formData.businessCertificate ? (
+                    <Dragger
+                      style={{
+                        padding: '24px',
+                        background: isDarkMode ? '#141414' : '#fafafa',
+                        borderColor: isDarkMode ? '#333333' : '#d9d9d9',
+                        borderRadius: 8,
+                      }}
+                      showUploadList={false}
+                      beforeUpload={async (file) => {
+                        try {
+                          const base64 = await fileToBase64(file);
+                          const sizeStr = file.size > 1024 * 1024
+                            ? (file.size / (1024 * 1024)).toFixed(1) + ' MB'
+                            : Math.round(file.size / 1024) + ' KB';
+                          setFormData((prev) => ({
+                            ...prev,
+                            businessCertificate: base64,
+                            gstCertificate: base64,
+                            businessCertificateName: file.name,
+                            businessCertificateSize: sizeStr,
+                            businessCertificateType: file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+                          }));
+                          message.success(`Attached ${file.name}`);
+                        } catch {
+                          message.error('Failed to read document');
+                        }
+                        return false;
+                      }}
+                    >
+                      <p style={{ margin: 0 }}>
+                        <FilePdfOutlined style={{ color: '#4338ca', fontSize: 28 }} />
+                      </p>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: isDarkMode ? '#ffffff' : '#0f172a', margin: '6px 0 0 0' }}>
+                        Click or drag document to upload
+                      </p>
+                      <p style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b', margin: 0 }}>
+                        PDF, PNG, or JPG up to 10MB
+                      </p>
+                    </Dragger>
+                  ) : (
+                    <div
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: 8,
+                        backgroundColor: isDarkMode ? '#141414' : '#f8fafc',
+                        border: `1px solid ${isDarkMode ? '#333333' : '#e2e8f0'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 6,
+                            backgroundColor: (formData.businessCertificateType?.includes('pdf') || formData.businessCertificateName?.toLowerCase().endsWith('.pdf')) ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                            color: (formData.businessCertificateType?.includes('pdf') || formData.businessCertificateName?.toLowerCase().endsWith('.pdf')) ? '#ef4444' : '#3b82f6',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 18,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {(formData.businessCertificateType?.includes('pdf') || formData.businessCertificateName?.toLowerCase().endsWith('.pdf')) ? (
+                            <FilePdfOutlined />
+                          ) : (
+                            <PictureOutlined />
+                          )}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: isDarkMode ? '#ffffff' : '#0f172a',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                            title={formData.businessCertificateName}
+                          >
+                            {formData.businessCertificateName}
+                          </div>
+                          <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b', marginTop: 1 }}>
+                            {formData.businessCertificateSize}
+                          </div>
+                        </div>
+                      </div>
+
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            businessCertificate: '',
+                            gstCertificate: '',
+                            businessCertificateName: '',
+                            businessCertificateSize: '',
+                            businessCertificateType: '',
+                          }));
+                        }}
+                        style={{ fontWeight: 600 }}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -984,122 +1457,201 @@ export const GymOnboarding = () => {
                     2. Location, Geolocation & Operating Hours
                   </div>
                   <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
-                    Pinpoint address, geo-coordinates for the map finder, and weekly timings
-                  </div>
-                </div>
-
-                {/* City Preset Fast Selector */}
-                <div style={{ marginBottom: 20, padding: '12px 16px', background: isDarkMode ? '#141414' : '#f8fafc', borderRadius: 8, border: `1px solid ${isDarkMode ? '#262626' : '#e2e8f0'}` }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? '#cccccc' : '#475569', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <CompassOutlined style={{ color: '#4338ca' }} /> Quick Geo-Preset for Metros:
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {CITY_PRESETS.map((p) => (
-                      <Button
-                        key={p.city}
-                        size="small"
-                        onClick={() => handleApplyPresetCity(p)}
-                        style={{ borderRadius: 16, fontSize: 12, fontWeight: 600 }}
-                      >
-                        {p.city} ({p.area})
-                      </Button>
-                    ))}
+                    Provide address details, Google Maps location link, and operating schedules
                   </div>
                 </div>
 
                 <Row gutter={[16, 16]}>
                   <Col xs={24}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Full Street Address / Building Name *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <CompassOutlined style={{ color: '#4338ca' }} /> Google Maps Link (Auto-detects GPS Coordinates)
+                      </span>
+                      {formData.lat && formData.lng && (
+                        <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
+                          GPS: {formData.lat}, {formData.lng}
+                        </span>
+                      )}
+                    </div>
+                    <Input
+                      placeholder="Paste Google Maps URL e.g. https://maps.app.goo.gl/... or https://maps.google.com/?q=13.0827,80.2707"
+                      value={formData.googleMapsUrl}
+                      onChange={async (e) => {
+                        const url = e.target.value;
+                        const coords = extractCoordinatesFromMapsUrl(url);
+                        if (coords) {
+                          setFormData((prev) => ({
+                            ...prev,
+                            googleMapsUrl: url,
+                            lat: coords.lat,
+                            lng: coords.lng,
+                          }));
+                          message.success(`GPS coordinates extracted: ${coords.lat}, ${coords.lng}`);
+
+                          const parsed = await reverseGeocodeCoordinates(coords.lat, coords.lng);
+                          if (parsed) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              address: prev.address || parsed.address,
+                              area: prev.area || parsed.area,
+                              city: prev.city || parsed.city,
+                              state: prev.state || parsed.state,
+                              pincode: prev.pincode || parsed.pincode,
+                            }));
+                            setErrors((prev) => {
+                              const next = { ...prev };
+                              if (parsed.address) delete next.address;
+                              if (parsed.area) delete next.area;
+                              if (parsed.city) delete next.city;
+                              if (parsed.state) delete next.state;
+                              if (parsed.pincode) delete next.pincode;
+                              return next;
+                            });
+                          }
+                        } else {
+                          handleFieldChange('googleMapsUrl', url);
+                        }
+                      }}
+                      style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                    />
+                  </Col>
+
+                  <Col xs={24}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        marginBottom: 6,
+                        color: isDarkMode ? '#cccccc' : '#334155',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>Full Street Address / Building Name * {renderFieldSuccess('address')}</span>
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<EnvironmentOutlined />}
+                        loading={isFetchingGps}
+                        onClick={handleGetAddressByGps}
+                        style={{
+                          padding: 0,
+                          height: 'auto',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: '#4338ca',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        Get by GPS
+                      </Button>
                     </div>
                     <Input
                       placeholder="e.g. Plot 42, 2nd Avenue, Anna Nagar West"
                       value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      status={touched.address && errors.address ? 'error' : ''}
+                      onChange={(e) => handleFieldChange('address', e.target.value)}
+                      onBlur={() => handleFieldBlur('address')}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                     />
+                    {renderFieldError('address')}
                   </Col>
 
                   <Col xs={24} md={6}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Area / Locality *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      Area / Locality * {renderFieldSuccess('area')}
                     </div>
                     <Input
                       placeholder="e.g. Anna Nagar"
                       value={formData.area}
-                      onChange={(e) => setFormData({ ...formData, area: e.target.value })}
+                      status={touched.area && errors.area ? 'error' : ''}
+                      onChange={(e) => handleFieldChange('area', e.target.value)}
+                      onBlur={() => handleFieldBlur('area')}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                     />
+                    {renderFieldError('area')}
                   </Col>
 
                   <Col xs={24} md={6}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      City *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      City * {renderFieldSuccess('city')}
                     </div>
                     <Input
                       placeholder="e.g. Chennai"
                       value={formData.city}
-                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      status={touched.city && errors.city ? 'error' : ''}
+                      onChange={(e) => handleFieldChange('city', e.target.value)}
+                      onBlur={() => handleFieldBlur('city')}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                     />
+                    {renderFieldError('city')}
                   </Col>
 
                   <Col xs={24} md={6}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      State *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      State * {renderFieldSuccess('state')}
                     </div>
                     <Input
                       placeholder="e.g. Tamil Nadu"
                       value={formData.state}
-                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                      status={touched.state && errors.state ? 'error' : ''}
+                      onChange={(e) => handleFieldChange('state', e.target.value)}
+                      onBlur={() => handleFieldBlur('state')}
+                      style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                    />
+                    {renderFieldError('state')}
+                  </Col>
+
+                  <Col xs={24} md={6}>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      Pincode * {renderFieldSuccess('pincode')}
+                    </div>
+                    <Input
+                      placeholder="e.g. 600040"
+                      value={formData.pincode}
+                      status={touched.pincode && errors.pincode ? 'error' : ''}
+                      onChange={(e) => handleFieldChange('pincode', e.target.value)}
+                      onBlur={() => handleFieldBlur('pincode')}
+                      style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                    />
+                    {renderFieldError('pincode')}
+                  </Col>
+
+                  <Col xs={24} md={12}>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                      Landmark (Optional)
+                    </div>
+                    <Input
+                      placeholder="e.g. Opposite Metro Station"
+                      value={formData.landmark}
+                      onChange={(e) => handleFieldChange('landmark', e.target.value)}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                     />
                   </Col>
 
                   <Col xs={24} md={6}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Pincode *
-                    </div>
-                    <Input
-                      placeholder="e.g. 600040"
-                      value={formData.pincode}
-                      onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
-                      style={{ height: 40, borderRadius: 'var(--radius-base)' }}
-                    />
-                  </Col>
-
-                  <Col xs={24} md={8}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Landmark
-                    </div>
-                    <Input
-                      placeholder="e.g. Opposite Metro Station"
-                      value={formData.landmark}
-                      onChange={(e) => setFormData({ ...formData, landmark: e.target.value })}
-                      style={{ height: 40, borderRadius: 'var(--radius-base)' }}
-                    />
-                  </Col>
-
-                  <Col xs={24} md={8}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
                       Latitude (GPS)
                     </div>
                     <InputNumber
                       placeholder="13.0850"
                       value={formData.lat}
-                      onChange={(v) => setFormData({ ...formData, lat: v })}
+                      onChange={(v) => handleFieldChange('lat', v)}
                       style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
                     />
                   </Col>
 
-                  <Col xs={24} md={8}>
+                  <Col xs={24} md={6}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
                       Longitude (GPS)
                     </div>
                     <InputNumber
                       placeholder="80.2101"
                       value={formData.lng}
-                      onChange={(v) => setFormData({ ...formData, lng: v })}
+                      onChange={(v) => handleFieldChange('lng', v)}
                       style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
                     />
                   </Col>
@@ -1119,14 +1671,14 @@ export const GymOnboarding = () => {
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                       <Input
                         value={formData.weekdayOpen}
-                        onChange={(e) => setFormData({ ...formData, weekdayOpen: e.target.value })}
+                        onChange={(e) => handleFieldChange('weekdayOpen', e.target.value)}
                         placeholder="05:30 AM"
                         style={{ height: 40 }}
                       />
                       <span>to</span>
                       <Input
                         value={formData.weekdayClose}
-                        onChange={(e) => setFormData({ ...formData, weekdayClose: e.target.value })}
+                        onChange={(e) => handleFieldChange('weekdayClose', e.target.value)}
                         placeholder="10:30 PM"
                         style={{ height: 40 }}
                       />
@@ -1140,14 +1692,14 @@ export const GymOnboarding = () => {
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                       <Input
                         value={formData.weekendOpen}
-                        onChange={(e) => setFormData({ ...formData, weekendOpen: e.target.value })}
+                        onChange={(e) => handleFieldChange('weekendOpen', e.target.value)}
                         placeholder="06:00 AM"
                         style={{ height: 40 }}
                       />
                       <span>to</span>
                       <Input
                         value={formData.weekendClose}
-                        onChange={(e) => setFormData({ ...formData, weekendClose: e.target.value })}
+                        onChange={(e) => handleFieldChange('weekendClose', e.target.value)}
                         placeholder="09:00 PM"
                         style={{ height: 40 }}
                       />
@@ -1158,7 +1710,7 @@ export const GymOnboarding = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
                       <Switch
                         checked={formData.is24Hours}
-                        onChange={(chk) => setFormData({ ...formData, is24Hours: chk })}
+                        onChange={(chk) => handleFieldChange('is24Hours', chk)}
                       />
                       <span style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
                         24x7 Open Facility
@@ -1170,7 +1722,7 @@ export const GymOnboarding = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
                       <Switch
                         checked={formData.isOpenHolidays}
-                        onChange={(chk) => setFormData({ ...formData, isOpenHolidays: chk })}
+                        onChange={(chk) => handleFieldChange('isOpenHolidays', chk)}
                       />
                       <span style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
                         Open on Public Holidays
@@ -1197,27 +1749,33 @@ export const GymOnboarding = () => {
 
                 <Row gutter={[16, 16]}>
                   <Col xs={24} md={8}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Floor Space (sq. ft.) *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      Floor Space (sq. ft.) * {renderFieldSuccess('floorSpaceSqFt')}
                     </div>
                     <InputNumber
                       value={formData.floorSpaceSqFt}
-                      onChange={(v) => setFormData({ ...formData, floorSpaceSqFt: v })}
+                      status={touched.floorSpaceSqFt && errors.floorSpaceSqFt ? 'error' : ''}
+                      onChange={(v) => handleFieldChange('floorSpaceSqFt', v)}
+                      onBlur={() => handleFieldBlur('floorSpaceSqFt')}
                       style={{ width: '100%', height: 40 }}
                       placeholder="5000"
                     />
+                    {renderFieldError('floorSpaceSqFt')}
                   </Col>
 
                   <Col xs={24} md={8}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Max Safe Floor Capacity (Athletes) *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      Max Safe Floor Capacity (Athletes) * {renderFieldSuccess('maxFloorCapacity')}
                     </div>
                     <InputNumber
                       value={formData.maxFloorCapacity}
-                      onChange={(v) => setFormData({ ...formData, maxFloorCapacity: v })}
+                      status={touched.maxFloorCapacity && errors.maxFloorCapacity ? 'error' : ''}
+                      onChange={(v) => handleFieldChange('maxFloorCapacity', v)}
+                      onBlur={() => handleFieldBlur('maxFloorCapacity')}
                       style={{ width: '100%', height: 40 }}
                       placeholder="85"
                     />
+                    {renderFieldError('maxFloorCapacity')}
                   </Col>
 
                   <Col xs={24} md={8}>
@@ -1226,7 +1784,7 @@ export const GymOnboarding = () => {
                     </div>
                     <Select
                       value={formData.badgeText}
-                      onChange={(v) => setFormData({ ...formData, badgeText: v })}
+                      onChange={(v) => handleFieldChange('badgeText', v)}
                       style={{ width: '100%', height: 40 }}
                     >
                       {BADGE_OPTIONS.map((b) => (
@@ -1236,20 +1794,119 @@ export const GymOnboarding = () => {
                   </Col>
 
                   <Col xs={24}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Cover Photo URL *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      Gym Logo * {renderFieldSuccess('logo')}
                     </div>
-                    <Input
-                      value={formData.coverPhoto}
-                      onChange={(e) => setFormData({ ...formData, coverPhoto: e.target.value })}
-                      placeholder="https://images.unsplash.com/..."
-                      style={{ height: 40 }}
-                    />
+
+                    {!formData.logo && !formData.coverPhoto ? (
+                      <div>
+                        <Dragger
+                          style={{
+                            padding: '16px',
+                            background: isDarkMode ? '#141414' : '#fafafa',
+                            borderColor: touched.logo && errors.logo ? '#ef4444' : (isDarkMode ? '#333333' : '#d9d9d9'),
+                            borderRadius: 8,
+                          }}
+                          showUploadList={false}
+                          beforeUpload={async (file) => {
+                            try {
+                              const base64 = await fileToBase64(file);
+                              handleFieldChange('logo', base64);
+                              handleFieldChange('coverPhoto', base64);
+                              message.success(`Gym logo "${file.name}" attached!`);
+                            } catch {
+                              message.error('Failed to read image file');
+                            }
+                            return false;
+                          }}
+                        >
+                          <p style={{ margin: 0 }}>
+                            <InboxOutlined style={{ color: '#4338ca', fontSize: 26 }} />
+                          </p>
+                          <p style={{ fontSize: 13, fontWeight: 700, margin: '6px 0 0 0', color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                            Click or drag & drop gym brand logo
+                          </p>
+                          <p style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', margin: '2px 0 0 0' }}>
+                            Supports JPG, PNG or WebP images
+                          </p>
+                        </Dragger>
+                        {renderFieldError('logo')}
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 16,
+                          padding: 12,
+                          borderRadius: 8,
+                          border: isDarkMode ? '1px solid #333333' : '1px solid #e2e8f0',
+                          backgroundColor: isDarkMode ? '#141414' : '#f8fafc',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 80,
+                            height: 80,
+                            borderRadius: 8,
+                            overflow: 'hidden',
+                            border: '1px solid #4338ca',
+                            flexShrink: 0,
+                            backgroundColor: isDarkMode ? '#1e1e1e' : '#edf4fe',
+                          }}
+                        >
+                          <img
+                            src={formData.logo || formData.coverPhoto}
+                            alt="Logo Preview"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </div>
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                            Gym Brand Logo
+                          </div>
+                          <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 2 }}>
+                            Logo uploaded and ready
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <Upload
+                            showUploadList={false}
+                            beforeUpload={async (file) => {
+                              try {
+                                const base64 = await fileToBase64(file);
+                                handleFieldChange('logo', base64);
+                                handleFieldChange('coverPhoto', base64);
+                                message.success(`Gym logo updated with "${file.name}"!`);
+                              } catch {
+                                message.error('Failed to read image file');
+                              }
+                              return false;
+                            }}
+                          >
+                            <Button size="small">Change</Button>
+                          </Upload>
+                          <Button
+                            size="small"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => {
+                              handleFieldChange('logo', '');
+                              handleFieldChange('coverPhoto', '');
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </Col>
 
                   <Col xs={24}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Facilities Multi-Select (Available at Facility)
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      Facilities Multi-Select (Available at Facility) * {renderFieldSuccess('facilities')}
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                       {FACILITY_OPTIONS.map((fac) => {
@@ -1262,7 +1919,7 @@ export const GymOnboarding = () => {
                               const next = checked
                                 ? [...formData.facilities, fac]
                                 : formData.facilities.filter((f) => f !== fac);
-                              setFormData({ ...formData, facilities: next });
+                              handleFieldChange('facilities', next);
                             }}
                             style={{
                               padding: '6px 14px',
@@ -1279,6 +1936,7 @@ export const GymOnboarding = () => {
                         );
                       })}
                     </div>
+                    {renderFieldError('facilities')}
                   </Col>
 
                   <Col xs={24}>
@@ -1296,7 +1954,7 @@ export const GymOnboarding = () => {
                               const next = checked
                                 ? [...formData.amenities, amen]
                                 : formData.amenities.filter((a) => a !== amen);
-                              setFormData({ ...formData, amenities: next });
+                              handleFieldChange('amenities', next);
                             }}
                             style={{
                               padding: '6px 14px',
@@ -1322,7 +1980,7 @@ export const GymOnboarding = () => {
                     <TextArea
                       rows={3}
                       value={formData.aboutText}
-                      onChange={(e) => setFormData({ ...formData, aboutText: e.target.value })}
+                      onChange={(e) => handleFieldChange('aboutText', e.target.value)}
                       placeholder="Write a compelling overview of what makes your fitness center unique..."
                     />
                   </Col>
@@ -1331,32 +1989,22 @@ export const GymOnboarding = () => {
             )}
 
             {/* ========================================================================= */}
-            {/* STEP 4: SERVICES, WORKOUTS & CERTIFIED TRAINERS */}
+            {/* STEP 4: SERVICES & WORKOUT DISCIPLINES */}
             {/* ========================================================================= */}
             {currentStep === 4 && (
               <div>
-                <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-                  <div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                      4. Supported Disciplines & Certified Coaches
-                    </div>
-                    <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
-                      List fitness disciplines offered and register certified personal trainers
-                    </div>
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    4. Supported Disciplines & Workout Programs
                   </div>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={() => setIsTrainerModalOpen(true)}
-                    style={{ backgroundColor: '#4338ca', fontWeight: 700 }}
-                  >
-                    Add Trainer
-                  </Button>
+                  <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
+                    Select fitness disciplines and workout training programs offered at your facility
+                  </div>
                 </div>
 
                 <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                    Disciplines & Workout Categories
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                    Disciplines & Workout Categories * {renderFieldSuccess('workouts')}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {WORKOUT_OPTIONS.map((w) => {
@@ -1369,7 +2017,7 @@ export const GymOnboarding = () => {
                             const next = checked
                               ? [...formData.workouts, w]
                               : formData.workouts.filter((item) => item !== w);
-                            setFormData({ ...formData, workouts: next });
+                            handleFieldChange('workouts', next);
                           }}
                           style={{
                             padding: '6px 14px',
@@ -1386,325 +2034,19 @@ export const GymOnboarding = () => {
                       );
                     })}
                   </div>
+                  {renderFieldError('workouts')}
                 </div>
-
-                <Divider style={{ margin: '20px 0' }} />
-
-                <div style={{ fontSize: 14, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 12 }}>
-                  Registered Gym Trainers ({formData.trainers.length})
-                </div>
-
-                {formData.trainers.length === 0 ? (
-                  <div style={{ padding: '30px', textAlign: 'center', background: isDarkMode ? '#141414' : '#f8fafc', borderRadius: 8 }}>
-                    <TeamOutlined style={{ fontSize: 32, color: '#94a3b8', marginBottom: 8 }} />
-                    <div style={{ fontWeight: 600, color: isDarkMode ? '#cccccc' : '#475569' }}>
-                      No trainers added yet
-                    </div>
-                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
-                      Click "Add Trainer" to register coaching staff for member matching.
-                    </div>
-                  </div>
-                ) : (
-                  <Row gutter={[16, 16]}>
-                    {formData.trainers.map((tr) => (
-                      <Col xs={24} sm={12} key={tr.id}>
-                        <Card
-                          style={{
-                            backgroundColor: isDarkMode ? '#141414' : '#ffffff',
-                            borderColor: isDarkMode ? '#333333' : '#e2e8f0',
-                            borderRadius: 10,
-                          }}
-                          styles={{ body: { padding: '16px' } }}
-                        >
-                          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                            <Avatar src={tr.image} size={50} />
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 800, fontSize: 14, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                                {tr.name}
-                              </div>
-                              <div style={{ fontSize: 12, color: '#4338ca', fontWeight: 600 }}>
-                                {tr.specialty}
-                              </div>
-                              <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
-                                {tr.experienceYears} Years Exp • ⭐ {tr.rating} • ₹{tr.monthlyFee}/mo PT
-                              </div>
-                            </div>
-                            <Button
-                              type="text"
-                              danger
-                              icon={<DeleteOutlined />}
-                              onClick={() => handleRemoveTrainer(tr.id)}
-                            />
-                          </div>
-                        </Card>
-                      </Col>
-                    ))}
-                  </Row>
-                )}
               </div>
             )}
 
             {/* ========================================================================= */}
-            {/* STEP 5: SESSIONS & PRICING PLANS */}
+            {/* STEP 5: PAYOUT & SUBSCRIPTION TIER */}
             {/* ========================================================================= */}
             {currentStep === 5 && (
               <div>
                 <div style={{ marginBottom: 24 }}>
                   <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    5. Session Passes & Membership Pricing
-                  </div>
-                  <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
-                    Define pay-per-session rates, weekly pass, and long-term membership tier prices
-                  </div>
-                </div>
-
-                <div style={{ fontSize: 14, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 12 }}>
-                  Flexible Walk-In Passes
-                </div>
-
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} md={8}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Single Drop-in Session Pass (₹) *
-                    </div>
-                    <InputNumber
-                      prefix="₹"
-                      value={formData.singleSessionPrice}
-                      onChange={(v) => setFormData({ ...formData, singleSessionPrice: v })}
-                      style={{ width: '100%', height: 40 }}
-                    />
-                  </Col>
-
-                  <Col xs={24} md={8}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Weekly Unlimited Pass (₹)
-                    </div>
-                    <InputNumber
-                      prefix="₹"
-                      value={formData.weeklyPassPrice}
-                      onChange={(v) => setFormData({ ...formData, weeklyPassPrice: v })}
-                      style={{ width: '100%', height: 40 }}
-                    />
-                  </Col>
-
-                  <Col xs={24} md={8}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      5-Session Flexi Pass (₹)
-                    </div>
-                    <InputNumber
-                      prefix="₹"
-                      value={formData.fiveSessionPrice}
-                      onChange={(v) => setFormData({ ...formData, fiveSessionPrice: v })}
-                      style={{ width: '100%', height: 40 }}
-                    />
-                  </Col>
-                </Row>
-
-                <Divider style={{ margin: '24px 0 20px 0' }} />
-
-                <div style={{ fontSize: 14, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 12 }}>
-                  Tiered Long-Term Membership Packages
-                </div>
-
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} md={6}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Monthly (1 Month) ₹
-                    </div>
-                    <InputNumber
-                      prefix="₹"
-                      value={formData.monthlyPrice}
-                      onChange={(v) => setFormData({ ...formData, monthlyPrice: v })}
-                      style={{ width: '100%', height: 40 }}
-                    />
-                  </Col>
-
-                  <Col xs={24} md={6}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Quarterly (3 Months) ₹
-                    </div>
-                    <InputNumber
-                      prefix="₹"
-                      value={formData.quarterlyPrice}
-                      onChange={(v) => setFormData({ ...formData, quarterlyPrice: v })}
-                      style={{ width: '100%', height: 40 }}
-                    />
-                  </Col>
-
-                  <Col xs={24} md={6}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Half-Yearly (6 Months) ₹
-                    </div>
-                    <InputNumber
-                      prefix="₹"
-                      value={formData.halfYearlyPrice}
-                      onChange={(v) => setFormData({ ...formData, halfYearlyPrice: v })}
-                      style={{ width: '100%', height: 40 }}
-                    />
-                  </Col>
-
-                  <Col xs={24} md={6}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Annual (12 Months) ₹
-                    </div>
-                    <InputNumber
-                      prefix="₹"
-                      value={formData.annualPrice}
-                      onChange={(v) => setFormData({ ...formData, annualPrice: v })}
-                      style={{ width: '100%', height: 40 }}
-                    />
-                  </Col>
-                </Row>
-              </div>
-            )}
-
-            {/* ========================================================================= */}
-            {/* STEP 6: RULES & SAFETY */}
-            {/* ========================================================================= */}
-            {currentStep === 6 && (
-              <div>
-                <div style={{ marginBottom: 24 }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    6. Facility Rules, Access Hardware & Safety Policy
-                  </div>
-                  <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
-                    Configure entry compliance, turnaround rules, and digital pass scanner verification
-                  </div>
-                </div>
-
-                <div style={{ fontSize: 14, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 12 }}>
-                  Entry Check-in Verification Modes
-                </div>
-
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} md={8}>
-                    <Card
-                      style={{
-                        backgroundColor: isDarkMode ? '#141414' : '#f8fafc',
-                        borderColor: '#4338ca',
-                        borderRadius: 8,
-                      }}
-                      styles={{ body: { padding: '14px' } }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <QrcodeOutlined style={{ fontSize: 24, color: '#4338ca' }} />
-                        <div>
-                          <div style={{ fontWeight: 800, fontSize: 13 }}>Dynamic QR Pass</div>
-                          <div style={{ fontSize: 11, color: '#64748b' }}>Time-cycled QR Scanner</div>
-                        </div>
-                      </div>
-                    </Card>
-                  </Col>
-
-                  <Col xs={24} md={8}>
-                    <Card
-                      style={{
-                        backgroundColor: isDarkMode ? '#141414' : '#f8fafc',
-                        borderColor: isDarkMode ? '#333333' : '#e2e8f0',
-                        borderRadius: 8,
-                      }}
-                      styles={{ body: { padding: '14px' } }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <SafetyOutlined style={{ fontSize: 24, color: '#16a34a' }} />
-                        <div>
-                          <div style={{ fontWeight: 800, fontSize: 13 }}>6-Digit OTP Fallback</div>
-                          <div style={{ fontSize: 11, color: '#64748b' }}>Front Desk Manual Verify</div>
-                        </div>
-                      </div>
-                    </Card>
-                  </Col>
-
-                  <Col xs={24} md={8}>
-                    <Card
-                      style={{
-                        backgroundColor: isDarkMode ? '#141414' : '#f8fafc',
-                        borderColor: isDarkMode ? '#333333' : '#e2e8f0',
-                        borderRadius: 8,
-                      }}
-                      styles={{ body: { padding: '14px' } }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <RocketOutlined style={{ fontSize: 24, color: '#ea580c' }} />
-                        <div>
-                          <div style={{ fontWeight: 800, fontSize: 13 }}>Turnstile Integration</div>
-                          <div style={{ fontSize: 11, color: '#64748b' }}>Automated RFID/QR Gate</div>
-                        </div>
-                      </div>
-                    </Card>
-                  </Col>
-                </Row>
-
-                <Divider style={{ margin: '24px 0 20px 0' }} />
-
-                <div style={{ fontSize: 14, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 12 }}>
-                  Member Conduct Rules
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-                  {formData.rules.map((rule, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <CheckCircleOutlined style={{ color: '#16a34a', fontSize: 16 }} />
-                      <Input
-                        value={rule}
-                        onChange={(e) => {
-                          const updated = [...formData.rules];
-                          updated[idx] = e.target.value;
-                          setFormData({ ...formData, rules: updated });
-                        }}
-                        style={{ height: 36 }}
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ fontSize: 14, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 12 }}>
-                  Cancellation & Rescheduling SLA
-                </div>
-
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} md={8}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Free Cancellation Window (Hours)
-                    </div>
-                    <InputNumber
-                      value={formData.freeCancellationHours}
-                      onChange={(v) => setFormData({ ...formData, freeCancellationHours: v })}
-                      style={{ width: '100%', height: 40 }}
-                    />
-                  </Col>
-                  <Col xs={24} md={8}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Refund Percentage (%)
-                    </div>
-                    <InputNumber
-                      value={formData.refundPercentage}
-                      onChange={(v) => setFormData({ ...formData, refundPercentage: v })}
-                      style={{ width: '100%', height: 40 }}
-                    />
-                  </Col>
-                  <Col xs={24} md={8}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Max Reschedule Times Allowed
-                    </div>
-                    <InputNumber
-                      value={formData.rescheduleAllowedCount}
-                      onChange={(v) => setFormData({ ...formData, rescheduleAllowedCount: v })}
-                      style={{ width: '100%', height: 40 }}
-                    />
-                  </Col>
-                </Row>
-              </div>
-            )}
-
-            {/* ========================================================================= */}
-            {/* STEP 7: PAYOUT & SUBSCRIPTION TIER */}
-            {/* ========================================================================= */}
-            {currentStep === 7 && (
-              <div>
-                <div style={{ marginBottom: 24 }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    7. GYMEZY Subscription Tier & Payout Settlement
+                    5. GYMEZY Subscription Tier & Payout Settlement
                   </div>
                   <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
                     Select platform software package and configure automated merchant bank details
@@ -1726,7 +2068,7 @@ export const GymOnboarding = () => {
                     return (
                       <Col xs={24} sm={12} key={tier.key}>
                         <Card
-                          onClick={() => setFormData({ ...formData, subscriptionType: tier.key })}
+                          onClick={() => handleFieldChange('subscriptionType', tier.key)}
                           style={{
                             cursor: 'pointer',
                             backgroundColor: isSelected ? (isDarkMode ? 'rgba(79, 70, 229, 0.15)' : '#eef2ff') : (isDarkMode ? '#141414' : '#ffffff'),
@@ -1765,15 +2107,18 @@ export const GymOnboarding = () => {
 
                 <Row gutter={[16, 16]}>
                   <Col xs={24} md={12}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Account Holder Name *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      Account Holder Name * {renderFieldSuccess('accountHolder')}
                     </div>
                     <Input
                       placeholder="e.g. FitZone Fitness Pvt Ltd"
                       value={formData.accountHolder}
-                      onChange={(e) => setFormData({ ...formData, accountHolder: e.target.value })}
+                      status={touched.accountHolder && errors.accountHolder ? 'error' : ''}
+                      onChange={(e) => handleFieldChange('accountHolder', e.target.value)}
+                      onBlur={() => handleFieldBlur('accountHolder')}
                       style={{ height: 40 }}
                     />
+                    {renderFieldError('accountHolder')}
                   </Col>
 
                   <Col xs={24} md={12}>
@@ -1782,7 +2127,7 @@ export const GymOnboarding = () => {
                     </div>
                     <Select
                       value={formData.bankName}
-                      onChange={(v) => setFormData({ ...formData, bankName: v })}
+                      onChange={(v) => handleFieldChange('bankName', v)}
                       style={{ width: '100%', height: 40 }}
                     >
                       <Option value="HDFC Bank">HDFC Bank</Option>
@@ -1795,27 +2140,33 @@ export const GymOnboarding = () => {
                   </Col>
 
                   <Col xs={24} md={12}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Bank Account Number *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      Bank Account Number * {renderFieldSuccess('accountNumber')}
                     </div>
                     <Input
                       placeholder="50200012345678"
                       value={formData.accountNumber}
-                      onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
+                      status={touched.accountNumber && errors.accountNumber ? 'error' : ''}
+                      onChange={(e) => handleFieldChange('accountNumber', e.target.value)}
+                      onBlur={() => handleFieldBlur('accountNumber')}
                       style={{ height: 40 }}
                     />
+                    {renderFieldError('accountNumber')}
                   </Col>
 
                   <Col xs={24} md={6}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      IFSC Code *
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
+                      IFSC Code * {renderFieldSuccess('ifscCode')}
                     </div>
                     <Input
                       placeholder="HDFC0001234"
                       value={formData.ifscCode}
-                      onChange={(e) => setFormData({ ...formData, ifscCode: e.target.value })}
+                      status={touched.ifscCode && errors.ifscCode ? 'error' : ''}
+                      onChange={(e) => handleFieldChange('ifscCode', e.target.value)}
+                      onBlur={() => handleFieldBlur('ifscCode')}
                       style={{ height: 40 }}
                     />
+                    {renderFieldError('ifscCode')}
                   </Col>
 
                   <Col xs={24} md={6}>
@@ -1825,38 +2176,112 @@ export const GymOnboarding = () => {
                     <Input
                       placeholder="fitzone@okhdfc"
                       value={formData.upiId}
-                      onChange={(e) => setFormData({ ...formData, upiId: e.target.value })}
+                      onChange={(e) => handleFieldChange('upiId', e.target.value)}
                       style={{ height: 40 }}
                     />
                   </Col>
                 </Row>
-
-                <div style={{ marginTop: 20 }}>
-                  <Checkbox
-                    checked={formData.termsAccepted}
-                    onChange={(e) => setFormData({ ...formData, termsAccepted: e.target.checked })}
-                  >
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>
-                      I agree to the GYMEZY Merchant Agreement, 10% Pass Commission, and Data Privacy SLA.
-                    </span>
-                  </Checkbox>
-                </div>
               </div>
             )}
 
             {/* ========================================================================= */}
-            {/* STEP 8: REVIEW & GO LIVE */}
+            {/* STEP 6: REVIEW & GO LIVE */}
             {/* ========================================================================= */}
-            {currentStep === 8 && (
+            {currentStep === 6 && (
               <div>
                 <div style={{ marginBottom: 24 }}>
                   <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    8. Final Review & Partner Activation
+                    6. Final Review & Partner Activation
                   </div>
                   <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
                     Inspect configured profile parameters and publish to the live GYMEZY platform
                   </div>
                 </div>
+
+                {/* Pre-Launch Validation Health Banner */}
+                {validationSummary.isAllValid ? (
+                  <Alert
+                    type="success"
+                    showIcon
+                    icon={<CheckCircleFilled style={{ fontSize: 20, color: '#16a34a' }} />}
+                    message={<span style={{ fontWeight: 800, fontSize: 14 }}>All 5 Milestones Verified & Complete!</span>}
+                    description="All required business parameters, facilities, trainers, and payout coordinates are validated. You can publish this partner immediately."
+                    style={{ marginBottom: 20, borderRadius: 10 }}
+                  />
+                ) : (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    icon={<ExclamationCircleFilled style={{ fontSize: 20, color: '#ea580c' }} />}
+                    message={<span style={{ fontWeight: 800, fontSize: 14 }}>{validationSummary.totalMissing} Required Field(s) Incomplete</span>}
+                    description="Please resolve the missing fields in the checklist below before activating this partner."
+                    style={{ marginBottom: 20, borderRadius: 10 }}
+                  />
+                )}
+
+                {/* Step-by-Step Validation Checklist */}
+                <Card
+                  style={{
+                    backgroundColor: isDarkMode ? '#141414' : '#f8fafc',
+                    borderColor: isDarkMode ? '#333333' : '#e2e8f0',
+                    borderRadius: 10,
+                    marginBottom: 20,
+                  }}
+                  styles={{ body: { padding: '18px 20px' } }}
+                >
+                  <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 12, color: isDarkMode ? '#ffffff' : '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <FileProtectOutlined style={{ color: '#4338ca' }} /> Pre-Activation Compliance Checklist
+                  </div>
+                  <Row gutter={[12, 12]}>
+                    {ONBOARDING_STEPS.slice(0, 5).map((step) => {
+                      const st = validationSummary.statusMap[step.id];
+                      return (
+                        <Col xs={24} sm={12} md={8} key={step.id}>
+                          <div
+                            style={{
+                              padding: '10px 14px',
+                              borderRadius: 8,
+                              backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                              border: `1px solid ${st.isValid ? '#16a34a' : '#ea580c'}`,
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                                Step {step.id}: {step.title}
+                              </div>
+                              <div style={{ fontSize: 11, color: st.isValid ? '#16a34a' : '#ea580c', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                {st.isValid ? (
+                                  <>
+                                    <CheckCircleFilled style={{ color: '#16a34a' }} />
+                                    <span>Verified</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <WarningOutlined style={{ color: '#ea580c' }} />
+                                    <span>{st.missingCount} Missing</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            {!st.isValid && (
+                              <Button
+                                size="small"
+                                type="link"
+                                onClick={() => setCurrentStep(step.id)}
+                                style={{ padding: 0, fontWeight: 700, fontSize: 12 }}
+                              >
+                                Fix Step
+                              </Button>
+                            )}
+                          </div>
+                        </Col>
+                      );
+                    })}
+                  </Row>
+                </Card>
 
                 <Row gutter={[20, 20]}>
                   {/* Left: Summary Review Cards */}
@@ -1871,30 +2296,34 @@ export const GymOnboarding = () => {
                           <ShopOutlined /> Business & Location
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
-                          <div><span style={{ color: '#64748b' }}>Gym Name:</span> <strong>{formData.gymName}</strong></div>
-                          <div><span style={{ color: '#64748b' }}>Owner:</span> <strong>{formData.ownerName}</strong></div>
-                          <div><span style={{ color: '#64748b' }}>Phone:</span> <strong>+91 {formData.phone}</strong></div>
-                          <div><span style={{ color: '#64748b' }}>City:</span> <strong>{formData.city}</strong></div>
-                          <div style={{ gridColumn: 'span 2' }}><span style={{ color: '#64748b' }}>Address:</span> {formData.address}</div>
+                          <div><span style={{ color: '#64748b' }}>Gym Name:</span> <strong>{formData.gymName || '—'}</strong></div>
+                          <div><span style={{ color: '#64748b' }}>Owner:</span> <strong>{formData.ownerName || '—'}</strong></div>
+                          <div><span style={{ color: '#64748b' }}>Phone:</span> <strong>{formData.phone ? `+91 ${formData.phone}` : '—'}</strong></div>
+                          <div><span style={{ color: '#64748b' }}>City:</span> <strong>{formData.city || '—'}</strong></div>
+                          <div style={{ gridColumn: 'span 2' }}><span style={{ color: '#64748b' }}>Address:</span> {formData.address || '—'}</div>
                           <div style={{ gridColumn: 'span 2' }}><span style={{ color: '#64748b' }}>Timings:</span> {formData.is24Hours ? '24x7 Open' : `${formData.weekdayOpen} - ${formData.weekdayClose}`}</div>
                         </div>
                       </Card>
 
-                      {/* Pricing & Subscription Card */}
+                      {/* Subscription & Bank Settlement Card */}
                       <Card
                         style={{ backgroundColor: isDarkMode ? '#141414' : '#f8fafc', borderColor: isDarkMode ? '#333333' : '#e2e8f0', borderRadius: 8 }}
                         styles={{ body: { padding: '16px' } }}
                       >
                         <div style={{ fontSize: 14, fontWeight: 800, color: '#16a34a', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <CreditCardOutlined /> Pricing & GYMEZY Tier
+                          <CreditCardOutlined /> Subscription & Bank Settlement
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
-                          <div><span style={{ color: '#64748b' }}>Single Drop-in:</span> <strong>₹ {formData.singleSessionPrice}</strong></div>
-                          <div><span style={{ color: '#64748b' }}>Weekly Pass:</span> <strong>₹ {formData.weeklyPassPrice}</strong></div>
-                          <div><span style={{ color: '#64748b' }}>Monthly Plan:</span> <strong>₹ {formData.monthlyPrice}</strong></div>
-                          <div><span style={{ color: '#64748b' }}>Annual Plan:</span> <strong>₹ {formData.annualPrice}</strong></div>
                           <div><span style={{ color: '#64748b' }}>Platform Tier:</span> <Tag color="blue">{formData.subscriptionType}</Tag></div>
                           <div><span style={{ color: '#64748b' }}>Bank:</span> <strong>{formData.bankName}</strong></div>
+                          <div><span style={{ color: '#64748b' }}>Account Holder:</span> <strong>{formData.accountHolder || '—'}</strong></div>
+                          <div><span style={{ color: '#64748b' }}>Account No:</span> <strong>{formData.accountNumber ? `••••${formData.accountNumber.slice(-4)}` : '—'}</strong></div>
+                          <div><span style={{ color: '#64748b' }}>IFSC Code:</span> <strong>{formData.ifscCode || '—'}</strong></div>
+                          <div><span style={{ color: '#64748b' }}>UPI ID:</span> <strong>{formData.upiId || '—'}</strong></div>
+                          <div style={{ gridColumn: 'span 2' }}>
+                            <span style={{ color: '#64748b' }}>Pass & Membership Pricing:</span>{' '}
+                            <Tag color="cyan">Configured later by partner in Gym Owner Dashboard</Tag>
+                          </div>
                         </div>
                       </Card>
 
@@ -1905,7 +2334,7 @@ export const GymOnboarding = () => {
                         </div>
                         <Radio.Group
                           value={formData.initialApprovalStatus}
-                          onChange={(e) => setFormData({ ...formData, initialApprovalStatus: e.target.value })}
+                          onChange={(e) => handleFieldChange('initialApprovalStatus', e.target.value)}
                         >
                           <Radio value="Approved">
                             <span style={{ fontWeight: 700, color: '#16a34a' }}>Approved & Live Immediately</span>
@@ -1920,8 +2349,8 @@ export const GymOnboarding = () => {
 
                   {/* Right: Live Customer App Mobile Preview Card */}
                   <Col xs={24} md={10}>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: isDarkMode ? '#cbd5e1' : '#475569', marginBottom: 8, textAlign: 'center' }}>
-                      📱 Live GYMEZY Customer App Card Preview
+                    <div style={{ fontSize: 12, fontWeight: 800, color: isDarkMode ? '#cbd5e1' : '#475569', marginBottom: 8, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                      <MobileOutlined /> Live GYMEZY Customer App Card Preview
                     </div>
                     <div
                       style={{
@@ -1933,12 +2362,18 @@ export const GymOnboarding = () => {
                       }}
                     >
                       {/* Image Header */}
-                      <div style={{ position: 'relative', height: 160 }}>
-                        <img
-                          src={formData.coverPhoto}
-                          alt="Gym"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
+                      <div style={{ position: 'relative', height: 160, backgroundColor: '#0f172a' }}>
+                        {formData.logo || formData.coverPhoto ? (
+                          <img
+                            src={formData.logo || formData.coverPhoto}
+                            alt="Gym Logo"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8' }}>
+                            <PictureOutlined style={{ fontSize: 32 }} />
+                          </div>
+                        )}
                         <Tag
                           color="#4338ca"
                           style={{
@@ -1968,17 +2403,17 @@ export const GymOnboarding = () => {
                             gap: 4,
                           }}
                         >
-                          ⭐ 4.9 (New)
+                          <StarFilled style={{ color: '#fbbf24' }} /> 4.9 (New)
                         </div>
                       </div>
 
                       {/* Card Body */}
                       <div style={{ padding: '16px' }}>
                         <div style={{ fontWeight: 800, fontSize: 16, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                          {formData.gymName}
+                          {formData.gymName || 'Gym Name Preview'}
                         </div>
                         <div style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                          <EnvironmentOutlined /> {formData.area || formData.city}, {formData.city} • 1.2 km
+                          <EnvironmentOutlined /> {formData.area || formData.city || 'Locality'}, {formData.city || 'City'} • 1.2 km
                         </div>
 
                         {/* Facilities tags */}
@@ -1993,6 +2428,9 @@ export const GymOnboarding = () => {
                               +{formData.facilities.length - 3} more
                             </Tag>
                           )}
+                          {formData.facilities.length === 0 && (
+                            <span style={{ fontSize: 11, color: '#94a3b8' }}>No facilities selected</span>
+                          )}
                         </div>
 
                         {/* Price & Book Pass Button */}
@@ -2000,7 +2438,7 @@ export const GymOnboarding = () => {
                           <div>
                             <div style={{ fontSize: 10, color: '#94a3b8' }}>Pass starts at</div>
                             <div style={{ fontSize: 16, fontWeight: 900, color: '#4338ca' }}>
-                              ₹ {formData.singleSessionPrice} <span style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>/ session</span>
+                              ₹ {formData.singleSessionPrice || '—'} <span style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>/ session</span>
                             </div>
                           </div>
                           <Button
@@ -2032,7 +2470,7 @@ export const GymOnboarding = () => {
               </Button>
 
               <Space>
-                {currentStep < 8 ? (
+                {currentStep < 6 ? (
                   <Button
                     type="primary"
                     onClick={handleSaveAndNext}
@@ -2054,8 +2492,8 @@ export const GymOnboarding = () => {
                     loading={isSubmitting}
                     onClick={handleFinalPublish}
                     style={{
-                      backgroundColor: '#16a34a',
-                      borderColor: '#16a34a',
+                      backgroundColor: validationSummary.isAllValid ? '#16a34a' : '#4338ca',
+                      borderColor: validationSummary.isAllValid ? '#16a34a' : '#4338ca',
                       height: 44,
                       padding: '0 28px',
                       borderRadius: 'var(--radius-base)',
@@ -2073,52 +2511,7 @@ export const GymOnboarding = () => {
       </Row>
 
       {/* ========================================================================= */}
-      {/* MODAL 1: ADD TRAINER MODAL */}
-      {/* ========================================================================= */}
-      <Modal
-        title={<div style={{ fontWeight: 800, fontSize: 16 }}>Register Certified Trainer</div>}
-        open={isTrainerModalOpen}
-        onCancel={() => setIsTrainerModalOpen(false)}
-        footer={null}
-        destroyOnClose
-      >
-        <Form form={trainerForm} layout="vertical" onFinish={handleAddTrainer}>
-          <Form.Item label="Trainer Full Name" name="name" rules={[{ required: true, message: 'Please enter trainer name' }]}>
-            <Input placeholder="e.g. Rohit Sharma" />
-          </Form.Item>
-
-          <Form.Item label="Specialty / Fitness Focus" name="specialty" rules={[{ required: true, message: 'Please enter specialty' }]}>
-            <Input placeholder="e.g. Hypertrophy & Strength, Yoga, CrossFit" />
-          </Form.Item>
-
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item label="Experience (Years)" name="experienceYears" initialValue={5}>
-                <InputNumber min={1} max={30} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="Monthly PT Add-on Fee (₹)" name="monthlyFee" initialValue={2500}>
-                <InputNumber prefix="₹" style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item label="Trainer Avatar Image URL" name="image" initialValue="https://images.unsplash.com/photo-1568602471122-7832951cc4c5?q=80&w=150&auto=format&fit=crop">
-            <Input placeholder="https://..." />
-          </Form.Item>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-            <Button onClick={() => setIsTrainerModalOpen(false)}>Cancel</Button>
-            <Button type="primary" htmlType="submit" style={{ backgroundColor: '#4338ca', fontWeight: 700 }}>
-              Add Trainer to Roster
-            </Button>
-          </div>
-        </Form>
-      </Modal>
-
-      {/* ========================================================================= */}
-      {/* MODAL 2: CELEBRATION SUCCESS MODAL */}
+      {/* SUCCESS CELEBRATION MODAL */}
       {/* ========================================================================= */}
       <Modal
         open={isSuccessModalOpen}
@@ -2174,10 +2567,15 @@ export const GymOnboarding = () => {
             gap: 6,
           }}
         >
-          <div><strong>Partner ID:</strong> {createdGymSummary?.id || formData.gymId}</div>
-          <div><strong>Location:</strong> {formData.area}, {formData.city}</div>
-          <div><strong>Subscription Tier:</strong> {formData.subscriptionType} (₹4,999/mo)</div>
-          <div><strong>Drop-in Rate:</strong> ₹{formData.singleSessionPrice} / session</div>
+          <div>
+            <strong>Partner ID:</strong>{' '}
+            <Tag color="blue" style={{ fontWeight: 700, fontSize: 13, marginLeft: 4 }}>
+              {createdGymSummary?.partnerId || createdGymSummary?.id || formData.gymId}
+            </Tag>
+          </div>
+          <div><strong>Location:</strong> {formData.area ? `${formData.area}, ` : ''}{formData.city}</div>
+          <div><strong>Subscription Tier:</strong> {formData.subscriptionType}</div>
+          <div><strong>Membership & Passes:</strong> Configured in Owner Dashboard</div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

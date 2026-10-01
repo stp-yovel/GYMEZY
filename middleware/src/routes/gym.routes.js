@@ -4,6 +4,7 @@ import {
   getGyms,
   getGymById,
   updateGymStatus,
+  deleteGym,
 } from '../controllers/gym.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { authorizeRoles } from '../middlewares/role.middleware.js';
@@ -11,7 +12,10 @@ import { USER_ROLES } from '../models/user.model.js';
 
 const router = Router();
 
-// Onboard new gym partner (Accessible by Super Admin or onboarding portal)
+// Enforce JWT Authentication across all gym endpoints
+router.use(authenticate);
+
+// Onboard new gym partner (Authenticated via JWT)
 router.post('/onboard', onboardGym);
 router.post('/', onboardGym);
 
@@ -24,9 +28,15 @@ router.get('/:id', getGymById);
 // Super Admin status updates
 router.patch(
   '/:id/status',
-  authenticate,
   authorizeRoles(USER_ROLES.SUPER_ADMIN),
   updateGymStatus
+);
+
+// Super Admin delete gym
+router.delete(
+  '/:id',
+  authorizeRoles(USER_ROLES.SUPER_ADMIN),
+  deleteGym
 );
 
 export default router;

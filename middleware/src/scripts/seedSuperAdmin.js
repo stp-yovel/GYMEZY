@@ -4,7 +4,7 @@ import { User, USER_ROLES } from '../models/user.model.js';
 
 const seedSuperAdmin = async () => {
   try {
-    console.log('🔄 Connecting to MongoDB...');
+    console.log('[SEED] Connecting to MongoDB...');
     await connectDatabase();
 
     const adminEmail = 'admin@gymezy.com';
@@ -24,7 +24,7 @@ const seedSuperAdmin = async () => {
     };
 
     if (superAdmin) {
-      console.log(`⚠️ User with email ${adminEmail} already exists. Updating credentials & role...`);
+      console.log(`[SEED WARN] User with email ${adminEmail} already exists. Updating credentials & role...`);
       superAdmin.fullName = superAdminData.fullName;
       superAdmin.phone = superAdminData.phone;
       superAdmin.password = superAdminData.password;
@@ -33,28 +33,28 @@ const seedSuperAdmin = async () => {
       superAdmin.isActive = superAdminData.isActive;
       superAdmin.isVerified = superAdminData.isVerified;
       await superAdmin.save();
-      console.log('✅ Super Admin account updated successfully!');
+      console.log('[SEED SUCCESS] Super Admin account updated successfully!');
     } else {
       superAdmin = await User.create(superAdminData);
-      console.log('🎉 Super Admin account created successfully in database!');
+      console.log('[SEED SUCCESS] Super Admin account created successfully in database!');
     }
 
     console.log('\n=============================================');
-    console.log('👑 GYMEZY SUPER ADMIN CREDENTIALS');
+    console.log('GYMEZY SUPER ADMIN CREDENTIALS');
     console.log('=============================================');
-    console.log(`👤 Name:     ${superAdmin.fullName}`);
-    console.log(`📧 Email:    ${superAdmin.email}`);
-    console.log(`📱 Phone:    ${superAdmin.phone}`);
-    console.log(`🔑 Password: SuperAdmin@Gymezy2026!`);
-    console.log(`🛡️ Role:     ${superAdmin.role}`);
-    console.log(`📍 Address:  ${superAdmin.address}`);
+    console.log(`Name:     ${superAdmin.fullName}`);
+    console.log(`Email:    ${superAdmin.email}`);
+    console.log(`Phone:    ${superAdmin.phone}`);
+    console.log(`Password: SuperAdmin@Gymezy2026!`);
+    console.log(`Role:     ${superAdmin.role}`);
+    console.log(`Address:  ${superAdmin.address}`);
     console.log('=============================================\n');
 
     await mongoose.connection.close();
-    console.log('🔒 Database connection closed.');
+    console.log('[DATABASE] Database connection closed.');
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error creating Super Admin user:', error.message);
+    console.error('[SEED ERROR] Error creating Super Admin user:', error.message);
     if (mongoose.connection.readyState !== 0) {
       await mongoose.connection.close();
     }

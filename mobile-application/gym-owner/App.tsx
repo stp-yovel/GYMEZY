@@ -4,13 +4,17 @@ import { ThemeProvider } from './src/theme/ThemeContext';
 import { ToastProvider } from './src/widgets/CustomScaffoldMessage';
 import { AppNavigator } from './src/navigation/AppNavigator';
 
+import { AuthProvider } from './src/context/AuthContext';
+
 function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <ToastProvider>
-          <AppNavigator />
-        </ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <AppNavigator />
+          </ToastProvider>
+        </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

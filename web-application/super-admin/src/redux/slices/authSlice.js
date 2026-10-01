@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../../services/apiClient';
+import { setCookie, deleteCookie } from '../../utils/cookieUtils';
 
 /**
  * Async thunk for authenticating Super Admin credentials
@@ -11,15 +12,28 @@ export const loginSuperAdmin = createAsyncThunk(
       const response = await apiClient.post('/auth/login', {
         identifier,
         password,
+        portal: 'super-admin',
+        expectedRole: 'SUPER_ADMIN',
       });
 
-      if (response?.success && response?.data) {
-        return response.data;
+      const resPayload = response.data || response;
+      if (resPayload?.success && resPayload?.data) {
+        const user = resPayload.data;
+        if (user.role !== 'SUPER_ADMIN') {
+          deleteCookie('authToken');
+          return rejectWithValue('Access denied: Only Super Administrators can log in to the Super Admin Portal.');
+        }
+
+        if (user.token) {
+          setCookie('authToken', user.token, 7);
+        }
+        return user;
       }
-      return rejectWithValue(response?.message || 'Authentication failed.');
+      return rejectWithValue(resPayload?.message || 'Authentication failed.');
     } catch (error) {
+      deleteCookie('authToken');
       return rejectWithValue(
-        error.message || 'Unable to connect to server. Please check your network.'
+        error.response?.data?.message || error.message || 'Unable to connect to server. Please check your network.'
       );
     }
   }
@@ -33,12 +47,19 @@ export const fetchCurrentUser = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await apiClient.get('/auth/me');
-      if (response?.success && response?.data) {
-        return response.data;
+      const resPayload = response.data || response;
+      if (resPayload?.success && resPayload?.data) {
+        const user = resPayload.data;
+        if (user.role !== 'SUPER_ADMIN') {
+          deleteCookie('authToken');
+          return rejectWithValue('Access denied: Super Admin authorization required.');
+        }
+        return user;
       }
-      return rejectWithValue(response?.message || 'Session expired.');
+      return rejectWithValue(resPayload?.message || 'Session expired.');
     } catch (error) {
-      return rejectWithValue(error.message || 'Session invalid.');
+      deleteCookie('authToken');
+      return rejectWithValue(error.response?.data?.message || error.message || 'Session invalid.');
     }
   }
 );
@@ -54,6 +75,7 @@ export const logoutSuperAdmin = createAsyncThunk(
     } catch (err) {
       console.warn('Logout warning:', err.message);
     } finally {
+      deleteCookie('authToken');
       dispatch(authSlice.actions.logout());
     }
   }

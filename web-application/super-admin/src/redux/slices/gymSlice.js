@@ -1,4 +1,19 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { apiClient } from '../../services/apiClient';
+
+export const fetchGyms = createAsyncThunk(
+  'gyms/fetchGyms',
+  async (params, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.get('/gyms', { params });
+      return response.data?.data?.gyms || response.data?.data || [];
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || err.message || 'Failed to fetch gyms fleet'
+      );
+    }
+  }
+);
 
 const loadInitialGyms = () => {
   try {
@@ -115,6 +130,22 @@ export const gymSlice = createSlice({
       state.gyms = [];
       saveToLocalStorage([]);
     },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchGyms.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchGyms.fulfilled, (state, action) => {
+        state.loading = false;
+        state.gyms = Array.isArray(action.payload) ? action.payload : [];
+        saveToLocalStorage(state.gyms);
+      })
+      .addCase(fetchGyms.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
   },
 });
 

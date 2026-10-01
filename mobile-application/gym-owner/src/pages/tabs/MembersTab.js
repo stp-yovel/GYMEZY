@@ -16,187 +16,17 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeContext';
 import { AppColors } from '../../theme/appTheme';
 import { useToast } from '../../widgets/CustomScaffoldMessage';
+import { useAuth } from '../../context/AuthContext';
 
-const INITIAL_MEMBERS = [
-  {
-    id: 'M-101',
-    name: 'Rahul Sharma',
-    phone: '+91 98401 12345',
-    email: 'rahul.s@gmail.com',
-    plan: 'Annual VIP Pass',
-    expiry: '24 May 2026',
-    status: 'Active',
-    avatar: 'RS',
-    checkins: 48,
-    streak: '18 Days',
-    emergencyContact: '+91 98400 99999 (Brother)',
-    joinDate: '24 May 2025',
-  },
-  {
-    id: 'M-102',
-    name: 'Priya Sundaram',
-    phone: '+91 98402 23456',
-    email: 'priya.s@yahoo.com',
-    plan: 'Quarterly Pro',
-    expiry: '18 Aug 2025',
-    status: 'Active',
-    avatar: 'PS',
-    checkins: 32,
-    streak: '12 Days',
-    emergencyContact: '+91 98400 88888 (Father)',
-    joinDate: '18 May 2025',
-  },
-  {
-    id: 'M-103',
-    name: 'Arun Venkatesh',
-    phone: '+91 98403 34567',
-    email: 'arun.v@gmail.com',
-    plan: 'Monthly Standard',
-    expiry: '02 Oct 2026',
-    status: 'Expiring Soon',
-    avatar: 'AV',
-    checkins: 19,
-    streak: '5 Days',
-    emergencyContact: '+91 98400 77777 (Spouse)',
-    joinDate: '02 Sep 2026',
-  },
-  {
-    id: 'M-104',
-    name: 'Deepika Raman',
-    phone: '+91 98404 45678',
-    email: 'deepika.r@outlook.com',
-    plan: 'Personal Training VIP',
-    expiry: '14 Dec 2025',
-    status: 'Active',
-    avatar: 'DR',
-    checkins: 55,
-    streak: '24 Days',
-    emergencyContact: '+91 98400 66666 (Mother)',
-    joinDate: '14 Jun 2025',
-  },
-  {
-    id: 'M-105',
-    name: 'Karthik Raja',
-    phone: '+91 98405 56789',
-    email: 'karthik.raja@gmail.com',
-    plan: 'Annual VIP Pass',
-    expiry: '30 Jun 2026',
-    status: 'Active',
-    avatar: 'KR',
-    checkins: 62,
-    streak: '30 Days',
-    emergencyContact: '+91 98400 55555 (Friend)',
-    joinDate: '30 Jun 2025',
-  },
-  {
-    id: 'M-106',
-    name: 'Sneha Patel',
-    phone: '+91 98406 67890',
-    email: 'sneha.p@gmail.com',
-    plan: 'Monthly Standard',
-    expiry: '28 Sep 2026',
-    status: 'Inactive',
-    avatar: 'SP',
-    checkins: 11,
-    streak: '0 Days',
-    emergencyContact: '+91 98400 44444 (Father)',
-    joinDate: '28 Aug 2026',
-  },
-  {
-    id: 'M-107',
-    name: 'Manoj Kumar',
-    phone: '+91 98407 78901',
-    email: 'manoj.k@gmail.com',
-    plan: 'Quarterly Pro',
-    expiry: '04 Oct 2026',
-    status: 'Expiring Soon',
-    avatar: 'MK',
-    checkins: 27,
-    streak: '8 Days',
-    emergencyContact: '+91 98400 33333 (Spouse)',
-    joinDate: '04 Jul 2026',
-  },
-];
-
-const INITIAL_BOOKINGS = [
-  {
-    key: '1',
-    bookingId: 'BKG250721001',
-    customerId: 'CID1001',
-    customerName: 'Arun Kumar',
-    phone: '+91 98765 43210',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop',
-    type: 'App Booking',
-    date: 'Today',
-    time: '07:00 AM',
-    amount: '₹150',
-    status: 'Checked-in',
-    payment: 'Paid Online',
-  },
-  {
-    key: '2',
-    bookingId: 'BKG250721002',
-    customerId: 'CID1002',
-    customerName: 'Priya Sharma',
-    phone: '+91 91234 56789',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=150&auto=format&fit=crop',
-    type: 'Walk-in',
-    date: 'Today',
-    time: '08:30 AM',
-    amount: '₹150',
-    status: 'Upcoming',
-    payment: 'Cash',
-  },
-  {
-    key: '3',
-    bookingId: 'BKG250721003',
-    customerId: 'CID1003',
-    customerName: 'Vikram Singh',
-    phone: '+91 99876 54321',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop',
-    type: 'App Booking',
-    date: 'Today',
-    time: '09:00 AM',
-    amount: '₹150',
-    status: 'Completed',
-    payment: 'UPI',
-  },
-  {
-    key: '4',
-    bookingId: 'BKG250721004',
-    customerId: 'CID1004',
-    customerName: 'Neha Reddy',
-    phone: '+91 90012 34567',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150&auto=format&fit=crop',
-    type: 'App Booking',
-    date: 'Today',
-    time: '10:30 AM',
-    amount: '₹150',
-    status: 'Upcoming',
-    payment: 'Paid Online',
-  },
-  {
-    key: '5',
-    bookingId: 'BKG250721005',
-    customerId: 'CID1005',
-    customerName: 'Suresh Babu',
-    phone: '+91 98800 11223',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=150&auto=format&fit=crop',
-    type: 'Walk-in',
-    date: 'Today',
-    time: '11:15 AM',
-    amount: '₹150',
-    status: 'Upcoming',
-    payment: 'Cash',
-  },
-];
-
+const INITIAL_MEMBERS = [];
+const INITIAL_BOOKINGS = [];
 const MEMBER_FILTER_TABS = ['All', 'Active', 'Expiring Soon', 'Inactive'];
 const BOOKING_FILTER_TABS = ['All', 'Upcoming', 'Checked-in', 'Completed'];
 
 export const MembersTab = ({ topInset }) => {
   const { isDark } = useTheme();
   const { showToast } = useToast();
+  const { gym } = useAuth();
 
   // Mode: 'MEMBERS' or 'BOOKINGS'
   const [activeMode, setActiveMode] = useState('MEMBERS');
@@ -301,7 +131,8 @@ export const MembersTab = ({ topInset }) => {
 
   const handleWhatsApp = (phone, name) => {
     const cleanPhone = phone.replace(/[^0-9]/g, '');
-    const url = `whatsapp://send?phone=${cleanPhone}&text=Hi ${name}, greeting from FitZone Arena!`;
+    const gymName = gym?.name || 'our gym';
+    const url = `whatsapp://send?phone=${cleanPhone}&text=Hi ${name}, greeting from ${gymName}!`;
     Linking.openURL(url).catch(() => {
       Alert.alert('WhatsApp', `Opening chat with ${name} (${phone})`);
     });

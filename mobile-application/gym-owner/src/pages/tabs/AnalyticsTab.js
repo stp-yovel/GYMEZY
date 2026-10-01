@@ -10,6 +10,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeContext';
 import { AppColors } from '../../theme/appTheme';
+import { useAuth } from '../../context/AuthContext';
 
 const WEEKLY_CHECKINS = [
   { day: 'Mon', count: 74, heightPct: 74 },
@@ -35,6 +36,7 @@ const PLAN_STATS = [
 
 export const AnalyticsTab = ({ topInset }) => {
   const { isDark } = useTheme();
+  const { gym } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState('This Month');
 
   return (
@@ -55,7 +57,7 @@ export const AnalyticsTab = ({ topInset }) => {
             Performance & Insights
           </Text>
           <Text style={[styles.pageSubtitle, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-            Real-time analytics for FitZone Arena
+            Real-time analytics for {gym?.name || 'your gym'}
           </Text>
         </View>
       </View>

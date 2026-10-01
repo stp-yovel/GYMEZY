@@ -20,135 +20,10 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors } from '../theme/appTheme';
 import { useToast } from '../widgets/CustomScaffoldMessage';
+import { useAuth } from '../context/AuthContext';
 
-const MOCK_MEMBERS = [
-  {
-    id: 'MEM100245',
-    customerId: 'CUST100245',
-    bookingId: 'BK1002456',
-    name: 'Arun Kumar',
-    phone: '+91 91509 55071',
-    age: 28,
-    gender: 'Male',
-    status: 'Active',
-    bookingType: 'App Booking',
-    bookingDate: '21 May 2026, 07:00 AM',
-    session: 'General Workout',
-    plan: 'Gold Membership',
-    planType: 'Monthly',
-    startDate: '21 Apr 2026',
-    endDate: '21 May 2026 (30 Days)',
-    daysRemaining: 8,
-    totalCheckins: 18,
-    lastCheckin: '19 May 2026, 07:05 AM',
-    avatar: 'AK',
-  },
-  {
-    id: 'MEM100124',
-    customerId: 'CUST100124',
-    bookingId: 'BK1001240',
-    name: 'Rahul Krishnan',
-    phone: '+91 91509 55072',
-    age: 26,
-    gender: 'Male',
-    status: 'Active',
-    bookingType: 'Annual Pass',
-    bookingDate: '21 May 2026, 06:30 AM',
-    session: 'Strength Zone',
-    plan: 'Annual VIP Pass',
-    planType: 'Annual',
-    startDate: '01 Jan 2026',
-    endDate: '31 Dec 2026',
-    daysRemaining: 224,
-    totalCheckins: 76,
-    lastCheckin: '20 May 2026, 06:45 AM',
-    avatar: 'RK',
-  },
-  {
-    id: 'MEM100125',
-    customerId: 'CUST100125',
-    bookingId: 'BK1001250',
-    name: 'Priya Sharma',
-    phone: '+91 91509 55073',
-    age: 24,
-    gender: 'Female',
-    status: 'Active',
-    bookingType: 'Quarterly Pass',
-    bookingDate: '21 May 2026, 07:15 AM',
-    session: 'Yoga / HIIT',
-    plan: 'Quarterly Pro',
-    planType: 'Quarterly',
-    startDate: '15 Mar 2026',
-    endDate: '15 Jun 2026',
-    daysRemaining: 25,
-    totalCheckins: 34,
-    lastCheckin: '19 May 2026, 07:20 AM',
-    avatar: 'PS',
-  },
-  {
-    id: 'MEM100126',
-    customerId: 'CUST100126',
-    bookingId: 'BK1001260',
-    name: 'Sneha Nair',
-    phone: '+91 91509 55074',
-    age: 27,
-    gender: 'Female',
-    status: 'Active',
-    bookingType: 'Monthly Pass',
-    bookingDate: '21 May 2026, 07:45 AM',
-    session: 'Cardio Studio',
-    plan: 'Monthly Standard',
-    planType: 'Monthly',
-    startDate: '01 May 2026',
-    endDate: '31 May 2026',
-    daysRemaining: 10,
-    totalCheckins: 14,
-    lastCheckin: '18 May 2026, 08:00 AM',
-    avatar: 'SN',
-  },
-  {
-    id: 'MEM100127',
-    customerId: 'CUST100127',
-    bookingId: 'BK1001270',
-    name: 'Vijay Joseph',
-    phone: '+91 91509 55075',
-    age: 31,
-    gender: 'Male',
-    status: 'Expired',
-    bookingType: 'Day Pass',
-    bookingDate: '18 May 2026, 06:00 AM',
-    session: 'General Workout',
-    plan: 'Single Day Pass',
-    planType: 'Daily',
-    startDate: '18 May 2026',
-    endDate: '18 May 2026',
-    daysRemaining: 0,
-    totalCheckins: 1,
-    lastCheckin: '18 May 2026, 06:00 AM',
-    avatar: 'VJ',
-  },
-  {
-    id: 'MEM100128',
-    customerId: 'CUST100128',
-    bookingId: 'BK1001280',
-    name: 'Deepa Krishnan',
-    phone: '+91 91509 55076',
-    age: 29,
-    gender: 'Female',
-    status: 'Active',
-    bookingType: 'Personal Training VIP',
-    bookingDate: '21 May 2026, 08:00 AM',
-    session: 'Trainer 1-on-1',
-    plan: 'VIP Coach Pass',
-    planType: 'Quarterly',
-    startDate: '10 Apr 2026',
-    endDate: '10 Jul 2026',
-    daysRemaining: 50,
-    totalCheckins: 42,
-    lastCheckin: '20 May 2026, 08:00 AM',
-    avatar: 'DK',
-  },
-];
+const MOCK_MEMBERS = [];
+
 
 const SEARCH_FILTER_CHIPS = [
   'Customer Name',
@@ -170,6 +45,7 @@ const SESSION_AREAS = [
 export const CheckInScreen = ({ navigation, route }) => {
   const { isDark } = useTheme();
   const { showToast } = useToast();
+  const { gym } = useAuth();
   const insets = useSafeAreaInsets();
 
   // Mode: 'HUB' | 'QR' | 'SEARCH' | 'DETAILS' | 'SUCCESS'
@@ -987,7 +863,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Check-in at:
               </Text>
               <Text style={[styles.actionParamValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                FitZone Arena
+                {gym?.name || 'Gym Facility'}
               </Text>
             </View>
 

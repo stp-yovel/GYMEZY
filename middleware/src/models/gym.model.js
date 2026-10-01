@@ -1,5 +1,16 @@
 import mongoose from 'mongoose';
 
+const fileAttachmentSchema = new mongoose.Schema(
+  {
+    fileName: { type: String, trim: true, default: '' }, // Formatted as {gymname}_{filename} e.g. "titanium_fitness_pan.webp"
+    fileData: { type: String, default: '' }, // Compressed Base64 Data URL (data:image/webp;base64,... or data:application/pdf;base64,...)
+    mimeType: { type: String, trim: true, default: '' }, // "image/webp" | "application/pdf"
+    fileSizeKb: { type: Number, default: 0 },
+    uploadedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const openingHoursSchema = new mongoose.Schema(
   {
     weekdayOpen: { type: String, trim: true, default: '05:30 AM' },
@@ -45,25 +56,32 @@ const trainerSchema = new mongoose.Schema(
     experienceYears: { type: Number, default: 1, min: 0 },
     rating: { type: Number, default: 4.9, min: 0, max: 5 },
     monthlyFee: { type: Number, default: 0, min: 0 },
-    image: { type: String, default: '' }, // Compressed base64
+    image: { type: fileAttachmentSchema, default: () => ({}) }, // { fileName: "{gymname}_trainer_{name}", fileData: "..." }
   },
   { _id: false }
 );
 
 const documentsSchema = new mongoose.Schema(
   {
-    gstCertificate: { type: String, default: '' }, // Compressed base64 PDF/image
-    panCard: { type: String, default: '' },
-    tradeLicense: { type: String, default: '' },
-    bankProof: { type: String, default: '' },
-    fireSafetyCertificate: { type: String, default: '' },
-    fssaiCertificate: { type: String, default: '' },
+    gstCertificate: { type: fileAttachmentSchema, default: () => ({}) },
+    panCard: { type: fileAttachmentSchema, default: () => ({}) },
+    tradeLicense: { type: fileAttachmentSchema, default: () => ({}) },
+    bankProof: { type: fileAttachmentSchema, default: () => ({}) },
+    fireSafetyCertificate: { type: fileAttachmentSchema, default: () => ({}) },
+    fssaiCertificate: { type: fileAttachmentSchema, default: () => ({}) },
   },
   { _id: false }
 );
 
 const gymSchema = new mongoose.Schema(
   {
+    partnerId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+      index: true,
+    },
     name: {
       type: String,
       required: [true, 'Gym name is required'],
@@ -139,9 +157,10 @@ const gymSchema = new mongoose.Schema(
     // Facilities, Capacity & Media
     floorSpaceSqFt: { type: Number, default: 0, min: 0 },
     maxFloorCapacity: { type: Number, default: 0, min: 0 },
-    coverPhoto: { type: String, default: '' }, // Compressed base64 WebP
-    image: { type: String, default: '' },
-    galleryPhotos: [{ type: String }], // Array of compressed base64 WebP images
+    logo: { type: fileAttachmentSchema, default: () => ({}) }, // { fileName: "{gymname}_logo.webp", fileData: "..." }
+    coverPhoto: { type: fileAttachmentSchema, default: () => ({}) }, // Backwards compatibility
+    image: { type: String, default: '' }, // String convenience field
+    galleryPhotos: [fileAttachmentSchema], // Array of { fileName: "{gymname}_gallery_1.webp", fileData: "..." }
     images: [{ type: String }],
 
     facilities: [{ type: String, trim: true }],
@@ -232,8 +251,11 @@ gymSchema.index({ city: 1, isActive: 1 });
 gymSchema.index({ status: 1, approvalStatus: 1 });
 
 const sanitizeJsonTransform = (_doc, ret) => {
+  if (ret._id) {
+    ret.mongoId = ret._id.toString();
+    ret.id = ret.partnerId || ret._id.toString();
+  }
   delete ret._id;
-  delete ret.id;
   delete ret.__v;
   return ret;
 };

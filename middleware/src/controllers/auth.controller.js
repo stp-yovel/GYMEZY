@@ -4,6 +4,7 @@ import { ApiError } from '../utils/apiError.js';
 import { setAuthCookie, clearAuthCookie } from '../utils/cookieHelper.js';
 import { sanitizeDocument } from '../utils/responseTransformer.js';
 import { User } from '../models/user.model.js';
+import Gym from '../models/gym.model.js';
 
 /**
  * Unified Login Controller for all platform roles
@@ -44,6 +45,26 @@ export const login = asyncHandler(async (req, res) => {
     throw ApiError.unauthorized('Invalid credentials. Please verify your email/phone and password.');
   }
 
+  // Enforce portal-level role authorization
+  const requestedRole = req.body.expectedRole || req.body.requiredRole || (req.body.portal === 'super-admin' ? 'SUPER_ADMIN' : req.body.portal === 'gym-owner' ? 'GYM_OWNER' : null);
+  if (requestedRole) {
+    if (requestedRole === 'SUPER_ADMIN' && user.role !== 'SUPER_ADMIN') {
+      throw ApiError.forbidden('Access denied. Only Super Administrators are authorized to access the Super Admin Portal.');
+    }
+    if (requestedRole === 'GYM_OWNER' && user.role !== 'GYM_OWNER' && user.role !== 'SUPER_ADMIN') {
+      throw ApiError.forbidden('Access denied. This portal is reserved for registered Gym Owners and Managers.');
+    }
+  }
+
+  // Fetch gym profile if linked
+  let gymDetails = null;
+  if (user.gymId) {
+    const gym = await Gym.findById(user.gymId);
+    if (gym) {
+      gymDetails = sanitizeDocument(gym.toJSON());
+    }
+  }
+
   // Generate signed JWT token
   const token = user.generateAuthToken();
 
@@ -55,7 +76,11 @@ export const login = asyncHandler(async (req, res) => {
 
   return res.status(200).json(
     ApiResponse.success(
-      sanitizedUser,
+      {
+        ...sanitizedUser,
+        gym: gymDetails,
+        token,
+      },
       `Welcome back, ${user.fullName}! Login successful.`
     )
   );

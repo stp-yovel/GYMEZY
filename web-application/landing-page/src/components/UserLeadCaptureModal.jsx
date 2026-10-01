@@ -484,7 +484,7 @@ export default function UserLeadCaptureModal({
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </div>
-                <div className="user-success-badge">🎉 VIP PASS RESERVED</div>
+                <div className="user-success-badge">VIP PASS RESERVED</div>
                 <h3 className="lead-success-title">You're on the VIP Launch List!</h3>
                 <p className="lead-success-desc">
                   Thank you, <strong>{formData.name || 'Fitness Enthusiast'}</strong>! We have reserved your{' '}

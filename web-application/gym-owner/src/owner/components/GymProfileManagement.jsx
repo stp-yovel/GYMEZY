@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateGymProfile } from '../../redux/slices/gymSlice';
 import {
@@ -77,6 +77,7 @@ import {
   SwapOutlined,
   SaveOutlined,
   CopyOutlined,
+  StarFilled,
 } from '@ant-design/icons';
 import confetti from 'canvas-confetti';
 import { useTheme } from '../../theme/ThemeContext';
@@ -87,38 +88,29 @@ const { TextArea } = Input;
 
 // Initial Gym Profile Data
 export const INITIAL_GYM_PROFILE = {
-  name: 'FitZone Gym',
-  logo: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=200&auto=format&fit=crop',
+  name: 'My Gym',
+  logo: '',
   status: 'Active',
-  address: 'No. 15, 2nd Avenue, Anna Nagar, Chennai, Tamil Nadu - 600040',
-  shortAddress: 'Anna Nagar, Chennai, Tamil Nadu - 600040',
-  phone: '+91 98765 43210',
-  email: 'fitzonegym@gmail.com',
-  website: 'www.fitzonegym.com',
-  about:
-    'We provide world-class equipment, certified trainers, personalized workout plans, and a motivating environment to help you transform.',
-  description:
-    'FitZone Gym is committed to providing the best fitness experience with advanced equipment, expert guidance and flexible membership options for every fitness enthusiast.',
-  joinedOn: '15 May 2024',
-  memberSince: '1 Year 2 Months',
-  gymType: 'Commercial Gym',
-  gstNumber: '33ABCDE1234F1Z5',
-  establishedOn: '01 Jan 2020',
+  address: '',
+  shortAddress: '',
+  phone: '',
+  email: '',
+  website: '',
+  about: '',
+  description: '',
+  joinedOn: 'Recent',
+  memberSince: 'Active',
+  gymType: 'Fitness Center',
+  gstNumber: '',
+  establishedOn: '',
   ownershipType: 'Sole Proprietorship',
-  area: '3500 Sq.ft',
-  totalEquipment: '45',
-  trainerCount: '5',
-  genderAllowed: 'Male & Female',
-  coverPhoto:
-    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop',
-  gallery: [
-    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1574680096145-d05b474e2155?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=500&auto=format&fit=crop',
-  ],
+  area: '',
+  totalEquipment: '',
+  trainerCount: '0',
+  genderAllowed: 'Unisex',
+  logo: '',
+  coverPhoto: '',
+  gallery: [],
 };
 
 // Initial Facilities Data
@@ -266,7 +258,25 @@ const INITIAL_HOLIDAYS = [
 export const GymProfileManagement = () => {
   const { isDarkMode } = useTheme();
   const dispatch = useDispatch();
-  const [profile, setProfile] = useState(INITIAL_GYM_PROFILE);
+  const gymProfileFromRedux = useSelector((state) => state.gym?.gymProfile || state.auth?.user?.gym);
+
+  const [profile, setProfile] = useState(() => {
+    if (gymProfileFromRedux) {
+      return {
+        ...INITIAL_GYM_PROFILE,
+        name: gymProfileFromRedux.name || 'My Gym',
+        address: gymProfileFromRedux.fullAddress || gymProfileFromRedux.address || '',
+        shortAddress: gymProfileFromRedux.branch || gymProfileFromRedux.city || '',
+        phone: gymProfileFromRedux.phone || '',
+        email: gymProfileFromRedux.email || '',
+        logo: gymProfileFromRedux.logo?.fileData || gymProfileFromRedux.logo || gymProfileFromRedux.coverPhoto?.fileData || gymProfileFromRedux.image || INITIAL_GYM_PROFILE.logo,
+        coverPhoto: gymProfileFromRedux.coverPhoto?.fileData || gymProfileFromRedux.logo?.fileData || gymProfileFromRedux.image || INITIAL_GYM_PROFILE.coverPhoto,
+        ownerName: gymProfileFromRedux.ownerName || '',
+      };
+    }
+    return INITIAL_GYM_PROFILE;
+  });
+
   const [activeTab, setActiveTab] = useState('basic');
 
   // Multi-tab datasets
@@ -278,27 +288,43 @@ export const GymProfileManagement = () => {
   const [isAddHolidayModalOpen, setIsAddHolidayModalOpen] = useState(false);
   const [holidayForm] = Form.useForm();
   const [bankDetails, setBankDetails] = useState({
-    accountHolder: 'FitZone Fitness LLP',
-    bankName: 'HDFC Bank Ltd.',
-    accountNumber: '50200084729184',
-    ifscCode: 'HDFC0001234',
+    accountHolder: gymProfileFromRedux?.bankDetails?.accountHolder || gymProfileFromRedux?.name || 'Gym Enterprise',
+    bankName: gymProfileFromRedux?.bankDetails?.bankName || 'Verified Bank',
+    accountNumber: gymProfileFromRedux?.bankDetails?.accountNumber || '',
+    ifscCode: gymProfileFromRedux?.bankDetails?.ifscCode || '',
     accountType: 'Current Account',
-    branch: 'Anna Nagar Main Branch, Chennai',
-    upiId: 'fitzone.gym@hdfcbank',
+    branch: gymProfileFromRedux?.city || '',
+    upiId: gymProfileFromRedux?.bankDetails?.upiId || '',
     payoutSchedule: 'Daily T+1 Automated Direct Bank Deposit',
     gstInvoiceEnabled: true,
   });
+
   const [socialLinks, setSocialLinks] = useState({
-    instagram: 'https://instagram.com/fitzone_chennai',
-    instagramHandle: '@fitzone_chennai',
-    facebook: 'https://facebook.com/fitzonegymchennai',
-    youtube: 'https://youtube.com/@fitzonefitness',
-    whatsapp: '+91 98765 43210',
-    googleRating: '4.8',
-    googleReviewCount: '324',
-    googleBusinessUrl: 'https://maps.google.com/?q=FitZone+Gym+Anna+Nagar',
-    website: 'https://www.fitzonegym.com',
+    instagram: '',
+    instagramHandle: '',
+    facebook: '',
+    youtube: '',
+    whatsapp: gymProfileFromRedux?.phone || '',
+    googleRating: String(gymProfileFromRedux?.rating || '4.9'),
+    googleReviewCount: String(gymProfileFromRedux?.totalReviews || '0'),
+    googleBusinessUrl: '',
+    website: '',
   });
+
+  useEffect(() => {
+    if (gymProfileFromRedux) {
+      setProfile((prev) => ({
+        ...prev,
+        name: gymProfileFromRedux.name || prev.name,
+        address: gymProfileFromRedux.fullAddress || gymProfileFromRedux.address || prev.address,
+        shortAddress: gymProfileFromRedux.branch || gymProfileFromRedux.city || prev.shortAddress,
+        phone: gymProfileFromRedux.phone || prev.phone,
+        email: gymProfileFromRedux.email || prev.email,
+        logo: gymProfileFromRedux.logo?.fileData || gymProfileFromRedux.logo || gymProfileFromRedux.coverPhoto?.fileData || gymProfileFromRedux.image || prev.logo,
+        coverPhoto: gymProfileFromRedux.coverPhoto?.fileData || gymProfileFromRedux.logo?.fileData || gymProfileFromRedux.image || prev.coverPhoto,
+      }));
+    }
+  }, [gymProfileFromRedux]);
   const [systemSettings, setSystemSettings] = useState({
     turnstileTimeout: 5,
     renewalGracePeriod: 3,
@@ -1813,8 +1839,8 @@ export const GymProfileManagement = () => {
                   <GlobalOutlined />
                   <span style={{ fontSize: 15, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>Google Maps</span>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#fa8c16', marginTop: 8 }}>
-                  ★ {socialLinks.googleRating} / 5.0
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#fa8c16', marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <StarFilled style={{ color: '#fa8c16' }} /> {socialLinks.googleRating} / 5.0
                 </div>
                 <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 4 }}>
                   {socialLinks.googleReviewCount} Verified Reviews

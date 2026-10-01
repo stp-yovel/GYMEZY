@@ -17,6 +17,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../../theme/ThemeContext';
 import { AppColors } from '../../theme/appTheme';
 import { useToast } from '../../widgets/CustomScaffoldMessage';
+import { useAuth } from '../../context/AuthContext';
 
 const GYM_PHOTOS = [
   'https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=400&auto=format&fit=crop',
@@ -224,6 +225,7 @@ const INITIAL_SECTIONS = [
 export const SettingsTab = ({ topInset, navigation }) => {
   const { isDark, toggleTheme } = useTheme();
   const { showToast } = useToast();
+  const { user, gym, logout } = useAuth();
 
   // Navigation state within Settings:
   // 'MAIN' | 'GYM_PROFILE' | 'BASIC_PROFILE' | 'SUBSCRIPTION' | 'DOCUMENTS' | 'ACCOUNT_DETAILS' | 'TRAINER_PROFILE' | 'ADD_TRAINER' | 'EMPLOYEES' | 'ADD_EMPLOYEE' | 'SECTIONS'
@@ -295,7 +297,8 @@ export const SettingsTab = ({ topInset, navigation }) => {
         {
           text: 'Sign Out',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
+            await logout();
             showToast({ message: 'Signed out of Partner Portal successfully' });
             if (navigation?.replace) {
               navigation.replace('Login');
@@ -516,7 +519,6 @@ export const SettingsTab = ({ topInset, navigation }) => {
               resizeMode="contain"
             />
           </View>
-          <View style={styles.profileInfo}>
             <View style={styles.profileNameRow}>
               <Text
                 style={[
@@ -524,11 +526,13 @@ export const SettingsTab = ({ topInset, navigation }) => {
                   { color: isDark ? '#FFFFFF' : '#0F172A' },
                 ]}
               >
-                FitZone Gym
+                {gym?.name || user?.fullName || 'Gym Facility'}
               </Text>
               <View style={styles.activeStatusPill}>
                 <View style={styles.activeDot} />
-                <Text style={styles.activeStatusText}>Active</Text>
+                <Text style={styles.activeStatusText}>
+                  {gym?.subscriptionStatus || gym?.approvalStatus || 'Active'}
+                </Text>
               </View>
             </View>
             <Text
@@ -537,9 +541,8 @@ export const SettingsTab = ({ topInset, navigation }) => {
                 { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' },
               ]}
             >
-              Anna Nagar, Chennai
+              {gym?.city ? (gym?.area ? `${gym.area}, ${gym.city}` : gym.city) : gym?.fullAddress || 'Partner Location'}
             </Text>
-          </View>
         </View>
       </View>
 
@@ -1146,7 +1149,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
             Gym Name
           </Text>
           <Text style={[styles.infoFieldValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-            FitZone Gym
+            {gym?.name || 'Gym Facility'}
           </Text>
         </View>
 
@@ -1157,7 +1160,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
           <View style={styles.iconValRow}>
             <Ionicons name="call-outline" size={16} color={AppColors.primaryColor} />
             <Text style={[styles.infoFieldValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-              +91 91509 55071
+              {gym?.phone || user?.phone || 'Not Specified'}
             </Text>
           </View>
         </View>
@@ -1169,7 +1172,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
           <View style={styles.iconValRow}>
             <MaterialIcons name="mail-outline" size={16} color={AppColors.primaryColor} />
             <Text style={[styles.infoFieldValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-              info@fitzonegym.com
+              {gym?.email || user?.email || 'Not Specified'}
             </Text>
           </View>
         </View>
@@ -1181,7 +1184,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
           <View style={styles.iconValRow}>
             <MaterialIcons name="location-on" size={18} color={AppColors.dangerRed} />
             <Text style={[styles.infoFieldValue, { color: isDark ? '#FFFFFF' : '#0F172A', flex: 1 }]}>
-              No, 128, 2nd Avenue, Anna Nagar, Chennai - 600040, Tamil Nadu
+              {gym?.fullAddress || gym?.address || (gym?.city ? `${gym.area || gym.city}, ${gym.city}` : 'Partner Location')}
             </Text>
           </View>
         </View>
@@ -1202,7 +1205,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
           />
           <View style={styles.mapPinBadge}>
             <MaterialIcons name="location-pin" size={28} color="#EF4444" />
-            <Text style={styles.mapPinText}>Anna Nagar, Chennai</Text>
+            <Text style={styles.mapPinText}>{gym?.city || 'Partner Location'}</Text>
           </View>
         </View>
       </View>
@@ -1215,7 +1218,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
         <View style={styles.iconValRow}>
           <Ionicons name="globe-outline" size={16} color={AppColors.accentColor} />
           <Text style={[styles.infoFieldValue, { color: isDark ? '#93C5FD' : AppColors.primaryColor }]}>
-            www.fitzonegym.com
+            {gym?.website || 'gymezy.com'}
           </Text>
         </View>
       </View>
@@ -1589,7 +1592,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
             Account Holder Name
           </Text>
           <Text style={[styles.bankFieldValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-            FitZone Gym
+            {gym?.bankDetails?.accountHolder || gym?.name || user?.fullName || 'Gym Enterprise'}
           </Text>
         </View>
 
@@ -1598,7 +1601,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
             Bank Name
           </Text>
           <Text style={[styles.bankFieldValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-            HDFC Bank
+            {gym?.bankDetails?.bankName || 'Verified Bank'}
           </Text>
         </View>
 
@@ -1607,7 +1610,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
             Account Number
           </Text>
           <Text style={[styles.bankFieldValue, { color: isDark ? '#FFFFFF' : '#0F172A', letterSpacing: 1 }]}>
-            5020 1234 5678 9012
+            {gym?.bankDetails?.accountNumber ? `•••• •••• ${gym.bankDetails.accountNumber.slice(-4)}` : '•••• •••• ••••'}
           </Text>
         </View>
 
@@ -1616,7 +1619,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
             IFSC Code
           </Text>
           <Text style={[styles.bankFieldValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-            HDFC0001234
+            {gym?.bankDetails?.ifscCode || '•••••••'}
           </Text>
         </View>
 
@@ -1625,7 +1628,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
             Branch
           </Text>
           <Text style={[styles.bankFieldValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-            Anna Nagar, Chennai
+            {gym?.city || 'Main Branch'}
           </Text>
         </View>
 
@@ -1643,7 +1646,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
             UPI ID (Optional)
           </Text>
           <Text style={[styles.bankFieldValue, { color: isDark ? '#93C5FD' : AppColors.primaryColor }]}>
-            fitzonegym@hdfcbank
+            {gym?.bankDetails?.upiId || 'Not Configured'}
           </Text>
         </View>
 

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Layout, Menu, Button } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 
 const { Sider } = Layout;
 import {
@@ -17,162 +18,191 @@ import {
   CreditCardOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../../theme/ThemeContext';
+import { fetchGyms } from '../../redux/slices/gymSlice';
 import gymezyLogo from '../../assets/logo/gymezy.png';
 
 // Helper to render neatly proportioned sidebar count badges
-const renderMenuBadge = (count, isHighlight = false) => (
-  <span
-    style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minWidth: 20,
-      height: 20,
-      padding: '0 6px',
-      borderRadius: 10,
-      fontSize: 11,
-      fontWeight: 700,
-      lineHeight: 1,
-      backgroundColor: isHighlight ? '#6366f1' : 'rgba(255, 255, 255, 0.14)',
-      color: '#ffffff',
-      flexShrink: 0,
-    }}
-  >
-    {count}
-  </span>
-);
-
-export const SUPER_ADMIN_NAV_ITEMS = [
-  {
-    key: '/admin/dashboard',
-    icon: <DashboardOutlined />,
-    label: 'Dashboard',
-  },
-  {
-    key: 'gyms-sub',
-    icon: <ShopOutlined />,
-    label: (
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: 6 }}>
-        <span>Gyms</span>
-        {renderMenuBadge(18, true)}
-      </div>
-    ),
-    children: [
-      {
-        key: '/admin/gyms?tab=all',
-        label: (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-            <span>All Gyms</span>
-            {renderMenuBadge(1248, false)}
-          </div>
-        ),
-      },
-      {
-        key: '/admin/gyms?tab=pending',
-        label: (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-            <span>Pending Approval</span>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minWidth: 18,
-                height: 18,
-                padding: '0 5px',
-                borderRadius: 9,
-                fontSize: 10,
-                fontWeight: 800,
-                backgroundColor: '#d97706',
-                color: '#ffffff',
-              }}
-            >
-              18
-            </span>
-          </div>
-        ),
-      },
-      {
-        key: '/admin/gyms?tab=approved',
-        label: (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-            <span>Approved / Active</span>
-            {renderMenuBadge(1180, false)}
-          </div>
-        ),
-      },
-      {
-        key: '/admin/gyms?tab=on_hold',
-        label: (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-            <span>On Hold</span>
-            {renderMenuBadge(35, false)}
-          </div>
-        ),
-      },
-      {
-        key: '/admin/gyms?tab=rejected',
-        label: (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-            <span>Rejected</span>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minWidth: 18,
-                height: 18,
-                padding: '0 5px',
-                borderRadius: 9,
-                fontSize: 10,
-                fontWeight: 800,
-                backgroundColor: '#ef4444',
-                color: '#ffffff',
-              }}
-            >
-              15
-            </span>
-          </div>
-        ),
-      },
-    ],
-  },
-  {
-    key: '/admin/customers',
-    icon: <TeamOutlined />,
-    label: 'Customers',
-  },
-  {
-    key: '/admin/subscriptions',
-    icon: <DollarOutlined />,
-    label: 'Subscriptions',
-  },
-  {
-    key: '/admin/bookings',
-    icon: <CalendarOutlined />,
-    label: 'Bookings',
-  },
-  {
-    key: '/admin/payments',
-    icon: <CreditCardOutlined />,
-    label: 'Payments',
-  },
-  {
-    key: '/admin/reports',
-    icon: <BarChartOutlined />,
-    label: 'Reports',
-  },
-];
+const renderMenuBadge = (count, isHighlight = false) => {
+  if (count === undefined || count === null || count === 0) return null;
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 20,
+        height: 20,
+        padding: '0 6px',
+        borderRadius: 10,
+        fontSize: 11,
+        fontWeight: 700,
+        lineHeight: 1,
+        backgroundColor: isHighlight ? '#6366f1' : 'rgba(255, 255, 255, 0.14)',
+        color: '#ffffff',
+        flexShrink: 0,
+      }}
+    >
+      {count}
+    </span>
+  );
+};
 
 export const AppSidebar = ({
   collapsed = false,
   onCollapse,
-  menuItems = SUPER_ADMIN_NAV_ITEMS,
   brandRedirect = '/admin/dashboard',
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
   const { isDarkMode } = useTheme();
+
+  const gyms = useSelector((state) => state.gyms?.gyms || []);
+
+  useEffect(() => {
+    dispatch(fetchGyms());
+  }, [dispatch]);
+
+  // Compute live dynamic counts directly from real fleet data
+  const totalGyms = gyms.length;
+  const pendingCount = gyms.filter(
+    (g) => g.approvalStatus === 'Pending Approval' || g.status === 'Pending' || g.approvalStatus === 'Pending'
+  ).length;
+  const approvedCount = gyms.filter(
+    (g) => g.approvalStatus === 'Approved' || g.status === 'Active'
+  ).length;
+  const onHoldCount = gyms.filter(
+    (g) => g.approvalStatus === 'On Hold' || g.status === 'On Hold' || g.status === 'Inactive'
+  ).length;
+  const rejectedCount = gyms.filter(
+    (g) => g.approvalStatus === 'Rejected' || g.status === 'Rejected'
+  ).length;
+
+  const menuItems = [
+    {
+      key: '/admin/dashboard',
+      icon: <DashboardOutlined />,
+      label: 'Dashboard',
+    },
+    {
+      key: 'gyms-sub',
+      icon: <ShopOutlined />,
+      label: (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: 6 }}>
+          <span>Gyms</span>
+          {pendingCount > 0 && renderMenuBadge(pendingCount, true)}
+        </div>
+      ),
+      children: [
+        {
+          key: '/admin/gyms?tab=all',
+          label: (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <span>All Gyms</span>
+              {renderMenuBadge(totalGyms, false)}
+            </div>
+          ),
+        },
+        {
+          key: '/admin/gyms?tab=pending',
+          label: (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <span>Pending Approval</span>
+              {pendingCount > 0 && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 18,
+                    height: 18,
+                    padding: '0 5px',
+                    borderRadius: 9,
+                    fontSize: 10,
+                    fontWeight: 800,
+                    backgroundColor: '#d97706',
+                    color: '#ffffff',
+                  }}
+                >
+                  {pendingCount}
+                </span>
+              )}
+            </div>
+          ),
+        },
+        {
+          key: '/admin/gyms?tab=approved',
+          label: (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <span>Approved / Active</span>
+              {renderMenuBadge(approvedCount, false)}
+            </div>
+          ),
+        },
+        {
+          key: '/admin/gyms?tab=on_hold',
+          label: (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <span>On Hold</span>
+              {renderMenuBadge(onHoldCount, false)}
+            </div>
+          ),
+        },
+        {
+          key: '/admin/gyms?tab=rejected',
+          label: (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <span>Rejected</span>
+              {rejectedCount > 0 && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 18,
+                    height: 18,
+                    padding: '0 5px',
+                    borderRadius: 9,
+                    fontSize: 10,
+                    fontWeight: 800,
+                    backgroundColor: '#ef4444',
+                    color: '#ffffff',
+                  }}
+                >
+                  {rejectedCount}
+                </span>
+              )}
+            </div>
+          ),
+        },
+      ],
+    },
+    {
+      key: '/admin/customers',
+      icon: <TeamOutlined />,
+      label: 'Customers',
+    },
+    {
+      key: '/admin/subscriptions',
+      icon: <DollarOutlined />,
+      label: 'Subscriptions',
+    },
+    {
+      key: '/admin/bookings',
+      icon: <CalendarOutlined />,
+      label: 'Bookings',
+    },
+    {
+      key: '/admin/payments',
+      icon: <CreditCardOutlined />,
+      label: 'Payments',
+    },
+    {
+      key: '/admin/reports',
+      icon: <BarChartOutlined />,
+      label: 'Reports',
+    },
+  ];
 
   // Compute active key matching exact route and query parameter tab
   const getActiveKey = () => {

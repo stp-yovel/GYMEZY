@@ -1,12 +1,14 @@
-const SENSITIVE_KEYS = new Set(['_id', 'id', '__v', 'password', 'passwordHash', 'salt']);
+const SENSITIVE_KEYS = new Set(['_id', '__v', 'password', 'passwordHash', 'salt']);
 
 /**
- * Sanitizes a document, stripping internal database fields (_id, id, __v, passwords).
- * Only sets an index identifier if an integer index is explicitly provided (for tables/listings).
+ * Sanitizes and serializes a MongoDB document or object:
+ * - Strips internal database fields (_id, __v, password, passwordHash, salt)
+ * - Converts _id to standard clean id (or sequential integer index if explicitly provided)
+ * - Recursively normalizes subdocuments and arrays
  *
- * @param {Object} item - Data item to transform
+ * @param {Object} item - Data item or Mongoose document to transform
  * @param {number|null} index - Optional sequential row index identifier (e.g. 1, 2, 3)
- * @returns {Object} Sanitized object
+ * @returns {Object} Cleanly serialized and sanitized object
  */
 export const sanitizeDocument = (item, index = null) => {
   if (!item || typeof item !== 'object') {
@@ -18,13 +20,27 @@ export const sanitizeDocument = (item, index = null) => {
 
   const sanitized = {};
 
-  // If sequential index is explicitly provided, assign as integer index
-  if (index !== null && index !== undefined) {
+  // Assign clean id: partnerId / explicit id takes priority, otherwise convert Mongo _id
+  if (plainObj.partnerId) {
+    sanitized.id = plainObj.partnerId;
+    sanitized.partnerId = plainObj.partnerId;
+  } else if (plainObj.id !== undefined) {
+    sanitized.id = plainObj.id;
+  } else if (plainObj._id) {
+    sanitized.id = plainObj._id.toString();
+  } else if (index !== null && index !== undefined) {
     sanitized.id = index;
   }
 
+  if (plainObj._id) {
+    sanitized.mongoId = plainObj._id.toString();
+  }
+  if (index !== null && index !== undefined) {
+    sanitized.rowIndex = index;
+  }
+
   for (const [key, value] of Object.entries(plainObj)) {
-    if (SENSITIVE_KEYS.has(key)) {
+    if (SENSITIVE_KEYS.has(key) || key === 'id') {
       continue;
     }
 

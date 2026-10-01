@@ -1258,7 +1258,11 @@ export const BookingsManagement = () => {
           <div style={{ padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ padding: '14px', background: isDarkMode ? '#1e293b' : '#f8fafc', borderRadius: 10 }}>
               <div style={{ fontWeight: 800, fontSize: 16 }}>{selectedGymModal.name}</div>
-              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{selectedGymModal.location || 'Anna Nagar, Chennai'}</div>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                {typeof selectedGymModal.location === 'string' && selectedGymModal.location
+                  ? selectedGymModal.location
+                  : [selectedGymModal.area, selectedGymModal.city].filter(Boolean).join(', ') || selectedGymModal.fullAddress || selectedGymModal.address || 'Anna Nagar, Chennai'}
+              </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 13 }}>
               <div><span style={{ color: '#888' }}>Approval Status:</span> <Tag color="success">Approved & Live</Tag></div>

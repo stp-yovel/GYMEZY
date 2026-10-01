@@ -21,6 +21,7 @@ import {
   Badge,
   Tooltip,
   InputNumber,
+  Avatar,
 } from 'antd';
 import {
   SearchOutlined,
@@ -51,6 +52,7 @@ import {
   FileAddOutlined,
   UploadOutlined,
   RocketOutlined,
+  StarFilled,
 } from '@ant-design/icons';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -60,225 +62,55 @@ import {
   rejectGym,
   deleteGym,
   setGymStatus,
+  fetchGyms,
 } from '../redux/slices/gymSlice';
 import { useTheme } from '../theme/ThemeContext';
+import { apiClient } from '../services/apiClient';
+import GymDetailsView from './components/GymDetailsView';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 
-// Sample Initial Pending Changes Gyms Data
-const PENDING_APPROVAL_GYMS = [
-  {
-    id: 'pend-1',
-    name: 'FitZone Gym',
-    phone: '+91 98765 43210',
-    location: 'Anna Nagar, Chennai',
-    requestedBy: 'Ramesh Kumar',
-    requestedOn: '21 May 2026, 10:30 AM',
-    changesCount: 8,
-    status: 'Pending',
-    image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Pending Approval',
-    subscriptionType: 'Hybrid',
-    subscriptionStatus: 'Active',
-    membersCount: 420,
-    monthlyRevenue: '₹ 1,85,000',
-    rating: 4.8,
-  },
-  {
-    id: 'pend-2',
-    name: 'StrongFit Fitness',
-    phone: '+91 91234 56789',
-    location: 'Koramangala, Bengaluru',
-    requestedBy: 'Prakash Shetty',
-    requestedOn: '20 May 2026, 06:15 PM',
-    changesCount: 5,
-    status: 'Pending',
-    image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Pending Approval',
-    subscriptionType: 'App Only',
-    subscriptionStatus: 'Active',
-    membersCount: 310,
-    monthlyRevenue: '₹ 1,20,000',
-    rating: 4.6,
-  },
-  {
-    id: 'pend-3',
-    name: 'PowerHouse Gym',
-    phone: '+91 99876 54321',
-    location: 'Thane West, Mumbai',
-    requestedBy: 'Sandeep More',
-    requestedOn: '20 May 2026, 02:20 PM',
-    changesCount: 6,
-    status: 'Pending',
-    image: 'https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Pending Approval',
-    subscriptionType: 'GMS',
-    subscriptionStatus: 'Inactive',
-    membersCount: 580,
-    monthlyRevenue: '₹ 2,40,000',
-    rating: 4.9,
-  },
-  {
-    id: 'pend-4',
-    name: 'Muscle Factory',
-    phone: '+91 90012 34567',
-    location: 'Salt Lake, Kolkata',
-    requestedBy: 'Arindam Ghosh',
-    requestedOn: '19 May 2026, 11:45 AM',
-    changesCount: 3,
-    status: 'Pending',
-    image: 'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Pending Approval',
-    subscriptionType: 'App Only',
-    subscriptionStatus: 'Active',
-    membersCount: 260,
-    monthlyRevenue: '₹ 95,000',
-    rating: 4.5,
-  },
-  {
-    id: 'pend-5',
-    name: 'BodyCraft Gym',
-    phone: '+91 95555 66777',
-    location: 'Viman Nagar, Pune',
-    requestedBy: 'Vikram Patil',
-    requestedOn: '19 May 2026, 09:30 AM',
-    changesCount: 7,
-    status: 'Pending',
-    image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Pending Approval',
-    subscriptionType: 'GMS',
-    subscriptionStatus: 'Inactive',
-    membersCount: 390,
-    monthlyRevenue: '₹ 1,50,000',
-    rating: 4.7,
-  },
-];
+const getGymLocation = (gym) => {
+  if (!gym) return '—';
+  if (typeof gym.location === 'string' && gym.location) return gym.location;
+  const parts = [gym.area, gym.city, gym.state].filter(Boolean);
+  if (parts.length > 0) return parts.join(', ');
+  if (typeof gym.fullAddress === 'string' && gym.fullAddress) return gym.fullAddress;
+  if (typeof gym.address === 'string' && gym.address) return gym.address;
+  if (typeof gym.city === 'string' && gym.city) return gym.city;
+  return '—';
+};
 
-// All Gyms Mock Fleet
-const ALL_GYMS_DATA = [
-  ...PENDING_APPROVAL_GYMS,
-  {
-    id: 'gym-4',
-    name: 'Flex Fitness Studio',
-    phone: '+91 93456 78901',
-    location: 'Banjara Hills, Hyderabad',
-    requestedBy: 'Pooja Reddy',
-    requestedOn: '18 May 2026',
-    changesCount: 0,
-    status: 'Active',
-    image: 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Approved',
-    subscriptionType: 'Hybrid',
-    subscriptionStatus: 'Active',
-    membersCount: 520,
-    monthlyRevenue: '₹ 2,10,000',
-    rating: 4.9,
-  },
-  {
-    id: 'gym-7',
-    name: 'Elite Fitness Club',
-    phone: '+91 98811 22334',
-    location: 'Cyber City, Gurgaon',
-    requestedBy: 'Kavita Chawla',
-    requestedOn: '15 May 2026',
-    changesCount: 0,
-    status: 'Active',
-    image: 'https://images.unsplash.com/photo-1576678927484-cc907957088c?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Approved',
-    subscriptionType: 'Listing Only',
-    subscriptionStatus: 'Active',
-    membersCount: 340,
-    monthlyRevenue: '₹ 1,35,000',
-    rating: 4.7,
-  },
-  {
-    id: 'gym-8',
-    name: 'Peak Performance Hub',
-    phone: '+91 97654 32109',
-    location: 'Indiranagar, Bengaluru',
-    requestedBy: 'Arun Venkatesh',
-    requestedOn: '12 May 2026',
-    changesCount: 0,
-    status: 'Active',
-    image: 'https://images.unsplash.com/photo-1593079831268-3381b0db4a77?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'On Hold',
-    subscriptionType: 'Hybrid',
-    subscriptionStatus: 'Active',
-    membersCount: 480,
-    monthlyRevenue: '₹ 1,95,000',
-    rating: 4.8,
-  },
-  {
-    id: 'gym-9',
-    name: 'Spartan Strength Arena',
-    phone: '+91 94455 66778',
-    location: 'T. Nagar, Chennai',
-    requestedBy: 'Karthik Subramanian',
-    requestedOn: '10 May 2026',
-    changesCount: 0,
-    status: 'Active',
-    image: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Approved',
-    subscriptionType: 'Hybrid',
-    subscriptionStatus: 'Active',
-    membersCount: 610,
-    monthlyRevenue: '₹ 2,75,000',
-    rating: 4.9,
-  },
-  {
-    id: 'gym-10',
-    name: 'Olympus Crossfit Lounge',
-    phone: '+91 98112 34455',
-    location: 'Connaught Place, New Delhi',
-    requestedBy: 'Varun Grover',
-    requestedOn: '08 May 2026',
-    changesCount: 0,
-    status: 'Active',
-    image: 'https://images.unsplash.com/photo-1570829460005-c840387bb1ca?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Approved',
-    subscriptionType: 'App Only',
-    subscriptionStatus: 'Active',
-    membersCount: 450,
-    monthlyRevenue: '₹ 1,80,000',
-    rating: 4.8,
-  },
-  {
-    id: 'gym-11',
-    name: 'Titan Barbell Club',
-    phone: '+91 98223 99887',
-    location: 'Kothrud, Pune',
-    requestedBy: 'Anil Deshmukh',
-    requestedOn: '05 May 2026',
-    changesCount: 0,
-    status: 'Inactive',
-    image: 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Rejected',
-    subscriptionType: 'Listing Only',
-    subscriptionStatus: 'Inactive',
-    membersCount: 120,
-    monthlyRevenue: '₹ 45,000',
-    rating: 4.2,
-  },
-  {
-    id: 'gym-12',
-    name: 'Iron Dynasty Fitness',
-    phone: '+91 98334 11223',
-    location: 'Andheri West, Mumbai',
-    requestedBy: 'Rohan Mehta',
-    requestedOn: '02 May 2026',
-    changesCount: 0,
-    status: 'Active',
-    image: 'https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Approved',
-    subscriptionType: 'Hybrid',
-    subscriptionStatus: 'Active',
-    membersCount: 710,
-    monthlyRevenue: '₹ 3,20,000',
-    rating: 5.0,
-  },
-];
+const getGymInitials = (name) => {
+  if (!name || typeof name !== 'string') return 'GY';
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return 'GY';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+};
+
+const getGymLogoSrc = (gym) => {
+  if (!gym) return '';
+  if (typeof gym.logo === 'string' && gym.logo) return gym.logo;
+  if (gym.logo && typeof gym.logo.fileData === 'string' && gym.logo.fileData) return gym.logo.fileData;
+  if (typeof gym.logoUrl === 'string' && gym.logoUrl) return gym.logoUrl;
+  if (gym.coverPhoto && typeof gym.coverPhoto.fileData === 'string' && gym.coverPhoto.fileData) return gym.coverPhoto.fileData;
+  if (typeof gym.coverPhoto === 'string' && gym.coverPhoto) return gym.coverPhoto;
+  if (typeof gym.image === 'string' && gym.image) return gym.image;
+  return '';
+};
+
+const getGymImage = (gym) => {
+  if (!gym) return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=400&auto=format&fit=crop';
+  if (typeof gym.logo === 'string' && gym.logo) return gym.logo;
+  if (gym.logo && typeof gym.logo.fileData === 'string' && gym.logo.fileData) return gym.logo.fileData;
+  if (typeof gym.image === 'string' && gym.image) return gym.image;
+  if (typeof gym.coverPhoto === 'string' && gym.coverPhoto) return gym.coverPhoto;
+  if (gym.coverPhoto && typeof gym.coverPhoto.fileData === 'string' && gym.coverPhoto.fileData) return gym.coverPhoto.fileData;
+  return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=400&auto=format&fit=crop';
+};
 
 export const GymsManagement = () => {
   const { isDarkMode } = useTheme();
@@ -287,12 +119,16 @@ export const GymsManagement = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get('tab') || 'all';
 
-  // Redux Fleet Data
-  const reduxGyms = useSelector((state) => state.gyms?.gyms) || ALL_GYMS_DATA;
+  // Redux Fleet Data directly from store (zero mock fallbacks)
+  const reduxGyms = useSelector((state) => state.gyms?.gyms) || [];
+
+  useEffect(() => {
+    dispatch(fetchGyms());
+  }, [dispatch]);
 
   // Navigation Views: 'list' | 'review' | 'timing_diff'
   const [currentView, setCurrentView] = useState('list');
-  const [selectedGym, setSelectedGym] = useState(reduxGyms[0] || ALL_GYMS_DATA[0]);
+  const [selectedGym, setSelectedGym] = useState(reduxGyms[0] || null);
   const [activeSubTab, setActiveSubTab] = useState('profile');
 
   // Filter States for List View
@@ -305,10 +141,8 @@ export const GymsManagement = () => {
   // Modals
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
   const [quickAddForm] = Form.useForm();
-  const [detailsGym, setDetailsGym] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [adminNote, setAdminNote] = useState('');
 
@@ -326,11 +160,12 @@ export const GymsManagement = () => {
 
   const filteredGyms = useMemo(() => {
     return activeGymsList.filter((gym) => {
-      const matchName = (gym.name || '').toLowerCase().includes(searchName.toLowerCase());
-      const matchStatus = searchStatus === 'All' || gym.approvalStatus === searchStatus;
+      const matchName = String(gym.name || '').toLowerCase().includes(searchName.toLowerCase());
+      const matchStatus = searchStatus === 'All' || gym.approvalStatus === searchStatus || gym.status === searchStatus;
       const matchSubType = searchSubscriptionType === 'All' || gym.subscriptionType === searchSubscriptionType;
-      const matchLocation = (gym.location || gym.city || '').toLowerCase().includes(searchLocation.toLowerCase());
-      const matchPhone = (gym.phone || '').toLowerCase().includes(searchPhone.toLowerCase());
+      const locStr = getGymLocation(gym);
+      const matchLocation = locStr.toLowerCase().includes(searchLocation.toLowerCase());
+      const matchPhone = String(gym.phone || '').toLowerCase().includes(searchPhone.toLowerCase());
       return matchName && matchStatus && matchSubType && matchLocation && matchPhone;
     });
   }, [activeGymsList, searchName, searchStatus, searchSubscriptionType, searchLocation, searchPhone]);
@@ -347,8 +182,8 @@ export const GymsManagement = () => {
   };
 
   const handleOpenDetails = (gym) => {
-    setDetailsGym(gym);
-    setIsDetailsModalOpen(true);
+    setSelectedGym(gym);
+    setCurrentView('details');
   };
 
   const handleTabChange = (key) => {
@@ -375,9 +210,17 @@ export const GymsManagement = () => {
     setCurrentView('list');
   };
 
-  const handleDeleteGym = (gymId, gymName) => {
-    dispatch(deleteGym(gymId));
-    message.success(`Gym "${gymName}" removed from platform.`);
+  const handleDeleteGym = async (gymId, gymName) => {
+    try {
+      if (gymId && (gymId.length === 24 || !gymId.startsWith('GYM-'))) {
+        await apiClient.delete(`/gyms/${gymId}`);
+      }
+      dispatch(deleteGym(gymId));
+      message.success(`Gym "${gymName}" deleted successfully.`);
+    } catch {
+      dispatch(deleteGym(gymId));
+      message.success(`Gym "${gymName}" removed.`);
+    }
   };
 
   const handleQuickAddSubmit = (values) => {
@@ -409,6 +252,23 @@ export const GymsManagement = () => {
     setIsQuickAddModalOpen(false);
     quickAddForm.resetFields();
   };
+
+  // =========================================================================
+  // VIEW 4: COMPREHENSIVE FULL-PAGE GYM DETAILS & BOOKINGS VIEW
+  // =========================================================================
+  if (currentView === 'details' && selectedGym) {
+    return (
+      <GymDetailsView
+        gym={selectedGym}
+        allGyms={reduxGyms}
+        onBack={() => setCurrentView('list')}
+        onSelectGym={(g) => setSelectedGym(g)}
+        onApprove={handleApproveAll}
+        onReject={() => setIsRejectModalOpen(true)}
+        onStatusChange={(id, status) => dispatch(setGymStatus({ id, status }))}
+      />
+    );
+  }
 
   // =========================================================================
   // VIEW 3: DETAILED CHANGE COMPARISON (SCREEN 3)
@@ -665,6 +525,9 @@ export const GymsManagement = () => {
               <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
                 {selectedGym.name}
               </h1>
+              <Tag color="blue" style={{ fontWeight: 700, fontSize: 13, padding: '2px 8px' }}>
+                {selectedGym.partnerId || selectedGym.gymId || selectedGym.id}
+              </Tag>
               <span
                 style={{
                   padding: '3px 10px',
@@ -676,11 +539,11 @@ export const GymsManagement = () => {
                   border: `1px solid ${isDarkMode ? 'rgba(245, 158, 11, 0.3)' : '#fed7aa'}`,
                 }}
               >
-                Pending Approval
+                {selectedGym.approvalStatus || 'Pending Approval'}
               </span>
             </div>
             <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', marginTop: 4 }}>
-              Requested by <strong style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }}>{selectedGym.requestedBy}</strong> on {selectedGym.requestedOn}
+              Requested by <strong style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }}>{selectedGym.requestedBy || selectedGym.ownerName || 'Gym Partner'}</strong> on {selectedGym.requestedOn || 'Recent'}
             </div>
           </div>
 
@@ -1018,16 +881,26 @@ export const GymsManagement = () => {
 
   const getHeaderBadge = () => {
     switch (currentTab) {
-      case 'pending':
-        return <Badge count={18} style={{ backgroundColor: '#d97706', fontWeight: 800 }} />;
-      case 'approved':
-        return <Badge count={1180} overflowCount={9999} style={{ backgroundColor: '#16a34a', fontWeight: 800 }} />;
-      case 'on_hold':
-        return <Badge count={35} style={{ backgroundColor: '#3b82f6', fontWeight: 800 }} />;
-      case 'rejected':
-        return <Badge count={15} style={{ backgroundColor: '#ef4444', fontWeight: 800 }} />;
-      default:
-        return <Badge count={1248} overflowCount={9999} style={{ backgroundColor: '#4338ca', fontWeight: 800 }} />;
+      case 'pending': {
+        const count = reduxGyms.filter((g) => g.approvalStatus === 'Pending Approval' || g.status === 'Pending' || g.approvalStatus === 'Pending').length;
+        return count > 0 ? <Badge count={count} style={{ backgroundColor: '#d97706', fontWeight: 800 }} /> : null;
+      }
+      case 'approved': {
+        const count = reduxGyms.filter((g) => g.approvalStatus === 'Approved' || g.status === 'Active').length;
+        return count > 0 ? <Badge count={count} overflowCount={9999} style={{ backgroundColor: '#16a34a', fontWeight: 800 }} /> : null;
+      }
+      case 'on_hold': {
+        const count = reduxGyms.filter((g) => g.approvalStatus === 'On Hold' || g.status === 'On Hold' || g.status === 'Inactive').length;
+        return count > 0 ? <Badge count={count} style={{ backgroundColor: '#3b82f6', fontWeight: 800 }} /> : null;
+      }
+      case 'rejected': {
+        const count = reduxGyms.filter((g) => g.approvalStatus === 'Rejected' || g.status === 'Rejected').length;
+        return count > 0 ? <Badge count={count} style={{ backgroundColor: '#ef4444', fontWeight: 800 }} /> : null;
+      }
+      default: {
+        const count = reduxGyms.length;
+        return count > 0 ? <Badge count={count} overflowCount={9999} style={{ backgroundColor: '#4338ca', fontWeight: 800 }} /> : null;
+      }
     }
   };
 
@@ -1049,7 +922,7 @@ export const GymsManagement = () => {
   const getHeaderSubtitle = () => {
     switch (currentTab) {
       case 'pending':
-        return 'Gyms that have requested profile, timing, pricing, or amenity changes and are awaiting your verification.';
+        return 'Gyms that have requested profile, timing, pricing, or amenity changes and are awaiting verification.';
       case 'approved':
         return 'Verified and published gym partners operating live on the Gymezy platform.';
       case 'on_hold':
@@ -1057,7 +930,7 @@ export const GymsManagement = () => {
       case 'rejected':
         return 'Gym listings that did not meet onboarding quality and compliance standards.';
       default:
-        return 'View, search, filter, and manage all 1,248 partner gyms across the nationwide network.';
+        return `View, search, filter, and manage all ${reduxGyms.length} partner gyms across the nationwide network.`;
     }
   };
 
@@ -1293,57 +1166,135 @@ export const GymsManagement = () => {
           /* PENDING APPROVAL TABLE */
           <Table
             dataSource={filteredGyms}
-            rowKey="id"
+            rowKey={(record) => record.id || record._id || String(Math.random())}
             pagination={false}
-            scroll={{ x: 1000 }}
+            scroll={{ x: 1350 }}
             size="middle"
             columns={[
+              {
+                title: 'Partner ID',
+                dataIndex: 'partnerId',
+                key: 'partnerId',
+                width: 110,
+                render: (_, record) => {
+                  const partnerIdDisplay = record.partnerId || record.gymId || record.id;
+                  return (
+                    <span
+                      onClick={() => handleOpenDetails(record)}
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 13,
+                        color: isDarkMode ? '#818cf8' : '#4338ca',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        letterSpacing: '0.3px',
+                      }}
+                    >
+                      {partnerIdDisplay}
+                    </span>
+                  );
+                },
+              },
+              {
+                title: 'Gym Logo',
+                key: 'logo',
+                width: 90,
+                align: 'center',
+                render: (_, record) => {
+                  const logoSrc = getGymLogoSrc(record);
+                  const initials = getGymInitials(record.name);
+                  return (
+                    <div
+                      onClick={() => handleOpenDetails(record)}
+                      style={{ display: 'inline-flex', cursor: 'pointer', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      {logoSrc ? (
+                        <img
+                          src={logoSrc}
+                          alt={record.name || 'Logo'}
+                          style={{
+                            width: 38,
+                            height: 38,
+                            borderRadius: 8,
+                            objectFit: 'cover',
+                            border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                          }}
+                        />
+                      ) : (
+                        <Avatar
+                          shape="square"
+                          size={38}
+                          style={{
+                            backgroundColor: '#4338ca',
+                            color: '#ffffff',
+                            fontWeight: 800,
+                            fontSize: 13,
+                            borderRadius: 8,
+                          }}
+                        >
+                          {initials}
+                        </Avatar>
+                      )}
+                    </div>
+                  );
+                },
+              },
               {
                 title: 'Gym Name',
                 dataIndex: 'name',
                 key: 'name',
-                width: 210,
-                render: (name, record) => (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <img
-                      src={record.image}
-                      alt={name}
-                      style={{ width: 42, height: 42, borderRadius: 8, objectFit: 'cover', cursor: 'pointer' }}
-                      onClick={() => handleOpenDetails(record)}
-                    />
-                    <div>
-                      <div
-                        onClick={() => handleOpenDetails(record)}
-                        style={{
-                          fontWeight: 700,
-                          color: isDarkMode ? '#818cf8' : '#4338ca',
-                          cursor: 'pointer',
-                          textDecoration: 'underline',
-                        }}
-                      >
-                        {name}
-                      </div>
-                      <div style={{ fontSize: 12, color: isDarkMode ? '#888' : '#64748b' }}>
-                        {record.phone}
-                      </div>
-                    </div>
-                  </div>
+                width: 200,
+                render: (name) => (
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      color: isDarkMode ? '#f8fafc' : '#0f172a',
+                      fontSize: 13.5,
+                      lineHeight: '1.4',
+                    }}
+                  >
+                    {name}
+                  </span>
+                ),
+              },
+              {
+                title: 'Phone Number',
+                dataIndex: 'phone',
+                key: 'phone',
+                width: 140,
+                render: (phone) => (
+                  <span style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 500 }}>
+                    {phone || '—'}
+                  </span>
                 ),
               },
               {
                 title: 'Location',
                 dataIndex: 'location',
                 key: 'location',
-                width: 200,
-                render: (loc) => (
-                  <span style={{ color: isDarkMode ? '#d1d5db' : '#334155' }}>{loc}</span>
+                width: 190,
+                render: (_, record) => (
+                  <span
+                    style={{
+                      color: isDarkMode ? '#d1d5db' : '#334155',
+                      fontSize: 13,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      lineHeight: '18px',
+                    }}
+                    title={getGymLocation(record)}
+                  >
+                    {getGymLocation(record)}
+                  </span>
                 ),
               },
               {
                 title: 'Requested By',
                 dataIndex: 'requestedBy',
                 key: 'requestedBy',
-                width: 170,
+                width: 160,
                 render: (req, record) => (
                   <span
                     onClick={() => handleOpenDetails(record)}
@@ -1352,9 +1303,10 @@ export const GymsManagement = () => {
                       color: isDarkMode ? '#e2e8f0' : '#1e293b',
                       cursor: 'pointer',
                       textDecoration: 'underline',
+                      fontSize: 13,
                     }}
                   >
-                    {req}
+                    {req || record.ownerName || 'Gym Partner'}
                   </span>
                 ),
               },
@@ -1362,19 +1314,19 @@ export const GymsManagement = () => {
                 title: 'Requested On',
                 dataIndex: 'requestedOn',
                 key: 'requestedOn',
-                width: 180,
+                width: 150,
                 render: (date) => (
-                  <span style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>{date}</span>
+                  <span style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>{date || 'Recent'}</span>
                 ),
               },
               {
                 title: 'Changes',
                 dataIndex: 'changesCount',
                 key: 'changesCount',
-                width: 130,
+                width: 120,
                 render: (count) => (
                   <Tag color="orange" style={{ fontWeight: 700, borderRadius: 4 }}>
-                    {count} Changes
+                    {count || 1} Changes
                   </Tag>
                 ),
               },
@@ -1392,7 +1344,7 @@ export const GymsManagement = () => {
               {
                 title: 'Action',
                 key: 'action',
-                width: 120,
+                width: 110,
                 align: 'center',
                 fixed: 'right',
                 onCell: () => ({
@@ -1423,41 +1375,106 @@ export const GymsManagement = () => {
           /* ALL / APPROVED / ON-HOLD / REJECTED GYMS TABLE */
           <Table
             dataSource={filteredGyms}
-            rowKey="id"
+            rowKey={(record) => record.id || record._id || String(Math.random())}
             pagination={false}
-            scroll={{ x: 1200 }}
+            scroll={{ x: 1450 }}
             size="middle"
             columns={[
               {
-                title: 'Gym & Contact',
+                title: 'Partner ID',
+                dataIndex: 'partnerId',
+                key: 'partnerId',
+                width: 110,
+                render: (_, record) => {
+                  const partnerIdDisplay = record.partnerId || record.gymId || record.id;
+                  return (
+                    <span
+                      onClick={() => handleOpenDetails(record)}
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 13,
+                        color: isDarkMode ? '#818cf8' : '#4338ca',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        letterSpacing: '0.3px',
+                      }}
+                    >
+                      {partnerIdDisplay}
+                    </span>
+                  );
+                },
+              },
+              {
+                title: 'Gym Logo',
+                key: 'logo',
+                width: 90,
+                align: 'center',
+                render: (_, record) => {
+                  const logoSrc = getGymLogoSrc(record);
+                  const initials = getGymInitials(record.name);
+                  return (
+                    <div
+                      onClick={() => handleOpenDetails(record)}
+                      style={{ display: 'inline-flex', cursor: 'pointer', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      {logoSrc ? (
+                        <img
+                          src={logoSrc}
+                          alt={record.name || 'Logo'}
+                          style={{
+                            width: 38,
+                            height: 38,
+                            borderRadius: 8,
+                            objectFit: 'cover',
+                            border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                          }}
+                        />
+                      ) : (
+                        <Avatar
+                          shape="square"
+                          size={38}
+                          style={{
+                            backgroundColor: '#4338ca',
+                            color: '#ffffff',
+                            fontWeight: 800,
+                            fontSize: 13,
+                            borderRadius: 8,
+                          }}
+                        >
+                          {initials}
+                        </Avatar>
+                      )}
+                    </div>
+                  );
+                },
+              },
+              {
+                title: 'Gym Name',
                 dataIndex: 'name',
                 key: 'name',
-                width: 240,
-                render: (name, record) => (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <img
-                      src={record.image}
-                      alt={name}
-                      style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', cursor: 'pointer' }}
-                      onClick={() => handleOpenDetails(record)}
-                    />
-                    <div>
-                      <div
-                        onClick={() => handleOpenDetails(record)}
-                        style={{
-                          fontWeight: 700,
-                          color: isDarkMode ? '#818cf8' : '#4338ca',
-                          cursor: 'pointer',
-                          textDecoration: 'underline',
-                        }}
-                      >
-                        {name}
-                      </div>
-                      <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
-                        {record.phone}
-                      </div>
-                    </div>
-                  </div>
+                width: 200,
+                render: (name) => (
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      color: isDarkMode ? '#f8fafc' : '#0f172a',
+                      fontSize: 13.5,
+                      lineHeight: '1.4',
+                    }}
+                  >
+                    {name}
+                  </span>
+                ),
+              },
+              {
+                title: 'Phone Number',
+                dataIndex: 'phone',
+                key: 'phone',
+                width: 140,
+                render: (phone) => (
+                  <span style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 500 }}>
+                    {phone || '—'}
+                  </span>
                 ),
               },
               {
@@ -1465,13 +1482,28 @@ export const GymsManagement = () => {
                 dataIndex: 'location',
                 key: 'location',
                 width: 190,
-                render: (loc) => <span style={{ color: isDarkMode ? '#d1d5db' : '#334155' }}>{loc}</span>,
+                render: (_, record) => (
+                  <span
+                    style={{
+                      color: isDarkMode ? '#d1d5db' : '#334155',
+                      fontSize: 13,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      lineHeight: '18px',
+                    }}
+                    title={getGymLocation(record)}
+                  >
+                    {getGymLocation(record)}
+                  </span>
+                ),
               },
               {
                 title: 'Partner / Owner',
                 dataIndex: 'requestedBy',
                 key: 'requestedBy',
-                width: 160,
+                width: 150,
                 render: (owner, record) => (
                   <span
                     onClick={() => handleOpenDetails(record)}
@@ -1480,9 +1512,10 @@ export const GymsManagement = () => {
                       color: isDarkMode ? '#e2e8f0' : '#1e293b',
                       cursor: 'pointer',
                       textDecoration: 'underline',
+                      fontSize: 13,
                     }}
                   >
-                    {owner}
+                    {owner || record.ownerName || 'Gym Partner'}
                   </span>
                 ),
               },
@@ -1497,48 +1530,54 @@ export const GymsManagement = () => {
                   else if (status === 'Pending Approval') color = 'warning';
                   else if (status === 'On Hold') color = 'processing';
                   else if (status === 'Rejected') color = 'error';
-                  return <Tag color={color} style={{ fontWeight: 600 }}>{status}</Tag>;
+                  return <Tag color={color} style={{ fontWeight: 600 }}>{status || 'Approved'}</Tag>;
                 },
               },
               {
                 title: 'Subscription Tier',
                 dataIndex: 'subscriptionType',
                 key: 'subscriptionType',
-                width: 150,
+                width: 140,
                 render: (type) => {
                   let color = 'blue';
                   if (type === 'Hybrid') color = 'purple';
                   else if (type === 'GMS') color = 'cyan';
                   else if (type === 'Listing Only') color = 'default';
-                  return <Tag color={color} style={{ fontWeight: 600 }}>{type}</Tag>;
+                  return <Tag color={color} style={{ fontWeight: 600 }}>{type || 'Hybrid'}</Tag>;
                 },
               },
               {
                 title: 'Monthly GMV',
                 dataIndex: 'monthlyRevenue',
                 key: 'monthlyRevenue',
-                width: 140,
-                render: (rev) => (
-                  <span style={{ fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>
-                    {rev || '₹ 1,50,000'}
-                  </span>
-                ),
+                width: 130,
+                render: (rev) => {
+                  const formatted =
+                    typeof rev === 'number'
+                      ? `₹ ${rev.toLocaleString('en-IN')}`
+                      : rev || '₹ 0';
+                  return (
+                    <span style={{ fontWeight: 700, color: '#16a34a', fontFamily: 'monospace', fontSize: 13 }}>
+                      {formatted}
+                    </span>
+                  );
+                },
               },
               {
                 title: 'Plan Status',
                 dataIndex: 'subscriptionStatus',
                 key: 'subscriptionStatus',
-                width: 130,
+                width: 120,
                 render: (status) => (
-                  <Tag color={status === 'Active' ? 'green' : 'red'} style={{ fontWeight: 600 }}>
-                    {status}
+                  <Tag color={status === 'Active' || !status ? 'green' : 'red'} style={{ fontWeight: 600 }}>
+                    {status || 'Active'}
                   </Tag>
                 ),
               },
               {
                 title: 'Action',
                 key: 'actions',
-                width: 140,
+                width: 120,
                 fixed: 'right',
                 align: 'center',
                 onCell: () => ({
@@ -1582,151 +1621,18 @@ export const GymsManagement = () => {
       {/* 5. Pagination */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>
-          Showing 1 to {filteredGyms.length} of {isPendingView ? '18' : '1,248'} gyms
+          Showing {filteredGyms.length > 0 ? (currentPage - 1) * 10 + 1 : 0} to {Math.min(currentPage * 10, filteredGyms.length)} of {filteredGyms.length} gyms
         </div>
         <Pagination
           current={currentPage}
-          total={isPendingView ? 18 : 1248}
-          pageSize={5}
+          total={filteredGyms.length}
+          pageSize={10}
           onChange={setCurrentPage}
           showSizeChanger={false}
         />
       </div>
 
-      {/* 6. Comprehensive Gym Profile Details Modal */}
-      <Modal
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <ShopOutlined style={{ color: '#4338ca', fontSize: 20 }} />
-            <span>Gym Partner Profile Details</span>
-          </div>
-        }
-        open={isDetailsModalOpen}
-        onCancel={() => setIsDetailsModalOpen(false)}
-        footer={[
-          <Button key="close" onClick={() => setIsDetailsModalOpen(false)}>
-            Close
-          </Button>,
-          detailsGym?.approvalStatus === 'Pending Approval' ? (
-            <Button
-              key="review"
-              type="primary"
-              onClick={() => {
-                setIsDetailsModalOpen(false);
-                handleOpenReview(detailsGym);
-              }}
-              style={{ backgroundColor: '#4338ca', borderColor: '#4338ca' }}
-            >
-              Review Pending Changes →
-            </Button>
-          ) : (
-            <Button
-              key="edit"
-              type="primary"
-              onClick={() => {
-                message.info(`Editing configuration for ${detailsGym?.name}`);
-                setIsDetailsModalOpen(false);
-              }}
-              style={{ backgroundColor: '#4338ca', borderColor: '#4338ca' }}
-            >
-              Edit Partner Settings
-            </Button>
-          ),
-        ]}
-        width={720}
-        centered
-      >
-        {detailsGym && (
-          <div style={{ padding: '12px 0' }}>
-            {/* Top Gym Header Card */}
-            <div
-              style={{
-                display: 'flex',
-                gap: 16,
-                alignItems: 'center',
-                padding: 16,
-                borderRadius: 10,
-                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f8fafc',
-                border: `1px solid ${isDarkMode ? '#222' : '#e2e8f0'}`,
-                marginBottom: 20,
-              }}
-            >
-              <img
-                src={detailsGym.image}
-                alt={detailsGym.name}
-                style={{ width: 72, height: 72, borderRadius: 10, objectFit: 'cover' }}
-              />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{detailsGym.name}</h2>
-                  <Tag color={detailsGym.approvalStatus === 'Approved' ? 'success' : detailsGym.approvalStatus === 'Pending Approval' ? 'warning' : 'blue'}>
-                    {detailsGym.approvalStatus}
-                  </Tag>
-                </div>
-                <div style={{ color: isDarkMode ? '#888' : '#64748b', fontSize: 13, marginBottom: 4 }}>
-                  <EnvironmentOutlined style={{ marginRight: 6 }} />
-                  {detailsGym.location}
-                </div>
-                <div style={{ color: isDarkMode ? '#888' : '#64748b', fontSize: 13 }}>
-                  <PhoneOutlined style={{ marginRight: 6 }} />
-                  {detailsGym.phone}
-                </div>
-              </div>
-            </div>
 
-            {/* Quick Metrics Grid */}
-            <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
-              <Col span={6}>
-                <div style={{ padding: 12, borderRadius: 8, backgroundColor: isDarkMode ? '#141414' : '#f1f5f9', textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: '#888', fontWeight: 600 }}>MEMBERS</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#3b82f6', marginTop: 2 }}>{detailsGym.membersCount || 450}</div>
-                </div>
-              </Col>
-              <Col span={6}>
-                <div style={{ padding: 12, borderRadius: 8, backgroundColor: isDarkMode ? '#141414' : '#f1f5f9', textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: '#888', fontWeight: 600 }}>MONTHLY GMV</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#16a34a', marginTop: 2 }}>{detailsGym.monthlyRevenue || '₹ 1.85L'}</div>
-                </div>
-              </Col>
-              <Col span={6}>
-                <div style={{ padding: 12, borderRadius: 8, backgroundColor: isDarkMode ? '#141414' : '#f1f5f9', textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: '#888', fontWeight: 600 }}>PLAN TIER</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: '#8b5cf6', marginTop: 3 }}>{detailsGym.subscriptionType}</div>
-                </div>
-              </Col>
-              <Col span={6}>
-                <div style={{ padding: 12, borderRadius: 8, backgroundColor: isDarkMode ? '#141414' : '#f1f5f9', textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: '#888', fontWeight: 600 }}>RATING</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#f59e0b', marginTop: 2 }}>★ {detailsGym.rating || 4.8}</div>
-                </div>
-              </Col>
-            </Row>
-
-            {/* Key Information Sections */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <div style={{ padding: 14, borderRadius: 8, border: `1px solid ${isDarkMode ? '#222' : '#e2e8f0'}` }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? '#ccc' : '#334155', marginBottom: 8 }}>
-                  Partner / Contact Person
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 2 }}>{detailsGym.requestedBy}</div>
-                <div style={{ fontSize: 12, color: '#888' }}>Authorized Gym Franchise Owner</div>
-                <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>Last verified on 15 May 2026</div>
-              </div>
-
-              <div style={{ padding: 14, borderRadius: 8, border: `1px solid ${isDarkMode ? '#222' : '#e2e8f0'}` }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? '#ccc' : '#334155', marginBottom: 8 }}>
-                  Platform Status
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-                  <Tag color="success">Listed on App</Tag>
-                  <Tag color="blue">IoT Turnstile Active</Tag>
-                </div>
-                <div style={{ fontSize: 12, color: '#888' }}>Payouts enabled via Razorpay Route</div>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
 
       {/* 7. Fast-Track Quick Add Gym Modal */}
       <Modal

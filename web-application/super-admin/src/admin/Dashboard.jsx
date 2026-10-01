@@ -30,6 +30,7 @@ import {
   FireOutlined,
   SyncOutlined,
   FieldTimeOutlined,
+  StarFilled,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../theme/ThemeContext';
@@ -990,7 +991,7 @@ export const Dashboard = () => {
                           </div>
                         </div>
                       </div>
-                      <Tag color="green">★ {gym.rating || 0}</Tag>
+                      <Tag color="green" icon={<StarFilled style={{ color: '#fbbf24', marginRight: 2 }} />}>{gym.rating || 0}</Tag>
                     </div>
                   ))}
                 </div>

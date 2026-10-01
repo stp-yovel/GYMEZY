@@ -2,6 +2,7 @@ import Gym from '../models/gym.model.js';
 import User from '../models/user.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { ApiResponse } from '../utils/apiResponse.js';
+import { transformListWithIndex } from '../utils/responseTransformer.js';
 
 // Calculate monthly labels for the past 6 months
 const getLast6MonthsLabels = () => {
@@ -109,8 +110,8 @@ export const getDashboardStats = asyncHandler(async (_req, res) => {
     totalAppOpens: 0,
     completedSessions: 0,
     revenueMonthly,
-    topGyms: topGymsList,
-    pendingApprovals: pendingGymsList,
+    topGyms: transformListWithIndex(topGymsList),
+    pendingApprovals: transformListWithIndex(pendingGymsList),
     recentActivities: [],
     systemHealth: {
       apiUptime: 100,
@@ -121,5 +122,7 @@ export const getDashboardStats = asyncHandler(async (_req, res) => {
     },
   };
 
-  return ApiResponse.success(res, 200, 'Dashboard statistics retrieved successfully', responseData);
+  return res.status(200).json(
+    ApiResponse.success(responseData, 'Dashboard statistics retrieved successfully')
+  );
 });

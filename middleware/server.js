@@ -10,21 +10,21 @@ const startServer = async () => {
     await connectDatabase();
 
     server = app.listen(ENV.PORT, () => {
-      console.log(`🚀 GYMEZY API Server running on port ${ENV.PORT} [${ENV.NODE_ENV}]`);
-      console.log(`👉 Health check: http://localhost:${ENV.PORT}/api/v1/health`);
+      console.log(`[SERVER] GYMEZY API Server running on port ${ENV.PORT} [${ENV.NODE_ENV}]`);
+      console.log(`[HEALTH] Health check: http://localhost:${ENV.PORT}/api/v1/health`);
     });
   } catch (error) {
-    console.error('❌ Server failed to start:', error.message);
+    console.error('[SERVER ERROR] Server failed to start:', error.message);
     process.exit(1);
   }
 };
 
 // Graceful shutdown handler
 const handleGracefulShutdown = (signal) => {
-  console.log(`\n🛑 Received ${signal}. Shutting down gracefully...`);
+  console.log(`\n[SHUTDOWN] Received ${signal}. Shutting down gracefully...`);
   if (server) {
     server.close(() => {
-      console.log('🔒 Closed HTTP server connections.');
+      console.log('[SHUTDOWN] Closed HTTP server connections.');
       process.exit(0);
     });
   } else {
