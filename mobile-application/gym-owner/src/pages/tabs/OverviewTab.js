@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,65 +7,93 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeContext';
 import { AppColors } from '../../theme/appTheme';
 import { useAuth } from '../../context/AuthContext';
-
-const RECENT_CHECKINS = [
-  {
-    id: '1',
-    name: 'Rahul Sharma',
-    plan: 'Annual VIP Pass',
-    time: '2 mins ago',
-    type: 'Cardio & Strength',
-    status: 'Active',
-    avatar: 'RS',
-  },
-  {
-    id: '2',
-    name: 'Priya Sundaram',
-    plan: 'Quarterly Pro',
-    time: '14 mins ago',
-    type: 'Yoga / HIIT',
-    status: 'Active',
-    avatar: 'PS',
-  },
-  {
-    id: '3',
-    name: 'Arun Venkatesh',
-    plan: 'Monthly Standard',
-    time: '28 mins ago',
-    type: 'Strength Zone',
-    status: 'Expiring in 3d',
-    avatar: 'AV',
-  },
-  {
-    id: '4',
-    name: 'Deepika Raman',
-    plan: 'Personal Training VIP',
-    time: '45 mins ago',
-    type: 'Trainer 1-on-1',
-    status: 'Active',
-    avatar: 'DR',
-  },
-  {
-    id: '5',
-    name: 'Karthik Raja',
-    plan: 'Annual VIP Pass',
-    time: '1 hour ago',
-    type: 'CrossFit & Cardio',
-    status: 'Active',
-    avatar: 'KR',
-  },
-];
+import { apiService } from '../../services/apiService';
+import { getGymLogoUri } from '../../utils/mediaUtils';
 
 export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
   const { isDark } = useTheme();
-  const { user, gym } = useAuth();
-  const [capacity] = useState(gym?.floorCapacity || 50);
+  const { user, gym, refreshGymProfile } = useAuth();
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [employees, setEmployees] = useState([]);
+
+  // Fetch live employees and refresh gym profile
+  const fetchOverviewData = useCallback(async () => {
+    try {
+      if (refreshGymProfile) {
+        await refreshGymProfile();
+      }
+      const employeeData = await apiService.getEmployees();
+      if (Array.isArray(employeeData)) {
+        setEmployees(employeeData);
+      }
+    } catch (err) {
+      console.warn('Overview data fetch error:', err.message);
+    }
+  }, [refreshGymProfile]);
+
+  useEffect(() => {
+    fetchOverviewData();
+  }, [fetchOverviewData]);
+
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchOverviewData();
+    setIsRefreshing(false);
+  };
+
+  // Gym Initials for Avatar Fallback
+  const gymInitials = useMemo(() => {
+    const name = gym?.name || user?.fullName || 'Gym';
+    return name
+      .split(' ')
+      .filter(Boolean)
+      .map((w) => w[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase() || 'GY';
+  }, [gym?.name, user?.fullName]);
+
+  // Safe Gym Logo URI
+  const logoUri = useMemo(() => getGymLogoUri(gym), [gym]);
+
+  // Dynamic Occupancy & Floor Metrics
+  const floorCapacity = Number(gym?.floorCapacity || gym?.capacity || 100);
+  const liveOccupancy = Number(gym?.liveOccupancy !== undefined ? gym.liveOccupancy : 0);
+  const occupancyPercent = Math.min(100, Math.round((liveOccupancy / floorCapacity) * 100));
+
+  // Dynamic Live Key Metrics
+  const activeMembersCount = Number(
+    gym?.activeMembersCount !== undefined
+      ? gym.activeMembersCount
+      : Array.isArray(gym?.members)
+      ? gym.members.length
+      : 0
+  );
+  const todayCheckinsCount = Number(gym?.todayCheckinsCount !== undefined ? gym.todayCheckinsCount : 0);
+  const monthlyRevenue = Number(gym?.monthlyRevenue !== undefined ? gym.monthlyRevenue : gym?.totalRevenue || 0);
+  const formattedRevenue =
+    monthlyRevenue >= 100000
+      ? `₹${(monthlyRevenue / 100000).toFixed(2)}L`
+      : `₹${monthlyRevenue.toLocaleString('en-IN')}`;
+  const expiringSoonCount = Number(gym?.expiringMembersCount !== undefined ? gym.expiringMembersCount : 0);
+
+  // Dynamic Staff Attendance Counts
+  const totalStaff = employees.length;
+  const presentStaff = employees.filter(
+    (e) => e.status === 'Active' || e.attendance === 'Present' || e.attendance === 'Checked In'
+  ).length;
+  const absentStaff = Math.max(0, totalStaff - presentStaff);
+
+  // Live Member Check-ins
+  const liveCheckins = Array.isArray(gym?.recentCheckins) ? gym.recentCheckins : [];
 
   return (
     <ScrollView
@@ -77,8 +105,16 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
         },
       ]}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={onRefresh}
+          colors={[AppColors.primaryColor]}
+          tintColor={AppColors.primaryColor}
+        />
+      }
     >
-      {/* 1. Clean Top Header: Gym Name, Partner ID & Notification Badge (NO theme or logout here) */}
+      {/* 1. Top Header: Gym Logo, Gym Name, Location & Notifications */}
       <View style={styles.topHeader}>
         <View style={styles.gymProfile}>
           <View
@@ -90,19 +126,26 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
               },
             ]}
           >
-            <Image
-              source={require('../../../assets/logo/gymezy.png')}
-              style={styles.gymLogo}
-              resizeMode="contain"
-            />
+            {logoUri ? (
+              <Image
+                source={{ uri: logoUri }}
+                style={styles.gymLogo}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[styles.gymInitialBadge, { backgroundColor: AppColors.primaryColor }]}>
+                <Text style={styles.gymInitialText}>{gymInitials}</Text>
+              </View>
+            )}
           </View>
-          <View>
+          <View style={styles.gymInfoBox}>
             <View style={styles.gymNameRow}>
               <Text
                 style={[
                   styles.gymName,
                   { color: isDark ? '#FFFFFF' : '#0F172A' },
                 ]}
+                numberOfLines={1}
               >
                 {gym?.name || user?.fullName || 'Gym Facility'}
               </Text>
@@ -115,13 +158,18 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
                 styles.gymLocation,
                 { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' },
               ]}
+              numberOfLines={1}
             >
-              {gym?.city ? (gym?.area ? `${gym.area}, ${gym.city}` : gym.city) : gym?.fullAddress || 'Partner Location'}
+              {gym?.city
+                ? gym?.area
+                  ? `${gym.area}, ${gym.city}`
+                  : gym.city
+                : gym?.fullAddress || 'Partner Location'}
             </Text>
           </View>
         </View>
 
-        {/* Notifications Icon Button with live badge */}
+        {/* Notifications Icon Button */}
         <TouchableOpacity
           style={[
             styles.notifBtn,
@@ -132,8 +180,8 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
           ]}
           onPress={() =>
             Alert.alert(
-              'Partner Notifications',
-              '• 3 new members registered today\n• Monthly settlement ₹1.85L processed\n• 12 memberships expiring this week'
+              `${gym?.name || 'Gym'} Notifications`,
+              `• Super Admin Status: ${gym?.approvalStatus || 'Approved'}\n• Staff Registered: ${totalStaff} staff members\n• Active Platform Plans: ${(gym?.pricingPlans ? Object.keys(gym.pricingPlans).length : 0)} configured`
             )
           }
           activeOpacity={0.8}
@@ -168,7 +216,7 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
               { color: isDark ? '#FFFFFF' : '#0F172A' },
             ]}
           >
-            {capacity} <Text style={styles.capacityTotal}>/ 100 slots</Text>
+            {liveOccupancy} <Text style={styles.capacityTotal}>/ {floorCapacity} slots</Text>
           </Text>
         </View>
         <View
@@ -181,8 +229,9 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
             style={[
               styles.capacityFill,
               {
-                width: `${capacity}%`,
-                backgroundColor: capacity > 80 ? AppColors.dangerRed : AppColors.secondaryColor,
+                width: `${occupancyPercent}%`,
+                backgroundColor:
+                  occupancyPercent > 80 ? AppColors.dangerRed : AppColors.secondaryColor,
               },
             ]}
           />
@@ -194,7 +243,9 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
               { color: isDark ? 'rgba(255,255,255,0.55)' : '#64748B' },
             ]}
           >
-            Moderate floor load • Safe capacity limit is 100 concurrent members
+            {occupancyPercent === 0
+              ? `Floor available • Safe capacity limit is ${floorCapacity} concurrent members`
+              : `Current floor load is ${occupancyPercent}% of safe capacity limit (${floorCapacity} members)`}
           </Text>
         </View>
       </View>
@@ -226,7 +277,7 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
               { color: isDark ? '#FFFFFF' : '#0F172A' },
             ]}
           >
-            248
+            {activeMembersCount}
           </Text>
           <Text
             style={[
@@ -263,7 +314,7 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
               { color: isDark ? '#FFFFFF' : '#0F172A' },
             ]}
           >
-            64
+            {todayCheckinsCount}
           </Text>
           <Text
             style={[
@@ -298,7 +349,7 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
               { color: isDark ? '#FFFFFF' : '#0F172A' },
             ]}
           >
-            ₹1.85L
+            {formattedRevenue}
           </Text>
           <Text
             style={[
@@ -333,7 +384,7 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
               { color: isDark ? '#FFFFFF' : '#0F172A' },
             ]}
           >
-            12
+            {expiringSoonCount}
           </Text>
           <Text
             style={[
@@ -401,7 +452,9 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
               Staff & Trainer Attendance
             </Text>
             <Text style={[styles.staffQuickSub, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-              18 / 28 Present Today • 7 Absent
+              {totalStaff > 0
+                ? `${presentStaff} / ${totalStaff} Present Today • ${absentStaff} Absent`
+                : '0 Staff Configured • Tap to Manage Staff'}
             </Text>
           </View>
         </View>
@@ -432,69 +485,103 @@ export const OverviewTab = ({ topInset, navigation, onNavigateToMembers }) => {
           },
         ]}
       >
-        {RECENT_CHECKINS.map((item, index) => (
-          <View
-            key={item.id}
-            style={[
-              styles.checkinRow,
-              index < RECENT_CHECKINS.length - 1 && [
-                styles.checkinBorder,
-                { borderColor: isDark ? AppColors.darkBorder : '#F1F5F9' },
-              ],
-            ]}
-          >
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{item.avatar}</Text>
-            </View>
+        {liveCheckins.length > 0 ? (
+          liveCheckins.map((item, index) => (
+            <View
+              key={item.id || index}
+              style={[
+                styles.checkinRow,
+                index < liveCheckins.length - 1 && [
+                  styles.checkinBorder,
+                  { borderColor: isDark ? AppColors.darkBorder : '#F1F5F9' },
+                ],
+              ]}
+            >
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarText}>
+                  {item.avatar ||
+                    (item.name
+                      ? item.name
+                          .split(' ')
+                          .map((p) => p[0])
+                          .join('')
+                          .substring(0, 2)
+                          .toUpperCase()
+                      : 'MB')}
+                </Text>
+              </View>
 
-            <View style={styles.checkinInfo}>
-              <Text
-                style={[
-                  styles.checkinName,
-                  { color: isDark ? '#FFFFFF' : '#0F172A' },
-                ]}
-              >
-                {item.name}
-              </Text>
-              <Text
-                style={[
-                  styles.checkinMeta,
-                  { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' },
-                ]}
-              >
-                {item.plan} • {item.type}
-              </Text>
-            </View>
+              <View style={styles.checkinInfo}>
+                <Text
+                  style={[
+                    styles.checkinName,
+                    { color: isDark ? '#FFFFFF' : '#0F172A' },
+                  ]}
+                >
+                  {item.name || 'Member'}
+                </Text>
+                <Text
+                  style={[
+                    styles.checkinMeta,
+                    { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' },
+                  ]}
+                >
+                  {item.plan || 'Standard Pass'} • {item.type || 'Workout'}
+                </Text>
+              </View>
 
-            <View style={styles.checkinStatusBox}>
-              <Text
-                style={[
-                  styles.checkinStatusBadge,
-                  {
-                    color:
-                      item.status === 'Active'
-                        ? AppColors.secondaryColor
-                        : AppColors.warningAmber,
-                    backgroundColor:
-                      item.status === 'Active'
-                        ? 'rgba(0, 191, 98, 0.12)'
-                        : 'rgba(245, 158, 11, 0.12)',
-                  },
-                ]}
-              >
-                {item.status}
-              </Text>
-              <Text
-                style={[
-                  styles.checkinTime,
-                  { color: isDark ? 'rgba(255,255,255,0.45)' : '#94A3B8' },
-                ]}
-              >
-                {item.time}
-              </Text>
+              <View style={styles.checkinStatusBox}>
+                <Text
+                  style={[
+                    styles.checkinStatusBadge,
+                    {
+                      color:
+                        item.status === 'Active'
+                          ? AppColors.secondaryColor
+                          : AppColors.warningAmber,
+                      backgroundColor:
+                        item.status === 'Active'
+                          ? 'rgba(0, 191, 98, 0.12)'
+                          : 'rgba(245, 158, 11, 0.12)',
+                    },
+                  ]}
+                >
+                  {item.status || 'Active'}
+                </Text>
+                <Text
+                  style={[
+                    styles.checkinTime,
+                    { color: isDark ? 'rgba(255,255,255,0.45)' : '#94A3B8' },
+                  ]}
+                >
+                  {item.time || 'Just now'}
+                </Text>
+              </View>
             </View>
+          ))
+        ) : (
+          <View style={styles.emptyCheckinsBox}>
+            <MaterialIcons
+              name="qr-code-scanner"
+              size={32}
+              color={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
+            />
+            <Text style={[styles.emptyCheckinsTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+              No Check-ins Recorded Today
+            </Text>
+            <Text style={[styles.emptyCheckinsSub, { color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }]}>
+              Members checking in via QR scan or check-in verification will appear here in real-time.
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyScanBtn}
+              onPress={() => navigation?.navigate('CheckIn', { initialMode: 'QR' })}
+              activeOpacity={0.88}
+            >
+              <MaterialIcons name="qr-code" size={18} color="#FFFFFF" />
+              <Text style={styles.emptyScanBtnText}>Scan Member Entry</Text>
+            </TouchableOpacity>
           </View>
-        ))}
+        )}
       </View>
     </ScrollView>
   );
@@ -517,18 +604,32 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   gymLogoWrapper: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 6,
     overflow: 'hidden',
   },
   gymLogo: {
     width: '100%',
     height: '100%',
+  },
+  gymInitialBadge: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gymInitialText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  gymInfoBox: {
+    flex: 1,
   },
   gymNameRow: {
     flexDirection: 'row',
@@ -556,6 +657,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    marginLeft: 8,
   },
   notifDot: {
     position: 'absolute',
@@ -720,7 +822,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     paddingHorizontal: 16,
-    paddingVertical: 4,
+    paddingVertical: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -812,5 +914,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     marginTop: 2,
+  },
+  emptyCheckinsBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  emptyCheckinsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  emptyCheckinsSub: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  emptyScanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: AppColors.primaryColor,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  emptyScanBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

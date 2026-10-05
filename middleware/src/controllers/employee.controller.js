@@ -1,0 +1,617 @@
+import { Employee } from '../models/employee.model.js';
+import { Gym } from '../models/gym.model.js';
+import { ApiError } from '../utils/apiError.js';
+import { ApiResponse } from '../utils/apiResponse.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { USER_ROLES } from '../models/user.model.js';
+
+/**
+ * Calculate precise field-level differences between previous and updated objects
+ */
+const calculateFieldDiff = (previous, updated) => {
+  const diff = {};
+  const ignoredKeys = new Set(['_id', 'id', 'key', 'updatedAt', 'createdAt', 'auditHistory', '__v']);
+
+  Object.keys(updated).forEach((key) => {
+    if (ignoredKeys.has(key)) return;
+    const oldVal = previous[key];
+    const newVal = updated[key];
+
+    if (JSON.stringify(oldVal) !== JSON.stringify(newVal) && newVal !== undefined) {
+      diff[key] = {
+        oldValue: oldVal !== undefined ? oldVal : null,
+        newValue: newVal,
+      };
+    }
+  });
+
+  return diff;
+};
+
+/**
+ * Resolve Gym ID and Partner ID for employee operation
+ */
+const resolveGymContext = async (req, gymIdInput, gymPartnerIdInput) => {
+  let gym = null;
+
+  try {
+    if (gymIdInput && typeof gymIdInput === 'string' && gymIdInput.match(/^[0-9a-fA-F]{24}$/)) {
+      gym = await Gym.findById(gymIdInput);
+    }
+    if (!gym && (gymPartnerIdInput || gymIdInput)) {
+      gym = await Gym.findOne({
+        $or: [
+          { partnerId: gymPartnerIdInput || gymIdInput },
+          { _id: gymIdInput && gymIdInput.match(/^[0-9a-fA-F]{24}$/) ? gymIdInput : null },
+        ].filter(Boolean),
+      });
+    }
+    if (!gym && req.user?.gymId && String(req.user.gymId).match(/^[0-9a-fA-F]{24}$/)) {
+      gym = await Gym.findById(req.user.gymId);
+    }
+    if (!gym && req.user?.userId) {
+      gym = await Gym.findOne({
+        $or: [
+          { ownerId: req.user.userId },
+          { userId: req.user.userId },
+          { email: req.user.email },
+        ],
+      });
+    }
+  } catch {
+    // Non-critical error during DB query
+  }
+
+  if (gym) {
+    return {
+      gymId: gym._id,
+      gymPartnerId: gym.partnerId || `GYM${String(gym._id).slice(-4).toUpperCase()}`,
+      gymName: gym.name,
+    };
+  }
+
+  // Graceful fallback when gym record is passed from request context
+  if (gymIdInput || gymPartnerIdInput || req.body?.gymName || req.user?.gymName) {
+    return {
+      gymId: gymIdInput || req.user?.gymId || req.user?.userId || 'GYM_DIRECT',
+      gymPartnerId: gymPartnerIdInput || (typeof gymIdInput === 'string' && !gymIdInput.match(/^[0-9a-fA-F]{24}$/) ? gymIdInput : 'GP-ACTIVE'),
+      gymName: req.body?.gymName || req.user?.gymName || 'Fitness Center',
+    };
+  }
+
+  throw ApiError.badRequest('Unable to identify gym association. Please provide a valid Gym ID or Partner ID.');
+};
+
+/**
+ * Generate sequential Employee / Trainer ID strictly isolated per Gym
+ * Format: TR001, TR002 for Trainers; EMP001, EMP002 for other staff.
+ * Scoped strictly to the specific gym (gymId / gymPartnerId) and calculates the highest
+ * existing sequence number so numbering never clashes across gyms or gets messed up by deletions/roles.
+ */
+const generateSequentialEmpId = async (gymId, gymPartnerId, role) => {
+  const rolePrefix = role?.toLowerCase().includes('trainer') ? 'TR' : 'EMP';
+  const prefixRegex = new RegExp(`^${rolePrefix}(\\d+)$`, 'i');
+
+  const gymFilters = [];
+  if (gymId) gymFilters.push({ gymId });
+  if (gymPartnerId) gymFilters.push({ gymPartnerId });
+
+  // Query all employees belonging strictly to this gym
+  const existingEmployees = await Employee.find(
+    gymFilters.length > 0 ? { $or: gymFilters } : {},
+    { employeeId: 1 }
+  ).lean();
+
+  let maxNum = 0;
+  for (const emp of existingEmployees) {
+    if (emp.employeeId) {
+      const match = String(emp.employeeId).match(prefixRegex);
+      if (match && match[1]) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+  }
+
+  const nextSeq = maxNum + 1;
+  return `${rolePrefix}${String(nextSeq).padStart(3, '0')}`;
+};
+
+/**
+ * Create a new employee / trainer
+ * Route: POST /api/v1/employees
+ */
+export const createEmployee = asyncHandler(async (req, res) => {
+  const {
+    gymId: inputGymId,
+    gymPartnerId: inputPartnerId,
+    name,
+    role,
+    phone,
+    email,
+    avatar,
+    gender,
+    joinDate,
+    type,
+    accessType,
+    status,
+    attendance,
+    specialty,
+    experienceYears,
+    previousCompany,
+    previousDesignation,
+    previousExp,
+    emergencyContact,
+    schedule,
+    compensation,
+    notes,
+    documents,
+    trainerCerts,
+  } = req.body;
+
+  if (!name) {
+    throw ApiError.badRequest('Employee name is required.');
+  }
+
+  const { gymId, gymPartnerId, gymName } = await resolveGymContext(req, inputGymId, inputPartnerId);
+
+  // Generate sequential Employee / Trainer ID strictly isolated for this Gym
+  const generatedEmpId = await generateSequentialEmpId(gymId, gymPartnerId, role);
+
+  const isSuperAdmin = req.user?.role === USER_ROLES.SUPER_ADMIN;
+  const initialApprovalStatus = isSuperAdmin ? 'Approved' : 'Pending Approval';
+
+  const newEmployeeData = {
+    gymId,
+    gymPartnerId,
+    gymName,
+    employeeId: req.body.employeeId || generatedEmpId,
+    name: name.trim(),
+    role: role || 'Trainer',
+    phone: phone || '',
+    email: email ? email.trim().toLowerCase() : '',
+    avatar: avatar || '',
+    gender: gender || 'All',
+    joinDate: joinDate || new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    type: type || 'Full-Time',
+    accessType: accessType || 'Employee',
+    status: status || 'Active',
+    attendance: attendance || 'Present',
+    approvalStatus: initialApprovalStatus,
+    pendingAction: isSuperAdmin ? 'NONE' : 'NEW_EMPLOYEE',
+    specialty: specialty || '',
+    experienceYears: Number(experienceYears) || 1,
+    previousCompany: previousCompany || '',
+    previousDesignation: previousDesignation || '',
+    previousExp: previousExp || '',
+    emergencyContact: emergencyContact || {},
+    schedule: schedule || {},
+    compensation: compensation || {},
+    notes: notes || '',
+    documents: Array.isArray(documents) ? documents : [],
+    trainerCerts: Array.isArray(trainerCerts) ? trainerCerts : [],
+    approvedBy: isSuperAdmin ? req.user.email : '',
+    approvedAt: isSuperAdmin ? new Date() : null,
+  };
+
+  // Build initial Audit History Entry (clean non-circular snapshot)
+  const cleanSnapshot = { ...newEmployeeData };
+
+  const initialAuditLog = {
+    changeType: 'ADD_EMPLOYEE',
+    changedBy: req.user?.fullName || req.user?.name || req.user?.email || 'Gym Owner',
+    changedByRole: req.user?.role || 'GYM_OWNER',
+    changedAt: new Date(),
+    gymId,
+    gymPartnerId,
+    gymName,
+    editedFields: {
+      initialCreation: {
+        oldValue: null,
+        newValue: `Created ${newEmployeeData.role} (${newEmployeeData.name})`,
+      },
+    },
+    previousSnapshot: null,
+    newSnapshot: cleanSnapshot,
+    approvalStatus: initialApprovalStatus,
+    reviewedBy: isSuperAdmin ? req.user.email : '',
+    reviewedAt: isSuperAdmin ? new Date() : null,
+  };
+
+  newEmployeeData.auditHistory = [initialAuditLog];
+
+  const createdEmployee = await Employee.create(newEmployeeData);
+
+  return res.status(201).json(
+    ApiResponse.created(
+      createdEmployee,
+      isSuperAdmin
+        ? 'Employee created and auto-approved successfully.'
+        : 'Employee submitted successfully. Pending approval by Super Admin.'
+    )
+  );
+});
+
+/**
+ * Get all employees with filtering and server-side pagination
+ * Route: GET /api/v1/employees
+ */
+export const getEmployees = asyncHandler(async (req, res) => {
+  const {
+    gymId,
+    gymPartnerId,
+    role,
+    approvalStatus,
+    status,
+    search,
+    page = 1,
+    limit = 8,
+    pageSize,
+  } = req.query;
+  const andConditions = [];
+
+  const targetIdentifier = gymId || gymPartnerId;
+  if (targetIdentifier) {
+    let matchingGym = null;
+    try {
+      if (typeof targetIdentifier === 'string' && targetIdentifier.match(/^[0-9a-fA-F]{24}$/)) {
+        matchingGym = await Gym.findById(targetIdentifier);
+      }
+      if (!matchingGym) {
+        matchingGym = await Gym.findOne({ partnerId: targetIdentifier });
+      }
+    } catch {
+      // Non-critical
+    }
+
+    const orConditions = [
+      { gymPartnerId: targetIdentifier },
+      { gymId: targetIdentifier },
+    ];
+    if (matchingGym) {
+      orConditions.push({ gymId: matchingGym._id });
+      if (matchingGym.partnerId) {
+        orConditions.push({ gymPartnerId: matchingGym.partnerId });
+      }
+    }
+
+    andConditions.push({ $or: orConditions });
+  } else if (req.user?.role === USER_ROLES.GYM_OWNER) {
+    const ownerGym = await Gym.findOne({
+      $or: [
+        { ownerId: req.user._id || req.user.userId },
+        { userId: req.user._id || req.user.userId },
+        { email: req.user.email },
+      ].filter(Boolean),
+    });
+    if (ownerGym) {
+      andConditions.push({
+        $or: [
+          { gymId: ownerGym._id },
+          { gymPartnerId: ownerGym.partnerId },
+        ],
+      });
+    }
+  }
+
+  if (role && role !== 'ALL') andConditions.push({ role });
+  if (approvalStatus && approvalStatus !== 'ALL') andConditions.push({ approvalStatus });
+  if (status && status !== 'ALL') andConditions.push({ status });
+
+  if (search) {
+    const regex = new RegExp(search.trim(), 'i');
+    andConditions.push({
+      $or: [{ name: regex }, { phone: regex }, { email: regex }, { employeeId: regex }],
+    });
+  }
+
+  const finalFilter = andConditions.length > 0 ? { $and: andConditions } : {};
+
+  // Count total matching records in database
+  const totalEmployees = await Employee.countDocuments(finalFilter);
+
+  // Pagination calculations
+  const rawLimit = pageSize || limit;
+  const isFetchAll = rawLimit === 'all' || rawLimit === '0';
+  const parsedLimit = isFetchAll ? 0 : Math.max(1, Number.parseInt(rawLimit, 10) || 8);
+  const parsedPage = Math.max(1, Number.parseInt(page, 10) || 1);
+  const skip = parsedLimit > 0 ? (parsedPage - 1) * parsedLimit : 0;
+  const totalPages = parsedLimit > 0 ? Math.ceil(totalEmployees / parsedLimit) : 1;
+
+  let query = Employee.find(finalFilter).sort({ createdAt: -1 });
+  if (parsedLimit > 0) {
+    query = query.skip(skip).limit(parsedLimit);
+  }
+
+  const employees = await query;
+
+  return res.status(200).json(
+    ApiResponse.success(
+      {
+        employees,
+        pagination: {
+          total: totalEmployees,
+          page: parsedPage,
+          limit: parsedLimit || totalEmployees,
+          totalPages,
+          hasNextPage: parsedPage < totalPages,
+          hasPrevPage: parsedPage > 1,
+        },
+        count: employees.length,
+        total: totalEmployees,
+        totalPages,
+        currentPage: parsedPage,
+        pageSize: parsedLimit || totalEmployees,
+      },
+      'Employees retrieved successfully.'
+    )
+  );
+});
+
+/**
+ * Get all pending approvals across gyms for Super Admin
+ * Route: GET /api/v1/employees/approvals
+ */
+export const getPendingApprovals = asyncHandler(async (req, res) => {
+  const { gymId, gymPartnerId } = req.query;
+  const andConditions = [{ approvalStatus: 'Pending Approval' }];
+
+  const targetIdentifier = gymId || gymPartnerId;
+  if (targetIdentifier) {
+    let matchingGym = null;
+    try {
+      if (typeof targetIdentifier === 'string' && targetIdentifier.match(/^[0-9a-fA-F]{24}$/)) {
+        matchingGym = await Gym.findById(targetIdentifier);
+      }
+      if (!matchingGym) {
+        matchingGym = await Gym.findOne({ partnerId: targetIdentifier });
+      }
+    } catch {
+      // Non-critical
+    }
+
+    const orConditions = [
+      { gymPartnerId: targetIdentifier },
+      { gymId: targetIdentifier },
+    ];
+    if (matchingGym) {
+      orConditions.push({ gymId: matchingGym._id });
+      if (matchingGym.partnerId) {
+        orConditions.push({ gymPartnerId: matchingGym.partnerId });
+      }
+    }
+    andConditions.push({ $or: orConditions });
+  }
+
+  const pendingEmployees = await Employee.find({ $and: andConditions })
+    .sort({ updatedAt: -1 });
+
+  return res.status(200).json(
+    ApiResponse.success(
+      {
+        count: pendingEmployees.length,
+        pendingApprovals: pendingEmployees,
+      },
+      'Pending employee approvals retrieved.'
+    )
+  );
+});
+
+/**
+ * Edit employee details with field diff & audit logging
+ * Route: PUT /api/v1/employees/:id
+ */
+export const updateEmployee = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const employee = await Employee.findById(id);
+
+  if (!employee) {
+    throw ApiError.notFound('Employee not found.');
+  }
+
+  const isSuperAdmin = req.user?.role === USER_ROLES.SUPER_ADMIN;
+  const previousSnapshot = employee.toObject();
+
+  const allowedUpdates = [
+    'name',
+    'role',
+    'phone',
+    'email',
+    'avatar',
+    'gender',
+    'type',
+    'accessType',
+    'status',
+    'attendance',
+    'specialty',
+    'experienceYears',
+    'previousCompany',
+    'previousDesignation',
+    'previousExp',
+    'emergencyContact',
+    'schedule',
+    'compensation',
+    'notes',
+    'documents',
+    'trainerCerts',
+  ];
+
+  const updatedFieldsPayload = {};
+  allowedUpdates.forEach((field) => {
+    if (req.body[field] !== undefined) {
+      updatedFieldsPayload[field] = req.body[field];
+    }
+  });
+
+  // Calculate detailed diff of changed fields
+  const editedDiff = calculateFieldDiff(previousSnapshot, updatedFieldsPayload);
+
+  if (Object.keys(editedDiff).length === 0) {
+    return res.status(200).json(ApiResponse.success(employee, 'No changes detected.'));
+  }
+
+  const changedByName = req.user?.fullName || req.user?.name || req.user?.email || 'Gym Owner';
+
+  if (isSuperAdmin) {
+    // Super Admin direct update: instantly apply changes
+    Object.assign(employee, updatedFieldsPayload);
+    employee.approvalStatus = 'Approved';
+    employee.pendingAction = 'NONE';
+    employee.pendingChanges = null;
+    employee.approvedBy = req.user.email;
+    employee.approvedAt = new Date();
+
+    employee.auditHistory.push({
+      changeType: 'EDIT_EMPLOYEE',
+      changedBy: changedByName,
+      changedByRole: req.user.role,
+      changedAt: new Date(),
+      gymId: employee.gymId,
+      gymPartnerId: employee.gymPartnerId,
+      gymName: employee.gymName,
+      editedFields: editedDiff,
+      previousSnapshot,
+      newSnapshot: employee.toObject(),
+      approvalStatus: 'Approved',
+      reviewedBy: req.user.email,
+      reviewedAt: new Date(),
+    });
+  } else {
+    // Gym Owner update: record proposed changes and set to Pending Approval
+    const onlyChangedFields = {};
+    Object.entries(editedDiff).forEach(([field, diffItem]) => {
+      onlyChangedFields[field] = diffItem.newValue;
+    });
+
+    employee.approvalStatus = 'Pending Approval';
+    employee.pendingAction = 'EDIT_DETAILS';
+    employee.pendingChanges = onlyChangedFields;
+
+    employee.auditHistory.push({
+      changeType: 'EDIT_EMPLOYEE',
+      changedBy: changedByName,
+      changedByRole: 'GYM_OWNER',
+      changedAt: new Date(),
+      gymId: employee.gymId,
+      gymPartnerId: employee.gymPartnerId,
+      gymName: employee.gymName,
+      editedFields: editedDiff,
+      previousSnapshot,
+      newSnapshot: onlyChangedFields,
+      approvalStatus: 'Pending Approval',
+    });
+  }
+
+  await employee.save();
+
+  return res.status(200).json(
+    ApiResponse.success(
+      employee,
+      isSuperAdmin
+        ? 'Employee details updated and approved.'
+        : 'Employee edits submitted successfully. Pending Super Admin approval.'
+    )
+  );
+});
+
+/**
+ * Super Admin Decision Engine: Approve or Reject Employee addition / edit
+ * Route: PATCH /api/v1/employees/:id/approval
+ */
+export const reviewEmployeeApproval = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { decision, adminRemarks } = req.body; // decision: 'Approved' | 'Rejected'
+
+  if (!decision || !['Approved', 'Rejected'].includes(decision)) {
+    throw ApiError.badRequest('Decision must be either "Approved" or "Rejected".');
+  }
+
+  const employee = await Employee.findById(id);
+
+  if (!employee) {
+    throw ApiError.notFound('Employee not found.');
+  }
+
+  const reviewerName = req.user?.fullName || req.user?.name || req.user?.email || 'Super Admin';
+
+  if (decision === 'Approved') {
+    if (employee.pendingChanges && typeof employee.pendingChanges === 'object') {
+      Object.assign(employee, employee.pendingChanges);
+      employee.pendingChanges = null;
+    }
+    employee.approvalStatus = 'Approved';
+    employee.pendingAction = 'NONE';
+    employee.approvedBy = reviewerName;
+    employee.approvedAt = new Date();
+    employee.adminRemarks = adminRemarks || 'Approved by Super Administrator';
+  } else {
+    employee.approvalStatus = 'Rejected';
+    employee.pendingAction = 'NONE';
+    employee.pendingChanges = null;
+    employee.adminRemarks = adminRemarks || 'Rejected during Super Admin inspection';
+  }
+
+  // Update latest audit history record
+  if (employee.auditHistory && employee.auditHistory.length > 0) {
+    const latestAudit = employee.auditHistory[employee.auditHistory.length - 1];
+    latestAudit.approvalStatus = decision;
+    latestAudit.adminRemarks = employee.adminRemarks;
+    latestAudit.reviewedBy = reviewerName;
+    latestAudit.reviewedAt = new Date();
+  }
+
+  await employee.save();
+
+  return res.status(200).json(
+    ApiResponse.success(
+      employee,
+      `Employee request has been ${decision.toLowerCase()} successfully.`
+    )
+  );
+});
+
+/**
+ * Deactivate or Delete an Employee
+ * Route: DELETE /api/v1/employees/:id
+ */
+export const deleteEmployee = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const employee = await Employee.findById(id);
+
+  if (!employee) {
+    throw ApiError.notFound('Employee not found.');
+  }
+
+  const isSuperAdmin = req.user?.role === USER_ROLES.SUPER_ADMIN;
+
+  if (isSuperAdmin) {
+    await Employee.findByIdAndDelete(id);
+    return res.status(200).json(ApiResponse.success(null, 'Employee deleted permanently.'));
+  }
+
+  // If Gym Owner: marks as Inactive and creates deactivation audit record
+  employee.status = 'Inactive';
+  employee.attendance = '—';
+  employee.approvalStatus = 'Pending Approval';
+  employee.pendingAction = 'DEACTIVATION';
+
+  employee.auditHistory.push({
+    changeType: 'DEACTIVATE_EMPLOYEE',
+    changedBy: req.user?.fullName || req.user?.name || req.user?.email || 'Gym Owner',
+    changedByRole: 'GYM_OWNER',
+    changedAt: new Date(),
+    gymId: employee.gymId,
+    gymPartnerId: employee.gymPartnerId,
+    gymName: employee.gymName,
+    editedFields: { status: { oldValue: 'Active', newValue: 'Inactive' } },
+    approvalStatus: 'Pending Approval',
+  });
+
+  await employee.save();
+
+  return res.status(200).json(
+    ApiResponse.success(employee, 'Employee deactivation requested. Pending Super Admin approval.')
+  );
+});

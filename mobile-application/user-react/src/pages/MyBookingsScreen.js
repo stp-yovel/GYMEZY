@@ -14,7 +14,6 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors, AppTheme } from '../theme/appTheme';
 import { useBookingRepository } from '../data/BookingContext';
-import { MockData } from '../data/mockData';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -33,17 +32,12 @@ export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
 
   const filteredBookings = bookings.filter((b) => b.status === selectedTab);
 
-  const bookNewSession = (category = 'Gym') => {
-    const defaultGym = MockData.gyms[0];
-    navigation.navigate('BookingSession', {
-      gym: defaultGym,
-      initialCategory: category,
-    });
+  const bookNewSession = (_category = 'Gym') => {
+    navigation.navigate('HomeTabs');
   };
 
   const buyMembership = () => {
-    const defaultGym = MockData.gyms[0];
-    navigation.navigate('BuyMembership', { gym: defaultGym });
+    navigation.navigate('HomeTabs');
   };
 
   const openBookingDetails = (booking) => {

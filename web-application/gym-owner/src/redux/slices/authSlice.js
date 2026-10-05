@@ -51,6 +51,37 @@ export const loginUser = createAsyncThunk(
   }
 );
 
+export const refreshCurrentUser = createAsyncThunk(
+  'auth/refreshCurrentUser',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.get('/auth/me');
+      const responseData = response.data?.data || response.data || {};
+      const userRole = responseData.role || 'GYM_OWNER';
+
+      const user = {
+        id: responseData.id || responseData._id,
+        name: responseData.fullName || responseData.name,
+        fullName: responseData.fullName || responseData.name,
+        email: responseData.email,
+        phone: responseData.phone,
+        role: userRole,
+        gymId: responseData.gym?.id || responseData.gymId,
+        gymName: responseData.gym?.name || responseData.gymName || 'My Gym',
+        branch: responseData.gym?.city || responseData.gym?.area || '',
+        gym: responseData.gym || null,
+      };
+
+      localStorage.setItem('gymezy_user', JSON.stringify(user));
+      return user;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || err.message || 'Failed to refresh account status.'
+      );
+    }
+  }
+);
+
 const getInitialUser = () => {
   try {
     const raw = localStorage.getItem('gymezy_user');
@@ -113,6 +144,10 @@ export const authSlice = createSlice({
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+      .addCase(refreshCurrentUser.fulfilled, (state, action) => {
+        state.user = action.payload;
+        state.isAuthenticated = true;
       });
   },
 });

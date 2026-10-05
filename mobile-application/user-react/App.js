@@ -12,6 +12,7 @@ import {
 } from '@expo-google-fonts/outfit';
 
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import { AuthProvider } from './src/context/AuthContext';
 import { BookingProvider } from './src/data/BookingContext';
 import { ToastProvider } from './src/widgets/CustomScaffoldMessage';
 import { AppNavigator } from './src/navigation/AppNavigator';
@@ -46,11 +47,13 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <BookingProvider>
-          <ToastProvider>
-            <MainApp />
-          </ToastProvider>
-        </BookingProvider>
+        <AuthProvider>
+          <BookingProvider>
+            <ToastProvider>
+              <MainApp />
+            </ToastProvider>
+          </BookingProvider>
+        </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

@@ -1,0 +1,223 @@
+import mongoose from 'mongoose';
+
+const employeeAuditLogSchema = new mongoose.Schema(
+  {
+    changeType: {
+      type: String,
+      enum: ['ADD_EMPLOYEE', 'EDIT_EMPLOYEE', 'DEACTIVATE_EMPLOYEE', 'STATUS_CHANGE'],
+      required: true,
+    },
+    changedBy: { type: String, trim: true, default: 'Gym Owner' },
+    changedByRole: { type: String, trim: true, default: 'GYM_OWNER' },
+    changedAt: { type: Date, default: Date.now },
+    gymId: { type: mongoose.Schema.Types.Mixed, required: true, index: true },
+    gymPartnerId: { type: String, trim: true, required: true, index: true },
+    gymName: { type: String, trim: true, default: '' },
+    editedFields: { type: mongoose.Schema.Types.Mixed, default: {} }, // Diffs e.g. { role: { old: 'Trainer', new: 'Manager' } }
+    previousSnapshot: { type: mongoose.Schema.Types.Mixed, default: {} },
+    newSnapshot: { type: mongoose.Schema.Types.Mixed, default: {} },
+    approvalStatus: {
+      type: String,
+      enum: ['Pending Approval', 'Approved', 'Rejected'],
+      default: 'Pending Approval',
+      index: true,
+    },
+    adminRemarks: { type: String, trim: true, default: '' },
+    reviewedBy: { type: String, trim: true, default: '' },
+    reviewedAt: { type: Date, default: null },
+  },
+  { _id: true, timestamps: true }
+);
+
+const employeeSchema = new mongoose.Schema(
+  {
+    // Gym Association (Mandatory)
+    gymId: {
+      type: mongoose.Schema.Types.Mixed,
+      required: [true, 'Gym ID is required'],
+      index: true,
+    },
+    gymPartnerId: {
+      type: String,
+      required: [true, 'Gym Partner ID is required'],
+      trim: true,
+      index: true,
+    },
+    gymName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+
+    // Employee Identification
+    employeeId: {
+      type: String,
+      required: [true, 'Employee ID is required'],
+      trim: true,
+      index: true,
+    },
+    name: {
+      type: String,
+      required: [true, 'Employee name is required'],
+      trim: true,
+    },
+    role: {
+      type: String,
+      required: [true, 'Employee role is required'],
+      trim: true,
+      default: 'Trainer',
+    },
+    phone: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: '',
+    },
+    avatar: {
+      type: String,
+      default: '',
+    },
+    gender: {
+      type: String,
+      enum: ['Male', 'Female', 'All', 'Other'],
+      default: 'All',
+    },
+    joinDate: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    type: {
+      type: String,
+      enum: ['Full-Time', 'Part-Time', 'Temporary'],
+      default: 'Full-Time',
+    },
+    accessType: {
+      type: String,
+      enum: ['Admin', 'Employee', 'None'],
+      default: 'Employee',
+    },
+
+    // Status & Approval State
+    status: {
+      type: String,
+      enum: ['Active', 'Inactive', 'Suspended', 'On Leave'],
+      default: 'Active',
+      index: true,
+    },
+    attendance: {
+      type: String,
+      enum: ['Present', 'Absent', 'On Leave', '—'],
+      default: 'Present',
+    },
+    approvalStatus: {
+      type: String,
+      enum: ['Pending Approval', 'Approved', 'Rejected'],
+      default: 'Pending Approval',
+      index: true,
+    },
+    pendingAction: {
+      type: String,
+      enum: ['NEW_EMPLOYEE', 'EDIT_DETAILS', 'DEACTIVATION', 'NONE'],
+      default: 'NEW_EMPLOYEE',
+    },
+    pendingChanges: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null, // Stores draft changes before Super Admin approval
+    },
+    adminRemarks: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    approvedBy: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    approvedAt: {
+      type: Date,
+      default: null,
+    },
+
+    // Professional & Past Employment Details
+    specialty: { type: String, trim: true, default: '' },
+    experienceYears: { type: Number, default: 1, min: 0 },
+    previousCompany: { type: String, trim: true, default: '' },
+    previousDesignation: { type: String, trim: true, default: '' },
+    previousExp: { type: String, trim: true, default: '' },
+
+    // Emergency Contact
+    emergencyContact: {
+      name: { type: String, trim: true, default: '' },
+      relationship: { type: String, trim: true, default: '' },
+      phone: { type: String, trim: true, default: '' },
+    },
+
+    // Schedule & Pay
+    schedule: {
+      workingDays: [{ type: String, trim: true }],
+      workingTimeStart: { type: String, trim: true, default: '09:00 AM' },
+      workingTimeEnd: { type: String, trim: true, default: '06:00 PM' },
+      isDifferentDays: { type: Boolean, default: false },
+      startDate: { type: String, trim: true, default: '' },
+      endDate: { type: String, trim: true, default: '' },
+    },
+    compensation: {
+      payType: { type: String, enum: ['Hourly', 'Session', 'Daily', 'Monthly'], default: 'Monthly' },
+      payAmount: { type: Number, default: 0, min: 0 },
+      payFreq: { type: String, enum: ['Daily', 'Weekly', 'Monthly'], default: 'Monthly' },
+    },
+    notes: { type: String, trim: true, default: '' },
+
+    // Uploaded Documents & Certificates
+    documents: [
+      {
+        docType: { type: String, trim: true, default: 'Personal Document' },
+        docNum: { type: String, trim: true, default: '' },
+        fileName: { type: String, trim: true, default: '' },
+        fileData: { type: String, default: '' },
+        addedOn: { type: String, trim: true, default: '' },
+      },
+    ],
+    trainerCerts: [
+      {
+        certType: { type: String, trim: true, default: 'Trainer Certificate' },
+        certNum: { type: String, trim: true, default: '' },
+        fileName: { type: String, trim: true, default: '' },
+        fileData: { type: String, default: '' },
+        addedOn: { type: String, trim: true, default: '' },
+      },
+    ],
+
+    // Complete Audit Log of all additions & edits
+    auditHistory: [employeeAuditLogSchema],
+  },
+  {
+    timestamps: true,
+  }
+);
+
+employeeSchema.index({ gymId: 1, approvalStatus: 1 });
+employeeSchema.index({ gymPartnerId: 1, employeeId: 1 });
+
+const sanitizeJsonTransform = (_doc, ret) => {
+  if (ret._id) {
+    ret.id = ret._id.toString();
+    ret.key = ret._id.toString();
+  }
+  delete ret._id;
+  delete ret.__v;
+  return ret;
+};
+
+employeeSchema.set('toJSON', { transform: sanitizeJsonTransform });
+employeeSchema.set('toObject', { transform: sanitizeJsonTransform });
+
+export const Employee = mongoose.model('Employee', employeeSchema);
+export default Employee;

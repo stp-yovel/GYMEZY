@@ -11,6 +11,28 @@ const fileAttachmentSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const dayScheduleSchema = new mongoose.Schema(
+  {
+    day: { type: String, trim: true },
+    isOpen: { type: Boolean, default: true },
+    openTime: { type: String, trim: true, default: '05:30 AM' },
+    closeTime: { type: String, trim: true, default: '10:30 PM' },
+  },
+  { _id: false }
+);
+
+const holidaySchema = new mongoose.Schema(
+  {
+    id: { type: String, trim: true },
+    date: { type: String, trim: true },
+    title: { type: String, trim: true },
+    type: { type: String, trim: true, default: 'Closed' },
+    hours: { type: String, trim: true, default: '' },
+    notes: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
 const openingHoursSchema = new mongoose.Schema(
   {
     weekdayOpen: { type: String, trim: true, default: '05:30 AM' },
@@ -21,8 +43,86 @@ const openingHoursSchema = new mongoose.Schema(
     isSplitShift: { type: Boolean, default: false },
     isOpenHolidays: { type: Boolean, default: true },
     is24Hours: { type: Boolean, default: false },
+    schedule: [dayScheduleSchema],
+    holidays: [holidaySchema],
   },
   { _id: false }
+);
+
+const customPlanSchema = new mongoose.Schema(
+  {
+    id: { type: String, trim: true },
+    name: { type: String, required: true, trim: true },
+    badge: { type: String, trim: true, default: 'Monthly' },
+    price: { type: Number, required: true, min: 0 },
+    duration: { type: String, trim: true, default: '30 Days' },
+    description: { type: String, trim: true, default: '' },
+    features: [{ type: String, trim: true }],
+    popular: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const customFacilitySchema = new mongoose.Schema(
+  {
+    id: { type: String, trim: true },
+    name: { type: String, required: true, trim: true },
+    category: { type: String, trim: true, default: 'General' },
+    status: { type: String, trim: true, default: 'Active' },
+    count: { type: Number, default: 1, min: 0 },
+  },
+  { _id: false }
+);
+
+const socialLinksSchema = new mongoose.Schema(
+  {
+    instagram: { type: String, trim: true, default: '' },
+    instagramHandle: { type: String, trim: true, default: '' },
+    facebook: { type: String, trim: true, default: '' },
+    youtube: { type: String, trim: true, default: '' },
+    whatsapp: { type: String, trim: true, default: '' },
+    website: { type: String, trim: true, default: '' },
+    googleBusinessUrl: { type: String, trim: true, default: '' },
+    googleRating: { type: String, trim: true, default: '4.9' },
+    googleReviewCount: { type: String, trim: true, default: '0' },
+  },
+  { _id: false }
+);
+
+const systemSettingsSchema = new mongoose.Schema(
+  {
+    turnstileTimeout: { type: Number, default: 5 },
+    renewalGracePeriod: { type: Number, default: 3 },
+    autoCheckoutHours: { type: Number, default: 2.5 },
+    smsCheckInAlerts: { type: Boolean, default: true },
+    whatsappAlerts: { type: Boolean, default: true },
+    audioChimeEnabled: { type: Boolean, default: true },
+    spotWalkInsAllowed: { type: Boolean, default: true },
+  },
+  { _id: false }
+);
+
+const gymAuditLogSchema = new mongoose.Schema(
+  {
+    changeType: { type: String, required: true },
+    changedBy: { type: String, trim: true, default: 'Gym Owner' },
+    changedByRole: { type: String, trim: true, default: 'GYM_OWNER' },
+    changedAt: { type: Date, default: Date.now },
+    field: { type: String, trim: true, default: 'General Update' },
+    requestedOn: { type: String, trim: true, default: '' },
+    editedFields: { type: mongoose.Schema.Types.Mixed, default: {} },
+    previousSnapshot: { type: mongoose.Schema.Types.Mixed, default: {} },
+    newSnapshot: { type: mongoose.Schema.Types.Mixed, default: {} },
+    approvalStatus: {
+      type: String,
+      enum: ['Pending Approval', 'Pending Admin Review', 'Approved', 'Rejected'],
+      default: 'Pending Admin Review',
+    },
+    adminRemarks: { type: String, trim: true, default: '' },
+    reviewedBy: { type: String, trim: true, default: '' },
+    reviewedAt: { type: Date, default: null },
+  },
+  { _id: true, timestamps: true }
 );
 
 const pricingPlansSchema = new mongoose.Schema(
@@ -45,6 +145,10 @@ const bankDetailsSchema = new mongoose.Schema(
     accountNumber: { type: String, trim: true, default: '' },
     ifscCode: { type: String, trim: true, default: '' },
     upiId: { type: String, trim: true, default: '' },
+    accountType: { type: String, trim: true, default: 'Current Account' },
+    branch: { type: String, trim: true, default: '' },
+    payoutSchedule: { type: String, trim: true, default: 'Daily T+1 Automated Direct Bank Deposit' },
+    gstInvoiceEnabled: { type: Boolean, default: true },
   },
   { _id: false }
 );
@@ -189,6 +293,16 @@ const gymSchema = new mongoose.Schema(
       type: pricingPlansSchema,
       default: () => ({}),
     },
+    customPricingPlans: [customPlanSchema],
+    customFacilities: [customFacilitySchema],
+    socialLinks: {
+      type: socialLinksSchema,
+      default: () => ({}),
+    },
+    systemSettings: {
+      type: systemSettingsSchema,
+      default: () => ({}),
+    },
 
     // Rules & Safety
     rules: [{ type: String, trim: true }],
@@ -220,21 +334,26 @@ const gymSchema = new mongoose.Schema(
       default: () => ({}),
     },
 
+    // Audit & Change Requests
+    pendingChanges: { type: mongoose.Schema.Types.Mixed, default: null },
+    auditHistory: [gymAuditLogSchema],
+
     // Platform State
     status: {
       type: String,
-      enum: ['Active', 'Pending', 'Inactive', 'Suspended'],
+      enum: ['Active', 'Pending', 'On Hold', 'Inactive', 'Suspended', 'Rejected'],
       default: 'Active',
       index: true,
     },
     approvalStatus: {
       type: String,
-      enum: ['Approved', 'Pending Approval', 'Rejected'],
+      enum: ['Approved', 'Pending Approval', 'On Hold', 'Rejected'],
       default: 'Approved',
       index: true,
     },
     changesCount: { type: Number, default: 0, min: 0 },
     rejectionReason: { type: String, trim: true, default: '' },
+    remark: { type: String, trim: true, default: '' },
     rating: { type: Number, default: 4.9, min: 0, max: 5 },
     reviewsCount: { type: Number, default: 0, min: 0 },
     membersCount: { type: Number, default: 0, min: 0 },

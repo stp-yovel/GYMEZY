@@ -641,7 +641,32 @@ export const CheckInScreen = ({ navigation, route }) => {
   /* STEP 4: VERIFICATION & CHECK-IN DETAILS VIEW                               */
   /* -------------------------------------------------------------------------- */
   const renderDetailsView = () => {
-    const isExpired = selectedMember.status === 'Expired';
+    if (!selectedMember) {
+      return (
+        <View style={[styles.container, { backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground }]}>
+          <View style={[styles.searchTopHeader, { paddingTop: topInset + 10 }]}>
+            <TouchableOpacity
+              style={[styles.backIconBtn, { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
+              onPress={() => setCurrentStep('SEARCH')}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="arrow-back" size={22} color={isDark ? '#FFFFFF' : '#0F172A'} />
+            </TouchableOpacity>
+            <Text style={[styles.searchScreenTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+              Verify Check-in
+            </Text>
+            <View style={{ width: 40 }} />
+          </View>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <Text style={{ color: isDark ? '#FFFFFF' : '#0F172A', fontSize: 15, fontWeight: '600' }}>
+              No member selected
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    const isExpired = selectedMember?.status === 'Expired';
 
     return (
       <View style={[styles.container, { backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground }]}>
@@ -676,12 +701,12 @@ export const CheckInScreen = ({ navigation, route }) => {
           >
             <View style={styles.profileVerifyTop}>
               <View style={styles.detailsAvatarCircle}>
-                <Text style={styles.detailsAvatarText}>{selectedMember.avatar}</Text>
+                <Text style={styles.detailsAvatarText}>{selectedMember?.avatar || 'M'}</Text>
               </View>
               <View style={styles.detailsProfileInfo}>
                 <View style={styles.detailsNameRow}>
                   <Text style={[styles.detailsName, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                    {selectedMember.name}
+                    {selectedMember?.name || 'Member'}
                   </Text>
                   <View
                     style={[
@@ -697,20 +722,20 @@ export const CheckInScreen = ({ navigation, route }) => {
                         { color: isExpired ? AppColors.dangerRed : AppColors.secondaryColor },
                       ]}
                     >
-                      {selectedMember.status}
+                      {selectedMember?.status || 'Active'}
                     </Text>
                   </View>
                 </View>
                 <Text style={[styles.detailsMetaId, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                  Customer ID: {selectedMember.customerId}
+                  Customer ID: {selectedMember?.customerId || ''}
                 </Text>
                 <View style={styles.detailsContactRow}>
                   <Ionicons name="call" size={13} color={AppColors.primaryColor} />
                   <Text style={[styles.detailsPhone, { color: isDark ? 'rgba(255,255,255,0.7)' : '#334155' }]}>
-                    {selectedMember.phone}
+                    {selectedMember?.phone || '--'}
                   </Text>
                   <Text style={[styles.detailsAgeGender, { color: isDark ? 'rgba(255,255,255,0.5)' : '#94A3B8' }]}>
-                    • Age: {selectedMember.age} • {selectedMember.gender}
+                    • Age: {selectedMember?.age || '--'} • {selectedMember?.gender || '--'}
                   </Text>
                 </View>
               </View>
@@ -736,7 +761,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Booking Type
               </Text>
               <Text style={[styles.tableValuePill, { color: isDark ? '#93C5FD' : AppColors.primaryColor }]}>
-                {selectedMember.bookingType}
+                {selectedMember?.bookingType || 'Standard'}
               </Text>
             </View>
 
@@ -745,7 +770,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Booking ID
               </Text>
               <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedMember.bookingId}
+                {selectedMember?.bookingId || '--'}
               </Text>
             </View>
 
@@ -754,7 +779,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Booking Date
               </Text>
               <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedMember.bookingDate}
+                {selectedMember?.bookingDate || '--'}
               </Text>
             </View>
 
@@ -763,7 +788,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Session / Plan
               </Text>
               <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedMember.plan}
+                {selectedMember?.plan || '--'}
               </Text>
             </View>
 
@@ -772,7 +797,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Subscription End Date
               </Text>
               <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedMember.endDate}
+                {selectedMember?.endDate || '--'}
               </Text>
             </View>
 
@@ -784,12 +809,12 @@ export const CheckInScreen = ({ navigation, route }) => {
                 style={[
                   styles.tableValue,
                   {
-                    color: selectedMember.daysRemaining > 0 ? AppColors.secondaryColor : AppColors.dangerRed,
+                    color: (selectedMember?.daysRemaining || 0) > 0 ? AppColors.secondaryColor : AppColors.dangerRed,
                     fontWeight: '800',
                   },
                 ]}
               >
-                {selectedMember.daysRemaining > 0 ? `${selectedMember.daysRemaining} Days` : 'Expired'}
+                {(selectedMember?.daysRemaining || 0) > 0 ? `${selectedMember?.daysRemaining} Days` : 'Expired'}
               </Text>
             </View>
 
@@ -798,7 +823,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Total Check-ins
               </Text>
               <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedMember.totalCheckins}
+                {selectedMember?.totalCheckins || 0}
               </Text>
             </View>
 
@@ -807,7 +832,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Last Check-in
               </Text>
               <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedMember.lastCheckin}
+                {selectedMember?.lastCheckin || '--'}
               </Text>
             </View>
           </View>

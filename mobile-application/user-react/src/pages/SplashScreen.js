@@ -11,8 +11,12 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors } from '../theme/appTheme';
 
+import { useAuth } from '../context/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export const SplashScreen = ({ navigation }) => {
   const { isDark } = useTheme();
+  const { isAuthenticated, isRestoringSession } = useAuth();
 
   const logoScale = useRef(new Animated.Value(0.7)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -51,13 +55,25 @@ export const SplashScreen = ({ navigation }) => {
       ]).start();
     }, 600);
 
-    // Auto-navigate to Onboarding after 3 seconds
-    const timer = setTimeout(() => {
-      navigation.replace('Onboarding');
-    }, 3000);
+    // Navigate once session restoration is complete and minimum splash duration has passed
+    const timer = setTimeout(async () => {
+      if (isRestoringSession) {
+        return;
+      }
+      if (isAuthenticated) {
+        navigation.replace('HomeTabs');
+      } else {
+        const onboardingDone = await AsyncStorage.getItem('@gymezy_onboarding_completed');
+        if (onboardingDone === 'true') {
+          navigation.replace('Login');
+        } else {
+          navigation.replace('Onboarding');
+        }
+      }
+    }, 2200);
 
     return () => clearTimeout(timer);
-  }, [navigation]);
+  }, [navigation, isAuthenticated, isRestoringSession]);
 
   return (
     <View style={styles.container}>

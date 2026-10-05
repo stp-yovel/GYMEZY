@@ -18,7 +18,6 @@ import { AppColors, AppTheme } from '../theme/appTheme';
 import { DigitalQrPassCard } from '../widgets/DigitalQrPassCard';
 import { useBookingRepository } from '../data/BookingContext';
 import { useToast } from '../widgets/CustomScaffoldMessage';
-import { MockData } from '../data/mockData';
 
 const CANCEL_REASONS = [
   'Relocating / Moving away',
@@ -51,8 +50,12 @@ export const MembershipDetailsScreen = ({ route, navigation }) => {
   };
 
   const openUpgradeFlow = () => {
-    const defaultGym = MockData.gyms.find((g) => g.name === membership.gymName) || MockData.gyms[0];
-    navigation.navigate('BuyMembership', { gym: defaultGym });
+    const gymObj = membership.gym || {
+      name: membership.gymName,
+      location: membership.gymLocation,
+      imageUrl: membership.gymImageUrl,
+    };
+    navigation.navigate('BuyMembership', { gym: gymObj });
   };
 
   const handleConfirmCancel = () => {

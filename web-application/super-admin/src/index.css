@@ -349,34 +349,6 @@ button {
   font-weight: var(--font-semibold) !important;
 }
 
-.font-light {
-  font-weight: var(--font-light) !important;
-}
-
-.font-regular {
-  font-weight: var(--font-regular) !important;
-}
-
-.font-medium {
-  font-weight: var(--font-medium) !important;
-}
-
-.font-semibold {
-  font-weight: var(--font-semibold) !important;
-}
-
-.font-bold {
-  font-weight: var(--font-bold) !important;
-}
-
-.font-extrabold {
-  font-weight: var(--font-extrabold) !important;
-}
-
-.font-extrabold {
-  font-weight: var(--font-extrabold) !important;
-}
-
 .tracking-tighter {
   letter-spacing: var(--tracking-tighter) !important;
 }
@@ -751,4 +723,81 @@ input[type="password"]::-webkit-textfield-decoration-container {
 
 html.dark .table-hyperlink:hover {
   color: #a5b4fc !important;
+}
+
+/* ==========================================================================
+   GYM DETAILS VIEW MODERN PILL TABS
+   ========================================================================== */
+.gym-details-tabs.ant-tabs {
+  overflow: visible;
+}
+
+.gym-details-tabs > .ant-tabs-nav {
+  margin-bottom: 20px !important;
+  background: var(--bg-surface-elevated) !important;
+  padding: 6px 8px !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.gym-details-tabs > .ant-tabs-nav .ant-tabs-nav-wrap {
+  overflow: visible !important;
+}
+
+.gym-details-tabs > .ant-tabs-nav .ant-tabs-nav-list {
+  display: flex !important;
+  gap: 6px !important;
+  flex-wrap: wrap !important;
+}
+
+.gym-details-tabs .ant-tabs-tab {
+  padding: 8px 16px !important;
+  font-weight: 600 !important;
+  font-size: 13.5px !important;
+  border-radius: 8px !important;
+  margin: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.gym-details-tabs .ant-tabs-tab:hover {
+  background: rgba(0, 56, 130, 0.06) !important;
+  color: var(--color-primary) !important;
+}
+
+.gym-details-tabs .ant-tabs-tab.ant-tabs-tab-active {
+  background: var(--color-primary) !important;
+}
+
+.gym-details-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn,
+.gym-details-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn span {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.gym-details-tabs .ant-tabs-ink-bar {
+  display: none !important;
+}
+
+/* Dark mode tab overrides */
+html.dark .gym-details-tabs > .ant-tabs-nav {
+  background: #0d0d0d !important;
+  border-color: #222222 !important;
+}
+
+html.dark .gym-details-tabs .ant-tabs-tab:hover {
+  background: rgba(22, 119, 255, 0.14) !important;
+  color: #38bdf8 !important;
+}
+
+html.dark .gym-details-tabs .ant-tabs-tab.ant-tabs-tab-active {
+  background: #1677ff !important;
+}
+
+html.dark .gym-details-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn,
+html.dark .gym-details-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn span {
+  color: #ffffff !important;
 }

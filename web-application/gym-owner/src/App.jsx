@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './general/Login';
+import Register from './general/Register';
+import ApplicationStatus from './general/ApplicationStatus';
 import OwnerLayout from './owner/OwnerLayout';
 import Dashboard from './owner/Dashboard';
 import QrCheckIn from './owner/QrCheckIn';
@@ -17,6 +19,10 @@ export function App() {
         {/* Main Entry Points */}
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/application-status" element={<ApplicationStatus />} />
+        <Route path="/pending-approval" element={<Navigate to="/application-status" replace />} />
+        <Route path="/status" element={<Navigate to="/application-status" replace />} />
 
         {/* Gym Owner Portal Nested Routes */}
         <Route path="/owner" element={<OwnerLayout />}>

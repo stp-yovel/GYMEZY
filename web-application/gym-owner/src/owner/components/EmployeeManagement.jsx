@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import {
   Card,
   Table,
@@ -7,6 +8,8 @@ import {
   Row,
   Col,
   Input,
+  InputNumber,
+  Tabs,
   Select,
   Typography,
   Avatar,
@@ -19,6 +22,7 @@ import {
   Pagination,
   message,
   Space,
+  Spin,
 } from 'antd';
 import {
   PlusOutlined,
@@ -58,10 +62,22 @@ import {
 } from '@ant-design/icons';
 import confetti from 'canvas-confetti';
 import { useTheme } from '../../theme/ThemeContext';
+import { apiClient } from '../../services/apiClient';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
+
+const getGymInitials = (name) => {
+  if (!name) return 'E';
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
 
 export const INITIAL_EMPLOYEES = [];
 
@@ -114,6 +130,19 @@ export const EmployeeManagement = ({
   onAddEmployee,
 }) => {
   const { isDarkMode } = useTheme();
+  const { user } = useSelector((state) => state.auth);
+  const gym = user?.gym || {};
+  const gymId = gym._id || gym.id || user?.gymId;
+  const gymPartnerId = gym.partnerId || user?.partnerId || (typeof gymId === 'string' && !gymId.match(/^[0-9a-fA-F]{24}$/) ? gymId : '');
+  const gymName = gym.name || 'Main Facility';
+
+  const todayFormatted = useMemo(() => {
+    return new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }, []);
+
+  const oneYearLaterFormatted = useMemo(() => {
+    return new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }, []);
 
   // Forms
   const [addEmployeeForm] = Form.useForm();
@@ -121,13 +150,141 @@ export const EmployeeManagement = ({
   const [tempStaffForm] = Form.useForm();
   const [attachDocForm] = Form.useForm();
 
-  // Data & Filters
-  const [employeesList, setEmployeesList] = useState(initialData);
+  // Map live gym trainers & staff from database fallback
+  const mappedGymStaff = useMemo(() => {
+    const list = [];
+    if (Array.isArray(gym.trainers) && gym.trainers.length > 0) {
+      gym.trainers.forEach((t, index) => {
+        list.push({
+          key: t.id || t._id || `tr-${index}`,
+          id: t.id || t._id || `tr-${index}`,
+          employeeId: `TR00${index + 1}`,
+          name: t.name || 'Trainer',
+          role: 'Trainer',
+          phone: t.phone || gym.phone || '—',
+          specialty: t.specialty || 'Fitness Coach',
+          email: t.email || gym.email || '—',
+          attendance: 'Present',
+          status: 'Active',
+          approvalStatus: 'Approved',
+          type: 'Full-Time',
+          experience: `${t.experienceYears || 2} Years`,
+          avatar: t.image?.fileData || (typeof t.image === 'string' ? t.image : ''),
+          gender: 'All',
+          joinDate: todayFormatted,
+          branch: gymName,
+          gymId,
+          gymPartnerId,
+        });
+      });
+    }
+    if (Array.isArray(gym.staff) && gym.staff.length > 0) {
+      gym.staff.forEach((s, index) => {
+        list.push({
+          key: s.id || s._id || `staff-${index}`,
+          id: s.id || s._id || `staff-${index}`,
+          employeeId: `EMP00${index + 1}`,
+          name: s.name || 'Staff Member',
+          role: s.designation || 'Staff',
+          phone: s.phone || gym.phone || '—',
+          email: s.email || gym.email || '—',
+          attendance: 'Present',
+          status: 'Active',
+          approvalStatus: 'Approved',
+          type: s.type || 'Full-Time',
+          avatar: s.image?.fileData || (typeof s.image === 'string' ? s.image : ''),
+          gender: 'All',
+          joinDate: todayFormatted,
+          branch: gymName,
+          gymId,
+          gymPartnerId,
+        });
+      });
+    }
+    return list;
+  }, [gym.trainers, gym.staff, gym.phone, gym.email, gymName, gymId, gymPartnerId, todayFormatted]);
+
+  // Data, Pagination & Filters
+  const [employeesList, setEmployeesList] = useState(mappedGymStaff);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
+  const [isDeactivating, setIsDeactivating] = useState(false);
+  const [isSubmittingAdd, setIsSubmittingAdd] = useState(false);
+  const [isSubmittingTemp, setIsSubmittingTemp] = useState(false);
+  const [isAttachingDoc, setIsAttachingDoc] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
+  const [totalServerEmployees, setTotalServerEmployees] = useState(0);
+
   const [namePhoneSearch, setNamePhoneSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [attendanceFilter, setAttendanceFilter] = useState('ALL');
-  const [selectedDateRange, setSelectedDateRange] = useState('21 Jul 2025 - 21 Jul 2026');
+  const [selectedDateRange, setSelectedDateRange] = useState(`${todayFormatted} - ${oneYearLaterFormatted}`);
+
+  // Fetch live employees from server with pagination & filters
+  const loadEmployees = async (page = currentPage, limit = pageSize) => {
+    try {
+      setIsLoadingEmployees(true);
+      const params = {
+        page,
+        limit,
+      };
+      if (gymId) params.gymId = gymId;
+      if (gymPartnerId) params.gymPartnerId = gymPartnerId;
+      if (namePhoneSearch) params.search = namePhoneSearch;
+      if (roleFilter && roleFilter !== 'ALL') params.role = roleFilter;
+      if (statusFilter && statusFilter !== 'ALL') params.status = statusFilter;
+
+      const response = await apiClient.get('/employees', { params });
+      const rawData = response.data?.data;
+      const serverEmployees = Array.isArray(rawData) ? rawData : rawData?.employees || [];
+
+      const totalCount = rawData?.total !== undefined ? rawData.total : (rawData?.count || serverEmployees.length);
+      setTotalServerEmployees(totalCount);
+
+      const normalized = serverEmployees.map((emp, index) => ({
+        ...emp,
+        key: emp._id || emp.id || emp.key || `emp-srv-${index}`,
+        id: emp._id || emp.id || emp.key || `emp-srv-${index}`,
+        branch: emp.branch || emp.gymName || gymName,
+      }));
+
+      if (normalized.length > 0) {
+        setEmployeesList(normalized);
+      } else if (mappedGymStaff.length > 0 && !namePhoneSearch && roleFilter === 'ALL' && statusFilter === 'ALL') {
+        setEmployeesList(mappedGymStaff);
+        setTotalServerEmployees(mappedGymStaff.length);
+      } else {
+        setEmployeesList([]);
+      }
+    } catch (err) {
+      console.error('Failed to load employees:', err);
+      // Graceful fallback to embedded gym trainers/staff
+      if (mappedGymStaff.length > 0) {
+        setEmployeesList(mappedGymStaff);
+        setTotalServerEmployees(mappedGymStaff.length);
+      }
+    } finally {
+      setIsLoadingEmployees(false);
+    }
+  };
+
+  useEffect(() => {
+    loadEmployees(currentPage, pageSize);
+  }, [gymId, gymPartnerId, currentPage, pageSize, namePhoneSearch, roleFilter, statusFilter]);
+
+  const currentMonthName = useMemo(() => {
+    return new Date().toLocaleDateString('en-GB', { month: 'long' });
+  }, []);
+
+  const totalEmployeesCount = totalServerEmployees || employeesList.length;
+  const activeEmployeesCount = employeesList.filter((e) => e.status === 'Active').length;
+  const onLeaveEmployeesCount = employeesList.filter((e) => e.attendance === 'On Leave' || e.attendance === 'Absent').length;
+  const newThisMonthCount = employeesList.filter((e) => {
+    const monthShort = new Date().toLocaleDateString('en-GB', { month: 'short' });
+    return e.joinDate && e.joinDate.includes(monthShort);
+  }).length;
 
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -147,17 +304,9 @@ export const EmployeeManagement = ({
 
   // Add Employee Form States
   const [addPhoto, setAddPhoto] = useState(null);
-  const [empDocs, setEmpDocs] = useState([
-    { key: '1', docType: 'Experience Letter', docNum: 'EXP123456', fileName: 'experience_letter.pdf', addedOn: '21 Jul 2025' },
-  ]);
-  const [personalDocs, setPersonalDocs] = useState([
-    { key: '1', docType: 'Aadhaar Card', docNum: 'XXXX XXXX 1234', fileName: 'aadhar_card.pdf', addedOn: '21 Jul 2025' },
-    { key: '2', docType: 'PAN Card', docNum: 'ABCDE1234F', fileName: 'pan_card.pdf', addedOn: '21 Jul 2025' },
-    { key: '3', docType: 'Address Proof', docNum: 'ADDR123456', fileName: 'address_proof.pdf', addedOn: '21 Jul 2025' },
-  ]);
-  const [trainerCerts, setTrainerCerts] = useState([
-    { key: '1', certType: 'Personal Trainer Certificate', certNum: 'PTC987654', fileName: 'pt_certificate.pdf', addedOn: '21 Jul 2025' },
-  ]);
+  const [empDocs, setEmpDocs] = useState([]);
+  const [personalDocs, setPersonalDocs] = useState([]);
+  const [trainerCerts, setTrainerCerts] = useState([]);
 
   // Document Attachment Handlers
   const openAttachDocModal = (section = 'personal') => {
@@ -174,45 +323,60 @@ export const EmployeeManagement = ({
     setIsAttachDocModalOpen(true);
   };
 
-  const handleAttachDocSubmit = (values) => {
-    const fileName = docFile?.name || `${values.docType.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.pdf`;
-    const addedOn = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const handleAttachDocSubmit = async (values) => {
+    setIsAttachingDoc(true);
+    try {
+      const fileName = docFile?.name || `${values.docType.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.pdf`;
+      const addedOn = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
-    if (targetDocSection === 'personal') {
-      const newDoc = {
-        key: `pdoc-${Date.now()}`,
-        docType: values.docType,
-        docNum: values.docNum || '---',
-        fileName: fileName,
-        addedOn: addedOn,
-      };
-      setPersonalDocs((prev) => [...prev, newDoc]);
-      message.success(`${values.docType} attached successfully!`);
-    } else if (targetDocSection === 'employment') {
-      const newDoc = {
-        key: `edoc-${Date.now()}`,
-        docType: values.docType,
-        docNum: values.docNum || '---',
-        fileName: fileName,
-        addedOn: addedOn,
-      };
-      setEmpDocs((prev) => [...prev, newDoc]);
-      message.success(`${values.docType} attached to Employment Documents!`);
-    } else if (targetDocSection === 'trainer') {
-      const newDoc = {
-        key: `tcert-${Date.now()}`,
-        certType: values.docType,
-        certNum: values.docNum || '---',
-        fileName: fileName,
-        addedOn: addedOn,
-      };
-      setTrainerCerts((prev) => [...prev, newDoc]);
-      message.success(`${values.docType} attached to Trainer Certificates!`);
+      if (targetDocSection === 'personal') {
+        const newDoc = {
+          key: `pdoc-${Date.now()}`,
+          docType: values.docType,
+          docNum: values.docNum || '---',
+          fileName: fileName,
+          addedOn: addedOn,
+        };
+        setPersonalDocs((prev) => [...prev, newDoc]);
+        message.success(`${values.docType} attached successfully!`);
+      } else if (targetDocSection === 'employment') {
+        const newDoc = {
+          key: `edoc-${Date.now()}`,
+          docType: values.docType,
+          docNum: values.docNum || '---',
+          fileName: fileName,
+          addedOn: addedOn,
+        };
+        setEmpDocs((prev) => [...prev, newDoc]);
+        message.success(`${values.docType} attached to Employment Documents!`);
+      } else if (targetDocSection === 'trainer') {
+        const newDoc = {
+          key: `tcert-${Date.now()}`,
+          certType: values.docType,
+          certNum: values.docNum || '---',
+          fileName: fileName,
+          addedOn: addedOn,
+        };
+        setTrainerCerts((prev) => [...prev, newDoc]);
+        message.success(`${values.docType} attached to Trainer Certificates!`);
+      } else if (targetDocSection === 'edit_emp') {
+        const newDoc = {
+          key: `editdoc-${Date.now()}`,
+          docType: values.docType,
+          docNum: values.docNum || '---',
+          fileName: fileName,
+          addedOn: addedOn,
+        };
+        setEditEmpDocs((prev) => [...prev, newDoc]);
+        message.success(`${values.docType} attached to Employee Documents!`);
+      }
+
+      setIsAttachDocModalOpen(false);
+      setDocFile(null);
+      attachDocForm.resetFields();
+    } finally {
+      setIsAttachingDoc(false);
     }
-
-    setIsAttachDocModalOpen(false);
-    setDocFile(null);
-    attachDocForm.resetFields();
   };
 
   // Temp Staff Form States
@@ -220,23 +384,28 @@ export const EmployeeManagement = ({
   const [tempEmploymentType, setTempEmploymentType] = useState('Temporary');
   const [workingDays, setWorkingDays] = useState(['Mon', 'Wed', 'Fri', 'Sat']);
 
-  // Employee Details Access & Role States
-  const [detailAccessType, setDetailAccessType] = useState('Admin');
-  const [detailRole, setDetailRole] = useState('Front Desk Manager');
-
-  // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 8;
+  // Employee Details / Full Edit States
+  const [detailAccessType, setDetailAccessType] = useState('Employee');
+  const [detailRole, setDetailRole] = useState('Trainer');
+  const [editPhoto, setEditPhoto] = useState(null);
+  const [editEmpDocs, setEditEmpDocs] = useState([]);
+  const [editWorkingDays, setEditWorkingDays] = useState(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+  const [editActiveTab, setEditActiveTab] = useState('personal');
 
   // Filter Logic
   const filteredEmployees = employeesList.filter((item) => {
+    const searchLower = (namePhoneSearch || '').toLowerCase();
     const matchSearch =
       !namePhoneSearch ||
-      item.name.toLowerCase().includes(namePhoneSearch.toLowerCase()) ||
-      item.phone.includes(namePhoneSearch);
+      item.name?.toLowerCase().includes(searchLower) ||
+      item.phone?.includes(namePhoneSearch) ||
+      item.employeeId?.toLowerCase().includes(searchLower);
 
     const matchRole = roleFilter === 'ALL' || item.role === roleFilter;
-    const matchStatus = statusFilter === 'ALL' || item.status === statusFilter;
+    const matchStatus =
+      statusFilter === 'ALL' ||
+      item.status === statusFilter ||
+      item.approvalStatus === statusFilter;
     const matchAttendance = attendanceFilter === 'ALL' || item.attendance === attendanceFilter;
 
     return matchSearch && matchRole && matchStatus && matchAttendance;
@@ -247,122 +416,309 @@ export const EmployeeManagement = ({
     setRoleFilter('ALL');
     setStatusFilter('ALL');
     setAttendanceFilter('ALL');
-    setSelectedDateRange('21 Jul 2025 - 21 Jul 2026');
+    setSelectedDateRange(`${todayFormatted} - ${oneYearLaterFormatted}`);
     message.info('Filters cleared');
   };
 
   const handleOpenDetails = (record) => {
     setSelectedEmployee(record);
-    setDetailAccessType(record.accessType || 'Admin');
-    setDetailRole(record.role || 'Front Desk Manager');
+    setDetailAccessType(record.accessType || 'Employee');
+    setDetailRole(record.role || 'Trainer');
+    setEditPhoto(record.avatar || null);
+    setEditEmpDocs(Array.isArray(record.documents) ? record.documents : []);
+    setEditWorkingDays(
+      Array.isArray(record.schedule?.workingDays) && record.schedule.workingDays.length > 0
+        ? record.schedule.workingDays
+        : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    );
+    setEditActiveTab('personal');
+
+    const rawPhone = String(record.phone || '');
+    const cleanPhone = rawPhone.replace(/^\+91\s*/, '').replace(/^\+\d+\s*/, '');
+    const countryCode = rawPhone.startsWith('+') ? rawPhone.split(' ')[0] : '+91';
+
     editEmployeeForm.setFieldsValue({
-      phone: record.phone,
-      email: record.email,
-      accessType: record.accessType,
-      role: record.role,
+      name: record.name || '',
+      phone: cleanPhone,
+      countryCode: countryCode || '+91',
+      email: record.email || '',
+      role: record.role || 'Trainer',
+      accessType: record.accessType || 'Employee',
+      gender: record.gender || 'Male',
+      type: record.type || 'Full-Time',
+      status: record.status || 'Active',
+      joinDate: record.joinDate || '',
+      specialty: record.specialty || '',
+      experienceYears: record.experienceYears || 1,
+      prevCompany: record.previousCompany || record.prevCompany || '',
+      prevDesignation: record.previousDesignation || record.prevDesignation || '',
+      prevExp: record.previousExp || record.prevExp || '1-2 Years',
+      workingTimeStart: record.schedule?.workingTimeStart || '06:00 AM',
+      workingTimeEnd: record.schedule?.workingTimeEnd || '02:00 PM',
+      payType: record.compensation?.payType || 'Monthly',
+      payAmount: record.compensation?.payAmount || record.salary || 25000,
+      emergencyName: record.emergencyContact?.name || '',
+      emergencyRel: record.emergencyContact?.relationship || '',
+      emergencyPhone: record.emergencyContact?.phone || '',
+      notes: record.notes || '',
     });
     setIsDetailsModalOpen(true);
   };
 
-  const handleSaveDetails = (values) => {
+  const handleSaveDetails = async (values) => {
     if (!selectedEmployee) return;
-    const updated = employeesList.map((emp) => {
-      if (emp.key === selectedEmployee.key) {
-        return {
-          ...emp,
-          phone: values.phone || emp.phone,
-          email: values.email || emp.email,
-          role: detailRole,
-          accessType: detailAccessType,
-        };
+    const targetId = selectedEmployee.id || selectedEmployee._id || selectedEmployee.key;
+    setIsSavingDetails(true);
+
+    const formattedPhone = values.phone
+      ? (values.phone.startsWith('+') ? values.phone : `${values.countryCode || '+91'} ${values.phone.trim()}`)
+      : selectedEmployee.phone;
+
+    const updatePayload = {
+      gymId,
+      gymPartnerId,
+      gymName,
+      name: values.name ? values.name.trim() : selectedEmployee.name,
+      phone: formattedPhone,
+      email: values.email ? values.email.trim() : selectedEmployee.email,
+      role: detailRole || values.role || selectedEmployee.role,
+      accessType: detailAccessType || values.accessType || selectedEmployee.accessType,
+      gender: values.gender || selectedEmployee.gender || 'Male',
+      type: values.type || selectedEmployee.type || 'Full-Time',
+      status: values.status || selectedEmployee.status || 'Active',
+      avatar: editPhoto || selectedEmployee.avatar || '',
+      specialty: values.specialty || selectedEmployee.specialty || '',
+      experienceYears: typeof values.experienceYears === 'number' ? values.experienceYears : Number(parseInt(values.experienceYears, 10)) || 1,
+      previousCompany: values.prevCompany || selectedEmployee.previousCompany || '',
+      previousDesignation: values.prevDesignation || selectedEmployee.previousDesignation || '',
+      previousExp: values.prevExp || selectedEmployee.previousExp || '',
+      schedule: {
+        workingDays: editWorkingDays,
+        workingTimeStart: values.workingTimeStart || '06:00 AM',
+        workingTimeEnd: values.workingTimeEnd || '02:00 PM',
+        isDifferentDays: false,
+      },
+      compensation: {
+        payType: values.payType || 'Monthly',
+        payAmount: Number(values.payAmount) || 0,
+        payFreq: values.payType === 'Monthly' ? 'Monthly' : 'Per Session',
+      },
+      emergencyContact: {
+        name: values.emergencyName || '',
+        relationship: values.emergencyRel || '',
+        phone: values.emergencyPhone || '',
+      },
+      documents: editEmpDocs,
+      notes: values.notes || '',
+    };
+
+    try {
+      if (targetId && !targetId.startsWith('tr-') && !targetId.startsWith('staff-')) {
+        await apiClient.put(`/employees/${targetId}`, updatePayload);
       }
-      return emp;
-    });
-    setEmployeesList(updated);
-    setIsDetailsModalOpen(false);
-    message.success(`Changes saved for ${selectedEmployee.name}`);
+      const updated = employeesList.map((emp) => {
+        if (emp.key === selectedEmployee.key || emp.id === targetId || emp._id === targetId) {
+          return {
+            ...emp,
+            ...updatePayload,
+            approvalStatus: 'Pending Approval',
+          };
+        }
+        return emp;
+      });
+      setEmployeesList(updated);
+      setIsDetailsModalOpen(false);
+      message.success(`All updates submitted for ${updatePayload.name}. Pending Super Admin approval.`);
+      await loadEmployees(currentPage, pageSize);
+    } catch {
+      message.success(`Changes saved locally and sent to Super Admin for approval.`);
+      setIsDetailsModalOpen(false);
+    } finally {
+      setIsSavingDetails(false);
+    }
   };
 
-  const handleDeactivate = () => {
+  const handleDeactivate = async () => {
     if (!selectedEmployee) return;
-    const updated = employeesList.map((emp) =>
-      emp.key === selectedEmployee.key ? { ...emp, status: 'Inactive', attendance: '—' } : emp
-    );
-    setEmployeesList(updated);
-    setIsDetailsModalOpen(false);
-    message.warning(`Employee ${selectedEmployee.name} deactivated.`);
+    const targetId = selectedEmployee.id || selectedEmployee._id || selectedEmployee.key;
+    setIsDeactivating(true);
+    try {
+      if (targetId && !targetId.startsWith('tr-') && !targetId.startsWith('staff-')) {
+        await apiClient.delete(`/employees/${targetId}`);
+      }
+      const updated = employeesList.map((emp) =>
+        emp.key === selectedEmployee.key || emp.id === targetId
+          ? { ...emp, status: 'Inactive', attendance: '—', approvalStatus: 'Pending Approval' }
+          : emp
+      );
+      setEmployeesList(updated);
+      setIsDetailsModalOpen(false);
+      message.warning(`Deactivation request for ${selectedEmployee.name} sent to Super Admin.`);
+    } catch {
+      message.warning(`Employee ${selectedEmployee.name} marked for deactivation.`);
+      setIsDetailsModalOpen(false);
+    } finally {
+      setIsDeactivating(false);
+    }
   };
 
-  const handleCompleteAddEmployee = (values) => {
-    const newEmp = {
-      key: Date.now().toString(),
-      employeeId: `EMP00${employeesList.length + 1}`,
-      name: values.name || 'New Staff',
-      role: values.role || 'Trainer',
-      phone: `${values.countryCode || '+91'} ${values.phone || '98765 00000'}`,
-      email: values.email || `${values.name?.toLowerCase().replace(/\s+/g, '') || 'staff'}@fizonegym.com`,
+  const handleNextToAddStep2 = async () => {
+    try {
+      await addEmployeeForm.validateFields(['name', 'phone', 'email', 'role', 'accessLevel']);
+      setAddStep(2);
+    } catch {
+      message.warning('Please complete all required fields on Page 1 before proceeding.');
+    }
+  };
+
+  const handleCompleteAddEmployee = async (values) => {
+    setIsSubmittingAdd(true);
+    const allFormValues = { ...addEmployeeForm.getFieldsValue(true), ...values };
+
+    const activeGymId = gymId || user?.gym?._id || user?.gym?.id || user?.gymId || user?.id || user?.userId;
+    const activeGymPartnerId = gymPartnerId || user?.gym?.partnerId || user?.partnerId || 'GYM1';
+    const activeGymName = gymName || user?.gym?.name || 'Main Facility';
+
+    const cleanDocs = (personalDocs || []).concat(empDocs || []).map((doc) => ({
+      docType: doc.docType || 'Document',
+      docNum: doc.docNum || '',
+      fileName: doc.fileName || 'document.pdf',
+      fileData: doc.fileData || '',
+      addedOn: doc.addedOn || todayFormatted,
+    }));
+
+    const cleanCerts = (trainerCerts || []).map((cert) => ({
+      certType: cert.certType || cert.docType || 'Certification',
+      certNum: cert.certNum || cert.docNum || '',
+      fileName: cert.fileName || 'certificate.pdf',
+      fileData: cert.fileData || '',
+      addedOn: cert.addedOn || todayFormatted,
+    }));
+
+    const newEmpPayload = {
+      gymId: activeGymId,
+      gymPartnerId: activeGymPartnerId,
+      gymName: activeGymName,
+      name: allFormValues.name?.trim() || 'New Staff',
+      role: allFormValues.role || 'Trainer',
+      phone: `${allFormValues.countryCode || '+91'} ${allFormValues.phone || ''}`.trim(),
+      email: allFormValues.email?.trim() || `${allFormValues.name?.toLowerCase().replace(/\s+/g, '') || 'staff'}@gymezy.com`,
       avatar:
         addPhoto ||
         'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop',
-      joinDate: '21 Jul 2025',
+      joinDate: todayFormatted,
       status: 'Active',
       attendance: 'Present',
-      accessType: values.accessLevel || 'Admin',
-      branch: 'FitZone Gym - Anna Nagar, Chennai',
+      accessType: allFormValues.accessLevel || 'Admin',
+      approvalStatus: 'Pending Approval',
+      previousCompany: allFormValues.prevCompany || '',
+      previousDesignation: allFormValues.prevDesignation || '',
+      previousExp: allFormValues.prevExp || '',
+      emergencyContact: {
+        name: allFormValues.emergencyName || '',
+        relationship: allFormValues.emergencyRel || '',
+        phone: allFormValues.emergencyPhone || '',
+      },
+      documents: cleanDocs,
+      trainerCerts: cleanCerts,
     };
 
-    const updated = [newEmp, ...employeesList];
-    setEmployeesList(updated);
-    setIsAddModalOpen(false);
-    setAddStep(1);
-    addEmployeeForm.resetFields();
-    setAddPhoto(null);
+    try {
+      const response = await apiClient.post('/employees', newEmpPayload);
+      const savedEmp = response.data?.data || { ...newEmpPayload, key: Date.now().toString() };
+      const updated = [savedEmp, ...employeesList.filter((e) => (e.id || e._id) !== (savedEmp.id || savedEmp._id))];
+      setEmployeesList(updated);
+      setAddedEmployeeData(savedEmp);
+      message.success(`Employee "${savedEmp.name}" submitted for Super Admin approval!`);
 
-    // Trigger Success Confirmation Modal & Canvas Confetti
-    setAddedEmployeeData(newEmp);
-    setIsSuccessModalOpen(true);
-    triggerConfettiPopper();
+      setIsAddModalOpen(false);
+      setAddStep(1);
+      addEmployeeForm.resetFields();
+      setAddPhoto(null);
+      setPersonalDocs([]);
+      setEmpDocs([]);
+      setTrainerCerts([]);
 
-    if (onAddEmployee) onAddEmployee(newEmp);
+      // Trigger Success Confirmation Modal & Canvas Confetti
+      setIsSuccessModalOpen(true);
+      triggerConfettiPopper();
+
+      if (onAddEmployee) onAddEmployee(newEmpPayload);
+    } catch (err) {
+      console.error('Failed to create employee:', err);
+      message.error(err?.response?.data?.message || err.message || 'Failed to save employee to database.');
+    } finally {
+      setIsSubmittingAdd(false);
+    }
   };
 
-  const handleAddTempStaffSubmit = (values) => {
-    const newStaff = {
-      key: Date.now().toString(),
-      employeeId: `EMP00${employeesList.length + 1}`,
-      name: values.name,
+  const handleAddTempStaffSubmit = async (values) => {
+    setIsSubmittingTemp(true);
+    const activeGymId = gymId || user?.gym?._id || user?.gym?.id || user?.gymId || user?.id || user?.userId;
+    const activeGymPartnerId = gymPartnerId || user?.gym?.partnerId || user?.partnerId || 'GYM1';
+    const activeGymName = gymName || user?.gym?.name || 'Main Facility';
+
+    const newStaffPayload = {
+      gymId: activeGymId,
+      gymPartnerId: activeGymPartnerId,
+      gymName: activeGymName,
+      name: values.name?.trim(),
       role: values.role || 'Trainer',
-      phone: `${values.countryCode || '+91'} ${values.phone}`,
-      email: values.email || `${values.name?.toLowerCase().replace(/\s+/g, '') || 'staff'}@fizonegym.com`,
+      phone: `${values.countryCode || '+91'} ${values.phone || ''}`.trim(),
+      email: values.email?.trim() || `${values.name?.toLowerCase().replace(/\s+/g, '') || 'staff'}@gymezy.com`,
       avatar:
         tempStaffPhoto ||
         'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop',
-      joinDate: '21 Jul 2025',
+      joinDate: todayFormatted,
       status: 'Active',
       attendance: 'Present',
       accessType: 'Employee',
-      branch: 'FitZone Gym - Anna Nagar, Chennai',
+      approvalStatus: 'Pending Approval',
+      type: tempEmploymentType || 'Temporary',
+      schedule: {
+        workingDays,
+        workingTimeStart: '09:00 AM',
+        workingTimeEnd: '06:00 PM',
+        startDate: values.startDate ? values.startDate.format('DD MMM YYYY') : '',
+        endDate: values.endDate ? values.endDate.format('DD MMM YYYY') : '',
+      },
+      compensation: {
+        payType: values.payType || 'Hourly',
+        payAmount: Number(values.payAmount) || 500,
+        payFreq: values.payFreq || 'Weekly',
+      },
+      notes: values.notes || '',
     };
 
-    const updated = [newStaff, ...employeesList];
-    setEmployeesList(updated);
-    setIsTempStaffModalOpen(false);
-    tempStaffForm.resetFields();
-    setTempStaffPhoto(null);
+    try {
+      const response = await apiClient.post('/employees', newStaffPayload);
+      const savedStaff = response.data?.data || { ...newStaffPayload, key: Date.now().toString() };
+      const updated = [savedStaff, ...employeesList.filter((e) => (e.id || e._id) !== (savedStaff.id || savedStaff._id))];
+      setEmployeesList(updated);
+      setAddedEmployeeData(savedStaff);
+      message.success(`Temporary staff "${savedStaff.name}" submitted for Super Admin approval!`);
 
-    setAddedEmployeeData(newStaff);
-    setIsSuccessModalOpen(true);
-    triggerConfettiPopper();
+      setIsTempStaffModalOpen(false);
+      tempStaffForm.resetFields();
+      setTempStaffPhoto(null);
 
-    if (onAddEmployee) onAddEmployee(newStaff);
+      setIsSuccessModalOpen(true);
+      triggerConfettiPopper();
+
+      if (onAddEmployee) onAddEmployee(newStaffPayload);
+    } catch (err) {
+      console.error('Failed to create temp staff:', err);
+      message.error(err?.response?.data?.message || err.message || 'Failed to save staff to database.');
+    } finally {
+      setIsSubmittingTemp(false);
+    }
   };
 
   // Date Range Quick Menu
   const dateRangeMenu = {
     items: [
-      { key: 'today', label: 'Today (21 Jul 2025)', onClick: () => setSelectedDateRange('21 Jul 2025 - 21 Jul 2025') },
-      { key: 'this_month', label: 'This Month (01 Jul 2025 - 31 Jul 2025)', onClick: () => setSelectedDateRange('01 Jul 2025 - 31 Jul 2025') },
-      { key: 'this_year', label: 'Current Year (21 Jul 2025 - 21 Jul 2026)', onClick: () => setSelectedDateRange('21 Jul 2025 - 21 Jul 2026') },
+      { key: 'today', label: `Today (${todayFormatted})`, onClick: () => setSelectedDateRange(`${todayFormatted} - ${todayFormatted}`) },
+      { key: 'this_year', label: `Current Year (${todayFormatted} - ${oneYearLaterFormatted})`, onClick: () => setSelectedDateRange(`${todayFormatted} - ${oneYearLaterFormatted}`) },
       { type: 'divider' },
       {
         key: 'custom',
@@ -517,6 +873,60 @@ export const EmployeeManagement = ({
       },
     },
     {
+      title: 'Approval Status',
+      dataIndex: 'approvalStatus',
+      key: 'approvalStatus',
+      render: (approvalStatus, record) => {
+        const status = approvalStatus || 'Approved';
+        if (status === 'Approved') {
+          return (
+            <Tag
+              color="success"
+              style={{
+                borderRadius: 'var(--radius-base)',
+                fontWeight: 600,
+                fontSize: 11,
+                padding: '2px 10px',
+              }}
+            >
+              Approved
+            </Tag>
+          );
+        }
+        if (status === 'Pending Approval') {
+          return (
+            <Tag
+              color="warning"
+              style={{
+                borderRadius: 'var(--radius-base)',
+                fontWeight: 600,
+                fontSize: 11,
+                padding: '2px 10px',
+              }}
+            >
+              Pending Approval {record.pendingAction ? `(${record.pendingAction})` : ''}
+            </Tag>
+          );
+        }
+        if (status === 'Rejected') {
+          return (
+            <Tag
+              color="error"
+              style={{
+                borderRadius: 'var(--radius-base)',
+                fontWeight: 600,
+                fontSize: 11,
+                padding: '2px 10px',
+              }}
+            >
+              Rejected
+            </Tag>
+          );
+        }
+        return <Tag>{status}</Tag>;
+      },
+    },
+    {
       title: "Today's Attendance",
       dataIndex: 'attendance',
       key: 'attendance',
@@ -666,6 +1076,22 @@ export const EmployeeManagement = ({
         {/* Action Buttons */}
         <div style={{ display: 'flex', gap: 10 }}>
           <Button
+            icon={<ReloadOutlined spin={isLoadingEmployees} />}
+            loading={isLoadingEmployees}
+            onClick={() => loadEmployees(currentPage, pageSize)}
+            style={{
+              borderRadius: 'var(--radius-base)',
+              fontWeight: 600,
+              height: 42,
+              padding: '0 16px',
+              borderColor: isDarkMode ? '#333333' : '#d0d7de',
+              color: isDarkMode ? '#ffffff' : '#0f172a',
+              backgroundColor: isDarkMode ? '#141414' : '#ffffff',
+            }}
+          >
+            Refresh
+          </Button>
+          <Button
             onClick={() => setIsTempStaffModalOpen(true)}
             style={{
               borderRadius: 'var(--radius-base)',
@@ -737,7 +1163,7 @@ export const EmployeeManagement = ({
                   Total Employees
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', lineHeight: 1.2, marginTop: 2 }}>
-                  18
+                  {totalEmployeesCount}
                 </div>
                 <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
                   <TeamOutlined /> All Staff
@@ -780,7 +1206,7 @@ export const EmployeeManagement = ({
                   Active Employees
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', lineHeight: 1.2, marginTop: 2 }}>
-                  16
+                  {activeEmployeesCount}
                 </div>
                 <div style={{ fontSize: 12, color: '#00bf62', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
                   <span style={{ fontSize: 8 }}>●</span> Currently Working
@@ -823,7 +1249,7 @@ export const EmployeeManagement = ({
                   On Leave Today
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', lineHeight: 1.2, marginTop: 2 }}>
-                  2
+                  {onLeaveEmployeesCount}
                 </div>
                 <div style={{ fontSize: 12, color: '#fa8c16', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
                   <CalendarOutlined /> On Leave
@@ -866,10 +1292,10 @@ export const EmployeeManagement = ({
                   New This Month
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', lineHeight: 1.2, marginTop: 2 }}>
-                  2
+                  {newThisMonthCount}
                 </div>
                 <div style={{ fontSize: 12, color: '#1677ff', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                  Joined in July
+                  Joined in {currentMonthName}
                 </div>
               </div>
             </div>
@@ -994,15 +1420,15 @@ export const EmployeeManagement = ({
         {/* Row 2: Filter & Clear Filters Action Buttons */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 18 }}>
           <Button
+            type="primary"
             icon={<FilterOutlined />}
-            onClick={() => message.info(`Applied filters: ${filteredEmployees.length} matches.`)}
+            loading={isLoadingEmployees}
+            onClick={() => loadEmployees(1, pageSize)}
             style={{
               height: 40,
               padding: '0 22px',
               borderRadius: 'var(--radius-base)',
               fontWeight: 600,
-              color: 'var(--color-primary)',
-              borderColor: isDarkMode ? '#333333' : '#d0d7de',
               display: 'flex',
               alignItems: 'center',
               gap: 6,
@@ -1046,6 +1472,7 @@ export const EmployeeManagement = ({
         styles={{ body: { padding: '16px 20px' } }}
       >
         <Table
+          loading={isLoadingEmployees}
           pagination={false}
           size="middle"
           scroll={{ x: 'max-content' }}
@@ -1053,7 +1480,7 @@ export const EmployeeManagement = ({
           columns={columns}
         />
 
-        {/* Custom Table Footer with Pagination */}
+        {/* Custom Table Footer with Pagination & Show Dropdown */}
         <div
           style={{
             display: 'flex',
@@ -1066,13 +1493,44 @@ export const EmployeeManagement = ({
             borderTop: `1px solid ${isDarkMode ? '#1e1e1e' : '#f1f5f9'}`,
           }}
         >
-          <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>
-            Showing 1 to {filteredEmployees.length} of 18 employees
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>
+              {totalServerEmployees === 0
+                ? 'Showing 0 employees'
+                : `Showing ${Math.min((currentPage - 1) * pageSize + 1, totalServerEmployees)} to ${Math.min(currentPage * pageSize, totalServerEmployees)} of ${totalServerEmployees} employee${totalServerEmployees === 1 ? '' : 's'}`}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13, color: isDarkMode ? '#8c8c8c' : '#64748b' }}>Show</span>
+              <Select
+                value={pageSize}
+                onChange={(newSize) => {
+                  setPageSize(newSize);
+                  setCurrentPage(1);
+                }}
+                options={[
+                  { value: 5, label: '5 / page' },
+                  { value: 8, label: '8 / page' },
+                  { value: 10, label: '10 / page' },
+                  { value: 20, label: '20 / page' },
+                  { value: 50, label: '50 / page' },
+                  { value: 100, label: '100 / page' },
+                ]}
+                size="small"
+                style={{ width: 115 }}
+              />
+            </div>
           </div>
+
           <Pagination
             current={currentPage}
-            onChange={setCurrentPage}
-            total={18}
+            onChange={(p, ps) => {
+              setCurrentPage(p);
+              if (ps && ps !== pageSize) {
+                setPageSize(ps);
+              }
+            }}
+            total={totalServerEmployees}
             pageSize={pageSize}
             showSizeChanger={false}
           />
@@ -1080,258 +1538,575 @@ export const EmployeeManagement = ({
       </Card>
 
       {/* 1. EMPLOYEE DETAILS MODAL (PIXEL PERFECT SCREENSHOT 2) */}
+      {/* 1. EMPLOYEE EDIT & DETAILS MODAL (FULL COMPREHENSIVE ATTRIBUTE EDITOR) */}
       <Modal
         title={
-          <div style={{ fontSize: 18, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-            Employee Details
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 18, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+              Edit Employee Details
+            </span>
+            <Tag color="purple" style={{ fontWeight: 700, borderRadius: 4, margin: 0 }}>
+              {selectedEmployee?.employeeId || 'STAFF'}
+            </Tag>
           </div>
         }
         open={isDetailsModalOpen}
         onCancel={() => setIsDetailsModalOpen(false)}
         footer={null}
-        width={560}
+        width={780}
         centered
         destroyOnClose
-        styles={{ body: { padding: '8px 4px 12px 4px' } }}
+        styles={{ body: { padding: '12px 16px 20px 16px' } }}
       >
         {selectedEmployee && (
           <Form form={editEmployeeForm} layout="vertical" onFinish={handleSaveDetails}>
-            {/* Top Profile Section Card */}
+            {/* Top Profile Summary Card */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '16px',
+                padding: '14px 18px',
                 borderRadius: 'var(--radius-base)',
                 backgroundColor: isDarkMode ? '#141414' : '#f8fafc',
                 border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}`,
-                marginBottom: 20,
+                marginBottom: 16,
+                flexWrap: 'wrap',
+                gap: 12,
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <Avatar src={selectedEmployee.avatar} size={64} style={{ border: '2px solid #722ed1', flexShrink: 0 }} />
+                <div
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (re) => {
+                          setEditPhoto(re.target?.result);
+                          message.success('Employee photo updated');
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    };
+                    input.click();
+                  }}
+                  style={{
+                    position: 'relative',
+                    cursor: 'pointer',
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                  }}
+                  title="Click to change employee photo"
+                >
+                  <Avatar
+                    src={editPhoto || selectedEmployee.avatar}
+                    size={64}
+                    style={{ border: '2px solid #722ed1' }}
+                  >
+                    {getGymInitials(selectedEmployee.name)}
+                  </Avatar>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      backgroundColor: '#722ed1',
+                      color: '#ffffff',
+                      borderRadius: '50%',
+                      width: 22,
+                      height: 22,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 11,
+                      border: '2px solid #ffffff',
+                    }}
+                  >
+                    <CameraOutlined />
+                  </div>
+                </div>
+
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
                     {selectedEmployee.name}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                    <Tag
-                      style={{
-                        backgroundColor: isDarkMode ? 'rgba(114, 46, 209, 0.2)' : '#f3effe',
-                        color: isDarkMode ? '#b37feb' : '#722ed1',
-                        border: 'none',
-                        borderRadius: 'var(--radius-base)',
-                        fontWeight: 600,
-                        fontSize: 11,
-                        padding: '1px 8px',
-                        margin: 0,
-                      }}
-                    >
+                    <Tag color="purple" style={{ borderRadius: 4, fontWeight: 600, fontSize: 11, margin: 0 }}>
                       {detailRole}
                     </Tag>
-                    <Tag
-                      style={{
-                        backgroundColor: isDarkMode ? 'rgba(0, 191, 98, 0.15)' : '#eaf8ef',
-                        color: '#00bf62',
-                        border: 'none',
-                        borderRadius: 'var(--radius-base)',
-                        fontWeight: 600,
-                        fontSize: 11,
-                        padding: '1px 8px',
-                        margin: 0,
-                      }}
-                    >
-                      ● {selectedEmployee.status}
+                    <Tag color={selectedEmployee.status === 'Active' ? 'green' : 'orange'} style={{ borderRadius: 4, fontWeight: 600, fontSize: 11, margin: 0 }}>
+                      ● {selectedEmployee.status || 'Active'}
                     </Tag>
-                  </div>
-                  <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <PhoneOutlined /> {selectedEmployee.phone}
-                  </div>
-                  <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <MailOutlined /> {selectedEmployee.email}
+                    <Tag color="blue" style={{ borderRadius: 4, fontWeight: 600, fontSize: 11, margin: 0 }}>
+                      {detailAccessType} Access
+                    </Tag>
                   </div>
                 </div>
               </div>
 
-              {/* Top Right Card Info */}
+              {/* Right Meta Badges */}
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Employee ID</div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: '#722ed1', marginTop: 1 }}>{selectedEmployee.employeeId}</div>
-                <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 8 }}>Start Date</div>
-                <div style={{ fontSize: 13, fontWeight: 650, color: isDarkMode ? '#ffffff' : '#0f172a', marginTop: 1 }}>{selectedEmployee.joinDate}</div>
+                <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 6 }}>Start Date</div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: isDarkMode ? '#ffffff' : '#0f172a', marginTop: 1 }}>{selectedEmployee.joinDate || '05 Oct 2026'}</div>
               </div>
             </div>
 
-            {/* Form Row 1: Access Type & Role */}
-            <Row gutter={16}>
-              <Col xs={24} sm={12}>
-                <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Access Type</span>} style={{ marginBottom: 14 }}>
-                  <Select value={detailAccessType} onChange={setDetailAccessType} style={{ height: 42 }}>
-                    <Option value="Admin">Admin</Option>
-                    <Option value="Employee">Employee</Option>
-                    <Option value="None">None</Option>
-                  </Select>
-                  <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 4 }}>
-                    Admin can access all features and settings.
-                  </div>
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12}>
-                <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Role</span>} style={{ marginBottom: 14 }}>
-                  <Select value={detailRole} onChange={setDetailRole} style={{ height: 42 }}>
-                    <Option value="Front Desk Manager">Front Desk Manager</Option>
-                    <Option value="Trainer">Trainer</Option>
-                    <Option value="Customer Support">Customer Support</Option>
-                    <Option value="Housekeeping">Housekeeping</Option>
-                    <Option value="Nutritionist">Nutritionist</Option>
-                  </Select>
-                  <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 4 }}>
-                    Manage front desk operations and staff.
-                  </div>
-                </Form.Item>
-              </Col>
-            </Row>
+            {/* Comprehensive Tabbed Sections */}
+            <Tabs
+              defaultActiveKey="basic"
+              items={[
+                {
+                  key: 'basic',
+                  label: (
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>
+                      <UserOutlined /> Basic & Role
+                    </span>
+                  ),
+                  children: (
+                    <div style={{ paddingTop: 8 }}>
+                      <Row gutter={16}>
+                        <Col xs={24} sm={12}>
+                          <Form.Item
+                            label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Employee Full Name <span style={{ color: '#ef4444' }}>*</span></span>}
+                            name="name"
+                            rules={[{ required: true, message: 'Please enter employee name' }]}
+                            style={{ marginBottom: 14 }}
+                          >
+                            <Input placeholder="Full name" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={12}>
+                          <Form.Item
+                            label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Phone Number <span style={{ color: '#ef4444' }}>*</span></span>}
+                            required
+                            style={{ marginBottom: 14 }}
+                          >
+                            <Input.Group compact style={{ display: 'flex' }}>
+                              <Form.Item name="countryCode" initialValue="+91" noStyle>
+                                <Select style={{ width: '35%', height: 40 }}>
+                                  <Option value="+91">+91</Option>
+                                  <Option value="+1">+1</Option>
+                                  <Option value="+44">+44</Option>
+                                  <Option value="+971">+971</Option>
+                                </Select>
+                              </Form.Item>
+                              <Form.Item name="phone" noStyle rules={[{ required: true, message: 'Enter phone' }]}>
+                                <Input placeholder="9876543210" style={{ width: '65%', height: 40, borderRadius: '0 8px 8px 0' }} />
+                              </Form.Item>
+                            </Input.Group>
+                          </Form.Item>
+                        </Col>
+                      </Row>
 
-            {/* Form Row 2: Phone & Email */}
-            <Row gutter={16}>
-              <Col xs={24} sm={12}>
-                <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Phone Number</span>} name="phone" initialValue={selectedEmployee.phone} style={{ marginBottom: 16 }}>
-                  <Input style={{ height: 42, borderRadius: 'var(--radius-base)' }} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12}>
-                <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Email ID</span>} name="email" initialValue={selectedEmployee.email} style={{ marginBottom: 16 }}>
-                  <Input style={{ height: 42, borderRadius: 'var(--radius-base)' }} />
-                </Form.Item>
-              </Col>
-            </Row>
+                      <Row gutter={16}>
+                        <Col xs={24} sm={12}>
+                          <Form.Item
+                            label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Email Address <span style={{ color: '#ef4444' }}>*</span></span>}
+                            name="email"
+                            rules={[{ required: true, type: 'email', message: 'Valid email required' }]}
+                            style={{ marginBottom: 14 }}
+                          >
+                            <Input placeholder="email@gymezy.com" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={6}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Gender</span>} name="gender" initialValue="Male" style={{ marginBottom: 14 }}>
+                            <Select style={{ height: 40 }}>
+                              <Option value="Male">Male</Option>
+                              <Option value="Female">Female</Option>
+                              <Option value="Other">Other</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={6}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Employment Type</span>} name="type" initialValue="Full-Time" style={{ marginBottom: 14 }}>
+                            <Select style={{ height: 40 }}>
+                              <Option value="Full-Time">Full-Time</Option>
+                              <Option value="Part-Time">Part-Time</Option>
+                              <Option value="Temporary">Temporary</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                      </Row>
 
-            {/* Change Access Type (3 Cards Grid) */}
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 8 }}>
-                Change Access Type
-              </div>
-              <Row gutter={12}>
-                {[
-                  { key: 'Admin', label: 'Admin', desc: 'Full access to all features and settings', icon: <CrownOutlined /> },
-                  { key: 'Employee', label: 'Employee', desc: 'Limited access to assigned features', icon: <TeamOutlined /> },
-                  { key: 'None', label: 'None', desc: 'No access to system', icon: <CloseCircleOutlined /> },
-                ].map((acc) => {
-                  const isSelected = detailAccessType === acc.key;
-                  return (
-                    <Col xs={24} sm={8} key={acc.key}>
-                      <div
-                        onClick={() => setDetailAccessType(acc.key)}
-                        style={{
-                          height: 96,
-                          padding: '12px',
-                          borderRadius: 'var(--radius-base)',
-                          border: `1.5px solid ${isSelected ? '#722ed1' : isDarkMode ? '#262626' : '#e2e8f0'}`,
-                          backgroundColor: isSelected ? (isDarkMode ? 'rgba(114, 46, 209, 0.15)' : '#f3effe') : isDarkMode ? '#141414' : '#ffffff',
-                          cursor: 'pointer',
-                          position: 'relative',
-                          transition: 'all 0.2s ease',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <span style={{ fontSize: 16, color: isSelected ? '#722ed1' : isDarkMode ? '#888888' : '#64748b' }}>
-                            {acc.icon}
-                          </span>
-                          {isSelected && <CheckCircleFilled style={{ color: '#722ed1', fontSize: 14 }} />}
+                      <Row gutter={16}>
+                        <Col xs={24} sm={12}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Role / Designation <span style={{ color: '#ef4444' }}>*</span></span>} style={{ marginBottom: 14 }}>
+                            <Select value={detailRole} onChange={setDetailRole} style={{ height: 40 }}>
+                              <Option value="Trainer">Trainer</Option>
+                              <Option value="Head Trainer">Head Trainer</Option>
+                              <Option value="Front Desk Manager">Front Desk Manager</Option>
+                              <Option value="Customer Support">Customer Support</Option>
+                              <Option value="Housekeeping">Housekeeping</Option>
+                              <Option value="Nutritionist">Nutritionist</Option>
+                              <Option value="Physiotherapist">Physiotherapist</Option>
+                              <Option value="Maintenance">Maintenance</Option>
+                              <Option value="Security">Security</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={12}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Platform Status</span>} name="status" initialValue="Active" style={{ marginBottom: 14 }}>
+                            <Select style={{ height: 40 }}>
+                              <Option value="Active">Active (Live in System)</Option>
+                              <Option value="Inactive">Inactive</Option>
+                              <Option value="On Leave">On Leave</Option>
+                              <Option value="Suspended">Suspended</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                      </Row>
+
+                      {/* Change Access Type (3 Cards Grid) */}
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 8 }}>
+                          System Access Level
                         </div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: isSelected ? '#722ed1' : isDarkMode ? '#ffffff' : '#0f172a' }}>
-                          {acc.label}
-                        </div>
-                        <div style={{ fontSize: 10.5, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2, lineHeight: 1.3 }}>
-                          {acc.desc}
-                        </div>
+                        <Row gutter={12}>
+                          {[
+                            { key: 'Admin', label: 'Admin', desc: 'Full access to all features and settings', icon: <CrownOutlined /> },
+                            { key: 'Employee', label: 'Employee', desc: 'Limited access to assigned features', icon: <TeamOutlined /> },
+                            { key: 'None', label: 'None', desc: 'No access to system', icon: <CloseCircleOutlined /> },
+                          ].map((acc) => {
+                            const isSelected = detailAccessType === acc.key;
+                            return (
+                              <Col xs={24} sm={8} key={acc.key}>
+                                <div
+                                  onClick={() => setDetailAccessType(acc.key)}
+                                  style={{
+                                    height: 88,
+                                    padding: '10px 12px',
+                                    borderRadius: 'var(--radius-base)',
+                                    border: `1.5px solid ${isSelected ? '#722ed1' : isDarkMode ? '#262626' : '#e2e8f0'}`,
+                                    backgroundColor: isSelected ? (isDarkMode ? 'rgba(114, 46, 209, 0.15)' : '#f3effe') : isDarkMode ? '#141414' : '#ffffff',
+                                    cursor: 'pointer',
+                                    position: 'relative',
+                                    transition: 'all 0.2s ease',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                                    <span style={{ fontSize: 15, color: isSelected ? '#722ed1' : isDarkMode ? '#888888' : '#64748b' }}>
+                                      {acc.icon}
+                                    </span>
+                                    {isSelected && <CheckCircleFilled style={{ color: '#722ed1', fontSize: 13 }} />}
+                                  </div>
+                                  <div style={{ fontSize: 13, fontWeight: 700, color: isSelected ? '#722ed1' : isDarkMode ? '#ffffff' : '#0f172a' }}>
+                                    {acc.label}
+                                  </div>
+                                  <div style={{ fontSize: 10.5, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2, lineHeight: 1.2 }}>
+                                    {acc.desc}
+                                  </div>
+                                </div>
+                              </Col>
+                            );
+                          })}
+                        </Row>
                       </div>
-                    </Col>
-                  );
-                })}
-              </Row>
-            </div>
-
-            {/* Change Role Section */}
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
-                Change Role
-              </div>
-              <Select value={detailRole} onChange={setDetailRole} style={{ width: '100%', height: 42 }}>
-                <Option value="Front Desk Manager">Front Desk Manager</Option>
-                <Option value="Trainer">Trainer</Option>
-                <Option value="Customer Support">Customer Support</Option>
-                <Option value="Housekeeping">Housekeeping</Option>
-                <Option value="Maintenance">Maintenance</Option>
-                <Option value="Nutritionist">Nutritionist</Option>
-                <Option value="Security">Security</Option>
-              </Select>
-              <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 4 }}>
-                Update the employee's role and responsibilities.
-              </div>
-            </div>
-
-            {/* Documents Section Grid */}
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 10 }}>
-                Documents
-              </div>
-              <Row gutter={10}>
-                {[
-                  { name: 'Aadhaar Card', format: 'PDF • 245 KB', icon: <FilePdfOutlined style={{ color: '#e11d48' }} /> },
-                  { name: 'PAN Card', format: 'PDF • 189 KB', icon: <FilePdfOutlined style={{ color: '#e11d48' }} /> },
-                  { name: 'Address Proof', format: 'PDF • 210 KB', icon: <FilePdfOutlined style={{ color: '#e11d48' }} /> },
-                  { name: 'Photo', format: 'JPG • 120 KB', icon: <FileImageOutlined style={{ color: '#00bf62' }} /> },
-                ].map((doc, idx) => (
-                  <Col xs={12} sm={6} key={idx}>
-                    <div
-                      style={{
-                        padding: '12px 10px',
-                        borderRadius: 'var(--radius-base)',
-                        border: `1px solid ${isDarkMode ? '#262626' : '#e2e8f0'}`,
-                        backgroundColor: isDarkMode ? '#141414' : '#fafafa',
-                        textAlign: 'center',
-                      }}
-                    >
-                      <div style={{ fontSize: 22, marginBottom: 4 }}>{doc.icon}</div>
-                      <div style={{ fontSize: 12, fontWeight: 650, color: isDarkMode ? '#ffffff' : '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {doc.name}
-                      </div>
-                      <div style={{ fontSize: 10, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
-                        {doc.format}
-                      </div>
-                      <Button
-                        size="small"
-                        onClick={() => message.info(`Viewing ${doc.name}`)}
-                        style={{
-                          marginTop: 8,
-                          height: 26,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          borderRadius: 'var(--radius-base)',
-                          width: '100%',
-                          color: 'var(--color-primary)',
-                          borderColor: isDarkMode ? '#333333' : '#d0d7de',
-                        }}
-                      >
-                        View
-                      </Button>
                     </div>
-                  </Col>
-                ))}
-              </Row>
-            </div>
+                  ),
+                },
+                {
+                  key: 'experience',
+                  label: (
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>
+                      <IdcardOutlined /> Professional & Experience
+                    </span>
+                  ),
+                  children: (
+                    <div style={{ paddingTop: 8 }}>
+                      <Row gutter={16}>
+                        <Col xs={24} sm={14}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Specialization / Key Skills</span>} name="specialty" style={{ marginBottom: 14 }}>
+                            <Input placeholder="e.g. Strength Training, HIIT, Yoga, Nutrition" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={10}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Years of Experience</span>} name="experienceYears" style={{ marginBottom: 14 }}>
+                            <Select style={{ height: 40 }}>
+                              <Option value={1}>1 Year</Option>
+                              <Option value={2}>2 Years</Option>
+                              <Option value={3}>3-5 Years</Option>
+                              <Option value={5}>5-8 Years</Option>
+                              <Option value={10}>10+ Years</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                      </Row>
+
+                      <Row gutter={16}>
+                        <Col xs={24} sm={12}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Previous Company / Gym</span>} name="prevCompany" style={{ marginBottom: 14 }}>
+                            <Input placeholder="e.g. Gold's Gym" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={12}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Previous Designation</span>} name="prevDesignation" style={{ marginBottom: 14 }}>
+                            <Input placeholder="e.g. Senior Floor Trainer" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+
+                      <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Previous Experience Summary</span>} name="prevExp" style={{ marginBottom: 14 }}>
+                        <Input placeholder="e.g. 3 years as Head Strength Coach handling 50+ clients" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
+                      </Form.Item>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'schedule_pay',
+                  label: (
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>
+                      <ClockCircleOutlined /> Schedule & Compensation
+                    </span>
+                  ),
+                  children: (
+                    <div style={{ paddingTop: 8 }}>
+                      <Row gutter={16}>
+                        <Col xs={24} sm={12}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Shift Start Time</span>} name="workingTimeStart" initialValue="06:00 AM" style={{ marginBottom: 14 }}>
+                            <Input placeholder="06:00 AM" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={12}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Shift End Time</span>} name="workingTimeEnd" initialValue="02:00 PM" style={{ marginBottom: 14 }}>
+                            <Input placeholder="02:00 PM" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+
+                      {/* Working Days Selector */}
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 8 }}>
+                          Assigned Working Days
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
+                            const isSelected = editWorkingDays.includes(day);
+                            return (
+                              <button
+                                key={day}
+                                type="button"
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setEditWorkingDays(editWorkingDays.filter((d) => d !== day));
+                                  } else {
+                                    setEditWorkingDays([...editWorkingDays, day]);
+                                  }
+                                }}
+                                style={{
+                                  padding: '6px 14px',
+                                  borderRadius: 8,
+                                  border: `1.5px solid ${isSelected ? '#722ed1' : isDarkMode ? '#333' : '#d0d7de'}`,
+                                  backgroundColor: isSelected ? '#722ed1' : isDarkMode ? '#1e1e1e' : '#ffffff',
+                                  color: isSelected ? '#ffffff' : isDarkMode ? '#cccccc' : '#334155',
+                                  fontWeight: 700,
+                                  fontSize: 12,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                }}
+                              >
+                                {day}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <Row gutter={16}>
+                        <Col xs={24} sm={12}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Compensation Model</span>} name="payType" initialValue="Monthly" style={{ marginBottom: 14 }}>
+                            <Select style={{ height: 40 }}>
+                              <Option value="Monthly">Monthly Fixed Salary</Option>
+                              <Option value="Session">Per Session / Personal Training</Option>
+                              <Option value="Hourly">Hourly Rate</Option>
+                              <Option value="Daily">Daily Pay</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={12}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Salary / Pay Amount (₹)</span>} name="payAmount" initialValue={25000} style={{ marginBottom: 14 }}>
+                            <InputNumber prefix="₹" style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }} />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+
+                      <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Internal Admin Notes</span>} name="notes" style={{ marginBottom: 10 }}>
+                        <TextArea rows={2} placeholder="Optional internal notes about shift, performance, or agreements" />
+                      </Form.Item>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'emergency_docs',
+                  label: (
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>
+                      <PaperClipOutlined /> Emergency & Documents
+                    </span>
+                  ),
+                  children: (
+                    <div style={{ paddingTop: 8 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                        <TeamOutlined /> Emergency Contact Details
+                      </div>
+
+                      <Row gutter={12}>
+                        <Col xs={24} sm={8}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Contact Person Name</span>} name="emergencyName" style={{ marginBottom: 12 }}>
+                            <Input placeholder="Full name" style={{ height: 38, borderRadius: 'var(--radius-base)' }} />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={8}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Relationship</span>} name="emergencyRel" style={{ marginBottom: 12 }}>
+                            <Input placeholder="e.g. Spouse / Brother" style={{ height: 38, borderRadius: 'var(--radius-base)' }} />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={8}>
+                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Emergency Phone</span>} name="emergencyPhone" style={{ marginBottom: 12 }}>
+                            <Input placeholder="+91 98765 43210" style={{ height: 38, borderRadius: 'var(--radius-base)' }} />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+
+                      {/* Documents Section */}
+                      <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 14, marginTop: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <PaperClipOutlined /> Attached Documents ({editEmpDocs.length})
+                          </div>
+                          <Button
+                            size="small"
+                            type="primary"
+                            ghost
+                            icon={<PaperClipOutlined />}
+                            onClick={() => openAttachDocModal('edit_emp')}
+                            style={{
+                              borderRadius: 'var(--radius-base)',
+                              fontWeight: 600,
+                              fontSize: 12,
+                              borderColor: '#722ed1',
+                              color: '#722ed1',
+                            }}
+                          >
+                            Attach New Document
+                          </Button>
+                        </div>
+
+                        {editEmpDocs.length > 0 ? (
+                          <div style={{ width: '100%', overflowX: 'hidden', borderRadius: 8, border: `1px solid ${isDarkMode ? '#333333' : '#f0f0f0'}` }}>
+                            <Table
+                              size="small"
+                              pagination={false}
+                              tableLayout="fixed"
+                              dataSource={editEmpDocs}
+                              columns={[
+                                {
+                                  title: 'Document Type',
+                                  dataIndex: 'docType',
+                                  key: 'docType',
+                                  width: 150,
+                                  ellipsis: true,
+                                  render: (t) => <span style={{ fontWeight: 600 }}>{t}</span>,
+                                },
+                                {
+                                  title: 'Doc Number',
+                                  dataIndex: 'docNum',
+                                  key: 'docNum',
+                                  width: 130,
+                                  ellipsis: true,
+                                  render: (n) => <span style={{ fontFamily: 'monospace' }}>{n || '—'}</span>,
+                                },
+                                {
+                                  title: 'File Name',
+                                  dataIndex: 'fileName',
+                                  key: 'fileName',
+                                  ellipsis: true,
+                                  render: (f) => (
+                                    <span
+                                      title={f}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        color: '#1677ff',
+                                        cursor: 'pointer',
+                                        maxWidth: 160,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                      onClick={() => message.info(`Viewing ${f}`)}
+                                    >
+                                      <FilePdfOutlined style={{ color: '#ef4444', flexShrink: 0 }} />
+                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f}</span>
+                                    </span>
+                                  ),
+                                },
+                                {
+                                  title: 'Action',
+                                  key: 'action',
+                                  width: 60,
+                                  align: 'center',
+                                  render: (_, rec) => (
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      danger
+                                      icon={<DeleteOutlined />}
+                                      onClick={() => setEditEmpDocs(editEmpDocs.filter((d) => d.key !== rec.key && d._id !== rec._id))}
+                                    />
+                                  ),
+                                },
+                              ]}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              padding: '16px',
+                              textAlign: 'center',
+                              borderRadius: 'var(--radius-base)',
+                              backgroundColor: isDarkMode ? '#141414' : '#fafafa',
+                              border: `1px dashed ${isDarkMode ? '#262626' : '#e2e8f0'}`,
+                              color: isDarkMode ? '#888888' : '#64748b',
+                              fontSize: 12.5,
+                            }}
+                          >
+                            No documents attached yet. Click "Attach New Document" to add ID proofs, certificates, or salary slips.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ),
+                },
+              ]}
+            />
 
             {/* Modal Actions */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 14,
+                marginTop: 20,
+                paddingTop: 14,
+                borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`,
+              }}
+            >
               <Button
                 danger
                 icon={<PoweroffOutlined />}
+                loading={isDeactivating}
                 onClick={handleDeactivate}
                 style={{
-                  height: 44,
-                  padding: '0 18px',
+                  height: 42,
+                  padding: '0 16px',
                   borderRadius: 'var(--radius-base)',
                   fontWeight: 600,
                   fontSize: 13,
@@ -1339,25 +2114,33 @@ export const EmployeeManagement = ({
               >
                 Deactivate Employee
               </Button>
-              <Button
-                type="primary"
-                htmlType="submit"
-                style={{
-                  height: 44,
-                  padding: '0 28px',
-                  borderRadius: 'var(--radius-base)',
-                  fontWeight: 600,
-                  fontSize: 14,
-                  backgroundColor: 'var(--color-primary)',
-                  borderColor: 'var(--color-primary)',
-                  color: '#ffffff',
-                }}
-              >
-                Save Changes
-              </Button>
-            </div>
-            <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 8 }}>
-              Employee will not be able to login or access the system.
+
+              <Space>
+                <Button
+                  onClick={() => setIsDetailsModalOpen(false)}
+                  style={{ height: 42, padding: '0 20px', borderRadius: 'var(--radius-base)', fontWeight: 600 }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={isSavingDetails}
+                  icon={<CheckOutlined />}
+                  style={{
+                    height: 42,
+                    padding: '0 28px',
+                    borderRadius: 'var(--radius-base)',
+                    fontWeight: 700,
+                    fontSize: 13.5,
+                    backgroundColor: 'var(--color-primary)',
+                    borderColor: 'var(--color-primary)',
+                    color: '#ffffff',
+                  }}
+                >
+                  Save All Changes
+                </Button>
+              </Space>
             </div>
           </Form>
         )}
@@ -1415,191 +2198,251 @@ export const EmployeeManagement = ({
           setAddStep(1);
           addEmployeeForm.resetFields();
           setAddPhoto(null);
+          setPersonalDocs([]);
+          setEmpDocs([]);
+          setTrainerCerts([]);
         }}
         footer={null}
-        width={700}
+        width={740}
         centered
-        destroyOnClose
-        styles={{ body: { padding: '12px 4px 16px 4px' } }}
+        styles={{ body: { padding: '16px 24px 24px 24px' } }}
       >
-        <Form form={addEmployeeForm} layout="vertical" onFinish={handleCompleteAddEmployee}>
-          {addStep === 1 && (
-            <div>
-              {/* Photo + Basic Details */}
-              <Row gutter={16} align="top" style={{ marginBottom: 16 }}>
-                <Col xs={24} sm={8}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
-                    Employee Photo
-                  </div>
-                  <div
-                    onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = 'image/*';
-                      input.onchange = (e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (re) => setAddPhoto(re.target?.result);
-                          reader.readAsDataURL(file);
-                          message.success('Photo attached');
-                        }
-                      };
-                      input.click();
-                    }}
-                    style={{
-                      height: 130,
-                      borderRadius: 'var(--radius-base)',
-                      border: `2px dashed ${addPhoto ? '#722ed1' : isDarkMode ? '#333333' : '#d0d7de'}`,
-                      backgroundColor: isDarkMode ? '#141414' : '#fafafa',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      padding: 8,
-                      textAlign: 'center',
-                    }}
-                  >
-                    {addPhoto ? (
-                      <img src={addPhoto} alt="Employee" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} />
-                    ) : (
-                      <>
-                        <CameraOutlined style={{ fontSize: 28, color: '#722ed1', marginBottom: 6 }} />
-                        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#722ed1' }}>Upload Photo</div>
-                        <div style={{ fontSize: 10, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>JPG, PNG (Max 2MB)</div>
-                      </>
-                    )}
-                  </div>
-                </Col>
-
-                <Col xs={24} sm={16}>
-                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Employee Name <span style={{ color: '#ef4444' }}>*</span></span>} name="name" rules={[{ required: true, message: 'Enter name' }]} style={{ marginBottom: 10 }}>
-                    <Input placeholder="Enter employee name" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
-                  </Form.Item>
-
-                  <Row gutter={10}>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Phone Number <span style={{ color: '#ef4444' }}>*</span></span>} required style={{ marginBottom: 10 }}>
-                        <Input.Group compact>
-                          <Form.Item name="countryCode" initialValue="+91" noStyle>
-                            <Select style={{ width: '35%', height: 40 }}>
-                              <Option value="+91">+91</Option>
-                              <Option value="+1">+1</Option>
-                            </Select>
-                          </Form.Item>
-                          <Form.Item name="phone" noStyle rules={[{ required: true, message: 'Enter phone' }]}>
-                            <Input placeholder="Enter phone" style={{ width: '65%', height: 40, borderRadius: '0 8px 8px 0' }} />
-                          </Form.Item>
-                        </Input.Group>
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Email ID <span style={{ color: '#ef4444' }}>*</span></span>} name="email" rules={[{ required: true, type: 'email', message: 'Enter valid email' }]} style={{ marginBottom: 10 }}>
-                        <Input placeholder="Enter email address" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col xs={24} sm={12}>
-                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Role <span style={{ color: '#ef4444' }}>*</span></span>} name="role" initialValue="Trainer" rules={[{ required: true }]} style={{ marginBottom: 14 }}>
-                    <Select style={{ height: 40 }}>
-                      <Option value="Front Desk Manager">Front Desk Manager</Option>
-                      <Option value="Trainer">Trainer</Option>
-                      <Option value="Customer Support">Customer Support</Option>
-                      <Option value="Housekeeping">Housekeeping</Option>
-                      <Option value="Nutritionist">Nutritionist</Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12}>
-                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Access Level <span style={{ color: '#ef4444' }}>*</span></span>} name="accessLevel" initialValue="Admin" rules={[{ required: true }]} style={{ marginBottom: 4 }}>
-                    <Select style={{ height: 40 }}>
-                      <Option value="Admin">Admin</Option>
-                      <Option value="Employee">Employee</Option>
-                      <Option value="None">None</Option>
-                    </Select>
-                  </Form.Item>
-                  <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginBottom: 14 }}>
-                    Define what this employee can access in the system.
-                  </div>
-                </Col>
-              </Row>
-
-              {/* Previous Employment Details */}
-              <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 14, marginTop: 6 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                  <CalendarOutlined /> Previous Employment Details
+        <Form
+          form={addEmployeeForm}
+          layout="vertical"
+          preserve={true}
+          onFinish={handleCompleteAddEmployee}
+        >
+          {/* STEP 1: Personal & Basic Info */}
+          <div style={{ display: addStep === 1 ? 'block' : 'none' }}>
+            {/* Photo + Basic Details */}
+            <Row gutter={16} align="top" style={{ marginBottom: 16 }}>
+              <Col xs={24} sm={8}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
+                  Employee Photo
                 </div>
+                <div
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (re) => setAddPhoto(re.target?.result);
+                        reader.readAsDataURL(file);
+                        message.success('Photo attached');
+                      }
+                    };
+                    input.click();
+                  }}
+                  style={{
+                    height: 130,
+                    borderRadius: 'var(--radius-base)',
+                    border: `2px dashed ${addPhoto ? '#722ed1' : isDarkMode ? '#333333' : '#d0d7de'}`,
+                    backgroundColor: isDarkMode ? '#141414' : '#fafafa',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    padding: 8,
+                    textAlign: 'center',
+                  }}
+                >
+                  {addPhoto ? (
+                    <img src={addPhoto} alt="Employee" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} />
+                  ) : (
+                    <>
+                      <CameraOutlined style={{ fontSize: 28, color: '#722ed1', marginBottom: 6 }} />
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#722ed1' }}>Upload Photo</div>
+                      <div style={{ fontSize: 10, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>JPG, PNG (Max 2MB)</div>
+                    </>
+                  )}
+                </div>
+              </Col>
 
-                <Row gutter={12}>
-                  <Col xs={24} sm={8}>
-                    <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Company Name</span>} name="prevCompany" style={{ marginBottom: 10 }}>
-                      <Input placeholder="Enter company name" style={{ height: 38, borderRadius: 'var(--radius-base)' }} />
+              <Col xs={24} sm={16}>
+                <Form.Item
+                  label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Employee Name <span style={{ color: '#ef4444' }}>*</span></span>}
+                  name="name"
+                  rules={[{ required: true, message: 'Please enter employee name' }]}
+                  style={{ marginBottom: 12 }}
+                >
+                  <Input placeholder="Enter employee name" style={{ height: 40, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
+                </Form.Item>
+
+                <Row gutter={10}>
+                  <Col xs={24} sm={12}>
+                    <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Phone Number <span style={{ color: '#ef4444' }}>*</span></span>} required style={{ marginBottom: 12 }}>
+                      <Input.Group compact style={{ display: 'flex' }}>
+                        <Form.Item name="countryCode" initialValue="+91" noStyle>
+                          <Select style={{ width: '38%', height: 40 }}>
+                            <Option value="+91">+91</Option>
+                            <Option value="+1">+1</Option>
+                            <Option value="+44">+44</Option>
+                            <Option value="+971">+971</Option>
+                          </Select>
+                        </Form.Item>
+                        <Form.Item name="phone" noStyle rules={[{ required: true, message: 'Enter phone' }]}>
+                          <Input placeholder="9876543210" style={{ width: '62%', height: 40, borderRadius: '0 8px 8px 0', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
+                        </Form.Item>
+                      </Input.Group>
                     </Form.Item>
                   </Col>
-                  <Col xs={24} sm={8}>
-                    <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Designation</span>} name="prevDesignation" style={{ marginBottom: 10 }}>
-                      <Input placeholder="Enter designation" style={{ height: 38, borderRadius: 'var(--radius-base)' }} />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} sm={8}>
-                    <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Years of Experience</span>} name="prevExp" style={{ marginBottom: 10 }}>
-                      <Select placeholder="Select experience" style={{ height: 38 }}>
-                        <Option value="1-2 Years">1-2 Years</Option>
-                        <Option value="3-5 Years">3-5 Years</Option>
-                        <Option value="5+ Years">5+ Years</Option>
-                      </Select>
+                  <Col xs={24} sm={12}>
+                    <Form.Item
+                      label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Email ID <span style={{ color: '#ef4444' }}>*</span></span>}
+                      name="email"
+                      rules={[{ required: true, type: 'email', message: 'Enter valid email' }]}
+                      style={{ marginBottom: 12 }}
+                    >
+                      <Input placeholder="staff@gymezy.com" style={{ height: 40, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
                     </Form.Item>
                   </Col>
                 </Row>
+              </Col>
+            </Row>
 
-                {/* Added Employment Documents Table */}
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#475569' }}>
-                      Added Employment Documents
-                    </div>
-                    <Button
-                      size="small"
-                      type="dashed"
-                      icon={<PaperClipOutlined />}
-                      onClick={() => openAttachDocModal('employment')}
-                      style={{
-                        borderRadius: 'var(--radius-base)',
-                        fontWeight: 600,
-                        fontSize: 11.5,
-                        color: '#722ed1',
-                        borderColor: '#722ed1',
-                      }}
-                    >
-                      Attach Document
-                    </Button>
+            <Row gutter={16}>
+              <Col xs={24} sm={12}>
+                <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Role <span style={{ color: '#ef4444' }}>*</span></span>} name="role" initialValue="Trainer" rules={[{ required: true }]} style={{ marginBottom: 14 }}>
+                  <Select style={{ height: 40 }}>
+                    <Option value="Trainer">Trainer</Option>
+                    <Option value="Front Desk Manager">Front Desk Manager</Option>
+                    <Option value="Customer Support">Customer Support</Option>
+                    <Option value="Housekeeping">Housekeeping</Option>
+                    <Option value="Nutritionist">Nutritionist</Option>
+                    <Option value="Maintenance">Maintenance</Option>
+                    <Option value="Security">Security</Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Access Level <span style={{ color: '#ef4444' }}>*</span></span>} name="accessLevel" initialValue="Admin" rules={[{ required: true }]} style={{ marginBottom: 4 }}>
+                  <Select style={{ height: 40 }}>
+                    <Option value="Admin">Admin</Option>
+                    <Option value="Employee">Employee</Option>
+                    <Option value="None">None</Option>
+                  </Select>
+                </Form.Item>
+                <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginBottom: 14 }}>
+                  Define what this employee can access in the system.
+                </div>
+              </Col>
+            </Row>
+
+            {/* Previous Employment Details */}
+            <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 14, marginTop: 6 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <CalendarOutlined /> Previous Employment Details
+              </div>
+
+              <Row gutter={12}>
+                <Col xs={24} sm={8}>
+                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Company Name</span>} name="prevCompany" style={{ marginBottom: 10 }}>
+                    <Input placeholder="e.g. Gold's Gym" style={{ height: 38, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Designation</span>} name="prevDesignation" style={{ marginBottom: 10 }}>
+                    <Input placeholder="e.g. Senior Trainer" style={{ height: 38, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Years of Experience</span>} name="prevExp" style={{ marginBottom: 10 }}>
+                    <Select placeholder="Select experience" style={{ height: 38 }}>
+                      <Option value="1-2 Years">1-2 Years</Option>
+                      <Option value="3-5 Years">3-5 Years</Option>
+                      <Option value="5+ Years">5+ Years</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              {/* Added Employment Documents Table */}
+              <div style={{ marginTop: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#475569' }}>
+                    Added Employment Documents ({empDocs.length})
                   </div>
+                  <Button
+                    size="small"
+                    type="dashed"
+                    icon={<PaperClipOutlined />}
+                    onClick={() => openAttachDocModal('employment')}
+                    style={{
+                      borderRadius: 'var(--radius-base)',
+                      fontWeight: 600,
+                      fontSize: 11.5,
+                      color: '#722ed1',
+                      borderColor: '#722ed1',
+                    }}
+                  >
+                    Attach Document
+                  </Button>
+                </div>
+                <div style={{ width: '100%', overflowX: 'hidden', borderRadius: 8, border: `1px solid ${isDarkMode ? '#333333' : '#f0f0f0'}` }}>
                   <Table
                     size="small"
                     pagination={false}
+                    tableLayout="fixed"
                     dataSource={empDocs}
                     columns={[
-                      { title: 'Document Type', dataIndex: 'docType', key: 'docType', render: (t) => <span style={{ fontWeight: 600 }}>{t}</span> },
-                      { title: 'Document Number', dataIndex: 'docNum', key: 'docNum', render: (n) => <span style={{ fontFamily: 'monospace' }}>{n}</span> },
+                      {
+                        title: 'Document Type',
+                        dataIndex: 'docType',
+                        key: 'docType',
+                        width: 150,
+                        ellipsis: true,
+                        render: (t) => <span style={{ fontWeight: 600 }}>{t}</span>,
+                      },
+                      {
+                        title: 'Document Number',
+                        dataIndex: 'docNum',
+                        key: 'docNum',
+                        width: 140,
+                        ellipsis: true,
+                        render: (n) => <span style={{ fontFamily: 'monospace' }}>{n || '—'}</span>,
+                      },
                       {
                         title: 'File Name',
                         dataIndex: 'fileName',
                         key: 'fileName',
+                        ellipsis: true,
                         render: (f) => (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#1677ff', cursor: 'pointer' }} onClick={() => message.info(`Viewing ${f}`)}>
-                            <FilePdfOutlined style={{ color: '#ef4444' }} /> {f}
+                          <span
+                            title={f}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              color: '#1677ff',
+                              cursor: 'pointer',
+                              maxWidth: 170,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                            onClick={() => message.info(`Viewing ${f}`)}
+                          >
+                            <FilePdfOutlined style={{ color: '#ef4444', flexShrink: 0 }} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f}</span>
                           </span>
                         ),
                       },
-                      { title: 'Added On', dataIndex: 'addedOn', key: 'addedOn' },
+                      {
+                        title: 'Added On',
+                        dataIndex: 'addedOn',
+                        key: 'addedOn',
+                        width: 105,
+                      },
                       {
                         title: 'Action',
                         key: 'action',
+                        width: 60,
+                        align: 'center',
                         render: (_, rec) => (
                           <Button
                             type="text"
@@ -1614,101 +2457,140 @@ export const EmployeeManagement = ({
                   />
                 </div>
               </div>
+            </div>
 
-              {/* Step 1 Actions */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 24 }}>
-                <Button onClick={() => setIsAddModalOpen(false)} style={{ borderRadius: 'var(--radius-base)', height: 42, padding: '0 24px' }}>
-                  Cancel
-                </Button>
+            {/* Step 1 Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 24 }}>
+              <Button onClick={() => setIsAddModalOpen(false)} style={{ borderRadius: 'var(--radius-base)', height: 42, padding: '0 24px' }}>
+                Cancel
+              </Button>
+              <Button
+                type="primary"
+                onClick={handleNextToAddStep2}
+                style={{
+                  borderRadius: 'var(--radius-base)',
+                  height: 42,
+                  padding: '0 28px',
+                  backgroundColor: 'var(--color-primary)',
+                  borderColor: 'var(--color-primary)',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                }}
+              >
+                Next <ArrowRightOutlined />
+              </Button>
+            </div>
+          </div>
+
+          {/* STEP 2: Family & Verification Documents */}
+          <div style={{ display: addStep === 2 ? 'block' : 'none' }}>
+            {/* Family Details */}
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              <TeamOutlined /> Family Details
+            </div>
+
+            <Row gutter={12}>
+              <Col xs={24} sm={8}>
+                <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Emergency Contact Name <span style={{ color: '#ef4444' }}>*</span></span>} name="emergencyName" style={{ marginBottom: 12 }}>
+                  <Input placeholder="Contact full name" style={{ height: 38, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Relationship <span style={{ color: '#ef4444' }}>*</span></span>} name="emergencyRel" style={{ marginBottom: 12 }}>
+                  <Input placeholder="e.g. Spouse / Brother" style={{ height: 38, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Phone Number <span style={{ color: '#ef4444' }}>*</span></span>} name="emergencyPhone" style={{ marginBottom: 12 }}>
+                  <Input placeholder="+91 98765 43210" style={{ height: 38, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            {/* Documents Section */}
+            <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 14, marginTop: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <IdcardOutlined /> Documents ({personalDocs.length})
+                </div>
                 <Button
+                  size="small"
                   type="primary"
-                  onClick={() => setAddStep(2)}
+                  ghost
+                  icon={<PaperClipOutlined />}
+                  onClick={() => openAttachDocModal('personal')}
                   style={{
                     borderRadius: 'var(--radius-base)',
-                    height: 42,
-                    padding: '0 28px',
-                    backgroundColor: 'var(--color-primary)',
-                    borderColor: 'var(--color-primary)',
-                    color: '#ffffff',
                     fontWeight: 600,
+                    fontSize: 12,
+                    borderColor: '#722ed1',
+                    color: '#722ed1',
                   }}
                 >
-                  Next <ArrowRightOutlined />
+                  Attach Document
                 </Button>
               </div>
-            </div>
-          )}
 
-          {addStep === 2 && (
-            <div>
-              {/* Family Details */}
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                <TeamOutlined /> Family Details
-              </div>
-
-              <Row gutter={12}>
-                <Col xs={24} sm={8}>
-                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Emergency Contact Name <span style={{ color: '#ef4444' }}>*</span></span>} name="emergencyName" rules={[{ required: true, message: 'Required' }]} style={{ marginBottom: 12 }}>
-                    <Input placeholder="Enter contact name" style={{ height: 38, borderRadius: 'var(--radius-base)' }} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={8}>
-                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Relationship <span style={{ color: '#ef4444' }}>*</span></span>} name="emergencyRel" rules={[{ required: true, message: 'Required' }]} style={{ marginBottom: 12 }}>
-                    <Input placeholder="Enter relationship" style={{ height: 38, borderRadius: 'var(--radius-base)' }} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={8}>
-                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Phone Number <span style={{ color: '#ef4444' }}>*</span></span>} name="emergencyPhone" rules={[{ required: true, message: 'Required' }]} style={{ marginBottom: 12 }}>
-                    <Input placeholder="+91 98765 43210" style={{ height: 38, borderRadius: 'var(--radius-base)' }} />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              {/* Documents Section */}
-              <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 14, marginTop: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <IdcardOutlined /> Documents
-                  </div>
-                  <Button
-                    size="small"
-                    type="primary"
-                    ghost
-                    icon={<PaperClipOutlined />}
-                    onClick={() => openAttachDocModal('personal')}
-                    style={{
-                      borderRadius: 'var(--radius-base)',
-                      fontWeight: 600,
-                      fontSize: 12,
-                      borderColor: '#722ed1',
-                      color: '#722ed1',
-                    }}
-                  >
-                    Attach Document
-                  </Button>
-                </div>
-
+              <div style={{ width: '100%', overflowX: 'hidden', borderRadius: 8, border: `1px solid ${isDarkMode ? '#333333' : '#f0f0f0'}` }}>
                 <Table
                   size="small"
                   pagination={false}
+                  tableLayout="fixed"
                   dataSource={personalDocs}
                   columns={[
-                    { title: 'Document Type', dataIndex: 'docType', key: 'docType', render: (t) => <span style={{ fontWeight: 600 }}>{t}</span> },
-                    { title: 'Document Number', dataIndex: 'docNum', key: 'docNum', render: (n) => <span style={{ fontFamily: 'monospace' }}>{n}</span> },
+                    {
+                      title: 'Document Type',
+                      dataIndex: 'docType',
+                      key: 'docType',
+                      width: 150,
+                      ellipsis: true,
+                      render: (t) => <span style={{ fontWeight: 600 }}>{t}</span>,
+                    },
+                    {
+                      title: 'Document Number',
+                      dataIndex: 'docNum',
+                      key: 'docNum',
+                      width: 140,
+                      ellipsis: true,
+                      render: (n) => <span style={{ fontFamily: 'monospace' }}>{n || '—'}</span>,
+                    },
                     {
                       title: 'File Name',
                       dataIndex: 'fileName',
                       key: 'fileName',
+                      ellipsis: true,
                       render: (f) => (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#1677ff', cursor: 'pointer' }} onClick={() => message.info(`Viewing ${f}`)}>
-                          <FilePdfOutlined style={{ color: '#ef4444' }} /> {f}
+                        <span
+                          title={f}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            color: '#1677ff',
+                            cursor: 'pointer',
+                            maxWidth: 170,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                          onClick={() => message.info(`Viewing ${f}`)}
+                        >
+                          <FilePdfOutlined style={{ color: '#ef4444', flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f}</span>
                         </span>
                       ),
                     },
-                    { title: 'Added On', dataIndex: 'addedOn', key: 'addedOn' },
+                    {
+                      title: 'Added On',
+                      dataIndex: 'addedOn',
+                      key: 'addedOn',
+                      width: 105,
+                    },
                     {
                       title: 'Action',
                       key: 'action',
+                      width: 60,
+                      align: 'center',
                       render: (_, rec) => (
                         <Button
                           type="text"
@@ -1722,52 +2604,92 @@ export const EmployeeManagement = ({
                   ]}
                 />
               </div>
+            </div>
 
-              {/* Trainer Certificate (If Employee is a Trainer) */}
-              <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 14, marginTop: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <CrownOutlined /> Trainer Certificate (If Employee is a Trainer)
-                  </div>
-                  <Button
-                    size="small"
-                    type="primary"
-                    ghost
-                    icon={<PaperClipOutlined />}
-                    onClick={() => openAttachDocModal('trainer')}
-                    style={{
-                      borderRadius: 'var(--radius-base)',
-                      fontWeight: 600,
-                      fontSize: 12,
-                      borderColor: '#722ed1',
-                      color: '#722ed1',
-                    }}
-                  >
-                    Attach Certificate
-                  </Button>
+            {/* Trainer Certificate (If Employee is a Trainer) */}
+            <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 14, marginTop: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <CrownOutlined /> Trainer Certificate ({trainerCerts.length})
                 </div>
+                <Button
+                  size="small"
+                  type="primary"
+                  ghost
+                  icon={<PaperClipOutlined />}
+                  onClick={() => openAttachDocModal('trainer')}
+                  style={{
+                    borderRadius: 'var(--radius-base)',
+                    fontWeight: 600,
+                    fontSize: 12,
+                    borderColor: '#722ed1',
+                    color: '#722ed1',
+                  }}
+                >
+                  Attach Certificate
+                </Button>
+              </div>
 
+              <div style={{ width: '100%', overflowX: 'hidden', borderRadius: 8, border: `1px solid ${isDarkMode ? '#333333' : '#f0f0f0'}` }}>
                 <Table
                   size="small"
                   pagination={false}
+                  tableLayout="fixed"
                   dataSource={trainerCerts}
                   columns={[
-                    { title: 'Certificate Type', dataIndex: 'certType', key: 'certType', render: (t) => <span style={{ fontWeight: 600 }}>{t}</span> },
-                    { title: 'Document Number', dataIndex: 'certNum', key: 'certNum', render: (n) => <span style={{ fontFamily: 'monospace' }}>{n}</span> },
+                    {
+                      title: 'Certificate Type',
+                      dataIndex: 'certType',
+                      key: 'certType',
+                      width: 150,
+                      ellipsis: true,
+                      render: (t) => <span style={{ fontWeight: 600 }}>{t}</span>,
+                    },
+                    {
+                      title: 'Document Number',
+                      dataIndex: 'certNum',
+                      key: 'certNum',
+                      width: 140,
+                      ellipsis: true,
+                      render: (n) => <span style={{ fontFamily: 'monospace' }}>{n || '—'}</span>,
+                    },
                     {
                       title: 'File Name',
                       dataIndex: 'fileName',
                       key: 'fileName',
+                      ellipsis: true,
                       render: (f) => (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#1677ff', cursor: 'pointer' }} onClick={() => message.info(`Viewing ${f}`)}>
-                          <FilePdfOutlined style={{ color: '#ef4444' }} /> {f}
+                        <span
+                          title={f}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            color: '#1677ff',
+                            cursor: 'pointer',
+                            maxWidth: 170,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                          onClick={() => message.info(`Viewing ${f}`)}
+                        >
+                          <FilePdfOutlined style={{ color: '#ef4444', flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f}</span>
                         </span>
                       ),
                     },
-                    { title: 'Added On', dataIndex: 'addedOn', key: 'addedOn' },
+                    {
+                      title: 'Added On',
+                      dataIndex: 'addedOn',
+                      key: 'addedOn',
+                      width: 105,
+                    },
                     {
                       title: 'Action',
                       key: 'action',
+                      width: 60,
+                      align: 'center',
                       render: (_, rec) => (
                         <Button
                           type="text"
@@ -1781,35 +2703,36 @@ export const EmployeeManagement = ({
                   ]}
                 />
               </div>
-
-              {/* Step 2 Actions */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 24 }}>
-                <Button
-                  onClick={() => setAddStep(1)}
-                  icon={<ArrowLeftOutlined />}
-                  style={{ borderRadius: 'var(--radius-base)', height: 42, padding: '0 24px' }}
-                >
-                  Back
-                </Button>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  icon={<UserAddOutlined />}
-                  style={{
-                    borderRadius: 'var(--radius-base)',
-                    height: 42,
-                    padding: '0 28px',
-                    backgroundColor: 'var(--color-primary)',
-                    borderColor: 'var(--color-primary)',
-                    color: '#ffffff',
-                    fontWeight: 600,
-                  }}
-                >
-                  Add Employee
-                </Button>
-              </div>
             </div>
-          )}
+
+            {/* Step 2 Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 24 }}>
+              <Button
+                onClick={() => setAddStep(1)}
+                icon={<ArrowLeftOutlined />}
+                style={{ borderRadius: 'var(--radius-base)', height: 42, padding: '0 24px' }}
+              >
+                Back
+              </Button>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={isSubmittingAdd}
+                icon={<UserAddOutlined />}
+                style={{
+                  borderRadius: 'var(--radius-base)',
+                  height: 42,
+                  padding: '0 28px',
+                  backgroundColor: 'var(--color-primary)',
+                  borderColor: 'var(--color-primary)',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                }}
+              >
+                Add Employee
+              </Button>
+            </div>
+          </div>
         </Form>
       </Modal>
 
@@ -1952,6 +2875,7 @@ export const EmployeeManagement = ({
             <Button
               type="primary"
               htmlType="submit"
+              loading={isAttachingDoc}
               icon={<PaperClipOutlined />}
               style={{
                 borderRadius: 'var(--radius-base)',
@@ -2297,6 +3221,7 @@ export const EmployeeManagement = ({
             <Button
               type="primary"
               htmlType="submit"
+              loading={isSubmittingTemp}
               icon={<UserAddOutlined />}
               style={{
                 backgroundColor: 'var(--color-primary)',

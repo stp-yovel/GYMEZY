@@ -1,0 +1,2387 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  Row,
+  Col,
+  Input,
+  Select,
+  Button,
+  Upload,
+  message,
+  Divider,
+  Tag,
+  InputNumber,
+  Switch,
+  Checkbox,
+} from 'antd';
+import {
+  PictureOutlined,
+  CheckCircleFilled,
+  CloseCircleFilled,
+  ArrowRightOutlined,
+  ArrowLeftOutlined,
+  SafetyCertificateFilled,
+  DeleteOutlined,
+  CheckOutlined,
+  LockOutlined,
+  UserOutlined,
+  MailOutlined,
+  PhoneOutlined,
+  SunOutlined,
+  MoonOutlined,
+  PlusOutlined,
+  InfoCircleOutlined,
+  AimOutlined,
+  EnvironmentOutlined,
+  CompassOutlined,
+  LoadingOutlined,
+} from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import confetti from 'canvas-confetti';
+import { useTheme } from '../theme/ThemeContext';
+import { apiClient } from '../services/apiClient';
+import gymezyLogo from '../assets/logo/gymezy.png';
+
+const { Option } = Select;
+
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+  });
+
+// GPS Regex helper for extracting coordinates from various Google Maps URL formats
+const AT_COORDS_REGEX = /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/;
+const Q_COORDS_REGEX = /[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/;
+const D3D4_COORDS_REGEX = /!3d(-?\d+(?:\.\d+)?)[^!]*!4d(-?\d+(?:\.\d+)?)/;
+const LL_COORDS_REGEX = /(?:ll|loc:)(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/;
+
+const extractCoordinatesFromMapsUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+
+  const atMatch = AT_COORDS_REGEX.exec(url);
+  if (atMatch) {
+    return { lat: Number.parseFloat(atMatch[1]), lng: Number.parseFloat(atMatch[2]) };
+  }
+
+  const qMatch = Q_COORDS_REGEX.exec(url);
+  if (qMatch) {
+    return { lat: Number.parseFloat(qMatch[1]), lng: Number.parseFloat(qMatch[2]) };
+  }
+
+  const d3d4Match = D3D4_COORDS_REGEX.exec(url);
+  if (d3d4Match) {
+    return { lat: Number.parseFloat(d3d4Match[1]), lng: Number.parseFloat(d3d4Match[2]) };
+  }
+
+  const llMatch = LL_COORDS_REGEX.exec(url);
+  if (llMatch) {
+    return { lat: Number.parseFloat(llMatch[1]), lng: Number.parseFloat(llMatch[2]) };
+  }
+
+  return null;
+};
+
+// OpenStreetMap Reverse Geocoding helper
+const reverseGeocodeCoordinates = async (lat, lng) => {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+      {
+        headers: {
+          'Accept-Language': 'en',
+        },
+      }
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    const addr = data.address || {};
+
+    const streetComponents = [
+      addr.building || addr.amenity || addr.house_name || addr.house_number,
+      addr.road || addr.street || addr.pedestrian || addr.footway,
+      addr.neighbourhood || addr.suburb || addr.residential,
+    ].filter(Boolean);
+
+    const fullStreet = streetComponents.length > 0
+      ? streetComponents.join(', ')
+      : (data.display_name ? data.display_name.split(',').slice(0, 2).join(', ').trim() : '');
+
+    const area = addr.suburb || addr.neighbourhood || addr.subdistrict || addr.city_district || addr.locality || '';
+    const city = addr.city || addr.town || addr.municipality || addr.village || addr.county || addr.state_district || '';
+    const state = addr.state || '';
+    const pincode = addr.postcode || '';
+
+    return {
+      address: fullStreet || data.display_name || '',
+      area,
+      city,
+      state,
+      pincode,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const STEPS = [
+  { id: 1, title: 'Basic Info', key: 'basic' },
+  { id: 2, title: 'Location & GPS', key: 'location' },
+  { id: 3, title: 'Facilities & Photos', key: 'facilities' },
+  { id: 4, title: 'Pricing & Plans', key: 'pricing' },
+  { id: 5, title: 'Bank & Submit', key: 'bank' },
+];
+
+const FACILITY_OPTIONS = [
+  'Air Conditioned',
+  'Locker Facility',
+  'Shower Available',
+  'Changing Rooms',
+  'Free Wi-Fi',
+  'Sound & Music System',
+  'Steam & Sauna',
+  'Ice Bath Recovery',
+  'Dedicated Parking',
+  'Turnstile Gate Access',
+  'First Aid Kit',
+  '24/7 CCTV Security',
+  'Biometric Entry',
+  'Personal Trainers Available',
+  'Cardio Theater',
+  'Olympic Barbells Area',
+];
+
+const WORKOUT_OPTIONS = [
+  'Strength & Weights',
+  'Cardio & Endurance',
+  'CrossFit Studio',
+  'HIIT Functional Training',
+  'Powerlifting',
+  'Bodybuilding',
+  'Yoga & Flexibility',
+  'Zumba / Dance Fitness',
+  'Boxing / MMA / Kickboxing',
+  'Calisthenics Floor',
+  'Pilates & Core',
+  'Aerobics',
+];
+
+const STEP_FIELDS = {
+  1: ['subscriptionType', 'gymName', 'ownerName', 'phone', 'email', 'password', 'confirmPassword', 'gstNumber', 'panNumber'],
+  2: ['address', 'area', 'city', 'state', 'pincode'],
+  3: ['floorSpaceSqFt', 'maxFloorCapacity', 'logo', 'facilities'],
+  4: ['workouts', 'singleSessionPrice'],
+  5: ['accountHolder', 'bankName', 'accountNumber', 'confirmAccountNumber', 'ifscCode', 'agreedToTerms'],
+};
+
+// Pure validator function
+const validateField = (field, value, form) => {
+  switch (field) {
+    case 'subscriptionType':
+      if (!value) return 'Please select a partnership plan';
+      return '';
+    case 'gymName':
+      if (!value || !value.trim()) return 'Gym / Studio name is required';
+      if (value.trim().length < 2) return 'Must be at least 2 characters';
+      return '';
+    case 'ownerName':
+      if (!value || !value.trim()) return 'Owner / MD name is required';
+      if (value.trim().length < 2) return 'Must be at least 2 characters';
+      return '';
+    case 'phone':
+      if (!value || !value.trim()) return 'Mobile number is required';
+      if (!/^\d{10}$/.test(value.trim())) return 'Must be a valid 10-digit mobile number';
+      return '';
+    case 'email':
+      if (!value || !value.trim()) return 'Email address is required';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) return 'Enter a valid email (e.g. owner@gym.com)';
+      return '';
+    case 'password': {
+      if (!value) return 'Password is required';
+      if (value.length < 8 || value.length > 16) return 'Must be 8 to 16 characters';
+      if (!/[A-Z]/.test(value)) return 'Must contain at least 1 uppercase letter';
+      if (!/\d/.test(value)) return 'Must contain at least 1 number';
+      if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(value)) return 'Must contain 1 special character';
+      return '';
+    }
+    case 'confirmPassword':
+      if (!value) return 'Please confirm your password';
+      if (value !== form.password) return 'Passwords do not match';
+      return '';
+    case 'gstNumber':
+      if (value && value.trim().length > 0 && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(value.trim())) {
+        return 'Invalid GSTIN format (e.g. 33AAAAA0000A1Z5)';
+      }
+      return '';
+    case 'panNumber':
+      if (value && value.trim().length > 0 && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(value.trim())) {
+        return 'Invalid PAN format (e.g. ABCDE1234F)';
+      }
+      return '';
+    case 'address':
+      if (!value || !value.trim()) return 'Street address is required';
+      if (value.trim().length < 5) return 'Enter full street address (min 5 characters)';
+      return '';
+    case 'area':
+      if (!value || !value.trim()) return 'Area / Locality is required';
+      return '';
+    case 'city':
+      if (!value || !value.trim()) return 'City is required';
+      return '';
+    case 'state':
+      if (!value || !value.trim()) return 'State is required';
+      return '';
+    case 'pincode':
+      if (!value || !value.trim()) return 'Pincode is required';
+      if (!/^\d{6}$/.test(value.trim())) return 'Pincode must be exactly 6 digits';
+      return '';
+    case 'floorSpaceSqFt':
+      if (!value || Number(value) < 100) return 'Floor area must be at least 100 sq. ft.';
+      return '';
+    case 'maxFloorCapacity':
+      if (!value || Number(value) < 1) return 'Max capacity must be at least 1';
+      return '';
+    case 'logo':
+      if (!value) return 'Gym brand logo is required';
+      return '';
+    case 'facilities':
+      if (!value || value.length === 0) return 'Select at least 1 facility';
+      return '';
+    case 'workouts':
+      if (!value || value.length === 0) return 'Select at least 1 workout discipline';
+      return '';
+    case 'singleSessionPrice':
+      if (!value || Number(value) < 1) return 'Single day pass price is required';
+      return '';
+    case 'accountHolder':
+      if (!value || !value.trim()) return 'Account holder name is required';
+      return '';
+    case 'bankName':
+      if (!value || !value.trim()) return 'Bank name is required';
+      return '';
+    case 'accountNumber':
+      if (!value || !value.trim()) return 'Account number is required';
+      if (value.trim().length < 8) return 'Account number must be at least 8 digits';
+      return '';
+    case 'confirmAccountNumber':
+      if (!value || !value.trim()) return 'Please confirm account number';
+      if (value.trim() !== form.accountNumber?.trim()) return 'Account numbers do not match';
+      return '';
+    case 'ifscCode':
+      if (!value || !value.trim()) return 'IFSC code is required';
+      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(value.trim())) return 'Invalid IFSC (e.g. HDFC0001234)';
+      return '';
+    case 'agreedToTerms':
+      if (!value) return 'You must accept the terms to proceed';
+      return '';
+    default:
+      return '';
+  }
+};
+
+export const Register = () => {
+  const navigate = useNavigate();
+  const { isDarkMode, toggleTheme } = useTheme();
+
+  const [currentStep, setCurrentStep] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [registeredGymData, setRegisteredGymData] = useState(null);
+
+  // GPS Auto-detect loading state and pinned visibility state
+  const [isFetchingGps, setIsFetchingGps] = useState(false);
+  const [isGpsPinned, setIsGpsPinned] = useState(false);
+
+  // Field touched tracker for live feedback
+  const [touched, setTouched] = useState({});
+
+  // Form State
+  const [formData, setFormData] = useState({
+    gymName: '',
+    tagline: '',
+    ownerName: '',
+    phone: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    businessType: 'Private Limited',
+    yearEstablished: '2024',
+    gstNumber: '',
+    panNumber: '',
+    branches: '1',
+
+    // Step 2: Location & GPS
+    address: '',
+    area: '',
+    city: 'Chennai',
+    state: 'Tamil Nadu',
+    pincode: '',
+    landmark: '',
+    lat: null,
+    lng: null,
+    googleMapsUrl: '',
+    weekdayOpen: '05:30 AM',
+    weekdayClose: '10:30 PM',
+    weekendOpen: '06:00 AM',
+    weekendClose: '09:00 PM',
+    isSplitShift: false,
+    isOpenHolidays: true,
+    is24Hours: false,
+
+    floorSpaceSqFt: 3500,
+    maxFloorCapacity: 45,
+    genderAllowed: 'Unisex',
+    logo: '',
+    coverPhoto: '',
+    galleryPhotos: [],
+    facilities: ['Air Conditioned', 'Locker Facility', 'Shower Available', 'Free Wi-Fi', '24/7 CCTV Security'],
+    amenities: ['RO Drinking Water', 'Fresh Towel Service', 'First Aid Kit'],
+    aboutText: '',
+
+    workouts: ['Strength & Weights', 'Cardio & Endurance', 'HIIT Functional Training'],
+    singleSessionPrice: 199,
+    weeklyPassPrice: 799,
+    fiveSessionPrice: 899,
+    monthlyPrice: 1999,
+    quarterlyPrice: 4999,
+    halfYearlyPrice: 8999,
+    annualPrice: 14999,
+    freeCancellationHours: 2,
+    refundPercentage: 100,
+    rescheduleAllowedCount: 2,
+
+    subscriptionType: 'Listing Only',
+    commissionRate: 10,
+    settlementCycle: 'Daily (T+1)',
+    accountHolder: '',
+    bankName: '',
+    accountNumber: '',
+    confirmAccountNumber: '',
+    ifscCode: '',
+    upiId: '',
+
+    agreedToTerms: false,
+  });
+
+  // Email availability check states
+  const [emailCheckStatus, setEmailCheckStatus] = useState('idle'); // 'idle' | 'checking' | 'available' | 'exists'
+  const [emailCheckError, setEmailCheckError] = useState('');
+
+  // API Call to check email availability
+  const checkEmailExistsApi = async (emailToCheck) => {
+    const trimmed = String(emailToCheck || '').trim().toLowerCase();
+    if (!trimmed || !trimmed.includes('@') || !trimmed.includes('.')) {
+      setEmailCheckStatus('idle');
+      setEmailCheckError('');
+      return null;
+    }
+
+    setEmailCheckStatus('checking');
+    setEmailCheckError('');
+
+    try {
+      const response = await apiClient.get(`/auth/check-email?email=${encodeURIComponent(trimmed)}`);
+      const data = response?.data?.data || response?.data;
+      if (data?.isExisting || data?.isAvailable === false) {
+        setEmailCheckStatus('exists');
+        setEmailCheckError('An account with this email address already exists. Please log in or use a different email.');
+        return false;
+      } else {
+        setEmailCheckStatus('available');
+        setEmailCheckError('');
+        return true;
+      }
+    } catch (err) {
+      if (err?.response?.data?.message?.includes('already exists')) {
+        setEmailCheckStatus('exists');
+        setEmailCheckError('An account with this email address already exists. Please log in or use a different email.');
+        return false;
+      }
+      setEmailCheckStatus('idle');
+      return null;
+    }
+  };
+
+  // Debounced email check when typing
+  useEffect(() => {
+    const trimmedEmail = (formData.email || '').trim();
+    if (!trimmedEmail || !trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
+      setEmailCheckStatus('idle');
+      setEmailCheckError('');
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      void checkEmailExistsApi(trimmedEmail);
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [formData.email]);
+
+  // Compute live validation errors reactively
+  const errors = useMemo(() => {
+    const errs = {};
+    const allFields = Object.values(STEP_FIELDS).flat();
+    for (const f of allFields) {
+      const msg = validateField(f, formData[f], formData);
+      if (msg) errs[f] = msg;
+    }
+    if (emailCheckError && !errs.email) {
+      errs.email = emailCheckError;
+    }
+    return errs;
+  }, [formData, emailCheckError]);
+
+  const updateField = (field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  const markFieldTouched = (field) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  // GPS Auto-detect and reverse geocode handler
+  const handleGetAddressByGps = () => {
+    if (!navigator.geolocation) {
+      message.error('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    setIsFetchingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const parsed = await reverseGeocodeCoordinates(latitude, longitude);
+
+          setFormData((prev) => ({
+            ...prev,
+            lat: latitude,
+            lng: longitude,
+            googleMapsUrl: `https://maps.google.com/?q=${latitude},${longitude}`,
+            ...(parsed?.address ? { address: parsed.address } : {}),
+            ...(parsed?.area ? { area: parsed.area } : {}),
+            ...(parsed?.city ? { city: parsed.city } : {}),
+            ...(parsed?.state ? { state: parsed.state } : {}),
+            ...(parsed?.pincode ? { pincode: parsed.pincode } : {}),
+          }));
+
+          setTouched((prev) => ({
+            ...prev,
+            address: true,
+            area: true,
+            city: true,
+            state: true,
+            pincode: true,
+          }));
+
+          setIsGpsPinned(true);
+          message.success(`GPS Location detected: (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+        } catch {
+          message.error('Failed to parse address from GPS coordinates.');
+        } finally {
+          setIsFetchingGps(false);
+        }
+      },
+      (geoError) => {
+        setIsFetchingGps(false);
+        message.error(geoError.message || 'Unable to retrieve location. Please check browser location permissions.');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  // Google Maps URL change handler that parses coordinates automatically
+  const handleGoogleMapsUrlChange = (url) => {
+    updateField('googleMapsUrl', url);
+    const coords = extractCoordinatesFromMapsUrl(url);
+    if (coords) {
+      setFormData((prev) => ({
+        ...prev,
+        googleMapsUrl: url,
+        lat: coords.lat,
+        lng: coords.lng,
+      }));
+      setIsGpsPinned(true);
+      message.success(`GPS coordinates synced: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`);
+    }
+  };
+
+  const toggleArrayItem = (field, item) => {
+    setFormData((prev) => {
+      const list = prev[field] || [];
+      const updated = list.includes(item) ? list.filter((i) => i !== item) : [...list, item];
+      return { ...prev, [field]: updated };
+    });
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  // Live password complexity metrics
+  const passwordChecks = {
+    length: formData.password.length >= 8 && formData.password.length <= 16,
+    hasUpper: /[A-Z]/.test(formData.password),
+    hasNumber: /\d/.test(formData.password),
+    hasSpecial: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(formData.password),
+    match: formData.password === formData.confirmPassword && formData.confirmPassword.length > 0,
+  };
+
+  // Check step validity
+  const isStepValid = (step) => {
+    const fields = STEP_FIELDS[step] || [];
+    return fields.every((f) => !errors[f]);
+  };
+
+  const handleNext = async () => {
+    const currentFields = STEP_FIELDS[currentStep] || [];
+    const newTouched = { ...touched };
+    let hasError = false;
+    for (const f of currentFields) {
+      newTouched[f] = true;
+      if (errors[f]) hasError = true;
+    }
+    setTouched(newTouched);
+
+    if (currentStep === 1) {
+      if (emailCheckStatus === 'checking') {
+        const isAvail = await checkEmailExistsApi(formData.email);
+        if (isAvail === false) {
+          message.error('An account with this email address already exists.');
+          return;
+        }
+      } else if (emailCheckStatus === 'exists' || emailCheckError) {
+        message.error('An account with this email address already exists. Please log in or use a different email.');
+        return;
+      } else if (emailCheckStatus === 'idle' && formData.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+        const isAvail = await checkEmailExistsApi(formData.email);
+        if (isAvail === false) {
+          message.error('An account with this email address already exists. Please log in or use a different email.');
+          return;
+        }
+      }
+    }
+
+    if (hasError) {
+      const firstError = currentFields.find((f) => errors[f]);
+      message.error(errors[firstError] || 'Please complete all required fields.');
+      return;
+    }
+
+    setCurrentStep((prev) => Math.min(prev + 1, 5));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handlePrev = () => {
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleLogoUpload = async (file) => {
+    try {
+      const b64 = await fileToBase64(file);
+      updateField('logo', b64);
+      message.success('Brand logo uploaded.');
+    } catch {
+      message.error('Failed to process image.');
+    }
+    return false;
+  };
+
+  const handleCoverUpload = async (file) => {
+    try {
+      const b64 = await fileToBase64(file);
+      updateField('coverPhoto', b64);
+      message.success('Cover photo uploaded.');
+    } catch {
+      message.error('Failed to process image.');
+    }
+    return false;
+  };
+
+  const handleFacilityPhotoUpload = async (file) => {
+    try {
+      const b64 = await fileToBase64(file);
+      setFormData((prev) => ({
+        ...prev,
+        galleryPhotos: [...(prev.galleryPhotos || []), b64],
+      }));
+      message.success('Facility photo added.');
+    } catch {
+      message.error('Failed to process photo.');
+    }
+    return false;
+  };
+
+  const handleRemoveFacilityPhoto = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      galleryPhotos: prev.galleryPhotos.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleSubmitRegistration = async () => {
+    const step5Fields = STEP_FIELDS[5];
+    const newTouched = { ...touched };
+    let hasError = false;
+    for (const f of step5Fields) {
+      newTouched[f] = true;
+      if (errors[f]) hasError = true;
+    }
+    setTouched(newTouched);
+
+    if (hasError) {
+      const firstError = step5Fields.find((f) => errors[f]);
+      message.error(errors[firstError] || 'Please review your bank & agreement details.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        name: formData.gymName.trim(),
+        gymName: formData.gymName.trim(),
+        tagline: formData.tagline.trim(),
+        ownerName: formData.ownerName.trim(),
+        phone: formData.phone.trim(),
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+        businessType: formData.businessType,
+        yearEstablished: formData.yearEstablished,
+        gstNumber: formData.gstNumber.trim(),
+        panNumber: formData.panNumber.trim(),
+        branches: formData.branches,
+
+        address: formData.address.trim(),
+        area: formData.area.trim(),
+        city: formData.city.trim(),
+        state: formData.state.trim(),
+        pincode: formData.pincode.trim(),
+        landmark: formData.landmark.trim(),
+        lat: Number(formData.lat) || 13.0827,
+        lng: Number(formData.lng) || 80.2707,
+        googleMapsUrl: formData.googleMapsUrl.trim() || `https://maps.google.com/?q=${formData.lat},${formData.lng}`,
+
+        weekdayOpen: formData.weekdayOpen,
+        weekdayClose: formData.weekdayClose,
+        weekendOpen: formData.weekendOpen,
+        weekendClose: formData.weekendClose,
+        isSplitShift: formData.isSplitShift,
+        isOpenHolidays: formData.isOpenHolidays,
+        is24Hours: formData.is24Hours,
+
+        floorSpaceSqFt: Number(formData.floorSpaceSqFt),
+        maxFloorCapacity: Number(formData.maxFloorCapacity),
+        genderAllowed: formData.genderAllowed,
+        logo: formData.logo,
+        coverPhoto: formData.coverPhoto || formData.logo,
+        galleryPhotos: formData.galleryPhotos || [],
+
+        facilities: formData.facilities,
+        amenities: formData.amenities,
+        workouts: formData.workouts,
+        aboutText: formData.aboutText,
+
+        singleSessionPrice: Number(formData.singleSessionPrice),
+        weeklyPassPrice: Number(formData.weeklyPassPrice),
+        fiveSessionPrice: Number(formData.fiveSessionPrice),
+        monthlyPrice: Number(formData.monthlyPrice),
+        quarterlyPrice: Number(formData.quarterlyPrice),
+        halfYearlyPrice: Number(formData.halfYearlyPrice),
+        annualPrice: Number(formData.annualPrice),
+        freeCancellationHours: Number(formData.freeCancellationHours),
+        refundPercentage: Number(formData.refundPercentage),
+        rescheduleAllowedCount: Number(formData.rescheduleAllowedCount),
+
+        subscriptionType: formData.subscriptionType,
+        commissionRate: Number(formData.commissionRate),
+        settlementCycle: formData.settlementCycle,
+
+        accountHolder: formData.accountHolder.trim(),
+        bankName: formData.bankName.trim(),
+        accountNumber: formData.accountNumber.trim(),
+        ifscCode: formData.ifscCode.trim(),
+        upiId: formData.upiId.trim(),
+
+        status: 'Pending',
+        approvalStatus: 'Pending Approval',
+        initialApprovalStatus: 'Pending Approval',
+      };
+
+      const res = await apiClient.post('/gyms/register', payload);
+
+      if (res.data?.success) {
+        setRegisteredGymData(res.data.data);
+        setIsSuccess(true);
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+        });
+      } else {
+        message.error(res.data?.message || 'Registration failed. Please review your details.');
+      }
+    } catch (err) {
+      message.error(
+        err.response?.data?.message || 'Failed to submit registration. Please check your network and inputs.'
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Live input style generator with error / valid feedback borders
+  const getInputStyle = (field) => {
+    const isFieldTouched = !!touched[field];
+    const hasFieldError = isFieldTouched && !!errors[field];
+    const isFieldValid = isFieldTouched && !errors[field] && formData[field];
+
+    return {
+      height: 44,
+      borderRadius: 8,
+      backgroundColor: isDarkMode ? '#121214' : '#ffffff',
+      borderColor: hasFieldError
+        ? '#ef4444'
+        : isFieldValid
+        ? '#10b981'
+        : isDarkMode
+        ? '#27272a'
+        : '#d4d4d8',
+      color: isDarkMode ? '#ffffff' : '#0f172a',
+      fontSize: 14,
+      transition: 'border-color 0.2s ease',
+    };
+  };
+
+  const labelStyle = {
+    display: 'block',
+    fontSize: 13,
+    fontWeight: 600,
+    color: isDarkMode ? '#cbd5e1' : '#334155',
+    marginBottom: 6,
+  };
+
+  // Helper to render inline error message below input
+  const renderFieldError = (field) => {
+    if (touched[field] && errors[field]) {
+      return (
+        <div
+          style={{
+            color: '#ef4444',
+            fontSize: 12,
+            marginTop: 4,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            fontWeight: 500,
+          }}
+        >
+          <CloseCircleFilled style={{ fontSize: 11 }} />
+          <span>{errors[field]}</span>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  if (isSuccess) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
+          color: isDarkMode ? '#ffffff' : '#0f172a',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 580,
+            width: '100%',
+            borderRadius: 16,
+            backgroundColor: isDarkMode ? '#121214' : '#ffffff',
+            border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`,
+            padding: '40px 32px',
+            textAlign: 'center',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.06)',
+          }}
+        >
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
+              backgroundColor: '#e6f4ea',
+              color: '#16a34a',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 32,
+              marginBottom: 16,
+            }}
+          >
+            <CheckCircleFilled />
+          </div>
+
+          <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 8px 0' }}>
+            Application Submitted for Approval
+          </h2>
+
+          <p style={{ color: '#64748b', fontSize: 14, lineHeight: 1.5, margin: '0 0 24px 0' }}>
+            Thank you for registering <strong>{formData.gymName}</strong>. Your gym profile and facility photos have been routed to the GYMEZY Super Admin review desk.
+          </p>
+
+          <div
+            style={{
+              backgroundColor: isDarkMode ? '#18181b' : '#f8fafc',
+              border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`,
+              borderRadius: 12,
+              padding: '16px 20px',
+              marginBottom: 24,
+              textAlign: 'left',
+            }}
+          >
+            <Row gutter={[16, 12]}>
+              <Col span={12}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Partner Ref ID
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#003882', marginTop: 2 }}>
+                  {registeredGymData?.partnerId || registeredGymData?.gymId || 'GYM-REG'}
+                </div>
+              </Col>
+              <Col span={12}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Initial Publication Status
+                </div>
+                <div style={{ marginTop: 2 }}>
+                  <Tag color="warning" style={{ fontWeight: 700, borderRadius: 6 }}>
+                    Pending Approval
+                  </Tag>
+                </div>
+              </Col>
+              <Col span={12}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Owner Name
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>
+                  {formData.ownerName}
+                </div>
+              </Col>
+              <Col span={12}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                  Login Email
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>
+                  {formData.email}
+                </div>
+              </Col>
+            </Row>
+          </div>
+
+          <Button
+            type="primary"
+            size="large"
+            block
+            onClick={() => navigate('/login')}
+            style={{
+              height: 46,
+              backgroundColor: '#003882',
+              borderColor: '#003882',
+              fontWeight: 700,
+              borderRadius: 8,
+            }}
+          >
+            Back to Sign In
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        backgroundColor: isDarkMode ? '#09090b' : '#f8fafc',
+        color: isDarkMode ? '#ffffff' : '#0f172a',
+        paddingBottom: 80,
+      }}
+    >
+      {/* MINIMAL TOP NAVBAR */}
+      <header
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+          backgroundColor: isDarkMode ? 'rgba(9, 9, 11, 0.85)' : 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`,
+          padding: '0 24px',
+          height: 60,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        {/* Left: Brand */}
+        <div
+          onClick={() => navigate('/login')}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+        >
+          <img
+            src={gymezyLogo}
+            alt="GYMEZY Logo"
+            style={{
+              width: 30,
+              height: 30,
+              objectFit: 'contain',
+              filter: isDarkMode ? 'brightness(0) invert(1)' : 'none',
+            }}
+          />
+          <span style={{ fontSize: 16, fontWeight: 900, letterSpacing: '1px' }}>GYMEZY</span>
+          <Tag
+            color="blue"
+            style={{
+              margin: 0,
+              borderRadius: 6,
+              fontSize: 11,
+              fontWeight: 700,
+              backgroundColor: isDarkMode ? '#1e293b' : '#eff6ff',
+              borderColor: '#93c5fd',
+              color: '#1d4ed8',
+            }}
+          >
+            Partner Onboarding
+          </Tag>
+        </div>
+
+        {/* Right: Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ fontSize: 13, color: '#64748b' }} className="hide-mobile">
+            Already a partner?{' '}
+            <a
+              onClick={() => navigate('/login')}
+              style={{ color: '#003882', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Sign In
+            </a>
+          </div>
+
+          <div
+            onClick={toggleTheme}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              height: 32,
+              padding: '0 10px',
+              borderRadius: 16,
+              backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+              border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`,
+              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 600,
+              color: isDarkMode ? '#e2e8f0' : '#475569',
+            }}
+          >
+            {isDarkMode ? (
+              <MoonOutlined style={{ color: '#ffd700' }} />
+            ) : (
+              <SunOutlined style={{ color: '#f59e0b' }} />
+            )}
+            <span>{isDarkMode ? 'Night' : 'Day'}</span>
+          </div>
+        </div>
+      </header>
+
+      {/* MAIN CONTAINER */}
+      <main style={{ maxWidth: 740, margin: '0 auto', padding: '32px 20px 0 20px' }}>
+        {/* STEP PROGRESS BAR WITH LIVE COMPLETION STATUS */}
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#003882', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Step {currentStep} of {STEPS.length} &bull; {STEPS[currentStep - 1].title}
+            </span>
+            <span style={{ fontSize: 12, color: isStepValid(currentStep) ? '#16a34a' : '#64748b', fontWeight: 600 }}>
+              {isStepValid(currentStep) ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <CheckOutlined /> Ready to proceed
+                </span>
+              ) : (
+                `${Math.round((currentStep / STEPS.length) * 100)}% Completed`
+              )}
+            </span>
+          </div>
+
+          {/* Minimal 5-segment track */}
+          <div style={{ display: 'flex', gap: 6, height: 5 }}>
+            {STEPS.map((s) => (
+              <div
+                key={s.id}
+                style={{
+                  flex: 1,
+                  borderRadius: 3,
+                  backgroundColor:
+                    s.id < currentStep
+                      ? '#10b981'
+                      : s.id === currentStep
+                      ? '#003882'
+                      : isDarkMode
+                      ? '#27272a'
+                      : '#e2e8f0',
+                  transition: 'background-color 0.3s ease',
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* STEP HEADER */}
+        <div style={{ marginBottom: 28 }}>
+          <h1
+            style={{
+              fontSize: 22,
+              fontWeight: 800,
+              color: isDarkMode ? '#ffffff' : '#0f172a',
+              margin: '0 0 6px 0',
+              letterSpacing: '-0.3px',
+            }}
+          >
+            {currentStep === 1 && "Let's start with your gym details"}
+            {currentStep === 2 && 'Location, GPS & Operating Hours'}
+            {currentStep === 3 && 'Facilities, Amenities & Photos'}
+            {currentStep === 4 && 'Workout Disciplines & Membership Pricing'}
+            {currentStep === 5 && 'Bank Account & Review'}
+          </h1>
+          <p style={{ fontSize: 14, color: '#64748b', margin: 0 }}>
+            {currentStep === 1 && 'Provide basic business information and create your administrator login credentials.'}
+            {currentStep === 2 && 'Pinpoint your exact facility address with live GPS and define regular operating hours.'}
+            {currentStep === 3 && 'Upload brand logo, cover photo, and high quality facility & equipment photos.'}
+            {currentStep === 4 && 'Set your walk-in single session pass price and optional recurring membership tiers.'}
+            {currentStep === 5 && 'Provide your settlement bank account. Your application will be submitted for Super Admin review.'}
+          </p>
+        </div>
+
+        {/* STEP CONTENT BODY (MINIMAL CARD) */}
+        <div
+          style={{
+            backgroundColor: isDarkMode ? '#121214' : '#ffffff',
+            border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`,
+            borderRadius: 14,
+            padding: '28px 24px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+          }}
+        >
+          {/* STEP 1: BASIC INFO & OWNER CREDENTIALS */}
+          {currentStep === 1 && (
+            <div>
+              {/* Partnership Plan Selection matching uploaded design */}
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>
+                    Select Partnership Plan <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>
+                    Choose your operating tier on GYMEZY
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                    gap: 8,
+                    padding: 4,
+                    backgroundColor: isDarkMode ? '#18181b' : '#f1f5f9',
+                    borderRadius: 10,
+                    border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`,
+                  }}
+                >
+                  {[
+                    { key: 'Listing Only', label: 'Free Listing', desc: 'Listing & Discovery' },
+                    { key: 'GMS', label: 'GMS Software', desc: 'Member & Billing' },
+                    { key: 'App Only', label: 'App Listing', desc: 'Direct Passes' },
+                    { key: 'Hybrid', label: 'Hybrid Partner', desc: 'Full Suite' },
+                  ].map((plan) => {
+                    const isSelected = (formData.subscriptionType || 'Hybrid') === plan.key;
+                    return (
+                      <button
+                        type="button"
+                        key={plan.key}
+                        onClick={() => updateField('subscriptionType', plan.key)}
+                        style={{
+                          padding: '12px 14px',
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          backgroundColor: isSelected
+                            ? isDarkMode
+                              ? '#003882'
+                              : '#ffffff'
+                            : 'transparent',
+                          color: isSelected
+                            ? isDarkMode
+                              ? '#ffffff'
+                              : '#0f172a'
+                            : isDarkMode
+                            ? '#94a3b8'
+                            : '#475569',
+                          boxShadow: isSelected
+                            ? isDarkMode
+                              ? '0 2px 8px rgba(0,0,0,0.4)'
+                              : '0 1px 4px rgba(0,0,0,0.08)'
+                            : 'none',
+                          border: isSelected && !isDarkMode ? '1px solid #cbd5e1' : '1px solid transparent',
+                          fontWeight: isSelected ? 800 : 700,
+                          fontSize: 13,
+                          letterSpacing: '-0.2px',
+                          outline: 'none',
+                          transition: 'all 0.2s ease',
+                          fontFamily: 'inherit',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 2,
+                        }}
+                      >
+                        <span style={{ fontSize: 13.5, fontWeight: isSelected ? 800 : 700 }}>{plan.label}</span>
+                        <span style={{ fontSize: 11, opacity: isSelected ? 0.9 : 0.65, fontWeight: 500 }}>{plan.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {renderFieldError('subscriptionType')}
+              </div>
+
+              <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 16 }}>
+                Facility Information
+              </div>
+
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={16}>
+                  <label style={labelStyle}>
+                    Gym / Studio Name <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. Apex Fitness Arena"
+                    value={formData.gymName}
+                    onChange={(e) => updateField('gymName', e.target.value)}
+                    onBlur={() => markFieldTouched('gymName')}
+                    style={getInputStyle('gymName')}
+                  />
+                  {renderFieldError('gymName')}
+                </Col>
+
+                <Col xs={24} sm={8}>
+                  <label style={labelStyle}>Year Established</label>
+                  <Input
+                    placeholder="2024"
+                    value={formData.yearEstablished}
+                    onChange={(e) => updateField('yearEstablished', e.target.value)}
+                    onBlur={() => markFieldTouched('yearEstablished')}
+                    style={getInputStyle('yearEstablished')}
+                  />
+                </Col>
+
+                <Col xs={24}>
+                  <label style={labelStyle}>Tagline / Motto</label>
+                  <Input
+                    placeholder="e.g. Forge Your Ultimate Self"
+                    value={formData.tagline}
+                    onChange={(e) => updateField('tagline', e.target.value)}
+                    style={getInputStyle('tagline')}
+                  />
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>Business Structure</label>
+                  <Select
+                    value={formData.businessType}
+                    onChange={(val) => updateField('businessType', val)}
+                    style={{ width: '100%', height: 44 }}
+                  >
+                    <Option value="Private Limited">Private Limited (Pvt Ltd)</Option>
+                    <Option value="Partnership">Partnership Firm</Option>
+                    <Option value="Proprietorship">Sole Proprietorship</Option>
+                    <Option value="LLP">Limited Liability Partnership (LLP)</Option>
+                    <Option value="Individual">Individual Fitness Studio</Option>
+                  </Select>
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>Number of Branches</label>
+                  <Select
+                    value={formData.branches}
+                    onChange={(val) => updateField('branches', val)}
+                    style={{ width: '100%', height: 44 }}
+                  >
+                    <Option value="1">1 (Single Facility)</Option>
+                    <Option value="2-5">2 – 5 Branches</Option>
+                    <Option value="6-10">6 – 10 Branches</Option>
+                    <Option value="10+">10+ Chain Network</Option>
+                  </Select>
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>GST Number (Optional)</label>
+                  <Input
+                    placeholder="e.g. 33AAAAA0000A1Z5"
+                    value={formData.gstNumber}
+                    onChange={(e) => updateField('gstNumber', e.target.value.toUpperCase())}
+                    onBlur={() => markFieldTouched('gstNumber')}
+                    style={getInputStyle('gstNumber')}
+                  />
+                  {renderFieldError('gstNumber')}
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>PAN Number (Optional)</label>
+                  <Input
+                    placeholder="e.g. ABCDE1234F"
+                    value={formData.panNumber}
+                    onChange={(e) => updateField('panNumber', e.target.value.toUpperCase())}
+                    onBlur={() => markFieldTouched('panNumber')}
+                    style={getInputStyle('panNumber')}
+                  />
+                  {renderFieldError('panNumber')}
+                </Col>
+              </Row>
+
+              <Divider style={{ margin: '24px 0 20px 0', borderColor: isDarkMode ? '#27272a' : '#f1f5f9' }} />
+
+              <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 16 }}>
+                Administrator Login Account
+              </div>
+
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>
+                    Owner / MD Full Name <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input
+                    prefix={<UserOutlined style={{ color: '#94a3b8' }} />}
+                    placeholder="e.g. Varun Kumar"
+                    value={formData.ownerName}
+                    onChange={(e) => updateField('ownerName', e.target.value)}
+                    onBlur={() => markFieldTouched('ownerName')}
+                    style={getInputStyle('ownerName')}
+                  />
+                  {renderFieldError('ownerName')}
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>
+                    Mobile / Contact Number <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input
+                    prefix={<PhoneOutlined style={{ color: '#94a3b8' }} />}
+                    placeholder="9876543210"
+                    maxLength={10}
+                    value={formData.phone}
+                    onChange={(e) => updateField('phone', e.target.value.replace(/\D/g, ''))}
+                    onBlur={() => markFieldTouched('phone')}
+                    style={getInputStyle('phone')}
+                  />
+                  {renderFieldError('phone')}
+                </Col>
+
+                <Col xs={24}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>
+                      Official Email Address <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    {emailCheckStatus === 'checking' && (
+                      <span style={{ fontSize: 11, color: '#6366f1', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 500 }}>
+                        <LoadingOutlined spin /> Checking availability...
+                      </span>
+                    )}
+                    {emailCheckStatus === 'available' && !errors.email && (
+                      <span style={{ fontSize: 11, color: '#10b981', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                        <CheckCircleFilled style={{ fontSize: 11 }} /> Email available
+                      </span>
+                    )}
+                    {emailCheckStatus === 'exists' && (
+                      <span style={{ fontSize: 11, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                        <CloseCircleFilled style={{ fontSize: 11 }} /> Email already registered
+                      </span>
+                    )}
+                  </div>
+                  <Input
+                    prefix={<MailOutlined style={{ color: '#94a3b8' }} />}
+                    suffix={
+                      emailCheckStatus === 'checking' ? (
+                        <LoadingOutlined style={{ color: '#6366f1' }} spin />
+                      ) : emailCheckStatus === 'available' && !errors.email ? (
+                        <CheckCircleFilled style={{ color: '#10b981' }} />
+                      ) : (emailCheckStatus === 'exists' || (touched.email && errors.email)) ? (
+                        <CloseCircleFilled style={{ color: '#ef4444' }} />
+                      ) : null
+                    }
+                    placeholder="e.g. owner@apexfitness.com"
+                    value={formData.email}
+                    onChange={(e) => updateField('email', e.target.value)}
+                    onBlur={() => {
+                      markFieldTouched('email');
+                      if (formData.email && formData.email.includes('@') && formData.email.includes('.')) {
+                        void checkEmailExistsApi(formData.email);
+                      }
+                    }}
+                    style={getInputStyle('email')}
+                  />
+                  {renderFieldError('email')}
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>
+                    Create Account Password <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input.Password
+                    prefix={<LockOutlined style={{ color: '#94a3b8' }} />}
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={(e) => updateField('password', e.target.value)}
+                    onBlur={() => markFieldTouched('password')}
+                    style={getInputStyle('password')}
+                  />
+                  {renderFieldError('password')}
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>
+                    Confirm Password <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input.Password
+                    prefix={<LockOutlined style={{ color: '#94a3b8' }} />}
+                    placeholder="••••••••"
+                    value={formData.confirmPassword}
+                    onChange={(e) => updateField('confirmPassword', e.target.value)}
+                    onBlur={() => markFieldTouched('confirmPassword')}
+                    style={getInputStyle('confirmPassword')}
+                  />
+                  {renderFieldError('confirmPassword')}
+                </Col>
+              </Row>
+
+              {/* Minimal Live Password Requirements Checklist */}
+              <div
+                style={{
+                  marginTop: 16,
+                  padding: '12px 14px',
+                  borderRadius: 8,
+                  backgroundColor: isDarkMode ? '#18181b' : '#f8fafc',
+                  border: `1px solid ${isDarkMode ? '#27272a' : '#f1f5f9'}`,
+                  display: 'flex',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                }}
+              >
+                {[
+                  { label: '8-16 Chars', valid: passwordChecks.length },
+                  { label: '1 Uppercase', valid: passwordChecks.hasUpper },
+                  { label: '1 Number', valid: passwordChecks.hasNumber },
+                  { label: '1 Special Symbol', valid: passwordChecks.hasSpecial },
+                  { label: 'Passwords Match', valid: passwordChecks.match },
+                ].map((item, idx) => (
+                  <span
+                    key={idx}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: item.valid ? '#16a34a' : '#94a3b8',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      transition: 'color 0.2s ease',
+                    }}
+                  >
+                    {item.valid ? (
+                      <CheckOutlined style={{ color: '#16a34a', fontWeight: 800 }} />
+                    ) : (
+                      '•'
+                    )}
+                    {item.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: LOCATION, GPS & OPERATING SCHEDULE */}
+          {currentStep === 2 && (
+            <div>
+              {/* GPS AUTO-DETECT TOP BAR */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 16,
+                  flexWrap: 'wrap',
+                  gap: 12,
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                  Facility Address & GPS Pin
+                </div>
+
+                <Button
+                  icon={<AimOutlined style={{ color: '#003882' }} />}
+                  loading={isFetchingGps}
+                  onClick={handleGetAddressByGps}
+                  style={{
+                    height: 36,
+                    borderRadius: 8,
+                    fontWeight: 600,
+                    borderColor: '#003882',
+                    color: '#003882',
+                    backgroundColor: isDarkMode ? '#1e293b' : '#eff6ff',
+                  }}
+                >
+                  Auto-Detect GPS Location
+                </Button>
+              </div>
+
+              {/* GPS Live Pinned Coordinates Badge - Displayed ONLY after Auto-Detection */}
+              {isGpsPinned && formData.lat && formData.lng && (
+                <div
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    backgroundColor: isDarkMode ? '#18181b' : '#f0fdf4',
+                    border: `1px solid ${isDarkMode ? '#27272a' : '#bbf7d0'}`,
+                    marginBottom: 18,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                    <EnvironmentOutlined style={{ color: '#16a34a', fontSize: 16 }} />
+                    <span style={{ fontWeight: 600, color: isDarkMode ? '#86efac' : '#15803d' }}>
+                      GPS Coordinates Pinned:
+                    </span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                      {Number(formData.lat).toFixed(5)}, {Number(formData.lng).toFixed(5)}
+                    </span>
+                  </div>
+
+                  <a
+                    href={formData.googleMapsUrl || `https://maps.google.com/?q=${formData.lat},${formData.lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: 13, color: '#003882', fontWeight: 700, textDecoration: 'underline' }}
+                  >
+                    View on Google Maps
+                  </a>
+                </div>
+              )}
+
+              <Row gutter={[16, 16]}>
+                <Col xs={24}>
+                  <label style={labelStyle}>
+                    Street Address / Door No. <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. 45/2, 2nd Floor, Gandhi Road"
+                    value={formData.address}
+                    onChange={(e) => updateField('address', e.target.value)}
+                    onBlur={() => markFieldTouched('address')}
+                    style={getInputStyle('address')}
+                  />
+                  {renderFieldError('address')}
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>
+                    Area / Locality <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. Anna Nagar West"
+                    value={formData.area}
+                    onChange={(e) => updateField('area', e.target.value)}
+                    onBlur={() => markFieldTouched('area')}
+                    style={getInputStyle('area')}
+                  />
+                  {renderFieldError('area')}
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>Nearby Landmark</label>
+                  <Input
+                    placeholder="e.g. Opposite Metro Station"
+                    value={formData.landmark}
+                    onChange={(e) => updateField('landmark', e.target.value)}
+                    style={getInputStyle('landmark')}
+                  />
+                </Col>
+
+                <Col xs={24} sm={8}>
+                  <label style={labelStyle}>
+                    City <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input
+                    placeholder="Chennai"
+                    value={formData.city}
+                    onChange={(e) => updateField('city', e.target.value)}
+                    onBlur={() => markFieldTouched('city')}
+                    style={getInputStyle('city')}
+                  />
+                  {renderFieldError('city')}
+                </Col>
+
+                <Col xs={24} sm={8}>
+                  <label style={labelStyle}>
+                    State <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input
+                    placeholder="Tamil Nadu"
+                    value={formData.state}
+                    onChange={(e) => updateField('state', e.target.value)}
+                    onBlur={() => markFieldTouched('state')}
+                    style={getInputStyle('state')}
+                  />
+                  {renderFieldError('state')}
+                </Col>
+
+                <Col xs={24} sm={8}>
+                  <label style={labelStyle}>
+                    Pincode <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input
+                    placeholder="600040"
+                    maxLength={6}
+                    value={formData.pincode}
+                    onChange={(e) => updateField('pincode', e.target.value.replace(/\D/g, ''))}
+                    onBlur={() => markFieldTouched('pincode')}
+                    style={getInputStyle('pincode')}
+                  />
+                  {renderFieldError('pincode')}
+                </Col>
+
+                <Col xs={24}>
+                  <label style={labelStyle}>Google Maps Share Link (Auto-extracts GPS)</label>
+                  <Input
+                    prefix={<CompassOutlined style={{ color: '#94a3b8' }} />}
+                    placeholder="Paste Google Maps URL e.g. https://maps.google.com/?q=13.0827,80.2707"
+                    value={formData.googleMapsUrl}
+                    onChange={(e) => handleGoogleMapsUrlChange(e.target.value)}
+                    style={getInputStyle('googleMapsUrl')}
+                  />
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>GPS Latitude</label>
+                  <InputNumber
+                    step={0.0001}
+                    value={formData.lat}
+                    onChange={(val) => {
+                      updateField('lat', val);
+                      if (formData.lng) updateField('googleMapsUrl', `https://maps.google.com/?q=${val},${formData.lng}`);
+                    }}
+                    style={{ width: '100%', height: 44, borderRadius: 8 }}
+                    placeholder="13.0827"
+                  />
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>GPS Longitude</label>
+                  <InputNumber
+                    step={0.0001}
+                    value={formData.lng}
+                    onChange={(val) => {
+                      updateField('lng', val);
+                      if (formData.lat) updateField('googleMapsUrl', `https://maps.google.com/?q=${formData.lat},${val}`);
+                    }}
+                    style={{ width: '100%', height: 44, borderRadius: 8 }}
+                    placeholder="80.2707"
+                  />
+                </Col>
+              </Row>
+
+              <Divider style={{ margin: '24px 0 20px 0', borderColor: isDarkMode ? '#27272a' : '#f1f5f9' }} />
+
+              <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 16 }}>
+                Regular Operating Hours
+              </div>
+
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>Monday – Friday Open</label>
+                  <Select
+                    value={formData.weekdayOpen}
+                    onChange={(val) => updateField('weekdayOpen', val)}
+                    style={{ width: '100%', height: 44 }}
+                  >
+                    {['05:00 AM', '05:30 AM', '06:00 AM', '06:30 AM', '07:00 AM'].map((t) => (
+                      <Option key={t} value={t}>{t}</Option>
+                    ))}
+                  </Select>
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>Monday – Friday Close</label>
+                  <Select
+                    value={formData.weekdayClose}
+                    onChange={(val) => updateField('weekdayClose', val)}
+                    style={{ width: '100%', height: 44 }}
+                  >
+                    {['09:00 PM', '09:30 PM', '10:00 PM', '10:30 PM', '11:00 PM', '11:30 PM'].map((t) => (
+                      <Option key={t} value={t}>{t}</Option>
+                    ))}
+                  </Select>
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>Saturday – Sunday Open</label>
+                  <Select
+                    value={formData.weekendOpen}
+                    onChange={(val) => updateField('weekendOpen', val)}
+                    style={{ width: '100%', height: 44 }}
+                  >
+                    {['05:30 AM', '06:00 AM', '06:30 AM', '07:00 AM', '08:00 AM'].map((t) => (
+                      <Option key={t} value={t}>{t}</Option>
+                    ))}
+                  </Select>
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>Saturday – Sunday Close</label>
+                  <Select
+                    value={formData.weekendClose}
+                    onChange={(val) => updateField('weekendClose', val)}
+                    style={{ width: '100%', height: 44 }}
+                  >
+                    {['08:00 PM', '08:30 PM', '09:00 PM', '09:30 PM', '10:00 PM'].map((t) => (
+                      <Option key={t} value={t}>{t}</Option>
+                    ))}
+                  </Select>
+                </Col>
+              </Row>
+
+              <div
+                style={{
+                  marginTop: 16,
+                  display: 'flex',
+                  gap: 24,
+                  flexWrap: 'wrap',
+                  padding: '12px 14px',
+                  borderRadius: 8,
+                  backgroundColor: isDarkMode ? '#18181b' : '#f8fafc',
+                  border: `1px solid ${isDarkMode ? '#27272a' : '#f1f5f9'}`,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Switch
+                    size="small"
+                    checked={formData.isOpenHolidays}
+                    onChange={(checked) => updateField('isOpenHolidays', checked)}
+                  />
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>Open on Public Holidays</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Switch
+                    size="small"
+                    checked={formData.is24Hours}
+                    onChange={(checked) => updateField('is24Hours', checked)}
+                  />
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>24/7 Access Active</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: FACILITIES, AMENITIES & PHOTOS */}
+          {currentStep === 3 && (
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 16 }}>
+                Capacity & Access
+              </div>
+
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={8}>
+                  <label style={labelStyle}>
+                    Floor Area (Sq. Ft.) <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <InputNumber
+                    min={200}
+                    max={50000}
+                    value={formData.floorSpaceSqFt}
+                    onChange={(val) => updateField('floorSpaceSqFt', val)}
+                    style={{ width: '100%', height: 44, borderRadius: 8 }}
+                  />
+                  {renderFieldError('floorSpaceSqFt')}
+                </Col>
+
+                <Col xs={24} sm={8}>
+                  <label style={labelStyle}>
+                    Max Slot Capacity <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <InputNumber
+                    min={5}
+                    max={300}
+                    value={formData.maxFloorCapacity}
+                    onChange={(val) => updateField('maxFloorCapacity', val)}
+                    style={{ width: '100%', height: 44, borderRadius: 8 }}
+                  />
+                  {renderFieldError('maxFloorCapacity')}
+                </Col>
+
+                <Col xs={24} sm={8}>
+                  <label style={labelStyle}>Gender Policy</label>
+                  <Select
+                    value={formData.genderAllowed}
+                    onChange={(val) => updateField('genderAllowed', val)}
+                    style={{ width: '100%', height: 44 }}
+                  >
+                    <Option value="Unisex">Unisex (All Welcome)</Option>
+                    <Option value="Men Only">Men Only</Option>
+                    <Option value="Women Only">Women Only</Option>
+                  </Select>
+                </Col>
+              </Row>
+
+              <Divider style={{ margin: '24px 0 20px 0', borderColor: isDarkMode ? '#27272a' : '#f1f5f9' }} />
+
+              <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 16 }}>
+                Brand Identity Media
+              </div>
+
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>
+                    Brand Logo <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  {formData.logo ? (
+                    <div
+                      style={{
+                        position: 'relative',
+                        height: 120,
+                        borderRadius: 8,
+                        border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isDarkMode ? '#18181b' : '#fafafa',
+                      }}
+                    >
+                      <img
+                        src={formData.logo}
+                        alt="Logo"
+                        style={{ maxHeight: 90, maxWidth: '80%', objectFit: 'contain' }}
+                      />
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => updateField('logo', '')}
+                        style={{ position: 'absolute', top: 8, right: 8 }}
+                      />
+                    </div>
+                  ) : (
+                    <Upload
+                      accept="image/*"
+                      showUploadList={false}
+                      beforeUpload={handleLogoUpload}
+                    >
+                      <div
+                        style={{
+                          height: 120,
+                          border: `1.5px dashed ${touched.logo && errors.logo ? '#ef4444' : isDarkMode ? '#3f3f46' : '#cbd5e1'}`,
+                          borderRadius: 8,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          backgroundColor: isDarkMode ? '#18181b' : '#fafafa',
+                          gap: 6,
+                        }}
+                      >
+                        <PictureOutlined style={{ fontSize: 22, color: '#94a3b8' }} />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#003882' }}>Upload Logo</span>
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>PNG or JPG (Square recommended)</span>
+                      </div>
+                    </Upload>
+                  )}
+                  {renderFieldError('logo')}
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>Cover Photo (Optional)</label>
+                  {formData.coverPhoto ? (
+                    <div
+                      style={{
+                        position: 'relative',
+                        height: 120,
+                        borderRadius: 8,
+                        border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isDarkMode ? '#18181b' : '#fafafa',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <img
+                        src={formData.coverPhoto}
+                        alt="Cover"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => updateField('coverPhoto', '')}
+                        style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff' }}
+                      />
+                    </div>
+                  ) : (
+                    <Upload
+                      accept="image/*"
+                      showUploadList={false}
+                      beforeUpload={handleCoverUpload}
+                    >
+                      <div
+                        style={{
+                          height: 120,
+                          border: `1.5px dashed ${isDarkMode ? '#3f3f46' : '#cbd5e1'}`,
+                          borderRadius: 8,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          backgroundColor: isDarkMode ? '#18181b' : '#fafafa',
+                          gap: 6,
+                        }}
+                      >
+                        <PictureOutlined style={{ fontSize: 22, color: '#94a3b8' }} />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#003882' }}>Upload Cover Banner</span>
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>16:9 Wide Landscape</span>
+                      </div>
+                    </Upload>
+                  )}
+                </Col>
+              </Row>
+
+              <Divider style={{ margin: '24px 0 20px 0', borderColor: isDarkMode ? '#27272a' : '#f1f5f9' }} />
+
+              {/* FACILITY & EQUIPMENT PHOTOS MULTI-UPLOAD */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label style={{ ...labelStyle, margin: 0 }}>
+                    Facility & Equipment Photos
+                  </label>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>
+                    {formData.galleryPhotos.length} photos uploaded
+                  </span>
+                </div>
+                <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 12px 0' }}>
+                  Upload clear photos of your workout floor, strength machines, cardio zones, and locker rooms.
+                </p>
+
+                {/* Upload Button + Gallery Grid */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+                    gap: 12,
+                  }}
+                >
+                  <Upload
+                    accept="image/*"
+                    showUploadList={false}
+                    beforeUpload={handleFacilityPhotoUpload}
+                  >
+                    <div
+                      style={{
+                        height: 100,
+                        border: `1.5px dashed ${isDarkMode ? '#3f3f46' : '#cbd5e1'}`,
+                        borderRadius: 8,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        backgroundColor: isDarkMode ? '#18181b' : '#fafafa',
+                        gap: 4,
+                      }}
+                    >
+                      <PlusOutlined style={{ fontSize: 18, color: '#003882' }} />
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#003882' }}>Add Photo</span>
+                    </div>
+                  </Upload>
+
+                  {formData.galleryPhotos.map((photoSrc, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        position: 'relative',
+                        height: 100,
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`,
+                      }}
+                    >
+                      <img
+                        src={photoSrc}
+                        alt={`Facility ${idx + 1}`}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFacilityPhoto(idx)}
+                        style={{
+                          position: 'absolute',
+                          top: 4,
+                          right: 4,
+                          width: 24,
+                          height: 24,
+                          borderRadius: '50%',
+                          backgroundColor: 'rgba(0,0,0,0.6)',
+                          color: '#ffffff',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 11,
+                        }}
+                      >
+                        <DeleteOutlined />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Divider style={{ margin: '24px 0 20px 0', borderColor: isDarkMode ? '#27272a' : '#f1f5f9' }} />
+
+              {/* AMENITIES PILLS */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>
+                  Available Amenities <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                  {FACILITY_OPTIONS.map((item) => {
+                    const isSelected = formData.facilities.includes(item);
+                    return (
+                      <div
+                        key={item}
+                        onClick={() => toggleArrayItem('facilities', item)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '6px 12px',
+                          borderRadius: 20,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          backgroundColor: isSelected
+                            ? '#003882'
+                            : isDarkMode
+                            ? '#18181b'
+                            : '#f1f5f9',
+                          color: isSelected
+                            ? '#ffffff'
+                            : isDarkMode
+                            ? '#cbd5e1'
+                            : '#475569',
+                          border: `1px solid ${
+                            isSelected
+                              ? '#003882'
+                              : isDarkMode
+                              ? '#27272a'
+                              : '#e2e8f0'
+                          }`,
+                          userSelect: 'none',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        {isSelected && <CheckOutlined style={{ fontSize: 10 }} />}
+                        {item}
+                      </div>
+                    );
+                  })}
+                </div>
+                {renderFieldError('facilities')}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: WORKOUTS & PRICING PLANS */}
+          {currentStep === 4 && (
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 12 }}>
+                Supported Workout Disciplines <span style={{ color: '#ef4444' }}>*</span>
+              </div>
+              <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 12px 0' }}>
+                Select all fitness and workout activities supported at your center.
+              </p>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                {WORKOUT_OPTIONS.map((item) => {
+                  const isSelected = formData.workouts.includes(item);
+                  return (
+                    <div
+                      key={item}
+                      onClick={() => toggleArrayItem('workouts', item)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '6px 14px',
+                        borderRadius: 20,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        backgroundColor: isSelected
+                          ? '#003882'
+                          : isDarkMode
+                          ? '#18181b'
+                          : '#f1f5f9',
+                        color: isSelected
+                          ? '#ffffff'
+                          : isDarkMode
+                          ? '#cbd5e1'
+                          : '#475569',
+                        border: `1px solid ${
+                          isSelected
+                            ? '#003882'
+                            : isDarkMode
+                            ? '#27272a'
+                            : '#e2e8f0'
+                        }`,
+                        userSelect: 'none',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      {isSelected && <CheckOutlined style={{ fontSize: 10 }} />}
+                      {item}
+                    </div>
+                  );
+                })}
+              </div>
+              {renderFieldError('workouts')}
+
+              <Divider style={{ margin: '24px 0 20px 0', borderColor: isDarkMode ? '#27272a' : '#f1f5f9' }} />
+
+              <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 16 }}>
+                Membership & Access Pricing
+              </div>
+
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>
+                    Single Day Session Pass (₹) <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <InputNumber
+                    min={49}
+                    max={2000}
+                    value={formData.singleSessionPrice}
+                    onChange={(val) => updateField('singleSessionPrice', val)}
+                    style={{ width: '100%', height: 44, borderRadius: 8 }}
+                  />
+                  <span style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginTop: 4 }}>
+                    Price per walk-in visitor for 1 full day access
+                  </span>
+                  {renderFieldError('singleSessionPrice')}
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>
+                    Monthly Unlimited Pass (₹)
+                  </label>
+                  <InputNumber
+                    min={499}
+                    max={15000}
+                    value={formData.monthlyPrice}
+                    onChange={(val) => updateField('monthlyPrice', val)}
+                    style={{ width: '100%', height: 44, borderRadius: 8 }}
+                  />
+                  <span style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginTop: 4 }}>
+                    Standard 30-day recurring membership
+                  </span>
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>Quarterly Pass (3 Months) (₹)</label>
+                  <InputNumber
+                    min={999}
+                    max={30000}
+                    value={formData.quarterlyPrice}
+                    onChange={(val) => updateField('quarterlyPrice', val)}
+                    style={{ width: '100%', height: 44, borderRadius: 8 }}
+                  />
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>Annual Pass (1 Year) (₹)</label>
+                  <InputNumber
+                    min={2999}
+                    max={99999}
+                    value={formData.annualPrice}
+                    onChange={(val) => updateField('annualPrice', val)}
+                    style={{ width: '100%', height: 44, borderRadius: 8 }}
+                  />
+                </Col>
+              </Row>
+
+              <div
+                style={{
+                  marginTop: 20,
+                  padding: '12px 16px',
+                  borderRadius: 8,
+                  backgroundColor: isDarkMode ? '#18181b' : '#f8fafc',
+                  border: `1px solid ${isDarkMode ? '#27272a' : '#f1f5f9'}`,
+                  fontSize: 12,
+                  color: '#64748b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                }}
+              >
+                <InfoCircleOutlined style={{ color: '#003882', fontSize: 16 }} />
+                <span>
+                  Members can cancel bookings up to <strong>2 hours</strong> before the session for a <strong>100% refund</strong>.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5: BANK & SETTLEMENT & REVIEW & SUBMISSION */}
+          {currentStep === 5 && (
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 16 }}>
+                Bank Account for Automated Payouts
+              </div>
+
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>
+                    Account Holder Name <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. Apex Fitness Pvt Ltd"
+                    value={formData.accountHolder}
+                    onChange={(e) => updateField('accountHolder', e.target.value)}
+                    onBlur={() => markFieldTouched('accountHolder')}
+                    style={getInputStyle('accountHolder')}
+                  />
+                  {renderFieldError('accountHolder')}
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>
+                    Bank Name <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. HDFC Bank Ltd"
+                    value={formData.bankName}
+                    onChange={(e) => updateField('bankName', e.target.value)}
+                    onBlur={() => markFieldTouched('bankName')}
+                    style={getInputStyle('bankName')}
+                  />
+                  {renderFieldError('bankName')}
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>
+                    Bank Account Number <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input
+                    placeholder="50100456789012"
+                    value={formData.accountNumber}
+                    onChange={(e) => updateField('accountNumber', e.target.value.replace(/\D/g, ''))}
+                    onBlur={() => markFieldTouched('accountNumber')}
+                    style={getInputStyle('accountNumber')}
+                  />
+                  {renderFieldError('accountNumber')}
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>
+                    Confirm Account Number <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input
+                    placeholder="Re-enter bank account number"
+                    value={formData.confirmAccountNumber}
+                    onChange={(e) => updateField('confirmAccountNumber', e.target.value.replace(/\D/g, ''))}
+                    onBlur={() => markFieldTouched('confirmAccountNumber')}
+                    style={getInputStyle('confirmAccountNumber')}
+                  />
+                  {renderFieldError('confirmAccountNumber')}
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>
+                    Bank IFSC Code <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. HDFC0001234"
+                    value={formData.ifscCode}
+                    onChange={(e) => updateField('ifscCode', e.target.value.toUpperCase())}
+                    onBlur={() => markFieldTouched('ifscCode')}
+                    style={getInputStyle('ifscCode')}
+                  />
+                  {renderFieldError('ifscCode')}
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>Payout UPI ID (Optional)</label>
+                  <Input
+                    placeholder="e.g. apexfitness@okaxis"
+                    value={formData.upiId}
+                    onChange={(e) => updateField('upiId', e.target.value)}
+                    style={getInputStyle('upiId')}
+                  />
+                </Col>
+              </Row>
+
+              <Divider style={{ margin: '24px 0 20px 0', borderColor: isDarkMode ? '#27272a' : '#f1f5f9' }} />
+
+              {/* INITIAL PUBLICATION STATUS CALLOUT */}
+              <div
+                style={{
+                  borderRadius: 10,
+                  padding: '16px 18px',
+                  backgroundColor: isDarkMode ? '#172554' : '#eff6ff',
+                  border: '1px solid #93c5fd',
+                  marginBottom: 20,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 14,
+                }}
+              >
+                <SafetyCertificateFilled style={{ color: '#2563eb', fontSize: 22, marginTop: 2 }} />
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#1e3a8a' }}>
+                      Initial Publication Status:
+                    </span>
+                    <Tag color="warning" style={{ fontWeight: 800, borderRadius: 6, fontSize: 12 }}>
+                      Pending Approval
+                    </Tag>
+                  </div>
+                  <div style={{ fontSize: 12, color: isDarkMode ? '#bfdbfe' : '#1e40af', lineHeight: 1.5 }}>
+                    Your facility registration, pricing, and photos will be submitted to the GYMEZY Super Admin review console. Once reviewed and approved by the Super Admin, your gym will automatically go live for user bookings on the customer mobile app.
+                  </div>
+                </div>
+              </div>
+
+              {/* Minimal Summary Box */}
+              <div
+                style={{
+                  padding: '16px',
+                  borderRadius: 10,
+                  backgroundColor: isDarkMode ? '#18181b' : '#f8fafc',
+                  border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`,
+                  marginBottom: 20,
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 8 }}>
+                  Registration Overview
+                </div>
+                <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div><strong>Partnership Plan:</strong> <Tag color="blue" style={{ fontWeight: 700, marginLeft: 4 }}>{formData.subscriptionType === 'Listing Only' ? 'Free Listing' : formData.subscriptionType === 'GMS' ? 'GMS Software' : formData.subscriptionType === 'App Only' ? 'App Listing' : 'Hybrid Partner'}</Tag></div>
+                  <div><strong>Gym Name:</strong> {formData.gymName || 'Not specified'}</div>
+                  <div><strong>Location:</strong> {formData.area}, {formData.city}</div>
+                  <div><strong>GPS Coordinates:</strong> {Number(formData.lat).toFixed(4)}, {Number(formData.lng).toFixed(4)}</div>
+                  <div><strong>Owner:</strong> {formData.ownerName} ({formData.phone})</div>
+                  <div><strong>Day Pass Price:</strong> ₹{formData.singleSessionPrice} / session</div>
+                  <div><strong>Facility Photos:</strong> {formData.galleryPhotos.length} photos ready</div>
+                </div>
+              </div>
+
+              {/* Terms Checkbox */}
+              <div>
+                <Checkbox
+                  checked={formData.agreedToTerms}
+                  onChange={(e) => updateField('agreedToTerms', e.target.checked)}
+                  style={{ fontSize: 13 }}
+                >
+                  I confirm that all provided details and facility photographs are accurate, and I agree to the{' '}
+                  <a style={{ color: '#003882', fontWeight: 600 }}>GYMEZY Partner Terms & Policies</a>.
+                </Checkbox>
+                {renderFieldError('agreedToTerms')}
+              </div>
+            </div>
+          )}
+
+          {/* BOTTOM NAVIGATION ACTIONS */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: 28,
+              paddingTop: 20,
+              borderTop: `1px solid ${isDarkMode ? '#27272a' : '#f1f5f9'}`,
+            }}
+          >
+            {currentStep > 1 ? (
+              <Button
+                type="text"
+                icon={<ArrowLeftOutlined />}
+                onClick={handlePrev}
+                style={{
+                  height: 44,
+                  fontWeight: 600,
+                  color: isDarkMode ? '#cbd5e1' : '#475569',
+                  borderRadius: 8,
+                }}
+              >
+                Back
+              </Button>
+            ) : (
+              <div />
+            )}
+
+            {currentStep < 5 ? (
+              <Button
+                type="primary"
+                icon={<ArrowRightOutlined />}
+                onClick={handleNext}
+                style={{
+                  height: 44,
+                  padding: '0 24px',
+                  backgroundColor: '#003882',
+                  borderColor: '#003882',
+                  fontWeight: 700,
+                  borderRadius: 8,
+                }}
+              >
+                Continue
+              </Button>
+            ) : (
+              <Button
+                type="primary"
+                loading={submitting}
+                onClick={handleSubmitRegistration}
+                style={{
+                  height: 44,
+                  padding: '0 28px',
+                  backgroundColor: '#003882',
+                  borderColor: '#003882',
+                  fontWeight: 700,
+                  borderRadius: 8,
+                }}
+              >
+                Submit Gym for Approval
+              </Button>
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default Register;

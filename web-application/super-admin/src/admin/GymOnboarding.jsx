@@ -35,6 +35,7 @@ import {
   ArrowLeftOutlined,
   InboxOutlined,
   SafetyCertificateFilled,
+  SafetyCertificateOutlined,
   DeleteOutlined,
   CheckOutlined,
   StarFilled,
@@ -43,6 +44,8 @@ import {
   FileProtectOutlined,
   FilePdfOutlined,
   MobileOutlined,
+  PlusOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
@@ -1989,22 +1992,24 @@ export const GymOnboarding = () => {
             )}
 
             {/* ========================================================================= */}
-            {/* STEP 4: SERVICES & WORKOUT DISCIPLINES */}
+            {/* STEP 4: WORKOUTS, AMENITIES, RULES & SAFETY */}
             {/* ========================================================================= */}
             {currentStep === 4 && (
               <div>
                 <div style={{ marginBottom: 24 }}>
                   <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    4. Supported Disciplines & Workout Programs
+                    4. Workouts, Amenities, Rules & Safety
                   </div>
                   <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
-                    Select fitness disciplines and workout training programs offered at your facility
+                    Configure fitness disciplines, member amenities, facility rules, and safety protocols
                   </div>
                 </div>
 
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
-                    Disciplines & Workout Categories * {renderFieldSuccess('workouts')}
+                {/* Workouts */}
+                <div style={{ marginBottom: 24, padding: '18px 20px', borderRadius: 10, border: `1px solid ${isDarkMode ? '#333333' : '#e2e8f0'}`, backgroundColor: isDarkMode ? '#141414' : '#fafafa' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <ThunderboltFilled style={{ color: '#EC4899' }} />
+                    Workout Disciplines Offered * {renderFieldSuccess('workouts')}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {WORKOUT_OPTIONS.map((w) => {
@@ -2020,10 +2025,7 @@ export const GymOnboarding = () => {
                             handleFieldChange('workouts', next);
                           }}
                           style={{
-                            padding: '6px 14px',
-                            borderRadius: 16,
-                            fontSize: 13,
-                            fontWeight: 600,
+                            padding: '6px 14px', borderRadius: 16, fontSize: 13, fontWeight: 600,
                             backgroundColor: selected ? '#4338ca' : (isDarkMode ? '#1e293b' : '#f1f5f9'),
                             color: selected ? '#ffffff' : (isDarkMode ? '#cbd5e1' : '#334155'),
                             border: `1px solid ${selected ? '#4338ca' : (isDarkMode ? '#334155' : '#cbd5e1')}`,
@@ -2036,6 +2038,137 @@ export const GymOnboarding = () => {
                   </div>
                   {renderFieldError('workouts')}
                 </div>
+
+                {/* Amenities */}
+                <div style={{ marginBottom: 24, padding: '18px 20px', borderRadius: 10, border: `1px solid ${isDarkMode ? '#333333' : '#e2e8f0'}`, backgroundColor: isDarkMode ? '#141414' : '#fafafa' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <StarFilled style={{ color: '#F59E0B' }} />
+                    Amenities & Member Perks
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {AMENITY_OPTIONS.map((amen) => {
+                      const selected = (formData.amenities || []).includes(amen);
+                      return (
+                        <Tag.CheckableTag
+                          key={amen}
+                          checked={selected}
+                          onChange={(checked) => {
+                            const next = checked
+                              ? [...(formData.amenities || []), amen]
+                              : (formData.amenities || []).filter((a) => a !== amen);
+                            handleFieldChange('amenities', next);
+                          }}
+                          style={{
+                            padding: '6px 14px', borderRadius: 16, fontSize: 13, fontWeight: 600,
+                            backgroundColor: selected ? '#F59E0B' : (isDarkMode ? '#1e293b' : '#fffbeb'),
+                            color: selected ? '#ffffff' : (isDarkMode ? '#cbd5e1' : '#92400e'),
+                            border: `1px solid ${selected ? '#F59E0B' : (isDarkMode ? '#334155' : '#fcd34d')}`,
+                          }}
+                        >
+                          {amen}
+                        </Tag.CheckableTag>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <Row gutter={[16, 16]}>
+                  {/* Gym Rules */}
+                  <Col xs={24} md={12}>
+                    <div style={{ padding: '18px 20px', borderRadius: 10, border: `1px solid ${isDarkMode ? '#333333' : '#e2e8f0'}`, backgroundColor: isDarkMode ? '#141414' : '#fafafa', height: '100%' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <FileTextOutlined style={{ color: '#6366F1' }} />
+                        Gym Rules & Member Guidelines
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                        {(formData.rules || []).map((rule, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}` }}>
+                            <CheckOutlined style={{ color: '#6366F1', fontSize: 11, flexShrink: 0 }} />
+                            <span style={{ flex: 1, fontSize: 12, color: isDarkMode ? '#e2e8f0' : '#334155' }}>{rule}</span>
+                            <Button
+                              type="text" size="small" danger
+                              icon={<DeleteOutlined />}
+                              onClick={() => handleFieldChange('rules', formData.rules.filter((_, i) => i !== idx))}
+                              style={{ padding: '0 4px' }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <Input
+                          placeholder="Add gym rule..."
+                          id="new-rule-input"
+                          style={{ height: 36 }}
+                          onPressEnter={(e) => {
+                            if (e.target.value.trim()) {
+                              handleFieldChange('rules', [...(formData.rules || []), e.target.value.trim()]);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                        <Button
+                          icon={<PlusOutlined />}
+                          onClick={() => {
+                            const input = document.getElementById('new-rule-input');
+                            if (input?.value?.trim()) {
+                              handleFieldChange('rules', [...(formData.rules || []), input.value.trim()]);
+                              input.value = '';
+                            }
+                          }}
+                          style={{ flexShrink: 0 }}
+                        />
+                      </div>
+                    </div>
+                  </Col>
+
+                  {/* Safety Measures */}
+                  <Col xs={24} md={12}>
+                    <div style={{ padding: '18px 20px', borderRadius: 10, border: `1px solid ${isDarkMode ? '#333333' : '#e2e8f0'}`, backgroundColor: isDarkMode ? '#141414' : '#fafafa', height: '100%' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <SafetyCertificateOutlined style={{ color: '#10B981' }} />
+                        Safety Measures & Protocols
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                        {(formData.safetyMeasures || []).map((measure, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, backgroundColor: isDarkMode ? '#1e293b' : '#f0fdf4', border: `1px solid ${isDarkMode ? '#334155' : '#bbf7d0'}` }}>
+                            <CheckCircleFilled style={{ color: '#10B981', fontSize: 11, flexShrink: 0 }} />
+                            <span style={{ flex: 1, fontSize: 12, color: isDarkMode ? '#e2e8f0' : '#166534' }}>{measure}</span>
+                            <Button
+                              type="text" size="small" danger
+                              icon={<DeleteOutlined />}
+                              onClick={() => handleFieldChange('safetyMeasures', formData.safetyMeasures.filter((_, i) => i !== idx))}
+                              style={{ padding: '0 4px' }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <Input
+                          placeholder="Add safety measure..."
+                          id="new-safety-input"
+                          style={{ height: 36 }}
+                          onPressEnter={(e) => {
+                            if (e.target.value.trim()) {
+                              handleFieldChange('safetyMeasures', [...(formData.safetyMeasures || []), e.target.value.trim()]);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                        <Button
+                          icon={<PlusOutlined />}
+                          onClick={() => {
+                            const input = document.getElementById('new-safety-input');
+                            if (input?.value?.trim()) {
+                              handleFieldChange('safetyMeasures', [...(formData.safetyMeasures || []), input.value.trim()]);
+                              input.value = '';
+                            }
+                          }}
+                          style={{ flexShrink: 0 }}
+                        />
+                      </div>
+                    </div>
+                  </Col>
+                </Row>
               </div>
             )}
 
@@ -2570,7 +2703,7 @@ export const GymOnboarding = () => {
           <div>
             <strong>Partner ID:</strong>{' '}
             <Tag color="blue" style={{ fontWeight: 700, fontSize: 13, marginLeft: 4 }}>
-              {createdGymSummary?.partnerId || createdGymSummary?.id || formData.gymId}
+              {createdGymSummary?.partnerId || formData.partnerId || '-'}
             </Tag>
           </div>
           <div><strong>Location:</strong> {formData.area ? `${formData.area}, ` : ''}{formData.city}</div>

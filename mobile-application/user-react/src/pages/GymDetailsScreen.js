@@ -29,8 +29,45 @@ import {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+const DEFAULT_RULES = [
+  'Carry a valid ID proof for entry.',
+  'Wear proper athletic shoes & workout attire.',
+  'Use a towel while using equipment.',
+  'Re-rack weights after use.',
+  'Maintain cleanliness and hygiene in the gym.',
+  'Follow trainer and staff instructions at all times.',
+];
+
+const DEFAULT_SAFETY = [
+  'Sanitized equipment regularly',
+  'First aid kit available',
+  'CCTV surveillance 24/7',
+  'Trained staff for assistance',
+  'Emergency exit & fire safety compliant',
+  'Proper ventilation & air circulation',
+];
+
+const DEFAULT_REVIEWS = [
+  {
+    userName: 'Arun Kumar',
+    userImageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop',
+    rating: 5.0,
+    bookingType: 'App Booking',
+    date: '2 days ago',
+    comment: 'Clean environment and very supportive trainers!',
+  },
+  {
+    userName: 'Priya Sharma',
+    userImageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=150&auto=format&fit=crop',
+    rating: 4.8,
+    bookingType: 'Member',
+    date: '1 week ago',
+    comment: 'Spacious gym with all modern machines. Loved the experience.',
+  },
+];
+
 export const GymDetailsScreen = ({ route, navigation }) => {
-  const { gym } = route.params;
+  const gym = route?.params?.gym || {};
   const { isDark, colors } = useTheme();
   const { showToast } = useToast();
 
@@ -46,6 +83,42 @@ export const GymDetailsScreen = ({ route, navigation }) => {
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [showSafety, setShowSafety] = useState(false);
+
+  // Safe normalized arrays and fields
+  const workouts = Array.isArray(gym.workouts) && gym.workouts.length > 0
+    ? gym.workouts
+    : ['GYM', 'Strength', 'Cardio', 'HIIT', 'CrossFit'];
+
+  const facilities = Array.isArray(gym.facilities) && gym.facilities.length > 0
+    ? gym.facilities
+    : ['AC Gym', 'Locker Facility', 'Shower Available', 'Changing Room', 'Free Wi-Fi'];
+
+  const amenities = Array.isArray(gym.amenities) && gym.amenities.length > 0
+    ? gym.amenities
+    : ['Drinking Water', 'Towel Service', 'Parking Available', 'First Aid Kit'];
+
+  const trainers = Array.isArray(gym.trainers) ? gym.trainers : [];
+
+  const reviews = Array.isArray(gym.reviews) && gym.reviews.length > 0
+    ? gym.reviews
+    : DEFAULT_REVIEWS;
+
+  const rules = Array.isArray(gym.rules) && gym.rules.length > 0
+    ? gym.rules
+    : DEFAULT_RULES;
+
+  const safety = Array.isArray(gym.safety) && gym.safety.length > 0
+    ? gym.safety
+    : Array.isArray(gym.safetyMeasures) && gym.safetyMeasures.length > 0
+    ? gym.safetyMeasures
+    : DEFAULT_SAFETY;
+
+  const openingHoursText =
+    typeof gym.openingHours === 'object' && gym.openingHours?.displayText
+      ? gym.openingHours.displayText
+      : typeof gym.openingHours === 'string' && gym.openingHours
+      ? gym.openingHours
+      : '05:30 AM - 10:30 PM';
 
   const toggleBookmark = () => {
     setIsBookmarked(!isBookmarked);
@@ -99,6 +172,15 @@ export const GymDetailsScreen = ({ route, navigation }) => {
     'Protein Bar': 'local-cafe',
   };
 
+  const coverImageUrl =
+    gym.coverPhoto?.fileData ||
+    (typeof gym.coverPhoto === 'string' && gym.coverPhoto.length > 0 ? gym.coverPhoto : null) ||
+    (gym.galleryPhotos && gym.galleryPhotos[0]?.fileData) ||
+    (Array.isArray(gym.images) && gym.images[0]) ||
+    gym.imageUrl ||
+    gym.image ||
+    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop';
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
@@ -108,7 +190,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
         {/* 1. TOP HERO IMAGE & ACTIONS */}
         <View style={styles.heroContainer}>
           <Image
-            source={{ uri: gym.imageUrl }}
+            source={{ uri: coverImageUrl }}
             style={styles.heroImage}
             resizeMode="cover"
           />
@@ -312,7 +394,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
               <View style={styles.locationDetailsCol}>
                 <Text style={[styles.locationLabel, { color: subtitleColor }]}>Operating Hours</Text>
                 <Text style={[styles.locationAddressText, { color: textColor, fontWeight: '600' }]}>
-                  {gym.openingHours}
+                  {openingHoursText}
                 </Text>
               </View>
             </View>
@@ -327,7 +409,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             </View>
             <View style={styles.squircleCardsRow}>
-              {gym.workouts.slice(0, 3).map((w, idx) => (
+              {workouts.slice(0, 3).map((w, idx) => (
                 <View
                   key={idx}
                   style={[
@@ -371,7 +453,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             </View>
             <View style={styles.squircleCardsRow}>
-              {gym.facilities.slice(0, 3).map((f, idx) => (
+              {facilities.slice(0, 3).map((f, idx) => (
                 <View
                   key={idx}
                   style={[
@@ -415,7 +497,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             </View>
             <View style={styles.squircleCardsRow}>
-              {gym.amenities.slice(0, 3).map((a, idx) => (
+              {amenities.slice(0, 3).map((a, idx) => (
                 <View
                   key={idx}
                   style={[
@@ -461,7 +543,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
           </View>
 
           {/* 9. CERTIFIED TRAINERS SECTION */}
-          {gym.trainers && gym.trainers.length > 0 && (
+          {trainers.length > 0 && (
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeaderRow}>
                 <Text style={[styles.sectionTitle, { color: textColor }]}>Certified Trainers</Text>
@@ -470,7 +552,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
                 </TouchableOpacity>
               </View>
               <View style={styles.trainersRow}>
-                {gym.trainers.slice(0, 2).map((tr, idx) => (
+                {trainers.slice(0, 2).map((tr, idx) => (
                   <TouchableOpacity
                     key={idx}
                     activeOpacity={0.8}
@@ -575,35 +657,34 @@ export const GymDetailsScreen = ({ route, navigation }) => {
             </View>
 
             {/* Individual Reviews */}
-            {gym.reviews &&
-              gym.reviews.slice(0, 2).map((rev, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.reviewCard,
-                    { backgroundColor: cardColor, borderColor: borderColor },
-                  ]}
-                >
-                  <View style={styles.reviewHeader}>
-                    <Image source={{ uri: rev.userImageUrl }} style={styles.reviewAvatar} />
-                    <View style={{ flex: 1, marginLeft: 8 }}>
-                      <Text style={[styles.reviewAuthor, { color: textColor }]}>{rev.userName}</Text>
-                      <View style={styles.reviewStarsRow}>
-                        {[1, 2, 3, 4, 5].map((s) => (
-                          <MaterialIcons
-                            key={s}
-                            name={s <= Math.floor(rev.rating) ? 'star' : 'star-border'}
-                            size={11}
-                            color="#F59E0B"
-                          />
-                        ))}
-                      </View>
+            {reviews.slice(0, 2).map((rev, idx) => (
+              <View
+                key={idx}
+                style={[
+                  styles.reviewCard,
+                  { backgroundColor: cardColor, borderColor: borderColor },
+                ]}
+              >
+                <View style={styles.reviewHeader}>
+                  <Image source={{ uri: rev.userImageUrl }} style={styles.reviewAvatar} />
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={[styles.reviewAuthor, { color: textColor }]}>{rev.userName}</Text>
+                    <View style={styles.reviewStarsRow}>
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <MaterialIcons
+                          key={s}
+                          name={s <= Math.floor(rev.rating || 5) ? 'star' : 'star-border'}
+                          size={11}
+                          color="#F59E0B"
+                        />
+                      ))}
                     </View>
-                    <Text style={[styles.reviewDate, { color: subtitleColor }]}>{rev.date}</Text>
                   </View>
-                  <Text style={[styles.reviewComment, { color: textColor }]}>{rev.comment}</Text>
+                  <Text style={[styles.reviewDate, { color: subtitleColor }]}>{rev.date}</Text>
                 </View>
-              ))}
+                <Text style={[styles.reviewComment, { color: textColor }]}>{rev.comment}</Text>
+              </View>
+            ))}
           </View>
 
           {/* 11. RULES & SAFETY GUIDELINES */}
@@ -611,7 +692,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
             {/* Rules */}
             <View style={[styles.guidelineCard, { backgroundColor: cardColor, borderColor: borderColor }]}>
               <Text style={[styles.guidelineTitle, { color: textColor }]}>Gym Rules</Text>
-              {gym.rules.slice(0, 3).map((r, i) => (
+              {rules.slice(0, 3).map((r, i) => (
                 <View key={i} style={styles.guidelineItem}>
                   <MaterialIcons name="check-circle" size={13} color={accentIconColor} style={{ marginRight: 4, marginTop: 1 }} />
                   <Text style={[styles.guidelineText, { color: subtitleColor }]} numberOfLines={2}>
@@ -627,7 +708,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
             {/* Safety */}
             <View style={[styles.guidelineCard, { backgroundColor: cardColor, borderColor: borderColor }]}>
               <Text style={[styles.guidelineTitle, { color: textColor }]}>Safety Measures</Text>
-              {gym.safety.slice(0, 3).map((s, i) => (
+              {safety.slice(0, 3).map((s, i) => (
                 <View key={i} style={styles.guidelineItem}>
                   <MaterialIcons name="verified-user" size={13} color="#00BF62" style={{ marginRight: 4, marginTop: 1 }} />
                   <Text style={[styles.guidelineText, { color: subtitleColor }]} numberOfLines={2}>
@@ -717,22 +798,22 @@ export const GymDetailsScreen = ({ route, navigation }) => {
       <FacilitiesPopup
         visible={showFacilities}
         onClose={() => setShowFacilities(false)}
-        facilities={gym.facilities}
+        facilities={facilities}
       />
       <AmenitiesPopup
         visible={showAmenities}
         onClose={() => setShowAmenities(false)}
-        amenities={gym.amenities}
+        amenities={amenities}
       />
       <WorkoutsPopup
         visible={showWorkouts}
         onClose={() => setShowWorkouts(false)}
-        workouts={gym.workouts}
+        workouts={workouts}
       />
       <TrainersPopup
         visible={showTrainers}
         onClose={() => setShowTrainers(false)}
-        trainers={gym.trainers}
+        trainers={trainers}
         onTrainerTap={(trainer) => {
           setShowTrainers(false);
           setSelectedTrainer(trainer);
@@ -743,7 +824,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
         visible={showTrainerReviews}
         onClose={() => setShowTrainerReviews(false)}
         trainer={selectedTrainer}
-        reviews={gym.reviews}
+        reviews={reviews}
         onBack={() => {
           setShowTrainerReviews(false);
           setShowTrainers(true);
@@ -752,19 +833,19 @@ export const GymDetailsScreen = ({ route, navigation }) => {
       <AllReviewsPopup
         visible={showAllReviews}
         onClose={() => setShowAllReviews(false)}
-        rating={gym.rating}
-        reviewsCount={gym.reviewsCount}
-        reviews={gym.reviews}
+        rating={gym.rating || 4.8}
+        reviewsCount={gym.reviewsCount || reviews.length}
+        reviews={reviews}
       />
       <RulesPopup
         visible={showRules}
         onClose={() => setShowRules(false)}
-        rules={gym.rules}
+        rules={rules}
       />
       <SafetyPopup
         visible={showSafety}
         onClose={() => setShowSafety(false)}
-        safety={gym.safety}
+        safety={safety}
       />
     </View>
   );

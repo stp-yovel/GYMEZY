@@ -15,23 +15,39 @@ export const fetchGyms = createAsyncThunk(
   }
 );
 
-const loadInitialGyms = () => {
-  try {
-    const saved = localStorage.getItem('gymezy_gyms_fleet');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) {
-        return parsed;
+export const updateGymStatusApi = createAsyncThunk(
+  'gyms/updateGymStatusApi',
+  async ({ id, status, approvalStatus, remark, notes, rejectionReason }, { rejectWithValue, dispatch }) => {
+    try {
+      const payload = {};
+      if (status) payload.status = status;
+      if (approvalStatus) payload.approvalStatus = approvalStatus;
+      const finalRemark = remark !== undefined ? remark : (notes !== undefined ? notes : rejectionReason);
+      if (finalRemark !== undefined) {
+        payload.remark = finalRemark;
+        payload.notes = finalRemark;
+        payload.rejectionReason = finalRemark;
       }
+      const response = await apiClient.patch(`/gyms/${id}/status`, payload);
+      dispatch(fetchGyms());
+      return response.data?.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || err.message || 'Failed to update gym status'
+      );
     }
-  } catch {
-    // Fallback to empty list
   }
-  return [];
-};
+);
+
+// Clean up any legacy mock data from localStorage
+try {
+  localStorage.removeItem('gymezy_gyms_fleet');
+} catch {
+  // Ignore in non-browser environments
+}
 
 const initialState = {
-  gyms: loadInitialGyms(),
+  gyms: [],
   selectedGym: null,
   filterStatus: 'All',
   filterSubscription: 'All',
@@ -40,21 +56,12 @@ const initialState = {
   error: null,
 };
 
-const saveToLocalStorage = (gyms) => {
-  try {
-    localStorage.setItem('gymezy_gyms_fleet', JSON.stringify(gyms));
-  } catch {
-    // Ignore storage quota errors
-  }
-};
-
 export const gymSlice = createSlice({
   name: 'gyms',
   initialState,
   reducers: {
     setGyms: (state, action) => {
       state.gyms = action.payload || [];
-      saveToLocalStorage(state.gyms);
     },
 
     addGym: (state, action) => {
@@ -71,54 +78,48 @@ export const gymSlice = createSlice({
         ...action.payload,
       };
       state.gyms.unshift(newGym);
-      saveToLocalStorage(state.gyms);
     },
 
     updateGym: (state, action) => {
       const { id, ...updates } = action.payload;
-      const index = state.gyms.findIndex((g) => g.id === id);
+      const index = state.gyms.findIndex((g) => g.id === id || g._id === id);
       if (index !== -1) {
         state.gyms[index] = {
           ...state.gyms[index],
           ...updates,
           updatedAt: new Date().toISOString(),
         };
-        saveToLocalStorage(state.gyms);
       }
     },
 
     deleteGym: (state, action) => {
-      state.gyms = state.gyms.filter((g) => g.id !== action.payload);
-      saveToLocalStorage(state.gyms);
+      state.gyms = state.gyms.filter((g) => (g.id || g._id) !== action.payload);
     },
 
     approveGym: (state, action) => {
-      const index = state.gyms.findIndex((g) => g.id === action.payload);
+      const index = state.gyms.findIndex((g) => (g.id || g._id) === action.payload);
       if (index !== -1) {
         state.gyms[index].approvalStatus = 'Approved';
         state.gyms[index].status = 'Active';
         state.gyms[index].changesCount = 0;
-        saveToLocalStorage(state.gyms);
       }
     },
 
     rejectGym: (state, action) => {
       const { id, reason } = action.payload;
-      const index = state.gyms.findIndex((g) => g.id === id);
+      const index = state.gyms.findIndex((g) => (g.id || g._id) === id);
       if (index !== -1) {
         state.gyms[index].approvalStatus = 'Rejected';
         state.gyms[index].rejectionReason = reason;
-        saveToLocalStorage(state.gyms);
       }
     },
 
     setGymStatus: (state, action) => {
       const { id, status, approvalStatus } = action.payload;
-      const index = state.gyms.findIndex((g) => g.id === id);
+      const index = state.gyms.findIndex((g) => (g.id || g._id) === id);
       if (index !== -1) {
         if (status) state.gyms[index].status = status;
         if (approvalStatus) state.gyms[index].approvalStatus = approvalStatus;
-        saveToLocalStorage(state.gyms);
       }
     },
 
@@ -128,7 +129,6 @@ export const gymSlice = createSlice({
 
     resetGymsFleet: (state) => {
       state.gyms = [];
-      saveToLocalStorage([]);
     },
   },
   extraReducers: (builder) => {
@@ -140,7 +140,6 @@ export const gymSlice = createSlice({
       .addCase(fetchGyms.fulfilled, (state, action) => {
         state.loading = false;
         state.gyms = Array.isArray(action.payload) ? action.payload : [];
-        saveToLocalStorage(state.gyms);
       })
       .addCase(fetchGyms.rejected, (state, action) => {
         state.loading = false;

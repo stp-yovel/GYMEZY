@@ -5,6 +5,7 @@ import { SplashScreen } from '../pages/SplashScreen';
 import { OnboardingScreen } from '../pages/OnboardingScreen';
 import { LoginScreen } from '../pages/LoginScreen';
 import { DashboardScreen } from '../pages/DashboardScreen';
+import { ApplicationStatusScreen } from '../pages/ApplicationStatusScreen';
 import { CheckInScreen } from '../pages/CheckInScreen';
 import { AttendanceScreen } from '../pages/AttendanceScreen';
 
@@ -31,6 +32,13 @@ export const AppNavigator = () => {
         <Stack.Screen
           name="Login"
           component={LoginScreen}
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="ApplicationStatus"
+          component={ApplicationStatusScreen}
           options={{
             animation: 'slide_from_right',
           }}

@@ -105,12 +105,22 @@ export const LoginScreen = ({ navigation }) => {
           loggedInUser?.fullName ||
           loggedInGym?.name ||
           'Partner';
+        const approvalStatus = loggedInGym?.approvalStatus || 'Pending Approval';
+        const isApproved = approvalStatus === 'Approved';
 
-        showToast({
-          message: `Welcome back, ${displayName}! Gym Owner Portal loaded.`,
-          isSuccess: true,
-        });
-        navigation.replace('Dashboard');
+        if (!isApproved) {
+          showToast({
+            message: `Welcome ${displayName}. Application status: ${approvalStatus}.`,
+            isInfo: true,
+          });
+          navigation.replace('ApplicationStatus');
+        } else {
+          showToast({
+            message: `Welcome back, ${displayName}! Gym Owner Portal loaded.`,
+            isSuccess: true,
+          });
+          navigation.replace('Dashboard');
+        }
       } else {
         const errorMsg =
           result.message || 'Invalid email/phone or password. Please try again.';

@@ -16,7 +16,6 @@ import { useTheme } from '../theme/ThemeContext';
 import { AppColors, AppTheme } from '../theme/appTheme';
 import { useBookingRepository } from '../data/BookingContext';
 import { useToast } from '../widgets/CustomScaffoldMessage';
-import { MockData } from '../data/mockData';
 
 const TABS = ['Active', 'Completed', 'Cancelled'];
 
@@ -54,8 +53,7 @@ export const MyMembershipsScreen = ({ navigation }) => {
   };
 
   const openUpgradeFlow = () => {
-    const defaultGym = MockData.gyms[0];
-    navigation.navigate('BuyMembership', { gym: defaultGym });
+    navigation.navigate('HomeTabs');
   };
 
   const primaryNavy = isDark ? '#93C5FD' : AppColors.primaryColor;

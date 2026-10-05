@@ -9,8 +9,8 @@ const startServer = async () => {
   try {
     await connectDatabase();
 
-    server = app.listen(ENV.PORT, () => {
-      console.log(`[SERVER] GYMEZY API Server running on port ${ENV.PORT} [${ENV.NODE_ENV}]`);
+    server = app.listen(ENV.PORT, '0.0.0.0', () => {
+      console.log(`[SERVER] GYMEZY API Server running on port ${ENV.PORT} [0.0.0.0] [${ENV.NODE_ENV}]`);
       console.log(`[HEALTH] Health check: http://localhost:${ENV.PORT}/api/v1/health`);
     });
   } catch (error) {

@@ -1,23 +1,25 @@
-import { Platform } from 'react-native';
+import { NativeModules } from 'react-native';
 
 const BACKEND_PORT = 5001;
-const LOCAL_WIFI_IP = '192.168.0.100';
+const LOCAL_WIFI_IP = '192.168.0.103';
 
-const getInitialBaseUrl = () => {
-  // If running on native Android/iOS, prioritize local LAN Wi-Fi IP
-  if (Platform.OS === 'android' || Platform.OS === 'ios') {
-    return `http://${LOCAL_WIFI_IP}:${BACKEND_PORT}/api/v1`;
-  }
-  if (typeof window !== 'undefined' && window.location?.hostname) {
-    const hostname = window.location.hostname;
-    if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      return `http://${hostname}:${BACKEND_PORT}/api/v1`;
+const getMetroHost = () => {
+  try {
+    const scriptURL = NativeModules?.SourceCode?.scriptURL;
+    if (scriptURL) {
+      const match = scriptURL.match(/^https?:\/\/([^:/]+)/);
+      if (match?.[1] && match[1] !== 'localhost' && match[1] !== '127.0.0.1') {
+        return match[1];
+      }
     }
+  } catch {
+    // ignore
   }
-  return `http://${LOCAL_WIFI_IP}:${BACKEND_PORT}/api/v1`;
+  return null;
 };
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -30,7 +32,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
   } catch (error) {
     if (error.name === 'AbortError' || error.message?.toLowerCase().includes('aborted')) {
       throw new Error(
-        `Server connection timed out (${Math.round(timeoutMs / 1000)}s) at ${url}. Please check your network connection.`
+        `Server connection timed out (${Math.round(timeoutMs / 1000)}s) at ${url}.`
       );
     }
     if (
@@ -39,7 +41,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
       error.message?.toLowerCase().includes('err_failed')
     ) {
       throw new Error(
-        `Unable to reach backend server at ${url.split('/api/v1')[0]}. Ensure the server is running on port ${BACKEND_PORT}.`
+        `Unable to reach backend server at ${url.split('/api/v1')[0]}. Ensure server is running on port ${BACKEND_PORT}.`
       );
     }
     throw error;
@@ -50,16 +52,23 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
 
 class ApiService {
   constructor() {
-    this.baseUrl = getInitialBaseUrl();
+    this.baseUrl = `http://localhost:${BACKEND_PORT}/api/v1`;
+    this.verifiedBase = null;
     this.token = null;
+    this.unauthorizedHandler = null;
+  }
+
+  setUnauthorizedHandler(handler) {
+    this.unauthorizedHandler = handler;
   }
 
   setBaseUrl(url) {
     this.baseUrl = url;
+    this.verifiedBase = url;
   }
 
   getBaseUrl() {
-    return this.baseUrl;
+    return this.verifiedBase || this.baseUrl;
   }
 
   setAuthToken(token) {
@@ -77,14 +86,17 @@ class ApiService {
     return headers;
   }
 
-  async executeFetch(endpoint, options = {}, timeoutMs = 8000) {
-    // Generate candidate URLs in priority order
+  async executeFetch(endpoint, options = {}, timeoutMs = 4000) {
+    const metroHost = getMetroHost();
+
+    // Priority candidates: USB adb reverse localhost first, then metroHost, then WiFi IP
     const candidateBases = [
-      this.baseUrl,
-      `http://${LOCAL_WIFI_IP}:${BACKEND_PORT}/api/v1`,
+      this.verifiedBase,
       `http://localhost:${BACKEND_PORT}/api/v1`,
-      `http://10.0.2.2:${BACKEND_PORT}/api/v1`,
       `http://127.0.0.1:${BACKEND_PORT}/api/v1`,
+      metroHost ? `http://${metroHost}:${BACKEND_PORT}/api/v1` : null,
+      `http://${LOCAL_WIFI_IP}:${BACKEND_PORT}/api/v1`,
+      `http://10.0.2.2:${BACKEND_PORT}/api/v1`,
     ];
 
     // Filter unique candidates preserving order
@@ -95,16 +107,23 @@ class ApiService {
       const currentBase = uniqueBases[i];
       const targetUrl = `${currentBase}${endpoint}`;
       try {
-        const response = await fetchWithTimeout(targetUrl, options, i === 0 ? timeoutMs : 4000);
-        this.baseUrl = currentBase; // Lock in the working base URL for subsequent calls
+        const response = await fetchWithTimeout(targetUrl, options, i === 0 && this.verifiedBase ? timeoutMs : 2000);
+        if (response.status === 401 && !endpoint.includes('/auth/login')) {
+          if (typeof this.unauthorizedHandler === 'function') {
+            this.unauthorizedHandler();
+          }
+        }
+        this.verifiedBase = currentBase; // Lock in the working base URL for subsequent calls
+        this.baseUrl = currentBase;
         return response;
       } catch (err) {
         lastError = err;
-        // Continue fallback attempts
       }
     }
 
-    throw lastError || new Error(`Unable to connect to backend server on port ${BACKEND_PORT}.`);
+    throw new Error(
+      `Unable to connect to backend server on port ${BACKEND_PORT}. If using a physical phone, please connect to the same Wi-Fi (${LOCAL_WIFI_IP}) or connect via USB with USB debugging enabled.`
+    );
   }
 
   async login({ identifier, password }) {
@@ -180,6 +199,141 @@ class ApiService {
       throw new Error(result.message || 'Failed to fetch current user session.');
     }
     return result.data;
+  }
+
+  async getGym(gymId) {
+    if (!gymId) throw new Error('Gym ID is required to fetch gym profile.');
+    const response = await this.executeFetch(`/gyms/${gymId}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to fetch gym profile.');
+    }
+    return result.data;
+  }
+
+  async updateGym(gymId, payload) {
+    if (!gymId) throw new Error('Gym ID is required to update details.');
+    const response = await this.executeFetch(`/gyms/${gymId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to update gym details.');
+    }
+    return {
+      data: result.data,
+      message: result.message || 'Gym changes submitted successfully. Pending Super Admin approval.',
+    };
+  }
+
+  async resubmitGym(gymId, notes = '') {
+    if (!gymId) throw new Error('Gym ID is required to resubmit application.');
+    const response = await this.executeFetch(`/gyms/${gymId}/resubmit`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ notes }),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to resubmit application.');
+    }
+    return result.data;
+  }
+
+  // Employee & Trainer Management Endpoints
+  async getEmployees(params = {}) {
+    const queryParts = [];
+    Object.entries(params).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && val !== '') {
+        queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(val)}`);
+      }
+    });
+    const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+
+    const response = await this.executeFetch(`/employees${queryString}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to fetch employees list.');
+    }
+    return result.data;
+  }
+
+  async getEmployeeById(id) {
+    if (!id) throw new Error('Employee ID is required.');
+    const response = await this.executeFetch(`/employees/${id}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to fetch employee details.');
+    }
+    return result.data;
+  }
+
+  async createEmployee(payload) {
+    const response = await this.executeFetch('/employees', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to create employee.');
+    }
+    return {
+      data: result.data,
+      message: result.message || 'Employee submitted successfully. Pending Super Admin approval.',
+    };
+  }
+
+  async updateEmployee(id, payload) {
+    if (!id) throw new Error('Employee ID is required to update details.');
+    const response = await this.executeFetch(`/employees/${id}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to update employee.');
+    }
+    return {
+      data: result.data,
+      message: result.message || 'Employee edits submitted successfully. Pending Super Admin approval.',
+    };
+  }
+
+  async deleteEmployee(id) {
+    if (!id) throw new Error('Employee ID is required to deactivate.');
+    const response = await this.executeFetch(`/employees/${id}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to deactivate employee.');
+    }
+    return {
+      data: result.data,
+      message: result.message || 'Employee deactivation requested. Pending Super Admin approval.',
+    };
   }
 }
 

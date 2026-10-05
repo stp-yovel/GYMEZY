@@ -5,6 +5,7 @@ import {
   Button,
   Checkbox,
   Switch,
+  Alert,
   message,
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
@@ -27,9 +28,11 @@ export const Login = () => {
   const { isDarkMode, toggleTheme } = useTheme();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState(null);
 
   const handleLogin = async (values) => {
     setLoading(true);
+    setLoginError(null);
     try {
       const resultAction = await dispatch(
         loginUser({
@@ -40,14 +43,28 @@ export const Login = () => {
 
       if (loginUser.fulfilled.match(resultAction)) {
         const user = resultAction.payload.user;
-        message.success(`Welcome back, ${user.fullName || user.name || 'Partner'}! Gym Owner Portal loaded.`);
-        navigate('/owner/dashboard');
+        const approvalStatus = user.gym?.approvalStatus || 'Approved';
+        const isPendingOrRejected =
+          approvalStatus === 'Pending Approval' ||
+          approvalStatus === 'Pending' ||
+          approvalStatus === 'Rejected';
+
+        if (isPendingOrRejected) {
+          message.info(`Welcome back, ${user.fullName || user.name || 'Partner'}! Your application status is loaded.`);
+          navigate('/application-status');
+        } else {
+          message.success(`Welcome back, ${user.fullName || user.name || 'Partner'}! Gym Owner Portal loaded.`);
+          navigate('/owner/dashboard');
+        }
       } else {
         const errorMsg = resultAction.payload || 'Invalid email/phone or password.';
+        setLoginError(errorMsg);
         message.error(errorMsg);
       }
     } catch (err) {
-      message.error(err.message || 'Login failed. Please verify credentials and try again.');
+      const errorMsg = err.message || 'Login failed. Please verify credentials and try again.';
+      setLoginError(errorMsg);
+      message.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -227,7 +244,7 @@ export const Login = () => {
             </div>
           </div>
 
-          <div style={{ marginBottom: 32 }}>
+          <div style={{ marginBottom: 24 }}>
             <h2
               style={{
                 fontSize: 24,
@@ -240,6 +257,22 @@ export const Login = () => {
               Sign In
             </h2>
           </div>
+
+          {loginError && (
+            <Alert
+              message="Sign In Notice"
+              description={loginError}
+              type="error"
+              showIcon
+              closable
+              onClose={() => setLoginError(null)}
+              style={{
+                marginBottom: 24,
+                borderRadius: 'var(--radius-base)',
+                fontSize: 13,
+              }}
+            />
+          )}
 
           <Form
             form={form}
@@ -323,6 +356,29 @@ export const Login = () => {
                 Sign In
               </Button>
             </Form.Item>
+
+            {/* Link to Gym Partner Registration */}
+            <div
+              style={{
+                marginTop: 24,
+                textAlign: 'center',
+                fontSize: 13,
+                color: isDarkMode ? '#94a3b8' : '#64748b',
+              }}
+            >
+              Want to partner with GYMEZY?{' '}
+              <a
+                onClick={() => navigate('/register')}
+                style={{
+                  color: 'var(--color-primary)',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                }}
+              >
+                Register your Gym
+              </a>
+            </div>
           </Form>
         </div>
       </div>

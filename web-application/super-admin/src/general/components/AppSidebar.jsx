@@ -19,6 +19,7 @@ import {
 } from '@ant-design/icons';
 import { useTheme } from '../../theme/ThemeContext';
 import { fetchGyms } from '../../redux/slices/gymSlice';
+import { employeeService } from '../../services/employeeService';
 import gymezyLogo from '../../assets/logo/gymezy.png';
 
 // Helper to render neatly proportioned sidebar count badges
@@ -58,10 +59,15 @@ export const AppSidebar = ({
   const { isDarkMode } = useTheme();
 
   const gyms = useSelector((state) => state.gyms?.gyms || []);
+  const [pendingTrainersCount, setPendingTrainersCount] = React.useState(0);
 
   useEffect(() => {
     dispatch(fetchGyms());
-  }, [dispatch]);
+    employeeService
+      .getPendingApprovals()
+      .then((data) => setPendingTrainersCount(Array.isArray(data) ? data.length : 0))
+      .catch(() => {});
+  }, [dispatch, location.pathname, location.search]);
 
   // Compute live dynamic counts directly from real fleet data
   const totalGyms = gyms.length;
@@ -78,6 +84,8 @@ export const AppSidebar = ({
     (g) => g.approvalStatus === 'Rejected' || g.status === 'Rejected'
   ).length;
 
+  const totalActionRequired = pendingCount + pendingTrainersCount;
+
   const menuItems = [
     {
       key: '/admin/dashboard',
@@ -88,16 +96,16 @@ export const AppSidebar = ({
       key: 'gyms-sub',
       icon: <ShopOutlined />,
       label: (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: 6 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: 4 }}>
           <span>Gyms</span>
-          {pendingCount > 0 && renderMenuBadge(pendingCount, true)}
+          {totalActionRequired > 0 && renderMenuBadge(totalActionRequired, true)}
         </div>
       ),
       children: [
         {
           key: '/admin/gyms?tab=all',
           label: (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: 2 }}>
               <span>All Gyms</span>
               {renderMenuBadge(totalGyms, false)}
             </div>
@@ -106,8 +114,8 @@ export const AppSidebar = ({
         {
           key: '/admin/gyms?tab=pending',
           label: (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-              <span>Pending Approval</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: 2 }}>
+              <span>Gym Approvals</span>
               {pendingCount > 0 && (
                 <span
                   style={{
@@ -122,6 +130,7 @@ export const AppSidebar = ({
                     fontWeight: 800,
                     backgroundColor: '#d97706',
                     color: '#ffffff',
+                    flexShrink: 0,
                   }}
                 >
                   {pendingCount}
@@ -131,9 +140,37 @@ export const AppSidebar = ({
           ),
         },
         {
+          key: '/admin/gyms?tab=trainer_requests',
+          label: (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: 2 }}>
+              <span>Trainer Requests</span>
+              {pendingTrainersCount > 0 && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 18,
+                    height: 18,
+                    padding: '0 5px',
+                    borderRadius: 9,
+                    fontSize: 10,
+                    fontWeight: 800,
+                    backgroundColor: '#f59e0b',
+                    color: '#ffffff',
+                    flexShrink: 0,
+                  }}
+                >
+                  {pendingTrainersCount}
+                </span>
+              )}
+            </div>
+          ),
+        },
+        {
           key: '/admin/gyms?tab=approved',
           label: (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: 2 }}>
               <span>Approved / Active</span>
               {renderMenuBadge(approvedCount, false)}
             </div>
@@ -142,7 +179,7 @@ export const AppSidebar = ({
         {
           key: '/admin/gyms?tab=on_hold',
           label: (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: 2 }}>
               <span>On Hold</span>
               {renderMenuBadge(onHoldCount, false)}
             </div>
@@ -151,7 +188,7 @@ export const AppSidebar = ({
         {
           key: '/admin/gyms?tab=rejected',
           label: (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: 2 }}>
               <span>Rejected</span>
               {rejectedCount > 0 && (
                 <span
@@ -167,6 +204,7 @@ export const AppSidebar = ({
                     fontWeight: 800,
                     backgroundColor: '#ef4444',
                     color: '#ffffff',
+                    flexShrink: 0,
                   }}
                 >
                   {rejectedCount}
@@ -221,7 +259,7 @@ export const AppSidebar = ({
       collapsed={collapsed}
       onCollapse={onCollapse}
       trigger={null}
-      width={250}
+      width={260}
       collapsedWidth={80}
       style={{
         backgroundColor: isDarkMode ? '#0d0d0d' : '#0e131f',

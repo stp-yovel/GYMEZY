@@ -19,175 +19,28 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors } from '../theme/appTheme';
 import { useToast } from '../widgets/CustomScaffoldMessage';
-
-const FULL_TIME_STAFF = [
-  {
-    id: 'EMP1001',
-    name: 'Ramesh Kumar',
-    role: 'Trainer',
-    phone: '+91 91509 55071',
-    type: 'Full Time',
-    shift: 'General Shift (6:00 AM - 2:00 PM)',
-    status: 'Present',
-    checkinTime: '07:35 AM',
-    checkoutTime: '--',
-    avatar: 'RK',
-  },
-  {
-    id: 'EMP1002',
-    name: 'Siva Kumar',
-    role: 'Gym Manager',
-    phone: '+91 91509 55072',
-    type: 'Full Time',
-    shift: 'General Shift (8:00 AM - 5:00 PM)',
-    status: 'Absent',
-    checkinTime: '--',
-    checkoutTime: '--',
-    avatar: 'SK',
-  },
-  {
-    id: 'EMP1003',
-    name: 'Anita Raj',
-    role: 'Receptionist',
-    phone: '+91 91509 55073',
-    type: 'Full Time',
-    shift: 'Morning Shift (6:00 AM - 2:00 PM)',
-    status: 'Present',
-    checkinTime: '07:40 AM',
-    checkoutTime: '--',
-    avatar: 'AR',
-  },
-  {
-    id: 'EMP1004',
-    name: 'Karthik',
-    role: 'Cleaner / Housekeeping',
-    phone: '+91 91509 55074',
-    type: 'Full Time',
-    shift: 'Morning Shift (5:30 AM - 1:30 PM)',
-    status: 'Absent',
-    checkinTime: '--',
-    checkoutTime: '--',
-    avatar: 'K',
-  },
-  {
-    id: 'EMP1005',
-    name: 'Meena',
-    role: 'Trainer',
-    phone: '+91 91509 55075',
-    type: 'Full Time',
-    shift: 'Morning Shift (6:00 AM - 2:00 PM)',
-    status: 'Present',
-    checkinTime: '07:50 AM',
-    checkoutTime: '--',
-    avatar: 'M',
-  },
-  {
-    id: 'EMP1006',
-    name: 'Vignesh',
-    role: 'Sales Executive',
-    phone: '+91 91509 55076',
-    type: 'Full Time',
-    shift: 'General Shift (9:00 AM - 6:00 PM)',
-    status: 'Present',
-    checkinTime: '08:05 AM',
-    checkoutTime: '--',
-    avatar: 'VG',
-  },
-  {
-    id: 'EMP1007',
-    name: 'Sangeetha M',
-    role: 'Floor Supervisor',
-    phone: '+91 91509 55077',
-    type: 'Full Time',
-    shift: 'Evening Shift (2:00 PM - 10:00 PM)',
-    status: 'On Leave',
-    checkinTime: '--',
-    checkoutTime: '--',
-    avatar: 'SM',
-  },
-];
-
-const PART_TIME_STAFF = [
-  {
-    id: 'EMP2001',
-    name: 'Prakash Singh',
-    role: 'Part Time Trainer',
-    phone: '+91 91509 55071',
-    type: 'Part Time',
-    contractStart: '01 May 2026',
-    contractEnd: '30 Jun 2026 (40 Days Left)',
-    workingDays: 'Mon, Wed, Fri',
-    shift: '6:00 AM - 11:00 AM',
-    status: 'Checked In',
-    checkinTime: '07:10 AM',
-    checkoutTime: '--',
-    totalHours: '--',
-    avatar: 'PS',
-  },
-  {
-    id: 'EMP2002',
-    name: 'Ajith Kumar',
-    role: 'Yoga Instructor',
-    phone: '+91 91509 55072',
-    type: 'Contract Employee',
-    contractStart: '01 May 2026',
-    contractEnd: '30 Jun 2026 (40 Days Left)',
-    workingDays: 'Mon, Wed, Fri',
-    shift: '6:00 AM - 11:00 AM',
-    status: 'Not Checked In',
-    checkinTime: '--',
-    checkoutTime: '--',
-    totalHours: '--',
-    avatar: 'AJ',
-  },
-  {
-    id: 'EMP2003',
-    name: 'Lakshmi Priya',
-    role: 'Zumba Instructor',
-    phone: '+91 91509 55073',
-    type: 'Part Time',
-    contractStart: '15 Apr 2026',
-    contractEnd: '15 Jul 2026 (45 Days Left)',
-    workingDays: 'Tue, Thu, Sat',
-    shift: '6:30 AM - 9:30 AM',
-    status: 'Checked In',
-    checkinTime: '06:45 AM',
-    checkoutTime: '--',
-    totalHours: '--',
-    avatar: 'LP',
-  },
-  {
-    id: 'EMP2004',
-    name: 'Naveen Raj',
-    role: 'Part Time Trainer',
-    phone: '+91 91509 55074',
-    type: 'Part Time',
-    contractStart: '01 May 2026',
-    contractEnd: '31 May 2026 (10 Days Left)',
-    workingDays: 'Daily',
-    shift: '5:00 PM - 9:30 PM',
-    status: 'Not Checked In',
-    checkinTime: '--',
-    checkoutTime: '--',
-    totalHours: '--',
-    avatar: 'NR',
-  },
-];
+import { useAuth } from '../context/AuthContext';
+import { apiService } from '../services/apiService';
 
 const SEARCH_FILTER_CHIPS = ['Employee Name', 'Phone Number', 'Employee ID', 'Role'];
 
 export const AttendanceScreen = ({ navigation, route }) => {
   const { isDark } = useTheme();
   const { showToast } = useToast();
+  const { gym } = useAuth();
   const insets = useSafeAreaInsets();
 
   // Mode: 'HUB' | 'FULL_TIME' | 'PART_TIME' | 'TODAY_SUMMARY' | 'EMPLOYEE_DETAIL'
   const initialView = route?.params?.initialView || 'HUB';
   const [currentView, setCurrentView] = useState(initialView);
 
+  // Live Employee Data
+  const [employees, setEmployees] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
   // Sub-tabs
   const [topTab, setTopTab] = useState('Search Employee'); // 'Search Employee' | "Today's Attendance"
-  const [attendanceSegment, setAttendanceSegment] = useState('Full Time (21)'); // 'Full Time (21)' | 'Part Time / Contract (17)'
+  const [attendanceSegment, setAttendanceSegment] = useState('Full Time');
   const [activeFilterChip, setActiveFilterChip] = useState('Employee Name');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -195,7 +48,7 @@ export const AttendanceScreen = ({ navigation, route }) => {
   const [showCheckinModal, setShowCheckinModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState(FULL_TIME_STAFF[0]);
+  const [selectedStaff, setSelectedStaff] = useState(null);
 
   // Check-out edit state
   const [checkoutTime, setCheckoutTime] = useState('02:35 PM');
@@ -207,6 +60,26 @@ export const AttendanceScreen = ({ navigation, route }) => {
     insets.top,
     Platform.OS === 'android' ? (StatusBar.currentHeight || 36) : 44
   );
+
+  useEffect(() => {
+    fetchEmployees();
+  }, [gym?.id, gym?._id, gym?.partnerId]);
+
+  const fetchEmployees = async () => {
+    const gymId = gym?.id || gym?._id || gym?.partnerId;
+    if (!gymId) return;
+    try {
+      setIsLoading(true);
+      const res = await apiService.getEmployees({ gymId, limit: 'all' });
+      if (res && Array.isArray(res.employees)) {
+        setEmployees(res.employees);
+      }
+    } catch (err) {
+      console.log('Error fetching employees in AttendanceScreen:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (showSuccessModal) {
@@ -221,8 +94,71 @@ export const AttendanceScreen = ({ navigation, route }) => {
     }
   }, [showSuccessModal, successScaleAnim]);
 
+  // Transform live backend employee models to staff items
+  const fullTimeStaff = employees
+    .filter((e) => e.type !== 'Part-Time' && e.type !== 'Temporary')
+    .map((e) => {
+      const initials = e.name
+        ? e.name
+            .split(' ')
+            .map((p) => p[0])
+            .join('')
+            .substring(0, 2)
+            .toUpperCase()
+        : 'EM';
+      return {
+        id: e.employeeId || e.id || e._id || 'EMP',
+        name: e.name || 'Staff Member',
+        role: e.role || 'Staff',
+        phone: e.phone || '',
+        type: e.type || 'Full Time',
+        shift: e.schedule?.workingTimeStart && e.schedule?.workingTimeEnd
+          ? `Shift (${e.schedule.workingTimeStart} - ${e.schedule.workingTimeEnd})`
+          : 'General Shift (6:00 AM - 2:00 PM)',
+        status: e.attendance || (e.status === 'Active' ? 'Present' : e.status || 'Present'),
+        checkinTime: e.checkinTime || '07:35 AM',
+        checkoutTime: e.checkoutTime || '--',
+        avatar: initials,
+        approvalStatus: e.approvalStatus || 'Approved',
+        raw: e,
+      };
+    });
+
+  const partTimeStaff = employees
+    .filter((e) => e.type === 'Part-Time' || e.type === 'Temporary')
+    .map((e) => {
+      const initials = e.name
+        ? e.name
+            .split(' ')
+            .map((p) => p[0])
+            .join('')
+            .substring(0, 2)
+            .toUpperCase()
+        : 'PT';
+      return {
+        id: e.employeeId || e.id || e._id || 'EMP',
+        name: e.name || 'Contract Trainer',
+        role: e.role || 'Part Time Trainer',
+        phone: e.phone || '',
+        type: e.type || 'Part Time',
+        contractStart: e.schedule?.startDate || '01 May 2026',
+        contractEnd: e.schedule?.endDate || '30 Jun 2026',
+        workingDays: Array.isArray(e.schedule?.workingDays) ? e.schedule.workingDays.join(', ') : 'Mon, Wed, Fri',
+        shift: e.schedule?.workingTimeStart && e.schedule?.workingTimeEnd
+          ? `${e.schedule.workingTimeStart} - ${e.schedule.workingTimeEnd}`
+          : '6:00 AM - 11:00 AM',
+        status: e.attendance || (e.status === 'Active' ? 'Checked In' : 'Not Checked In'),
+        checkinTime: e.checkinTime || '07:10 AM',
+        checkoutTime: e.checkoutTime || '--',
+        totalHours: '--',
+        avatar: initials,
+        approvalStatus: e.approvalStatus || 'Approved',
+        raw: e,
+      };
+    });
+
   // Filter staff list
-  const activeStaffList = currentView === 'FULL_TIME' ? FULL_TIME_STAFF : PART_TIME_STAFF;
+  const activeStaffList = currentView === 'FULL_TIME' ? fullTimeStaff : partTimeStaff;
   const filteredStaff = activeStaffList.filter((s) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
@@ -253,7 +189,7 @@ export const AttendanceScreen = ({ navigation, route }) => {
   const handleConfirmCheckin = () => {
     setShowCheckinModal(false);
     showToast({
-      message: `${selectedStaff.name} checked in successfully!`,
+      message: `${selectedStaff?.name || 'Employee'} checked in successfully!`,
       isSuccess: true,
     });
     setShowSuccessModal(true);
@@ -262,7 +198,7 @@ export const AttendanceScreen = ({ navigation, route }) => {
   const handleConfirmCheckout = () => {
     setShowCheckoutModal(false);
     showToast({
-      message: `${selectedStaff.name} checked out at ${checkoutTime} (7h 25m worked)`,
+      message: `${selectedStaff?.name || 'Employee'} checked out at ${checkoutTime}`,
       isSuccess: true,
     });
   };
@@ -376,25 +312,33 @@ export const AttendanceScreen = ({ navigation, route }) => {
             Today's Summary
           </Text>
           <Text style={[styles.summaryDate, { color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }]}>
-            21 May 2026
+            {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
           </Text>
         </View>
 
         <View style={styles.metricsGridRow}>
           <View style={styles.summaryStatCol}>
-            <Text style={[styles.statVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>28</Text>
+            <Text style={[styles.statVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+              {fullTimeStaff.length + partTimeStaff.length}
+            </Text>
             <Text style={[styles.statLabel, { color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }]}>Total Staff</Text>
           </View>
           <View style={styles.summaryStatCol}>
-            <Text style={[styles.statVal, { color: AppColors.secondaryColor }]}>18</Text>
+            <Text style={[styles.statVal, { color: AppColors.secondaryColor }]}>
+              {[...fullTimeStaff, ...partTimeStaff].filter((s) => s.status === 'Present' || s.status === 'Checked In').length}
+            </Text>
             <Text style={[styles.statLabel, { color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }]}>Present</Text>
           </View>
           <View style={styles.summaryStatCol}>
-            <Text style={[styles.statVal, { color: AppColors.dangerRed }]}>7</Text>
+            <Text style={[styles.statVal, { color: AppColors.dangerRed }]}>
+              {[...fullTimeStaff, ...partTimeStaff].filter((s) => s.status === 'Absent' || s.status === 'Not Checked In').length}
+            </Text>
             <Text style={[styles.statLabel, { color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }]}>Absent</Text>
           </View>
           <View style={styles.summaryStatCol}>
-            <Text style={[styles.statVal, { color: AppColors.warningAmber }]}>3</Text>
+            <Text style={[styles.statVal, { color: AppColors.warningAmber }]}>
+              {[...fullTimeStaff, ...partTimeStaff].filter((s) => s.status === 'On Leave').length}
+            </Text>
             <Text style={[styles.statLabel, { color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }]}>On Leave</Text>
           </View>
         </View>
@@ -415,7 +359,7 @@ export const AttendanceScreen = ({ navigation, route }) => {
         ]}
         onPress={() => {
           setCurrentView('TODAY_SUMMARY');
-          setAttendanceSegment('Full Time (21)');
+          setAttendanceSegment('Full Time');
         }}
         activeOpacity={0.8}
       >
@@ -426,7 +370,9 @@ export const AttendanceScreen = ({ navigation, route }) => {
           </Text>
         </View>
         <View style={styles.quickRight}>
-          <Text style={[styles.quickCount, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>14</Text>
+          <Text style={[styles.quickCount, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+            {fullTimeStaff.filter((s) => s.status === 'Present' || s.status === 'Checked In').length}
+          </Text>
           <MaterialIcons name="chevron-right" size={20} color={isDark ? 'rgba(255,255,255,0.4)' : '#94A3B8'} />
         </View>
       </TouchableOpacity>
@@ -441,7 +387,7 @@ export const AttendanceScreen = ({ navigation, route }) => {
         ]}
         onPress={() => {
           setCurrentView('TODAY_SUMMARY');
-          setAttendanceSegment('Part Time / Contract (17)');
+          setAttendanceSegment('Part Time');
         }}
         activeOpacity={0.8}
       >
@@ -452,7 +398,9 @@ export const AttendanceScreen = ({ navigation, route }) => {
           </Text>
         </View>
         <View style={styles.quickRight}>
-          <Text style={[styles.quickCount, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>4</Text>
+          <Text style={[styles.quickCount, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+            {partTimeStaff.filter((s) => s.status === 'Present' || s.status === 'Checked In').length}
+          </Text>
           <MaterialIcons name="chevron-right" size={20} color={isDark ? 'rgba(255,255,255,0.4)' : '#94A3B8'} />
         </View>
       </TouchableOpacity>
@@ -711,63 +659,89 @@ export const AttendanceScreen = ({ navigation, route }) => {
   /* -------------------------------------------------------------------------- */
   /* 3. CONTRACT EMPLOYEE DETAIL & ATTENDANCE HISTORY VIEW                      */
   /* -------------------------------------------------------------------------- */
-  const renderContractEmployeeDetailView = () => (
-    <View style={[styles.container, { backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground }]}>
-      {/* Top Header */}
-      <View style={[styles.searchHeaderRow, { paddingTop: topInset + 10 }]}>
-        <TouchableOpacity
-          style={[
-            styles.backBtn,
-            {
-              backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
-              borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-            },
-          ]}
-          onPress={() => setCurrentView('PART_TIME')}
-          activeOpacity={0.8}
-        >
-          <MaterialIcons name="arrow-back" size={22} color={isDark ? '#FFFFFF' : '#0F172A'} />
-        </TouchableOpacity>
-        <Text style={[styles.screenTitleText, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-          Part Time / Contract Employees
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
+  const renderContractEmployeeDetailView = () => {
+    if (!selectedStaff) {
+      return (
+        <View style={[styles.container, { backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground }]}>
+          <View style={[styles.searchHeaderRow, { paddingTop: topInset + 10 }]}>
+            <TouchableOpacity
+              style={[styles.backBtn, { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
+              onPress={() => setCurrentView('PART_TIME')}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="arrow-back" size={22} color={isDark ? '#FFFFFF' : '#0F172A'} />
+            </TouchableOpacity>
+            <Text style={[styles.screenTitleText, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+              Employee Details
+            </Text>
+            <View style={{ width: 40 }} />
+          </View>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <Text style={{ color: isDark ? '#FFFFFF' : '#0F172A', fontSize: 15, fontWeight: '600' }}>
+              No employee selected
+            </Text>
+          </View>
+        </View>
+      );
+    }
 
-      <ScrollView
-        contentContainerStyle={[styles.detailsScrollContent, { paddingBottom: 40 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Profile Card */}
-        <View
-          style={[
-            styles.profileVerifyCard,
-            {
-              backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
-              borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-            },
-          ]}
+    return (
+      <View style={[styles.container, { backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground }]}>
+        {/* Top Header */}
+        <View style={[styles.searchHeaderRow, { paddingTop: topInset + 10 }]}>
+          <TouchableOpacity
+            style={[
+              styles.backBtn,
+              {
+                backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
+                borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+              },
+            ]}
+            onPress={() => setCurrentView('PART_TIME')}
+            activeOpacity={0.8}
+          >
+            <MaterialIcons name="arrow-back" size={22} color={isDark ? '#FFFFFF' : '#0F172A'} />
+          </TouchableOpacity>
+          <Text style={[styles.screenTitleText, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+            Part Time / Contract Employees
+          </Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[styles.detailsScrollContent, { paddingBottom: 40 }]}
+          showsVerticalScrollIndicator={false}
         >
-          <View style={styles.profileVerifyTop}>
-            <View style={styles.staffAvatarCircle}>
-              <Text style={styles.staffAvatarText}>{selectedStaff.avatar}</Text>
-            </View>
-            <View style={styles.profileDetailInfo}>
-              <Text style={[styles.detailsName, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedStaff.name}
-              </Text>
-              <Text style={[styles.detailsRole, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                {selectedStaff.role} • {selectedStaff.id}
-              </Text>
-              <View style={styles.phoneRow}>
-                <Ionicons name="call" size={13} color={AppColors.primaryColor} />
-                <Text style={[styles.phoneText, { color: isDark ? 'rgba(255,255,255,0.7)' : '#334155' }]}>
-                  {selectedStaff.phone}
+          {/* Profile Card */}
+          <View
+            style={[
+              styles.profileVerifyCard,
+              {
+                backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
+                borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+              },
+            ]}
+          >
+            <View style={styles.profileVerifyTop}>
+              <View style={styles.staffAvatarCircle}>
+                <Text style={styles.staffAvatarText}>{selectedStaff?.avatar || 'EM'}</Text>
+              </View>
+              <View style={styles.profileDetailInfo}>
+                <Text style={[styles.detailsName, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                  {selectedStaff?.name || 'Employee'}
                 </Text>
+                <Text style={[styles.detailsRole, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                  {selectedStaff?.role || 'Staff'} • {selectedStaff?.id || ''}
+                </Text>
+                <View style={styles.phoneRow}>
+                  <Ionicons name="call" size={13} color={AppColors.primaryColor} />
+                  <Text style={[styles.phoneText, { color: isDark ? 'rgba(255,255,255,0.7)' : '#334155' }]}>
+                    {selectedStaff?.phone || '--'}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
 
         {/* Contract Details Table */}
         <View
@@ -788,7 +762,7 @@ export const AttendanceScreen = ({ navigation, route }) => {
               Contract Type
             </Text>
             <Text style={[styles.tableValuePill, { color: isDark ? '#93C5FD' : AppColors.primaryColor }]}>
-              {selectedStaff.type}
+              {selectedStaff?.type || 'Part Time'}
             </Text>
           </View>
 
@@ -797,7 +771,7 @@ export const AttendanceScreen = ({ navigation, route }) => {
               Contract Start Date
             </Text>
             <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-              {selectedStaff.contractStart}
+              {selectedStaff?.contractStart || '--'}
             </Text>
           </View>
 
@@ -806,7 +780,7 @@ export const AttendanceScreen = ({ navigation, route }) => {
               Contract End Date
             </Text>
             <Text style={[styles.tableValue, { color: AppColors.secondaryColor, fontWeight: '800' }]}>
-              {selectedStaff.contractEnd}
+              {selectedStaff?.contractEnd || '--'}
             </Text>
           </View>
 
@@ -815,7 +789,7 @@ export const AttendanceScreen = ({ navigation, route }) => {
               Working Days
             </Text>
             <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-              {selectedStaff.workingDays}
+              {selectedStaff?.workingDays || 'Mon, Wed, Fri'}
             </Text>
           </View>
 
@@ -824,7 +798,7 @@ export const AttendanceScreen = ({ navigation, route }) => {
               Daily Shift
             </Text>
             <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-              {selectedStaff.shift}
+              {selectedStaff?.shift || '6:00 AM - 11:00 AM'}
             </Text>
           </View>
         </View>
@@ -851,7 +825,7 @@ export const AttendanceScreen = ({ navigation, route }) => {
               </Text>
             </View>
             <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-              {selectedStaff.checkinTime}
+              {selectedStaff?.checkinTime || '--'}
             </Text>
           </View>
 
@@ -863,7 +837,7 @@ export const AttendanceScreen = ({ navigation, route }) => {
               </Text>
             </View>
             <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-              {selectedStaff.checkoutTime}
+              {selectedStaff?.checkoutTime || '--'}
             </Text>
           </View>
 
@@ -877,7 +851,7 @@ export const AttendanceScreen = ({ navigation, route }) => {
             <View style={styles.redDotStatusRow}>
               <View style={styles.statusDotRed} />
               <Text style={styles.statusDotText}>
-                {selectedStaff.status}
+                {selectedStaff?.status || 'Present'}
               </Text>
             </View>
           </View>
@@ -903,7 +877,7 @@ export const AttendanceScreen = ({ navigation, route }) => {
           ]}
           onPress={() =>
             Alert.alert(
-              `${selectedStaff.name} Attendance History`,
+              `${selectedStaff?.name || 'Employee'} Attendance History`,
               '• May 2026: 22 Days Present (100% attendance)\n• Apr 2026: 20 Days Present\n• Mar 2026: 21 Days Present'
             )
           }
@@ -916,15 +890,17 @@ export const AttendanceScreen = ({ navigation, route }) => {
       </ScrollView>
     </View>
   );
+};
 
   /* -------------------------------------------------------------------------- */
   /* 4. TODAY'S ATTENDANCE SUMMARY & GROUPED ROSTER VIEW                        */
   /* -------------------------------------------------------------------------- */
   const renderTodaySummaryView = () => {
     const isFullTimeSeg = attendanceSegment.startsWith('Full Time');
-    const sourceList = isFullTimeSeg ? FULL_TIME_STAFF : PART_TIME_STAFF;
+    const sourceList = isFullTimeSeg ? fullTimeStaff : partTimeStaff;
     const presentStaff = sourceList.filter((s) => s.status === 'Present' || s.status === 'Checked In');
     const absentStaff = sourceList.filter((s) => s.status === 'Absent' || s.status === 'Not Checked In');
+    const onLeaveStaff = sourceList.filter((s) => s.status === 'On Leave');
 
     return (
       <View style={[styles.container, { backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground }]}>
@@ -951,10 +927,10 @@ export const AttendanceScreen = ({ navigation, route }) => {
           </View>
         </View>
 
-        {/* Segment Tabs: Full Time (21) vs Part Time / Contract (17) */}
+        {/* Segment Tabs: Full Time vs Part Time */}
         <View style={[styles.segmentContainer, { borderBottomColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}>
-          {['Full Time (21)', 'Part Time / Contract (17)'].map((seg) => {
-            const isSelected = attendanceSegment === seg;
+          {[`Full Time (${fullTimeStaff.length})`, `Part Time / Contract (${partTimeStaff.length})`].map((seg) => {
+            const isSelected = attendanceSegment.startsWith('Full Time') ? seg.startsWith('Full Time') : seg.startsWith('Part Time');
             return (
               <TouchableOpacity
                 key={seg}
@@ -1005,7 +981,9 @@ export const AttendanceScreen = ({ navigation, route }) => {
                 },
               ]}
             >
-              <Text style={[styles.miniSummaryCount, { color: AppColors.secondaryColor }]}>14</Text>
+              <Text style={[styles.miniSummaryCount, { color: AppColors.secondaryColor }]}>
+                {presentStaff.length}
+              </Text>
               <Text style={[styles.miniSummaryLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>Present</Text>
             </View>
 
@@ -1018,7 +996,9 @@ export const AttendanceScreen = ({ navigation, route }) => {
                 },
               ]}
             >
-              <Text style={[styles.miniSummaryCount, { color: AppColors.dangerRed }]}>5</Text>
+              <Text style={[styles.miniSummaryCount, { color: AppColors.dangerRed }]}>
+                {absentStaff.length}
+              </Text>
               <Text style={[styles.miniSummaryLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>Absent</Text>
             </View>
 
@@ -1031,7 +1011,9 @@ export const AttendanceScreen = ({ navigation, route }) => {
                 },
               ]}
             >
-              <Text style={[styles.miniSummaryCount, { color: AppColors.warningAmber }]}>2</Text>
+              <Text style={[styles.miniSummaryCount, { color: AppColors.warningAmber }]}>
+                {onLeaveStaff.length}
+              </Text>
               <Text style={[styles.miniSummaryLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>On Leave</Text>
             </View>
           </View>
@@ -1154,123 +1136,128 @@ export const AttendanceScreen = ({ navigation, route }) => {
       {/* -------------------------------------------------------------------------- */}
       {/* MODAL 1: MARK CHECK-IN BOTTOM SHEET                                        */}
       {/* -------------------------------------------------------------------------- */}
+      {/* -------------------------------------------------------------------------- */}
+      {/* MODAL 1: MARK CHECK-IN BOTTOM SHEET                                        */}
+      {/* -------------------------------------------------------------------------- */}
       <Modal
-        visible={showCheckinModal}
+        visible={showCheckinModal && !!selectedStaff}
         transparent
         animationType="slide"
         onRequestClose={() => setShowCheckinModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.bottomSheetCard,
-              { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF' },
-            ]}
-          >
-            <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                Mark Check-in
-              </Text>
-              <TouchableOpacity onPress={() => setShowCheckinModal(false)}>
-                <MaterialIcons name="close" size={24} color={isDark ? '#FFFFFF' : '#0F172A'} />
+          {selectedStaff && (
+            <View
+              style={[
+                styles.bottomSheetCard,
+                { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF' },
+              ]}
+            >
+              <View style={styles.sheetHeader}>
+                <Text style={[styles.sheetTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                  Mark Check-in
+                </Text>
+                <TouchableOpacity onPress={() => setShowCheckinModal(false)}>
+                  <MaterialIcons name="close" size={24} color={isDark ? '#FFFFFF' : '#0F172A'} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Employee mini card */}
+              <View style={styles.modalStaffProfile}>
+                <View style={styles.staffAvatarCircle}>
+                  <Text style={styles.staffAvatarText}>{selectedStaff?.avatar || 'EM'}</Text>
+                </View>
+                <View style={styles.staffInfoBox}>
+                  <Text style={[styles.modalStaffName, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                    {selectedStaff?.name || 'Employee'}
+                  </Text>
+                  <Text style={[styles.modalStaffMeta, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                    {selectedStaff?.role || 'Staff'} • Employee ID: {selectedStaff?.id || ''}
+                  </Text>
+                  <Text style={[styles.modalStaffPhone, { color: isDark ? 'rgba(255,255,255,0.5)' : '#94A3B8' }]}>
+                    {selectedStaff?.phone || '--'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.sheetDivider, { backgroundColor: isDark ? AppColors.darkBorder : '#F1F5F9' }]} />
+
+              {/* Check-in parameters */}
+              <View style={styles.sheetParamRow}>
+                <View style={styles.iconParamRow}>
+                  <MaterialIcons name="event" size={18} color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'} />
+                  <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                    Date
+                  </Text>
+                </View>
+                <Text style={[styles.paramVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                  {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </Text>
+              </View>
+
+              <View style={styles.sheetParamRow}>
+                <View style={styles.iconParamRow}>
+                  <MaterialIcons name="schedule" size={18} color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'} />
+                  <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                    Check-in Time
+                  </Text>
+                </View>
+                <Text style={[styles.paramVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                  07:35 AM (Now)
+                </Text>
+              </View>
+
+              <View style={styles.sheetParamRow}>
+                <View style={styles.iconParamRow}>
+                  <MaterialIcons name="info" size={18} color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'} />
+                  <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                    Status
+                  </Text>
+                </View>
+                <View style={styles.redDotStatusRow}>
+                  <View style={styles.statusDotRed} />
+                  <Text style={styles.statusDotText}>Absent</Text>
+                </View>
+              </View>
+
+              <View style={[styles.sheetParamRow, { borderBottomWidth: 0 }]}>
+                <View style={styles.iconParamRow}>
+                  <MaterialIcons name="access-time" size={18} color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'} />
+                  <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                    Shift
+                  </Text>
+                </View>
+                <Text style={[styles.paramVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                  {selectedStaff?.shift || 'General Shift'}
+                </Text>
+              </View>
+
+              {/* Actions */}
+              <TouchableOpacity
+                style={styles.modalPrimaryBtn}
+                onPress={handleConfirmCheckin}
+                activeOpacity={0.88}
+              >
+                <MaterialIcons name="check" size={20} color="#FFFFFF" />
+                <Text style={styles.modalPrimaryBtnText}>Mark Check-in</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalCancelBtn,
+                  {
+                    borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                  },
+                ]}
+                onPress={() => setShowCheckinModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.modalCancelBtnText, { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' }]}>
+                  Cancel
+                </Text>
               </TouchableOpacity>
             </View>
-
-            {/* Employee mini card */}
-            <View style={styles.modalStaffProfile}>
-              <View style={styles.staffAvatarCircle}>
-                <Text style={styles.staffAvatarText}>{selectedStaff.avatar}</Text>
-              </View>
-              <View style={styles.staffInfoBox}>
-                <Text style={[styles.modalStaffName, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                  {selectedStaff.name}
-                </Text>
-                <Text style={[styles.modalStaffMeta, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                  {selectedStaff.role} • Employee ID: {selectedStaff.id}
-                </Text>
-                <Text style={[styles.modalStaffPhone, { color: isDark ? 'rgba(255,255,255,0.5)' : '#94A3B8' }]}>
-                  {selectedStaff.phone}
-                </Text>
-              </View>
-            </View>
-
-            <View style={[styles.sheetDivider, { backgroundColor: isDark ? AppColors.darkBorder : '#F1F5F9' }]} />
-
-            {/* Check-in parameters */}
-            <View style={styles.sheetParamRow}>
-              <View style={styles.iconParamRow}>
-                <MaterialIcons name="event" size={18} color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'} />
-                <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                  Date
-                </Text>
-              </View>
-              <Text style={[styles.paramVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                21 May 2026
-              </Text>
-            </View>
-
-            <View style={styles.sheetParamRow}>
-              <View style={styles.iconParamRow}>
-                <MaterialIcons name="schedule" size={18} color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'} />
-                <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                  Check-in Time
-                </Text>
-              </View>
-              <Text style={[styles.paramVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                07:35 AM (Now)
-              </Text>
-            </View>
-
-            <View style={styles.sheetParamRow}>
-              <View style={styles.iconParamRow}>
-                <MaterialIcons name="info" size={18} color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'} />
-                <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                  Status
-                </Text>
-              </View>
-              <View style={styles.redDotStatusRow}>
-                <View style={styles.statusDotRed} />
-                <Text style={styles.statusDotText}>Absent</Text>
-              </View>
-            </View>
-
-            <View style={[styles.sheetParamRow, { borderBottomWidth: 0 }]}>
-              <View style={styles.iconParamRow}>
-                <MaterialIcons name="access-time" size={18} color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'} />
-                <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                  Shift
-                </Text>
-              </View>
-              <Text style={[styles.paramVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedStaff.shift}
-              </Text>
-            </View>
-
-            {/* Actions */}
-            <TouchableOpacity
-              style={styles.modalPrimaryBtn}
-              onPress={handleConfirmCheckin}
-              activeOpacity={0.88}
-            >
-              <MaterialIcons name="check" size={20} color="#FFFFFF" />
-              <Text style={styles.modalPrimaryBtnText}>Mark Check-in</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.modalCancelBtn,
-                {
-                  borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                },
-              ]}
-              onPress={() => setShowCheckinModal(false)}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.modalCancelBtnText, { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' }]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          </View>
+          )}
         </View>
       </Modal>
 
@@ -1278,109 +1265,111 @@ export const AttendanceScreen = ({ navigation, route }) => {
       {/* MODAL 2: MARK CHECK-OUT BOTTOM SHEET                                       */}
       {/* -------------------------------------------------------------------------- */}
       <Modal
-        visible={showCheckoutModal}
+        visible={showCheckoutModal && !!selectedStaff}
         transparent
         animationType="slide"
         onRequestClose={() => setShowCheckoutModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.bottomSheetCard,
-              { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF' },
-            ]}
-          >
-            <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                Mark Check-out
-              </Text>
-              <TouchableOpacity onPress={() => setShowCheckoutModal(false)}>
-                <MaterialIcons name="close" size={24} color={isDark ? '#FFFFFF' : '#0F172A'} />
+          {selectedStaff && (
+            <View
+              style={[
+                styles.bottomSheetCard,
+                { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF' },
+              ]}
+            >
+              <View style={styles.sheetHeader}>
+                <Text style={[styles.sheetTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                  Mark Check-out
+                </Text>
+                <TouchableOpacity onPress={() => setShowCheckoutModal(false)}>
+                  <MaterialIcons name="close" size={24} color={isDark ? '#FFFFFF' : '#0F172A'} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Employee mini card */}
+              <View style={styles.modalStaffProfile}>
+                <View style={styles.staffAvatarCircle}>
+                  <Text style={styles.staffAvatarText}>{selectedStaff?.avatar || 'EM'}</Text>
+                </View>
+                <View style={styles.staffInfoBox}>
+                  <Text style={[styles.modalStaffName, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                    {selectedStaff?.name || 'Employee'}
+                  </Text>
+                  <Text style={[styles.modalStaffMeta, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                    {selectedStaff?.role || 'Staff'} • {selectedStaff?.id || ''}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.sheetDivider, { backgroundColor: isDark ? AppColors.darkBorder : '#F1F5F9' }]} />
+
+              <View style={styles.sheetParamRow}>
+                <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                  Check-in Time
+                </Text>
+                <Text style={[styles.paramVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                  {selectedStaff?.checkinTime || '--'}
+                </Text>
+              </View>
+
+              {/* Check-out Time Input Row */}
+              <View style={styles.sheetParamRow}>
+                <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                  Check-out Time
+                </Text>
+                <View style={styles.checkoutInputRow}>
+                  <TextInput
+                    value={checkoutTime}
+                    onChangeText={setCheckoutTime}
+                    style={[
+                      styles.timeInput,
+                      {
+                        color: isDark ? '#FFFFFF' : '#0F172A',
+                        backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC',
+                        borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                      },
+                    ]}
+                  />
+                  <MaterialIcons name="access-time" size={20} color={AppColors.primaryColor} />
+                </View>
+              </View>
+
+              <View style={[styles.sheetParamRow, { borderBottomWidth: 0 }]}>
+                <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                  Total Hours
+                </Text>
+                <Text style={[styles.paramVal, { color: AppColors.secondaryColor, fontWeight: '800' }]}>
+                  7h 25m
+                </Text>
+              </View>
+
+              {/* Actions */}
+              <TouchableOpacity
+                style={styles.modalPrimaryBtn}
+                onPress={handleConfirmCheckout}
+                activeOpacity={0.88}
+              >
+                <MaterialIcons name="check-circle" size={20} color="#FFFFFF" />
+                <Text style={styles.modalPrimaryBtnText}>Confirm Check-out</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalCancelBtn,
+                  {
+                    borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                  },
+                ]}
+                onPress={() => setShowCheckoutModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.modalCancelBtnText, { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' }]}>
+                  Cancel
+                </Text>
               </TouchableOpacity>
             </View>
-
-            {/* Employee mini card */}
-            <View style={styles.modalStaffProfile}>
-              <View style={styles.staffAvatarCircle}>
-                <Text style={styles.staffAvatarText}>{selectedStaff.avatar}</Text>
-              </View>
-              <View style={styles.staffInfoBox}>
-                <Text style={[styles.modalStaffName, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                  {selectedStaff.name}
-                </Text>
-                <Text style={[styles.modalStaffMeta, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                  {selectedStaff.role} • {selectedStaff.id}
-                </Text>
-              </View>
-            </View>
-
-            <View style={[styles.sheetDivider, { backgroundColor: isDark ? AppColors.darkBorder : '#F1F5F9' }]} />
-
-            <View style={styles.sheetParamRow}>
-              <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                Check-in Time
-              </Text>
-              <Text style={[styles.paramVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedStaff.checkinTime}
-              </Text>
-            </View>
-
-            {/* Check-out Time Input Row */}
-            <View style={styles.sheetParamRow}>
-              <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                Check-out Time
-              </Text>
-              <View style={styles.checkoutInputRow}>
-                <TextInput
-                  value={checkoutTime}
-                  onChangeText={setCheckoutTime}
-                  style={[
-                    styles.timeInput,
-                    {
-                      color: isDark ? '#FFFFFF' : '#0F172A',
-                      backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC',
-                      borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                    },
-                  ]}
-                />
-                <MaterialIcons name="access-time" size={20} color={AppColors.primaryColor} />
-              </View>
-            </View>
-
-            <View style={[styles.sheetParamRow, { borderBottomWidth: 0 }]}>
-              <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                Total Hours
-              </Text>
-              <Text style={[styles.paramVal, { color: AppColors.secondaryColor, fontWeight: '800' }]}>
-                7h 25m
-              </Text>
-            </View>
-
-            {/* Actions */}
-            <TouchableOpacity
-              style={styles.modalPrimaryBtn}
-              onPress={handleConfirmCheckout}
-              activeOpacity={0.88}
-            >
-              <MaterialIcons name="check-circle" size={20} color="#FFFFFF" />
-              <Text style={styles.modalPrimaryBtnText}>Confirm Check-out</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.modalCancelBtn,
-                {
-                  borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                },
-              ]}
-              onPress={() => setShowCheckoutModal(false)}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.modalCancelBtnText, { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' }]}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          </View>
+          )}
         </View>
       </Modal>
 
@@ -1388,88 +1377,94 @@ export const AttendanceScreen = ({ navigation, route }) => {
       {/* MODAL 3: CHECK-IN SUCCESSFUL CELEBRATION MODAL                             */}
       {/* -------------------------------------------------------------------------- */}
       <Modal
-        visible={showSuccessModal}
+        visible={showSuccessModal && !!selectedStaff}
         transparent
         animationType="fade"
         onRequestClose={() => setShowSuccessModal(false)}
       >
         <View style={styles.successModalOverlay}>
-          <View
-            style={[
-              styles.successModalCard,
-              { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF' },
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.closeModalCornerBtn}
-              onPress={() => setShowSuccessModal(false)}
-            >
-              <MaterialIcons name="close" size={22} color={isDark ? '#FFFFFF' : '#0F172A'} />
-            </TouchableOpacity>
-
-            <Animated.View
+          {selectedStaff && (
+            <View
               style={[
-                styles.successCircleWrapper,
-                {
-                  transform: [{ scale: successScaleAnim }],
-                },
+                styles.successModalCard,
+                { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF' },
               ]}
             >
-              <LinearGradient
-                colors={[AppColors.secondaryColor, '#059669']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.successCircleGradient}
+              <TouchableOpacity
+                style={styles.closeModalCornerBtn}
+                onPress={() => setShowSuccessModal(false)}
               >
-                <MaterialIcons name="check" size={44} color="#FFFFFF" />
-              </LinearGradient>
-            </Animated.View>
+                <MaterialIcons name="close" size={22} color={isDark ? '#FFFFFF' : '#0F172A'} />
+              </TouchableOpacity>
 
-            <Text style={[styles.successModalTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-              Check-in Successful
-            </Text>
-            <Text style={[styles.successModalName, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-              {selectedStaff.name}
-            </Text>
-            <Text style={[styles.successModalEmpId, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-              {selectedStaff.id}
-            </Text>
-            <Text style={styles.checkedInGreenBadge}>Checked-in Successfully</Text>
+              <Animated.View
+                style={[
+                  styles.successCircleWrapper,
+                  {
+                    transform: [{ scale: successScaleAnim }],
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={[AppColors.secondaryColor, '#059669']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.successCircleGradient}
+                >
+                  <MaterialIcons name="check" size={44} color="#FFFFFF" />
+                </LinearGradient>
+              </Animated.View>
 
-            <View style={[styles.receiptBox, { backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}>
-              <View style={styles.receiptRow}>
-                <View style={styles.iconParamRow}>
-                  <MaterialIcons name="event" size={16} color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'} />
-                  <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>Date</Text>
+              <Text style={[styles.successModalTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                Check-in Successful
+              </Text>
+              <Text style={[styles.successModalName, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                {selectedStaff?.name || 'Employee'}
+              </Text>
+              <Text style={[styles.successModalEmpId, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                {selectedStaff?.id || ''}
+              </Text>
+              <Text style={styles.checkedInGreenBadge}>Checked-in Successfully</Text>
+
+              <View style={[styles.receiptBox, { backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}>
+                <View style={styles.receiptRow}>
+                  <View style={styles.iconParamRow}>
+                    <MaterialIcons name="event" size={16} color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'} />
+                    <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>Date</Text>
+                  </View>
+                  <Text style={[styles.paramVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                    {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </Text>
                 </View>
-                <Text style={[styles.paramVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>21 May 2026</Text>
+
+                <View style={styles.receiptRow}>
+                  <View style={styles.iconParamRow}>
+                    <MaterialIcons name="schedule" size={16} color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'} />
+                    <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>Check-in Time</Text>
+                  </View>
+                  <Text style={[styles.paramVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>07:35 AM</Text>
+                </View>
+
+                <View style={[styles.receiptRow, { borderBottomWidth: 0 }]}>
+                  <View style={styles.iconParamRow}>
+                    <MaterialIcons name="access-time" size={16} color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'} />
+                    <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>Shift</Text>
+                  </View>
+                  <Text style={[styles.paramVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                    {selectedStaff?.shift || 'General Shift'}
+                  </Text>
+                </View>
               </View>
 
-              <View style={styles.receiptRow}>
-                <View style={styles.iconParamRow}>
-                  <MaterialIcons name="schedule" size={16} color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'} />
-                  <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>Check-in Time</Text>
-                </View>
-                <Text style={[styles.paramVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>07:35 AM</Text>
-              </View>
-
-              <View style={[styles.receiptRow, { borderBottomWidth: 0 }]}>
-                <View style={styles.iconParamRow}>
-                  <MaterialIcons name="access-time" size={16} color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'} />
-                  <Text style={[styles.paramLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>Shift</Text>
-                </View>
-                <Text style={[styles.paramVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>General Shift</Text>
-              </View>
+              <TouchableOpacity
+                style={styles.modalPrimaryBtn}
+                onPress={() => setShowSuccessModal(false)}
+                activeOpacity={0.88}
+              >
+                <Text style={styles.modalPrimaryBtnText}>OK</Text>
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={styles.modalPrimaryBtn}
-              onPress={() => setShowSuccessModal(false)}
-              activeOpacity={0.88}
-            >
-              <Text style={styles.modalPrimaryBtnText}>OK</Text>
-            </TouchableOpacity>
-          </View>
+          )}
         </View>
       </Modal>
     </View>

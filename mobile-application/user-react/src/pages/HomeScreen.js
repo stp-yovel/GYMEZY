@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,17 +10,21 @@ import {
   Dimensions,
   Modal,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors, AppTheme } from '../theme/appTheme';
-import { MockData } from '../data/mockData';
 import { CustomFloatingNavBar } from '../widgets/CustomFloatingNavBar';
 import { MyBookingsScreen } from './MyBookingsScreen';
 import { MyMembershipsScreen } from './MyMembershipsScreen';
 import { ProfileScreen } from './ProfileScreen';
+import { useToast } from '../widgets/CustomScaffoldMessage';
+import { useAuth } from '../context/AuthContext';
+import { locationService } from '../services/locationService';
+import { gymService } from '../services/gymService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -36,9 +40,45 @@ const CATEGORIES = [
   { name: 'Women Only', icon: 'female' },
 ];
 
+const getGymCoverImage = (gym) => {
+  if (!gym) return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop';
+  if (gym.coverPhoto?.fileData) return gym.coverPhoto.fileData;
+  if (typeof gym.coverPhoto === 'string' && gym.coverPhoto.length > 0) return gym.coverPhoto;
+  if (gym.galleryPhotos && gym.galleryPhotos.length > 0 && gym.galleryPhotos[0]?.fileData) return gym.galleryPhotos[0].fileData;
+  if (gym.images && gym.images.length > 0 && typeof gym.images[0] === 'string') return gym.images[0];
+  if (gym.imageUrl) return gym.imageUrl;
+  if (gym.image) return gym.image;
+  if (gym.logo?.fileData) return gym.logo.fileData;
+  return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop';
+};
+
 export const HomeScreen = ({ navigation }) => {
   const { isDark, colors } = useTheme();
+  const { showToast } = useToast();
+  const { user, isAuthenticated, isRestoringSession } = useAuth();
   const [currentTab, setCurrentTab] = useState(0);
+
+  // Auto-redirect to Login if session expires or user is logged out
+  useEffect(() => {
+    if (!isRestoringSession && !isAuthenticated) {
+      navigation.replace('Login');
+    }
+  }, [isAuthenticated, isRestoringSession, navigation]);
+
+  // Location State
+  const [userLocation, setUserLocation] = useState({
+    latitude: 13.085,
+    longitude: 80.2101,
+    name: 'Anna Nagar, Chennai',
+    city: 'Chennai',
+    isGps: false,
+  });
+  const [isLocating, setIsLocating] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+
+  // Gyms State (Queried directly from backend MongoDB database)
+  const [gyms, setGyms] = useState([]);
+  const [isLoadingGyms, setIsLoadingGyms] = useState(true);
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,12 +88,101 @@ export const HomeScreen = ({ navigation }) => {
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
-  const [bookmarkedGymNames, setBookmarkedGymNames] = useState(
-    new Set(['FitZone Gym', 'PowerHouse Gym', 'Core Fit Studio'])
-  );
+  const [bookmarkedGymNames, setBookmarkedGymNames] = useState(new Set());
 
-  const allGyms = MockData.gyms;
-  const topRatedGyms = allGyms.filter((g) => g.rating >= 4.7);
+  // 2. Check location permission on launch
+  useEffect(() => {
+    locationService.getPermissionStatus().then((status) => {
+      if (status === 'undetermined') {
+        const timer = setTimeout(() => {
+          setShowLocationModal(true);
+        }, 1200);
+        return () => clearTimeout(timer);
+      } else if (status === 'granted') {
+        handleDetectLocation(false);
+      }
+    });
+  }, []);
+
+  // 3. Fetch Nearest Gyms Directly from Backend API on location/filter/search changes
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoadingGyms(true);
+
+    const delay = searchQuery.trim().length > 0 ? 350 : 0;
+    const timer = setTimeout(() => {
+      gymService
+        .fetchGyms({
+          lat: userLocation.latitude,
+          lng: userLocation.longitude,
+          category: selectedCategory,
+          search: searchQuery,
+          type: selectedType,
+          facility: selectedFacility,
+          workout: selectedWorkout,
+        })
+        .then((res) => {
+          if (isMounted) {
+            setGyms(res.gyms || []);
+            setIsLoadingGyms(false);
+          }
+        })
+        .catch((_err) => {
+          if (isMounted) {
+            setIsLoadingGyms(false);
+          }
+        });
+    }, delay);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [
+    userLocation.latitude,
+    userLocation.longitude,
+    selectedCategory,
+    searchQuery,
+    selectedType,
+    selectedFacility,
+    selectedWorkout,
+  ]);
+
+  const handleDetectLocation = async (showFeedback = true) => {
+    setIsLocating(true);
+    try {
+      const res = await locationService.getCurrentLocation();
+      if (res.success && res.location) {
+        setUserLocation(res.location);
+        setShowLocationModal(false);
+        if (showFeedback) {
+          showToast({
+            message: `Located at ${res.location.name}! Fetching nearest gyms from server.`,
+            isSuccess: true,
+          });
+        }
+      } else {
+        if (showFeedback) {
+          showToast({
+            message: res.message || 'Location permission denied. You can select an area manually.',
+            isError: true,
+          });
+        }
+      }
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+
+
+  // Top Rated Gyms (Rating >= 4.7) from backend response
+  const topRatedGyms = useMemo(() => {
+    return gyms.filter((g) => (g.rating || 0) >= 4.7);
+  }, [gyms]);
+
+  // Filtered Gyms are the backend-computed and processed gyms
+  const filteredGyms = gyms;
 
   const toggleBookmark = (gymName) => {
     setBookmarkedGymNames((prev) => {
@@ -66,80 +195,6 @@ export const HomeScreen = ({ navigation }) => {
       return next;
     });
   };
-
-  // Filter logic matching Flutter
-  const filteredGyms = allGyms.filter((gym) => {
-    if (searchQuery.trim().length > 0) {
-      const q = searchQuery.toLowerCase().trim();
-      const matchesName = gym.name.toLowerCase().includes(q);
-      const matchesLocation = gym.location.toLowerCase().includes(q);
-      const matchesTags = gym.tags.some((t) => t.toLowerCase().includes(q));
-      if (!matchesName && !matchesLocation && !matchesTags) return false;
-    }
-
-    if (selectedCategory !== 'All') {
-      if (
-        selectedCategory === 'AC Gym' &&
-        !gym.facilities.some((f) => f.toLowerCase().includes('ac'))
-      ) {
-        return false;
-      }
-      if (
-        selectedCategory === 'Women Only' &&
-        !gym.name.includes('Zone') &&
-        !gym.tags.includes('Women Only')
-      ) {
-        return false;
-      }
-      if (
-        selectedCategory === 'Strength' &&
-        !gym.tags.includes('Strength') &&
-        !gym.tags.includes('Bodybuilding')
-      ) {
-        return false;
-      }
-      if (
-        selectedCategory === 'HIIT' &&
-        !gym.tags.includes('HIIT') &&
-        !gym.tags.includes('Cardio')
-      ) {
-        return false;
-      }
-      if (selectedCategory === 'Yoga' && !gym.tags.includes('Yoga')) {
-        return false;
-      }
-      if (
-        selectedCategory === 'Boxing' &&
-        !gym.tags.includes('Boxing') &&
-        !gym.tags.includes('MMA')
-      ) {
-        return false;
-      }
-      if (
-        selectedCategory === 'Zumba' &&
-        !gym.tags.includes('Zumba') &&
-        !gym.tags.includes('Dance')
-      ) {
-        return false;
-      }
-      if (selectedCategory === 'CrossFit' && !gym.tags.includes('CrossFit')) {
-        return false;
-      }
-    }
-
-    if (selectedType) {
-      if (selectedType === 'Women Only' && !gym.name.includes('Zone')) return false;
-      if (selectedType === 'Men Only' && gym.name.includes('Studio')) return false;
-    }
-    if (selectedFacility) {
-      if (selectedFacility === 'AC' && gym.rating < 4.6) return false;
-    }
-    if (selectedWorkout) {
-      if (!gym.tags.includes(selectedWorkout)) return false;
-    }
-
-    return true;
-  });
 
   const clearAllFilters = () => {
     setSearchQuery('');
@@ -156,6 +211,7 @@ export const HomeScreen = ({ navigation }) => {
     selectedFacility !== null ||
     selectedWorkout !== null;
 
+
   // 1. Explore Tab View matching Flutter 1:1
   const renderExploreTab = () => {
     return (
@@ -163,24 +219,42 @@ export const HomeScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.exploreScroll}
       >
-        {/* 1. Header Bar: "Hello Arjun 👋" + Location */}
+        {/* 1. Header Bar: Dynamic Greeting + Location */}
         <View style={styles.headerBar}>
           <View>
             <View style={styles.greetingRow}>
-              <Text style={[styles.greetingText, { color: colors.text }]}>Hello Arjun</Text>
+              <Text style={[styles.greetingText, { color: colors.text }]}>
+                Hello {user?.fullName ? user.fullName.split(' ')[0] : 'Fitness Pro'}
+              </Text>
               <Text style={styles.waveEmoji}> 👋</Text>
             </View>
-            <TouchableOpacity style={styles.locationPillRow} activeOpacity={0.7}>
-              <MaterialIcons name="location-on" size={14} color={AppColors.secondaryColor} />
-              <Text style={[styles.locationCityText, { color: colors.subtitle }]}>
-                Anna Nagar, Chennai
-              </Text>
+            <TouchableOpacity
+              style={styles.locationPillRow}
+              activeOpacity={0.7}
+              onPress={() => setShowLocationModal(true)}
+            >
               <MaterialIcons
-                name="keyboard-arrow-down"
-                size={16}
-                color={colors.subtitle}
-                style={{ marginLeft: 2 }}
+                name="location-on"
+                size={14}
+                color={AppColors.secondaryColor}
               />
+              <Text style={[styles.locationCityText, { color: colors.subtitle }]}>
+                {userLocation.name}
+              </Text>
+              {isLocating ? (
+                <ActivityIndicator
+                  size="small"
+                  color={AppColors.primaryColor}
+                  style={{ marginLeft: 6 }}
+                />
+              ) : (
+                <MaterialIcons
+                  name="keyboard-arrow-down"
+                  size={16}
+                  color={colors.subtitle}
+                  style={{ marginLeft: 2 }}
+                />
+              )}
             </TouchableOpacity>
           </View>
 
@@ -283,12 +357,16 @@ export const HomeScreen = ({ navigation }) => {
               {/* Bottom Row: Title, Subtitle, Claim Button */}
               <View style={styles.promoBottomRow}>
                 <View style={{ flex: 1, marginRight: 10 }}>
-                  <Text style={styles.promoGymTitle}>FitZone Luxury Gym</Text>
-                  <Text style={styles.promoGymSubtitle}>Quarterly Membership Pass</Text>
+                  <Text style={styles.promoGymTitle}>
+                    {gyms[0]?.name || 'GYMEZY Partner Gym'}
+                  </Text>
+                  <Text style={styles.promoGymSubtitle}>
+                    {gyms[0]?.location || 'Exclusive Membership Deal'}
+                  </Text>
                 </View>
 
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('GymDetails', { gym: allGyms[0] })}
+                  onPress={() => navigation.navigate('GymDetails', { gym: gyms[0] || {} })}
                   style={styles.claimOfferBtn}
                   activeOpacity={0.85}
                 >
@@ -304,6 +382,7 @@ export const HomeScreen = ({ navigation }) => {
             </View>
           </View>
         </View>
+
 
         {/* 4. Curated Category Chips */}
         <ScrollView
@@ -403,7 +482,7 @@ export const HomeScreen = ({ navigation }) => {
                     {/* Image Stack */}
                     <View style={styles.spotlightImageWrapper}>
                       <Image
-                        source={{ uri: gym.imageUrl }}
+                        source={{ uri: getGymCoverImage(gym) }}
                         style={styles.spotlightImage}
                         resizeMode="cover"
                       />
@@ -492,7 +571,14 @@ export const HomeScreen = ({ navigation }) => {
         </View>
 
         {/* 7. Gym List Cards */}
-        {filteredGyms.length === 0 ? (
+        {isLoadingGyms ? (
+          <View style={styles.gymsLoadingContainer}>
+            <ActivityIndicator size="large" color={AppColors.primaryColor} />
+            <Text style={[styles.gymsLoadingText, { color: colors.subtitle }]}>
+              Finding nearest gyms in {userLocation.name}...
+            </Text>
+          </View>
+        ) : filteredGyms.length === 0 ? (
           <View style={styles.emptyContainer}>
             <MaterialIcons name="search-off" size={48} color={colors.subtitle} />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No gyms found</Text>
@@ -503,6 +589,7 @@ export const HomeScreen = ({ navigation }) => {
         ) : (
           filteredGyms.map((gym, index) => {
             const isBookmarked = bookmarkedGymNames.has(gym.name);
+
 
             return (
               <View key={gym.id || gym.name} style={{ marginHorizontal: 16, marginBottom: 16 }}>
@@ -520,7 +607,7 @@ export const HomeScreen = ({ navigation }) => {
                   {/* Gym Hero Image with Badges */}
                   <View style={styles.gymCardImageContainer}>
                     <Image
-                      source={{ uri: gym.imageUrl }}
+                      source={{ uri: getGymCoverImage(gym) }}
                       style={styles.gymCardImage}
                       resizeMode="cover"
                     />
@@ -592,7 +679,7 @@ export const HomeScreen = ({ navigation }) => {
 
                     {/* Tags Row */}
                     <View style={styles.tagsContainer}>
-                      {gym.tags.slice(0, 3).map((tag, idx) => (
+                      {(gym.tags || ['Strength', 'Cardio']).slice(0, 3).map((tag, idx) => (
                         <View
                           key={idx}
                           style={[
@@ -632,144 +719,144 @@ export const HomeScreen = ({ navigation }) => {
                     </View>
                   </View>
                 </TouchableOpacity>
-
-                {/* 'GYMEZY for you' section after index 3 or at bottom */}
-                {index === 3 && (
-                  <View style={styles.gymezyForYouSection}>
-                    <View style={styles.forYouHeader}>
-                      <Text style={[styles.forYouTitle, { color: colors.text }]}>
-                        GYMEZY for you
-                      </Text>
-                      <View style={styles.exclusiveBadge}>
-                        <Text style={styles.exclusiveBadgeText}>Exclusive</Text>
-                      </View>
-                    </View>
-
-                    {/* 2-Column Cards Grid */}
-                    <View style={styles.forYouGrid}>
-                      <TouchableOpacity
-                        onPress={() => navigation.navigate('BuyMembership', { gym: allGyms[0] })}
-                        style={[
-                          styles.forYouCard,
-                          {
-                            backgroundColor: colors.card,
-                            borderColor: colors.border,
-                          },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.forYouIconBox,
-                            { backgroundColor: 'rgba(0, 56, 130, 0.1)' },
-                          ]}
-                        >
-                          <MaterialIcons
-                            name="card-membership"
-                            size={24}
-                            color={AppColors.primaryColor}
-                          />
-                        </View>
-                        <Text style={[styles.forYouCardTitle, { color: colors.text }]}>
-                          All-Access Pass
-                        </Text>
-                        <Text style={[styles.forYouCardSub, { color: colors.subtitle }]}>
-                          Work out at any partner gym across Chennai
-                        </Text>
-                        <View style={styles.forYouLinkRow}>
-                          <Text
-                            style={[
-                              styles.forYouLinkText,
-                              { color: isDark ? '#93C5FD' : AppColors.primaryColor },
-                            ]}
-                          >
-                            Get pass
-                          </Text>
-                          <MaterialIcons
-                            name="arrow-outward"
-                            size={14}
-                            color={isDark ? '#93C5FD' : AppColors.primaryColor}
-                          />
-                        </View>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={() => navigation.navigate('BookingSession', { gym: allGyms[0] })}
-                        style={[
-                          styles.forYouCard,
-                          {
-                            backgroundColor: colors.card,
-                            borderColor: colors.border,
-                          },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.forYouIconBox,
-                            { backgroundColor: 'rgba(0, 191, 98, 0.12)' },
-                          ]}
-                        >
-                          <MaterialIcons
-                            name="fitness-center"
-                            size={24}
-                            color={AppColors.secondaryColor}
-                          />
-                        </View>
-                        <Text style={[styles.forYouCardTitle, { color: colors.text }]}>
-                          Certified Trainers
-                        </Text>
-                        <Text style={[styles.forYouCardSub, { color: colors.subtitle }]}>
-                          Book 1-on-1 personal coaches at special rates
-                        </Text>
-                        <View style={styles.forYouLinkRow}>
-                          <Text
-                            style={[
-                              styles.forYouLinkText,
-                              { color: AppColors.secondaryColor },
-                            ]}
-                          >
-                            Book trainer
-                          </Text>
-                          <MaterialIcons
-                            name="arrow-outward"
-                            size={14}
-                            color={AppColors.secondaryColor}
-                          />
-                        </View>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Watermark Branding */}
-                    <View style={styles.watermarkSection}>
-                      <Text
-                        style={[
-                          styles.watermarkLogo,
-                          {
-                            color: isDark
-                              ? 'rgba(255, 255, 255, 0.16)'
-                              : 'rgba(1, 50, 126, 0.12)',
-                          },
-                        ]}
-                      >
-                        gymezy
-                      </Text>
-                      <Text
-                        style={[
-                          styles.watermarkTagline,
-                          {
-                            color: isDark
-                              ? 'rgba(255, 255, 255, 0.12)'
-                              : 'rgba(1, 50, 126, 0.10)',
-                          },
-                        ]}
-                      >
-                        for fitness. for you
-                      </Text>
-                    </View>
-                  </View>
-                )}
               </View>
             );
           })
+        )}
+
+        {/* 8. 'GYMEZY for you' and Watermark Branding Section at the bottom of the feed */}
+        {!isLoadingGyms && (
+          <View style={styles.gymezyForYouSection}>
+            <View style={styles.forYouHeader}>
+              <Text style={[styles.forYouTitle, { color: colors.text }]}>
+                GYMEZY for you
+              </Text>
+              <View style={styles.exclusiveBadge}>
+                <Text style={styles.exclusiveBadgeText}>Exclusive</Text>
+              </View>
+            </View>
+
+            {/* 2-Column Cards Grid */}
+            <View style={styles.forYouGrid}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('BuyMembership', { gym: gyms[0] || {} })}
+                style={[
+                  styles.forYouCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.forYouIconBox,
+                    { backgroundColor: 'rgba(0, 56, 130, 0.1)' },
+                  ]}
+                >
+                  <MaterialIcons
+                    name="card-membership"
+                    size={24}
+                    color={AppColors.primaryColor}
+                  />
+                </View>
+                <Text style={[styles.forYouCardTitle, { color: colors.text }]}>
+                  All-Access Pass
+                </Text>
+                <Text style={[styles.forYouCardSub, { color: colors.subtitle }]}>
+                  Work out at any partner gym across Chennai
+                </Text>
+                <View style={styles.forYouLinkRow}>
+                  <Text
+                    style={[
+                      styles.forYouLinkText,
+                      { color: isDark ? '#93C5FD' : AppColors.primaryColor },
+                    ]}
+                  >
+                    Get pass
+                  </Text>
+                  <MaterialIcons
+                    name="arrow-outward"
+                    size={14}
+                    color={isDark ? '#93C5FD' : AppColors.primaryColor}
+                  />
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => navigation.navigate('BookingSession', { gym: gyms[0] || {} })}
+                style={[
+                  styles.forYouCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.forYouIconBox,
+                    { backgroundColor: 'rgba(0, 191, 98, 0.12)' },
+                  ]}
+                >
+                  <MaterialIcons
+                    name="fitness-center"
+                    size={24}
+                    color={AppColors.secondaryColor}
+                  />
+                </View>
+                <Text style={[styles.forYouCardTitle, { color: colors.text }]}>
+                  Certified Trainers
+                </Text>
+                <Text style={[styles.forYouCardSub, { color: colors.subtitle }]}>
+                  Book 1-on-1 personal coaches at special rates
+                </Text>
+                <View style={styles.forYouLinkRow}>
+                  <Text
+                    style={[
+                      styles.forYouLinkText,
+                      { color: AppColors.secondaryColor },
+                    ]}
+                  >
+                    Book trainer
+                  </Text>
+                  <MaterialIcons
+                    name="arrow-outward"
+                    size={14}
+                    color={AppColors.secondaryColor}
+                  />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Watermark Branding */}
+            <View style={styles.watermarkSection}>
+              <Text
+                style={[
+                  styles.watermarkLogo,
+                  {
+                    color: isDark
+                      ? 'rgba(255, 255, 255, 0.16)'
+                      : 'rgba(1, 50, 126, 0.12)',
+                  },
+                ]}
+              >
+                gymezy
+              </Text>
+              <Text
+                style={[
+                  styles.watermarkTagline,
+                  {
+                    color: isDark
+                      ? 'rgba(255, 255, 255, 0.12)'
+                      : 'rgba(1, 50, 126, 0.10)',
+                  },
+                ]}
+              >
+                for fitness. for you
+              </Text>
+            </View>
+          </View>
         )}
       </ScrollView>
     );
@@ -905,6 +992,73 @@ export const HomeScreen = ({ navigation }) => {
                 <Text style={styles.filterApplyText}>Apply Filters</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ==================== LOCATION PERMISSION & CITY MODAL ==================== */}
+      <Modal
+        visible={showLocationModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowLocationModal(false)}
+      >
+        <View style={styles.filterModalOverlay}>
+          <View
+            style={[
+              styles.locationModalContent,
+              { backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF' },
+            ]}
+          >
+            {/* Top Icon Badge */}
+            <View style={styles.locationModalIconWrapper}>
+              <LinearGradient
+                colors={['#722ED1', AppColors.primaryColor]}
+                style={styles.locationModalIconBadge}
+              >
+                <MaterialIcons name="near-me" size={26} color="#FFFFFF" />
+              </LinearGradient>
+            </View>
+
+            <Text style={[styles.locationModalHeading, { color: colors.text }]}>
+              Find Nearest Gyms
+            </Text>
+            <Text style={[styles.locationModalSubText, { color: colors.subtitle }]}>
+              Enable GPS location to discover fitness studios, daily workout passes, and personal trainers nearest to you with travel distance.
+            </Text>
+
+            {/* GPS Enable Button */}
+            <TouchableOpacity
+              style={[
+                styles.gpsEnableActionBtn,
+                { backgroundColor: AppColors.primaryColor },
+              ]}
+              onPress={() => handleDetectLocation(true)}
+              disabled={isLocating}
+              activeOpacity={0.85}
+            >
+              {isLocating ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <View style={styles.gpsBtnRow}>
+                  <MaterialIcons name="my-location" size={18} color="#FFFFFF" />
+                  <Text style={styles.gpsEnableBtnText}>Allow Location (GPS)</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+
+
+
+            {/* Dismiss Button */}
+            <TouchableOpacity
+              style={styles.locationDismissAction}
+              onPress={() => setShowLocationModal(false)}
+            >
+              <Text style={[styles.locationDismissText, { color: colors.subtitle }]}>
+                Maybe Later
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1447,6 +1601,7 @@ const styles = StyleSheet.create({
   gymezyForYouSection: {
     marginTop: 20,
     marginBottom: 10,
+    marginHorizontal: 16,
   },
   forYouHeader: {
     flexDirection: 'row',
@@ -1611,4 +1766,88 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
+
+  /* Location Modal Styles */
+  locationModalContent: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 22,
+    paddingTop: 24,
+    paddingBottom: 32,
+    maxHeight: '85%',
+  },
+  locationModalIconWrapper: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  locationModalIconBadge: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#722ED1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  locationModalHeading: {
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+    letterSpacing: -0.3,
+  },
+  locationModalSubText: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginTop: 6,
+    marginBottom: 20,
+    paddingHorizontal: 8,
+  },
+  gpsEnableActionBtn: {
+    height: 50,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: AppColors.primaryColor,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  gpsBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  gpsEnableBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14.5,
+    fontWeight: '700',
+  },
+
+  locationDismissAction: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginTop: 10,
+  },
+  locationDismissText: {
+    fontSize: 13.5,
+    fontWeight: '600',
+  },
+
+  gymsLoadingContainer: {
+    paddingVertical: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gymsLoadingText: {
+    marginTop: 12,
+    fontSize: 13.5,
+    fontWeight: '600',
+  },
 });
+

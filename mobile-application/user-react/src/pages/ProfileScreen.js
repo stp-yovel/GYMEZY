@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { AppColors, AppTheme } from '../theme/appTheme';
 import { useBookingRepository } from '../data/BookingContext';
 import { useToast } from '../widgets/CustomScaffoldMessage';
+import { useAuth } from '../context/AuthContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -30,11 +31,7 @@ const FITNESS_GOALS = [
   'General Fitness & Mobility',
 ];
 
-const INVOICES = [
-  { id: 'INV-2025-001', title: 'FitZone Gym Annual Pass', date: '21 May 2025', amount: '₹11,999', status: 'Paid' },
-  { id: 'INV-2025-002', title: 'Olympic Fitness Day Pass', date: '14 May 2025', amount: '₹199', status: 'Paid' },
-  { id: 'INV-2025-003', title: 'PowerHouse 10-Session Pass', date: '02 Apr 2025', amount: '₹1,499', status: 'Paid' },
-];
+
 
 const FAQS = [
   {
@@ -59,15 +56,29 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
   const { isDark, colors } = useTheme();
   const { bookings, memberships } = useBookingRepository();
   const { showToast } = useToast();
+  const { user, logout, updateUser } = useAuth();
 
   // User Profile State
-  const [userName, setUserName] = useState('Alex Morgan');
-  const [userEmail, setUserEmail] = useState('alex.morgan@fitness.io');
-  const [userPhone, setUserPhone] = useState('+91 98765 43210');
-  const [userGender, setUserGender] = useState('Male');
-  const [userEmergencyContact, setUserEmergencyContact] = useState('+91 98123 45678 (Spouse)');
+  const [userName, setUserName] = useState(user?.fullName || 'Alex Morgan');
+  const [userEmail, setUserEmail] = useState(user?.email || 'alex.morgan@fitness.io');
+  const [userPhone, setUserPhone] = useState(user?.phone || '+91 98765 43210');
+  const [userGender, setUserGender] = useState(user?.gender === 'FEMALE' ? 'Female' : 'Male');
+  const [userEmergencyContact, setUserEmergencyContact] = useState(
+    user?.emergencyContact || '+91 98123 45678 (Spouse)'
+  );
   const avatarUrl =
+    user?.avatar ||
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop';
+
+  // Keep local state in sync when auth user updates
+  useEffect(() => {
+    if (user) {
+      if (user.fullName) setUserName(user.fullName);
+      if (user.email) setUserEmail(user.email);
+      if (user.phone) setUserPhone(user.phone);
+      if (user.emergencyContact) setUserEmergencyContact(user.emergencyContact);
+    }
+  }, [user]);
 
   // Body & Fitness Metrics
   const [heightCm, setHeightCm] = useState(178);
@@ -114,6 +125,29 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
   const activeBookings = bookings.filter((b) => b.status === 'Upcoming');
   const totalActivePasses = activeMemberships.length + activeBookings.length;
 
+  const userInvoices = useMemo(() => {
+    const list = [];
+    memberships.forEach((m) => {
+      list.push({
+        id: `INV-${m.id || 'MBR'}`,
+        title: `${m.gymName || 'Gym'} • ${m.planName || 'Membership'}`,
+        date: m.startDate || 'Active',
+        amount: `₹${m.amountPaid || 0}`,
+        status: m.status || 'Paid',
+      });
+    });
+    bookings.forEach((b) => {
+      list.push({
+        id: `INV-${b.id || 'BKG'}`,
+        title: `${b.gymName || 'Gym'} • ${b.sessionSubtitle || b.type || 'Pass'}`,
+        date: b.date || 'Recent',
+        amount: `₹${b.amountPaid || 0}`,
+        status: b.status || 'Paid',
+      });
+    });
+    return list;
+  }, [memberships, bookings]);
+
   const primaryNavy = isDark ? '#93C5FD' : '#003882';
   const cardColor = isDark ? '#1E1E1E' : '#FFFFFF';
   const textColor = isDark ? '#FFFFFF' : '#0F172A';
@@ -131,11 +165,26 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
   };
 
   const handleSaveProfile = () => {
-    setUserName(tempName.trim() || userName);
-    setUserEmail(tempEmail.trim() || userEmail);
-    setUserPhone(tempPhone.trim() || userPhone);
-    setUserEmergencyContact(tempEmergency.trim() || userEmergencyContact);
+    const updatedName = tempName.trim() || userName;
+    const updatedEmail = tempEmail.trim() || userEmail;
+    const updatedPhone = tempPhone.trim() || userPhone;
+    const updatedEmergency = tempEmergency.trim() || userEmergencyContact;
+
+    setUserName(updatedName);
+    setUserEmail(updatedEmail);
+    setUserPhone(updatedPhone);
+    setUserEmergencyContact(updatedEmergency);
     setUserGender(tempGender);
+
+    if (updateUser) {
+      updateUser({
+        fullName: updatedName,
+        email: updatedEmail,
+        phone: updatedPhone,
+        emergencyContact: updatedEmergency,
+      });
+    }
+
     setShowEditProfileModal(false);
     showToast({ message: 'Profile updated successfully', isSuccess: true });
   };
@@ -160,11 +209,14 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
     showToast({ message: 'Measurements updated successfully', isSuccess: true });
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setShowLogoutDialog(false);
+    if (logout) {
+      await logout();
+    }
     showToast({ message: 'Logged out successfully' });
     if (navigation?.replace) {
-      navigation.replace('Onboarding');
+      navigation.replace('Login');
     }
   };
 
@@ -295,7 +347,7 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
                 >
                   {activeMemberships.length > 0
                     ? activeMemberships[0].gymName
-                    : 'FitZone Gym'}
+                    : 'Explore Partner Gyms'}
                 </Text>
               </View>
               <MaterialIcons
@@ -318,7 +370,7 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
           >
             <MaterialIcons name="fitness-center" size={22} color="#3B82F6" />
             <Text style={[styles.statCardValue, { color: textColor }]} numberOfLines={1}>
-              18
+              {bookings.length}
             </Text>
             <Text style={[styles.statCardLabel, { color: subtitleColor }]} numberOfLines={1}>
               Workouts
@@ -334,7 +386,7 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
           >
             <MaterialIcons name="local-fire-department" size={22} color="#EF4444" />
             <Text style={[styles.statCardValue, { color: textColor }]} numberOfLines={1}>
-              5 Days
+              {user?.streakDays ? `${user.streakDays} Days` : '0 Days'}
             </Text>
             <Text style={[styles.statCardLabel, { color: subtitleColor }]} numberOfLines={1}>
               Streak 🔥
@@ -350,7 +402,7 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
           >
             <MaterialIcons name="card-membership" size={22} color="#10B981" />
             <Text style={[styles.statCardValue, { color: textColor }]} numberOfLines={1}>
-              {totalActivePasses > 0 ? `${totalActivePasses} Active` : '5 Active'}
+              {`${totalActivePasses} Active`}
             </Text>
             <Text style={[styles.statCardLabel, { color: subtitleColor }]} numberOfLines={1}>
               Passes
@@ -366,7 +418,7 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
           >
             <MaterialIcons name="bolt" size={22} color="#F59E0B" />
             <Text style={[styles.statCardValue, { color: textColor }]} numberOfLines={1}>
-              14.2k
+              {bookings.length > 0 ? `${bookings.length * 350}` : '0 kcal'}
             </Text>
             <Text style={[styles.statCardLabel, { color: subtitleColor }]} numberOfLines={1}>
               Calories
@@ -948,34 +1000,46 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
-              {INVOICES.map((inv) => (
-                <View
-                  key={inv.id}
-                  style={[
-                    styles.invoiceItemCard,
-                    {
-                      backgroundColor: isDark ? '#262626' : '#F8FAFC',
-                      borderColor: borderColor,
-                    },
-                  ]}
-                >
-                  <View style={styles.invoiceIconBox}>
-                    <MaterialIcons name="receipt-long" size={22} color="#003882" />
-                  </View>
-                  <View style={styles.invoiceContent}>
-                    <Text style={[styles.invoiceTitle, { color: textColor }]}>{inv.title}</Text>
-                    <Text style={[styles.invoiceMeta, { color: subtitleColor }]}>
-                      {inv.id} • {inv.date}
-                    </Text>
-                  </View>
-                  <View style={styles.invoicePriceCol}>
-                    <Text style={[styles.invoiceAmount, { color: textColor }]}>{inv.amount}</Text>
-                    <View style={styles.paidBadge}>
-                      <Text style={styles.paidBadgeText}>PAID</Text>
+              {userInvoices.length === 0 ? (
+                <View style={{ padding: 24, alignItems: 'center' }}>
+                  <MaterialIcons name="receipt" size={44} color={subtitleColor} />
+                  <Text style={{ color: textColor, fontWeight: '700', fontSize: 16, marginTop: 10 }}>
+                    No Invoices Found
+                  </Text>
+                  <Text style={{ color: subtitleColor, fontSize: 13, textAlign: 'center', marginTop: 4 }}>
+                    Your session bookings and gym membership purchases will appear here.
+                  </Text>
+                </View>
+              ) : (
+                userInvoices.map((inv) => (
+                  <View
+                    key={inv.id}
+                    style={[
+                      styles.invoiceItemCard,
+                      {
+                        backgroundColor: isDark ? '#262626' : '#F8FAFC',
+                        borderColor: borderColor,
+                      },
+                    ]}
+                  >
+                    <View style={styles.invoiceIconBox}>
+                      <MaterialIcons name="receipt-long" size={22} color="#003882" />
+                    </View>
+                    <View style={styles.invoiceContent}>
+                      <Text style={[styles.invoiceTitle, { color: textColor }]}>{inv.title}</Text>
+                      <Text style={[styles.invoiceMeta, { color: subtitleColor }]}>
+                        {inv.id} • {inv.date}
+                      </Text>
+                    </View>
+                    <View style={styles.invoicePriceCol}>
+                      <Text style={[styles.invoiceAmount, { color: textColor }]}>{inv.amount}</Text>
+                      <View style={styles.paidBadge}>
+                        <Text style={styles.paidBadgeText}>PAID</Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))}
+                ))
+              )}
             </ScrollView>
           </View>
         </View>
