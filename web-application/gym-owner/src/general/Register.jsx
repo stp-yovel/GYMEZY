@@ -170,8 +170,7 @@ const WORKOUT_OPTIONS = [
 const STEP_FIELDS = {
   1: ['subscriptionType', 'gymName', 'ownerName', 'phone', 'email', 'password', 'confirmPassword', 'gstNumber', 'panNumber'],
   2: ['address', 'area', 'city', 'state', 'pincode'],
-  3: ['floorSpaceSqFt', 'maxFloorCapacity', 'logo', 'facilities'],
-  4: ['workouts', 'singleSessionPrice'],
+  4: ['workouts', 'monthlyPrice'],
   5: ['accountHolder', 'bankName', 'accountNumber', 'confirmAccountNumber', 'ifscCode', 'agreedToTerms'],
 };
 
@@ -251,8 +250,8 @@ const validateField = (field, value, form) => {
     case 'workouts':
       if (!value || value.length === 0) return 'Select at least 1 workout discipline';
       return '';
-    case 'singleSessionPrice':
-      if (!value || Number(value) < 1) return 'Single day pass price is required';
+    case 'monthlyPrice':
+      if (!value || Number(value) < 1) return 'Monthly membership price is required';
       return '';
     case 'accountHolder':
       if (!value || !value.trim()) return 'Account holder name is required';
@@ -2074,34 +2073,17 @@ export const Register = () => {
               <Divider style={{ margin: '24px 0 20px 0', borderColor: isDarkMode ? '#27272a' : '#f1f5f9' }} />
 
               <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 16 }}>
-                Membership & Access Pricing
+                Membership & Access Pricing (4 Standard Tiers)
               </div>
 
               <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12}>
                   <label style={labelStyle}>
-                    Single Day Session Pass (₹) <span style={{ color: '#ef4444' }}>*</span>
+                    1. Monthly Unlimited Pass (₹) <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <InputNumber
-                    min={49}
-                    max={2000}
-                    value={formData.singleSessionPrice}
-                    onChange={(val) => updateField('singleSessionPrice', val)}
-                    style={{ width: '100%', height: 44, borderRadius: 8 }}
-                  />
-                  <span style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginTop: 4 }}>
-                    Price per walk-in visitor for 1 full day access
-                  </span>
-                  {renderFieldError('singleSessionPrice')}
-                </Col>
-
-                <Col xs={24} sm={12}>
-                  <label style={labelStyle}>
-                    Monthly Unlimited Pass (₹)
-                  </label>
-                  <InputNumber
-                    min={499}
-                    max={15000}
+                    min={299}
+                    max={25000}
                     value={formData.monthlyPrice}
                     onChange={(val) => updateField('monthlyPrice', val)}
                     style={{ width: '100%', height: 44, borderRadius: 8 }}
@@ -2109,28 +2091,61 @@ export const Register = () => {
                   <span style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginTop: 4 }}>
                     Standard 30-day recurring membership
                   </span>
+                  {renderFieldError('monthlyPrice')}
                 </Col>
 
                 <Col xs={24} sm={12}>
-                  <label style={labelStyle}>Quarterly Pass (3 Months) (₹)</label>
+                  <label style={labelStyle}>
+                    2. Quarterly Pass (3 Months) (₹)
+                  </label>
                   <InputNumber
-                    min={999}
-                    max={30000}
+                    min={699}
+                    max={50000}
                     value={formData.quarterlyPrice}
                     onChange={(val) => updateField('quarterlyPrice', val)}
                     style={{ width: '100%', height: 44, borderRadius: 8 }}
                   />
+                  <span style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginTop: 4 }}>
+                    Valid for 90 days {formData.monthlyPrice && formData.quarterlyPrice < formData.monthlyPrice * 3 && (
+                      <span style={{ color: '#10b981', fontWeight: 600 }}>• Save ₹{(formData.monthlyPrice * 3 - formData.quarterlyPrice).toLocaleString('en-IN')}</span>
+                    )}
+                  </span>
                 </Col>
 
                 <Col xs={24} sm={12}>
-                  <label style={labelStyle}>Annual Pass (1 Year) (₹)</label>
+                  <label style={labelStyle}>
+                    3. Half Yearly Pass (6 Months) (₹)
+                  </label>
                   <InputNumber
-                    min={2999}
-                    max={99999}
+                    min={1299}
+                    max={90000}
+                    value={formData.halfYearlyPrice}
+                    onChange={(val) => updateField('halfYearlyPrice', val)}
+                    style={{ width: '100%', height: 44, borderRadius: 8 }}
+                  />
+                  <span style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginTop: 4 }}>
+                    Valid for 180 days {formData.monthlyPrice && formData.halfYearlyPrice < formData.monthlyPrice * 6 && (
+                      <span style={{ color: '#10b981', fontWeight: 600 }}>• Save ₹{(formData.monthlyPrice * 6 - formData.halfYearlyPrice).toLocaleString('en-IN')}</span>
+                    )}
+                  </span>
+                </Col>
+
+                <Col xs={24} sm={12}>
+                  <label style={labelStyle}>
+                    4. Annual VIP Pass (1 Year) (₹)
+                  </label>
+                  <InputNumber
+                    min={2499}
+                    max={150000}
                     value={formData.annualPrice}
                     onChange={(val) => updateField('annualPrice', val)}
                     style={{ width: '100%', height: 44, borderRadius: 8 }}
                   />
+                  <span style={{ fontSize: 11, color: '#94a3b8', display: 'block', marginTop: 4 }}>
+                    Valid for 365 days {formData.monthlyPrice && formData.annualPrice < formData.monthlyPrice * 12 && (
+                      <span style={{ color: '#10b981', fontWeight: 600 }}>• Save ₹{(formData.monthlyPrice * 12 - formData.annualPrice).toLocaleString('en-IN')}</span>
+                    )}
+                  </span>
                 </Col>
               </Row>
 

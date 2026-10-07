@@ -22,10 +22,10 @@ const resolveExpectedRole = (body) => {
  */
 const fetchUserGym = async (user) => {
   if (user.gymId) {
-    return Gym.findById(user.gymId);
+    return Gym.findById(user.gymId).select('-auditHistory -documents -galleryPhotos -images');
   }
   if (user.role === USER_ROLES.GYM_OWNER) {
-    return Gym.findOne({ ownerId: user._id });
+    return Gym.findOne({ ownerId: user._id }).select('-auditHistory -documents -galleryPhotos -images');
   }
   return null;
 };

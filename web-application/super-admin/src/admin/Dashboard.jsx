@@ -7,7 +7,6 @@ import {
   Button,
   DatePicker,
   Tag,
-  Progress,
   Badge,
   Tooltip,
   Empty,
@@ -25,11 +24,9 @@ import {
   CrownOutlined,
   TeamOutlined,
   MobileOutlined,
-  ThunderboltOutlined,
   AuditOutlined,
   FireOutlined,
   SyncOutlined,
-  FieldTimeOutlined,
   StarFilled,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -1009,116 +1006,7 @@ export const Dashboard = () => {
           </Col>
         </Row>
 
-        {/* 5. LIVE ACTIVITY FEED & SYSTEM HEALTH STATUS */}
-        <Row gutter={[20, 20]} style={{ marginBottom: 24 }}>
-          {/* Real-time Activity Stream */}
-          <Col xs={24} lg={15}>
-            <Card
-              style={{
-                backgroundColor: 'var(--bg-surface-elevated)',
-                borderColor: 'var(--border-color)',
-                borderRadius: 'var(--radius-base)',
-                height: '100%',
-              }}
-              styles={{ body: { padding: '24px' } }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <FieldTimeOutlined style={{ fontSize: 18, color: '#3b82f6' }} />
-                  <span style={{ fontSize: 16, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    Live Platform Activity Stream
-                  </span>
-                </div>
-                <Badge status="processing" text={<span style={{ fontSize: 12, color: '#22c55e', fontWeight: 700 }}>Live Feed</span>} />
-              </div>
-
-              {stats.recentActivities && stats.recentActivities.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {stats.recentActivities.map((act, idx) => (
-                    <div key={idx}>{act.title}</div>
-                  ))}
-                </div>
-              ) : (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description={
-                    <span style={{ color: isDarkMode ? '#888' : '#64748b', fontSize: 13 }}>
-                      No recent platform bookings or transactions recorded yet
-                    </span>
-                  }
-                />
-              )}
-            </Card>
-          </Col>
-
-          {/* System Health & Infrastructure KPI */}
-          <Col xs={24} lg={9}>
-            <Card
-              style={{
-                backgroundColor: 'var(--bg-surface-elevated)',
-                borderColor: 'var(--border-color)',
-                borderRadius: 'var(--radius-base)',
-                height: '100%',
-              }}
-              styles={{ body: { padding: '24px' } }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <ThunderboltOutlined style={{ fontSize: 18, color: '#6366f1' }} />
-                  <span style={{ fontSize: 16, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    System Health & Uptime
-                  </span>
-                </div>
-                <Tag color="success" style={{ fontWeight: 700, borderRadius: 4 }}>
-                  100% Operational
-                </Tag>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                    <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 600 }}>API Gateway Uptime</span>
-                    <strong style={{ color: '#22c55e' }}>{stats.systemHealth?.apiUptime || 100}%</strong>
-                  </div>
-                  <Progress percent={stats.systemHealth?.apiUptime || 100} showInfo={false} strokeColor="#22c55e" size="small" />
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                    <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 600 }}>Payment Gateway Health</span>
-                    <strong style={{ color: '#6366f1' }}>{stats.systemHealth?.paymentGateway || 100}%</strong>
-                  </div>
-                  <Progress percent={stats.systemHealth?.paymentGateway || 100} showInfo={false} strokeColor="#6366f1" size="small" />
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                    <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 600 }}>Push Notification Engine</span>
-                    <strong style={{ color: '#3b82f6' }}>{stats.systemHealth?.notificationEngine || 100}%</strong>
-                  </div>
-                  <Progress percent={stats.systemHealth?.notificationEngine || 100} showInfo={false} strokeColor="#3b82f6" size="small" />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
-                  <div style={{ padding: '10px 12px', borderRadius: 8, backgroundColor: isDarkMode ? '#141414' : '#f8fafc', border: `1px solid ${isDarkMode ? '#222' : '#e2e8f0'}` }}>
-                    <div style={{ fontSize: 11, color: '#888' }}>Backend Cluster</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#22c55e', marginTop: 2 }}>
-                      {stats.systemHealth?.backendStatus || 'Online'}
-                    </div>
-                  </div>
-                  <div style={{ padding: '10px 12px', borderRadius: 8, backgroundColor: isDarkMode ? '#141414' : '#f8fafc', border: `1px solid ${isDarkMode ? '#222' : '#e2e8f0'}` }}>
-                    <div style={{ fontSize: 11, color: '#888' }}>Database Cluster</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#3b82f6', marginTop: 2 }}>
-                      {stats.systemHealth?.databaseStatus || 'Connected'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </Col>
-        </Row>
-
-        {/* 6. BOTTOM ROW: 3 Platform Metric Cards */}
+        {/* 5. BOTTOM ROW: 3 Platform Metric Cards */}
         <Card
           style={{
             backgroundColor: 'var(--bg-surface-elevated)',

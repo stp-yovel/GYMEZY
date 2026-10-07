@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Layout, Menu, Button } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 
 const { Sider } = Layout;
 import {
@@ -18,7 +18,6 @@ import {
   CreditCardOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../../theme/ThemeContext';
-import { fetchGyms } from '../../redux/slices/gymSlice';
 import { employeeService } from '../../services/employeeService';
 import gymezyLogo from '../../assets/logo/gymezy.png';
 
@@ -55,34 +54,35 @@ export const AppSidebar = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const dispatch = useDispatch();
   const { isDarkMode } = useTheme();
 
   const gyms = useSelector((state) => state.gyms?.gyms || []);
+  const stats = useSelector((state) => state.dashboard?.stats || {});
   const [pendingTrainersCount, setPendingTrainersCount] = React.useState(0);
 
   useEffect(() => {
-    dispatch(fetchGyms());
     employeeService
       .getPendingApprovals()
       .then((data) => setPendingTrainersCount(Array.isArray(data) ? data.length : 0))
       .catch(() => {});
-  }, [dispatch, location.pathname, location.search]);
+  }, []);
 
-  // Compute live dynamic counts directly from real fleet data
-  const totalGyms = gyms.length;
-  const pendingCount = gyms.filter(
-    (g) => g.approvalStatus === 'Pending Approval' || g.status === 'Pending' || g.approvalStatus === 'Pending'
-  ).length;
-  const approvedCount = gyms.filter(
-    (g) => g.approvalStatus === 'Approved' || g.status === 'Active'
-  ).length;
-  const onHoldCount = gyms.filter(
-    (g) => g.approvalStatus === 'On Hold' || g.status === 'On Hold' || g.status === 'Inactive'
-  ).length;
-  const rejectedCount = gyms.filter(
-    (g) => g.approvalStatus === 'Rejected' || g.status === 'Rejected'
-  ).length;
+  // Compute live dynamic counts directly from fleet data if loaded, or fallback to dashboard stats
+  const totalGyms = gyms.length > 0 ? gyms.length : (stats.registeredGyms?.total || stats.totalGyms || 0);
+  const pendingCount = gyms.length > 0
+    ? gyms.filter(
+        (g) => g.approvalStatus === 'Pending Approval' || g.status === 'Pending' || g.approvalStatus === 'Pending'
+      ).length
+    : (stats.pendingApprovalsCount || (Array.isArray(stats.pendingApprovals) ? stats.pendingApprovals.length : 0));
+  const approvedCount = gyms.length > 0
+    ? gyms.filter((g) => g.approvalStatus === 'Approved' || g.status === 'Active').length
+    : (stats.registeredGyms?.active || stats.activeGyms || 0);
+  const onHoldCount = gyms.length > 0
+    ? gyms.filter((g) => g.approvalStatus === 'On Hold' || g.status === 'On Hold' || g.status === 'Inactive').length
+    : (stats.registeredGyms?.inactive || 0);
+  const rejectedCount = gyms.length > 0
+    ? gyms.filter((g) => g.approvalStatus === 'Rejected' || g.status === 'Rejected').length
+    : 0;
 
   const totalActionRequired = pendingCount + pendingTrainersCount;
 

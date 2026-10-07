@@ -18,7 +18,7 @@ const getMetroHost = () => {
   return null;
 };
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -29,7 +29,12 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
     });
     return response;
   } catch (error) {
-    if (error.name === 'AbortError' || error.message?.toLowerCase().includes('aborted')) {
+    if (
+      error.name === 'AbortError' ||
+      error.message?.toLowerCase().includes('aborted') ||
+      error.message?.toLowerCase().includes('canceled') ||
+      error.message?.toLowerCase().includes('cancelled')
+    ) {
       throw new Error(
         `Server connection timed out (${Math.round(timeoutMs / 1000)}s) at ${url}.`
       );
@@ -89,20 +94,21 @@ class ApiService {
     return headers;
   }
 
-  async executeFetch(endpoint, options = {}, timeoutMs = 8000) {
+  async executeFetch(endpoint, options = {}, timeoutMs = 15000) {
     const metroHost = getMetroHost();
 
-    // Priority candidates: ADB reverse localhost, Metro host IP, WiFi LAN IP, Android emulator 10.0.2.2
+    // Priority candidates: Verified base, ADB reverse localhost, Metro host IP, WiFi LAN IP, Android emulator 10.0.2.2
     const candidateBases = [
       this.verifiedBase,
       `http://localhost:${BACKEND_PORT}/api/v1`,
-      `http://127.0.0.1:${BACKEND_PORT}/api/v1`,
       metroHost ? `http://${metroHost}:${BACKEND_PORT}/api/v1` : null,
       `http://${LOCAL_WIFI_IP}:${BACKEND_PORT}/api/v1`,
       `http://10.0.2.2:${BACKEND_PORT}/api/v1`,
+      `http://127.0.0.1:${BACKEND_PORT}/api/v1`,
     ];
 
     const uniqueBases = Array.from(new Set(candidateBases.filter(Boolean)));
+    let lastError = null;
 
     for (let i = 0; i < uniqueBases.length; i++) {
       const currentBase = uniqueBases[i];
@@ -111,7 +117,7 @@ class ApiService {
         const response = await fetchWithTimeout(
           targetUrl,
           options,
-          i === 0 && this.verifiedBase ? timeoutMs : 5000
+          i === 0 && this.verifiedBase ? timeoutMs : 8000
         );
 
         // Handle 401 Unauthorized globally
@@ -125,13 +131,14 @@ class ApiService {
         this.verifiedBase = currentBase;
         this.baseUrl = currentBase;
         return response;
-      } catch {
-        // Try next candidate base URL
+      } catch (err) {
+        lastError = err;
+        console.warn(`[API SERVICE] Failed ${targetUrl}:`, err.message);
       }
     }
 
     throw new Error(
-      `Unable to connect to backend server on port ${BACKEND_PORT}. Check Wi-Fi or adb reverse port forwarding.`
+      lastError?.message || `Unable to connect to GYMEZY backend on port ${BACKEND_PORT}. Check Wi-Fi or adb reverse port forwarding.`
     );
   }
 
@@ -250,6 +257,133 @@ class ApiService {
       headers: this.getHeaders(),
     });
     const json = await response.json();
+    return json.data;
+  }
+
+  /**
+   * Fetch Reviews for a specific Gym
+   */
+  async getGymReviews(gymId) {
+    const response = await this.executeFetch(`/gyms/${gymId}/reviews`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to fetch gym reviews.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Fetch Reviews for a specific Trainer
+   */
+  async getTrainerReviews(gymId, trainerIdentifier) {
+    const encoded = encodeURIComponent(trainerIdentifier);
+    const response = await this.executeFetch(`/gyms/${gymId}/trainers/${encoded}/reviews`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to fetch trainer reviews.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Submit a Member Review for a Gym
+   */
+  async submitGymReview(gymId, reviewData) {
+    const response = await this.executeFetch(`/gyms/${gymId}/reviews`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(reviewData),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to submit gym review.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Submit a Member Review for a Trainer
+   */
+  async submitTrainerReview(gymId, trainerIdentifier, reviewData) {
+    const encoded = encodeURIComponent(trainerIdentifier);
+    const response = await this.executeFetch(`/gyms/${gymId}/trainers/${encoded}/reviews`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(reviewData),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to submit trainer review.');
+    }
+    return json.data;
+  }
+  /**
+   * Fetch Ratings & Reviews for a specific Gym
+   */
+  async getGymRatings(gymId) {
+    const response = await this.executeFetch(`/gyms/${gymId}/ratings`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to fetch gym ratings.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Fetch Ratings for a specific Trainer
+   */
+  async getTrainerRatings(gymId, trainerIdentifier) {
+    const encoded = encodeURIComponent(trainerIdentifier);
+    const response = await this.executeFetch(`/gyms/${gymId}/trainers/${encoded}/ratings`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to fetch trainer ratings.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Submit a Member Rating for a Gym
+   */
+  async submitGymRating(gymId, ratingData) {
+    const response = await this.executeFetch(`/gyms/${gymId}/ratings`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(ratingData),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to submit gym rating.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Submit a Member Rating for a Trainer
+   */
+  async submitTrainerRating(gymId, trainerIdentifier, ratingData) {
+    const encoded = encodeURIComponent(trainerIdentifier);
+    const response = await this.executeFetch(`/gyms/${gymId}/trainers/${encoded}/ratings`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(ratingData),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to submit trainer rating.');
+    }
     return json.data;
   }
 }

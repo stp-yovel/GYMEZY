@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,39 +21,104 @@ import { useToast } from '../widgets/CustomScaffoldMessage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const PLANS = {
-  Monthly: {
-    price: 1299.0,
-    duration: '30 Days',
-    label: '₹1,299 / month',
-    sublabel: 'Valid for 30 days',
-    savings: null,
-    badge: null,
-  },
-  Quarterly: {
-    price: 3299.0,
-    duration: '90 Days',
-    label: '₹3,299 / 3 months',
-    sublabel: 'Valid for 90 days',
-    savings: 'Save ₹598',
-    badge: null,
-  },
-  'Half Yearly': {
-    price: 5999.0,
-    duration: '180 Days',
-    label: '₹5,999 / 6 months',
-    sublabel: 'Valid for 180 days',
-    savings: 'Save ₹2,394',
-    badge: null,
-  },
-  Annual: {
-    price: 11999.0,
-    duration: '365 Days',
-    label: '₹11,999 / year',
-    sublabel: 'Valid for 365 days',
-    savings: 'Save ₹7,788',
-    badge: 'Best Value',
-  },
+const getBenefitIcon = (text = '') => {
+  const lower = String(text).toLowerCase();
+  if (lower.includes('wifi') || lower.includes('wi-fi') || lower.includes('internet')) return 'wifi';
+  if (lower.includes('towel')) return 'dry-cleaning';
+  if (lower.includes('access') || lower.includes('facilit') || lower.includes('all-access') || lower.includes('unrestricted')) return 'all-inclusive';
+  if (lower.includes('group') || lower.includes('class') || lower.includes('trainer') || lower.includes('pt')) return 'group';
+  if (lower.includes('locker') || lower.includes('shower')) return 'lock-outline';
+  if (lower.includes('pass') || lower.includes('guest') || lower.includes('ticket')) return 'confirmation-number';
+  if (lower.includes('nutri') || lower.includes('diet') || lower.includes('meal')) return 'restaurant-menu';
+  if (lower.includes('steam') || lower.includes('sauna') || lower.includes('spa') || lower.includes('pool')) return 'hot-tub';
+  return 'check-circle';
+};
+
+const buildGymPlans = (gym) => {
+  const custom = Array.isArray(gym?.customPricingPlans) ? gym.customPricingPlans : [];
+  const flat = gym?.pricingPlans || {};
+
+  const monthlyTier = custom.find((p) => p?.tierId === 'monthly' || p?.badge?.toLowerCase().includes('month') || p?.duration?.includes('30'));
+  const quarterlyTier = custom.find((p) => p?.tierId === 'quarterly' || p?.badge?.toLowerCase().includes('quarter') || p?.duration?.includes('90'));
+  const halfYearlyTier = custom.find((p) => p?.tierId === 'half_yearly' || p?.badge?.toLowerCase().includes('half') || p?.duration?.includes('180'));
+  const annualTier = custom.find((p) => p?.tierId === 'annual' || p?.badge?.toLowerCase().includes('annual') || p?.badge?.toLowerCase().includes('year') || p?.duration?.includes('365'));
+
+  const monthlyPrice = Number(monthlyTier?.price ?? flat.monthly ?? 1299);
+  const quarterlyPrice = Number(quarterlyTier?.price ?? flat.quarterly ?? 3299);
+  const halfYearlyPrice = Number(halfYearlyTier?.price ?? flat.halfYearly ?? 5999);
+  const annualPrice = Number(annualTier?.price ?? flat.annual ?? 11999);
+
+  const calcSavings = (price, months) => {
+    const diff = monthlyPrice * months - price;
+    return diff > 0 ? `Save ₹${diff.toLocaleString('en-IN')}` : null;
+  };
+
+  return {
+    Monthly: {
+      name: monthlyTier?.name || 'Monthly Plan',
+      price: monthlyPrice,
+      duration: '30 Days',
+      label: `₹${monthlyPrice.toLocaleString('en-IN')} / month`,
+      sublabel: 'Valid for 30 days',
+      savings: null,
+      badge: monthlyTier?.popular ? 'Most Popular' : null,
+      features: Array.isArray(monthlyTier?.features) && monthlyTier.features.length > 0 ? monthlyTier.features : [
+        'Access to all gym facilities',
+        'Free group workout classes',
+        'Locker and shower facility',
+        'Trainer guidance on floor',
+      ],
+    },
+    Quarterly: {
+      name: quarterlyTier?.name || 'Quarterly Plan',
+      price: quarterlyPrice,
+      duration: '90 Days',
+      label: `₹${quarterlyPrice.toLocaleString('en-IN')} / 3 months`,
+      sublabel: 'Valid for 90 days',
+      savings: quarterlyTier?.savingsText || calcSavings(quarterlyPrice, 3),
+      badge: quarterlyTier?.popular ? 'Most Popular' : null,
+      features: Array.isArray(quarterlyTier?.features) && quarterlyTier.features.length > 0 ? quarterlyTier.features : [
+        'Access to all gym facilities',
+        'Free group workout classes',
+        'Locker and shower facility',
+        '1 Guest pass per month',
+        '2 Complimentary PT Sessions',
+      ],
+    },
+    'Half Yearly': {
+      name: halfYearlyTier?.name || 'Half Yearly Plan',
+      price: halfYearlyPrice,
+      duration: '180 Days',
+      label: `₹${halfYearlyPrice.toLocaleString('en-IN')} / 6 months`,
+      sublabel: 'Valid for 180 days',
+      savings: halfYearlyTier?.savingsText || calcSavings(halfYearlyPrice, 6),
+      badge: halfYearlyTier?.popular ? 'Most Popular' : null,
+      features: Array.isArray(halfYearlyTier?.features) && halfYearlyTier.features.length > 0 ? halfYearlyTier.features : [
+        'Access to all gym facilities',
+        'Free group workout classes',
+        'Locker and shower facility',
+        '1 Guest pass per month',
+        'Personalized nutrition guidance',
+        '4 Complimentary PT Sessions',
+      ],
+    },
+    Annual: {
+      name: annualTier?.name || 'Annual Plan',
+      price: annualPrice,
+      duration: '365 Days',
+      label: `₹${annualPrice.toLocaleString('en-IN')} / year`,
+      sublabel: 'Valid for 365 days',
+      savings: annualTier?.savingsText || calcSavings(annualPrice, 12),
+      badge: annualTier?.popular ? 'Most Popular' : 'Best Value',
+      features: Array.isArray(annualTier?.features) && annualTier.features.length > 0 ? annualTier.features : [
+        'Access to all gym facilities',
+        'Free group workout classes',
+        'Locker and shower facility',
+        '2 Guest passes per month',
+        'Personalized nutrition guidance',
+      ],
+    },
+  };
 };
 
 const TRAINERS = [
@@ -138,7 +203,8 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
 
   const totalSteps = withTrainer ? 6 : 4;
 
-  const planPrice = PLANS[selectedPlan]?.price || 11999.0;
+  const plans = useMemo(() => buildGymPlans(gym), [gym]);
+  const planPrice = plans[selectedPlan]?.price || 11999.0;
   const actualTrainerFee =
     withTrainer && selectedTrainer !== 'No Personal Trainer' ? trainerFee : 0.0;
   const totalAmount = planPrice + actualTrainerFee;
@@ -194,7 +260,7 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
         gymLocation: gym.location,
         gymImageUrl: gym.imageUrl,
         planName: `${selectedPlan} Membership`,
-        durationDays: PLANS[selectedPlan]?.duration,
+        durationDays: plans[selectedPlan]?.duration,
         amountPaid: totalAmount,
         startDate: formatDate(startDate),
         endDate: formatDate(endDate),
@@ -376,7 +442,7 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
             </Text>
 
             <View style={{ marginTop: 18 }}>
-              {Object.entries(PLANS).map(([planKey, planData]) => {
+              {Object.entries(plans).map(([planKey, planData]) => {
                 const isSel = selectedPlan === planKey;
                 return (
                   <TouchableOpacity
@@ -476,16 +542,15 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
             <Text style={[styles.benefitsHeading, { color: textColor }]}>
               Plan Benefits ({selectedPlan})
             </Text>
-            {[
-              { icon: 'all-inclusive', text: 'Access to all gym facilities' },
-              { icon: 'group', text: 'Free group workout classes' },
-              { icon: 'lock-outline', text: 'Locker and shower facility' },
-              { icon: 'confirmation-number', text: '1 Guest pass per month' },
-              { icon: 'restaurant-menu', text: 'Personalized nutrition guidance' },
-            ].map((b, i) => (
+            {(plans[selectedPlan]?.features || []).map((featureText, i) => (
               <View key={i} style={styles.benefitRow}>
-                <MaterialIcons name={b.icon} size={16} color="#00BF62" style={{ marginRight: 10 }} />
-                <Text style={[styles.benefitText, { color: textColor }]}>{b.text}</Text>
+                <MaterialIcons
+                  name={getBenefitIcon(featureText)}
+                  size={16}
+                  color="#00BF62"
+                  style={{ marginRight: 10 }}
+                />
+                <Text style={[styles.benefitText, { color: textColor }]}>{featureText}</Text>
               </View>
             ))}
           </View>
@@ -716,7 +781,7 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
                 <Text style={[styles.planBigTitle, { color: textColor }]}>{selectedPlan} Plan</Text>
                 <Text style={styles.planBigPrice}>₹{Math.round(planPrice)}</Text>
                 <Text style={[styles.planBigDuration, { color: subtitleColor }]}>
-                  Valid for {PLANS[selectedPlan]?.duration}
+                  Valid for {plans[selectedPlan]?.duration}
                 </Text>
 
                 <Text style={[styles.sectionSubtitle, { color: textColor, marginTop: 24 }]}>
@@ -730,7 +795,7 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
                   <View style={[styles.receiptDivider, { backgroundColor: borderColor }]} />
                   <View style={styles.receiptRow}>
                     <Text style={[styles.receiptLabel, { color: subtitleColor }]}>Duration</Text>
-                    <Text style={[styles.receiptValue, { color: textColor }]}>{PLANS[selectedPlan]?.duration}</Text>
+                    <Text style={[styles.receiptValue, { color: textColor }]}>{plans[selectedPlan]?.duration}</Text>
                   </View>
                   <View style={[styles.receiptDivider, { backgroundColor: borderColor }]} />
                   <View style={styles.receiptRow}>
@@ -757,7 +822,7 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
                   <View>
                     <Text style={[styles.receiptValue, { color: textColor }]}>{selectedPlan} Membership</Text>
                     <Text style={[styles.receiptLabel, { color: subtitleColor, marginTop: 2 }]}>
-                      {PLANS[selectedPlan]?.duration}
+                      {plans[selectedPlan]?.duration}
                     </Text>
                   </View>
                   <Text style={[styles.receiptValue, { color: textColor }]}>₹{Math.round(planPrice)}</Text>

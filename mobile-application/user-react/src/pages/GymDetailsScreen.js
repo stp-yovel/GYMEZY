@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,16 @@ import {
   StyleSheet,
   Dimensions,
   Share,
-  Platform,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
-import { AppColors, AppTheme } from '../theme/appTheme';
+import { AppColors } from '../theme/appTheme';
 import { useToast } from '../widgets/CustomScaffoldMessage';
+import { gymService } from '../services/gymService';
+import { apiService } from '../services/apiService';
 import {
   FacilitiesPopup,
   AmenitiesPopup,
@@ -29,49 +31,15 @@ import {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const DEFAULT_RULES = [
-  'Carry a valid ID proof for entry.',
-  'Wear proper athletic shoes & workout attire.',
-  'Use a towel while using equipment.',
-  'Re-rack weights after use.',
-  'Maintain cleanliness and hygiene in the gym.',
-  'Follow trainer and staff instructions at all times.',
-];
-
-const DEFAULT_SAFETY = [
-  'Sanitized equipment regularly',
-  'First aid kit available',
-  'CCTV surveillance 24/7',
-  'Trained staff for assistance',
-  'Emergency exit & fire safety compliant',
-  'Proper ventilation & air circulation',
-];
-
-const DEFAULT_REVIEWS = [
-  {
-    userName: 'Arun Kumar',
-    userImageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop',
-    rating: 5.0,
-    bookingType: 'App Booking',
-    date: '2 days ago',
-    comment: 'Clean environment and very supportive trainers!',
-  },
-  {
-    userName: 'Priya Sharma',
-    userImageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=150&auto=format&fit=crop',
-    rating: 4.8,
-    bookingType: 'Member',
-    date: '1 week ago',
-    comment: 'Spacious gym with all modern machines. Loved the experience.',
-  },
-];
-
 export const GymDetailsScreen = ({ route, navigation }) => {
-  const gym = route?.params?.gym || {};
+  const initialGym = route?.params?.gym || {};
+  const [gym, setGym] = useState(initialGym);
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
+
   const { isDark, colors } = useTheme();
   const { showToast } = useToast();
 
-  const [isBookmarked, setIsBookmarked] = useState(gym.isBookmarked || false);
+  const [isBookmarked, setIsBookmarked] = useState(initialGym.isBookmarked || false);
 
   // Popups state
   const [showFacilities, setShowFacilities] = useState(false);
@@ -84,34 +52,177 @@ export const GymDetailsScreen = ({ route, navigation }) => {
   const [showRules, setShowRules] = useState(false);
   const [showSafety, setShowSafety] = useState(false);
 
-  // Safe normalized arrays and fields
-  const workouts = Array.isArray(gym.workouts) && gym.workouts.length > 0
-    ? gym.workouts
-    : ['GYM', 'Strength', 'Cardio', 'HIIT', 'CrossFit'];
+  const [trainerReviewsList, setTrainerReviewsList] = useState([]);
 
-  const facilities = Array.isArray(gym.facilities) && gym.facilities.length > 0
-    ? gym.facilities
-    : ['AC Gym', 'Locker Facility', 'Shower Available', 'Changing Room', 'Free Wi-Fi'];
+  // Fetch full live document and dedicated reviews from DB on mount
+  useEffect(() => {
+    let isMounted = true;
+    const gymId = gym.id || gym.partnerId || gym.mongoId;
+    if (gymId) {
+      gymService
+        .fetchGymById(gymId)
+        .then((freshGym) => {
+          if (isMounted && freshGym) {
+            setGym((prev) => ({ ...prev, ...freshGym }));
+          }
+        })
+        .catch((err) => {
+          console.warn('[GYM DETAILS] Error loading live gym from DB:', err.message);
+        });
 
-  const amenities = Array.isArray(gym.amenities) && gym.amenities.length > 0
-    ? gym.amenities
-    : ['Drinking Water', 'Towel Service', 'Parking Available', 'First Aid Kit'];
+      // Call dedicated ratings & reviews API
+      apiService
+        .getGymRatings(gymId)
+        .then((revData) => {
+          if (isMounted && revData && (Array.isArray(revData.ratings) || Array.isArray(revData.reviews))) {
+            const list = revData.ratings || revData.reviews || [];
+            setGym((prev) => ({
+              ...prev,
+              ratings: list,
+              reviews: list,
+              rating: revData.rating,
+              reviewsCount: revData.reviewsCount,
+            }));
+          }
+        })
+        .catch(() => {
+          // Graceful fallback to existing gym reviews
+        });
+    }
 
+    return () => {
+      // Memory Optimization: Clean up and dispose heavy objects, image buffers, and popups on screen exit
+      isMounted = false;
+      setGym({});
+      setTrainerReviewsList([]);
+      setSelectedTrainer(null);
+    };
+  }, []);
+
+  const handleOpenTrainerReviews = (trainer) => {
+    if (!trainer) return;
+    setSelectedTrainer(trainer);
+    setTrainerReviewsList(trainer.ratings || trainer.reviews || []);
+    setShowTrainerReviews(true);
+
+    const gymId = gym.id || gym.partnerId || gym.mongoId;
+    if (gymId && trainer.name) {
+      apiService
+        .getTrainerRatings(gymId, trainer.name)
+        .then((data) => {
+          if (data && (Array.isArray(data.ratings) || Array.isArray(data.reviews))) {
+            setTrainerReviewsList(data.ratings || data.reviews || []);
+          }
+        })
+        .catch(() => {
+          // Keep existing ratings fallback
+        });
+    }
+  };
+
+  // Compute actual image gallery from DB data
+  const photos = useMemo(() => {
+    const list = [];
+    if (Array.isArray(gym.images) && gym.images.length > 0) {
+      gym.images.forEach((img) => {
+        if (typeof img === 'string' && img.trim().length > 0) list.push(img.trim());
+      });
+    }
+    if (Array.isArray(gym.galleryPhotos) && gym.galleryPhotos.length > 0) {
+      gym.galleryPhotos.forEach((p) => {
+        if (p?.fileData) list.push(p.fileData);
+      });
+    }
+    if (gym.coverPhoto?.fileData) {
+      list.push(gym.coverPhoto.fileData);
+    }
+    if (gym.image && typeof gym.image === 'string' && gym.image.trim().length > 0) {
+      if (!list.includes(gym.image.trim())) list.push(gym.image.trim());
+    }
+    if (gym.imageUrl && typeof gym.imageUrl === 'string' && gym.imageUrl.trim().length > 0) {
+      if (!list.includes(gym.imageUrl.trim())) list.push(gym.imageUrl.trim());
+    }
+    return list.length > 0
+      ? list
+      : ['https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop'];
+  }, [gym]);
+
+  // Real DB Arrays safely normalized to strings
+  const workouts = Array.isArray(gym.workouts)
+    ? gym.workouts.map((w) => (typeof w === 'string' ? w : w?.name || String(w))).filter(Boolean)
+    : [];
+  const facilities = Array.isArray(gym.facilities)
+    ? gym.facilities.map((f) => (typeof f === 'string' ? f : f?.name || String(f))).filter(Boolean)
+    : [];
+  const amenities = Array.isArray(gym.amenities)
+    ? gym.amenities.map((a) => (typeof a === 'string' ? a : a?.name || String(a))).filter(Boolean)
+    : [];
   const trainers = Array.isArray(gym.trainers) ? gym.trainers : [];
+  const rules = Array.isArray(gym.rules)
+    ? gym.rules.map((r) => (typeof r === 'string' ? r : r?.rule || String(r))).filter(Boolean)
+    : [];
+  const safety = Array.isArray(gym.safetyMeasures)
+    ? gym.safetyMeasures.map((s) => (typeof s === 'string' ? s : s?.measure || String(s))).filter(Boolean)
+    : Array.isArray(gym.safety)
+    ? gym.safety.map((s) => (typeof s === 'string' ? s : s?.measure || String(s))).filter(Boolean)
+    : [];
+  const reviews = Array.isArray(gym.reviews) ? gym.reviews : [];
 
-  const reviews = Array.isArray(gym.reviews) && gym.reviews.length > 0
-    ? gym.reviews
-    : DEFAULT_REVIEWS;
+  // Dynamic Review Statistics & Real Histogram Calculation
+  const reviewStats = useMemo(() => {
+    // If individual reviews are present in reviews array
+    if (Array.isArray(reviews) && reviews.length > 0) {
+      let sum = 0;
+      const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+      reviews.forEach((r) => {
+        const rVal = typeof r.rating === 'number' ? r.rating : 5;
+        const star = Math.max(1, Math.min(5, Math.round(rVal)));
+        counts[star] = (counts[star] || 0) + 1;
+        sum += rVal;
+      });
+      const avg = (sum / reviews.length).toFixed(1);
+      const hist = [5, 4, 3, 2, 1].map((s) => {
+        const count = counts[s] || 0;
+        const ratio = count / reviews.length;
+        return {
+          stars: s,
+          count,
+          ratio,
+          percent: `${Math.round(ratio * 100)}%`,
+        };
+      });
+      return {
+        rating: avg,
+        ratingNum: Number(avg),
+        total: reviews.length,
+        histograms: hist,
+        hasReviews: true,
+      };
+    }
 
-  const rules = Array.isArray(gym.rules) && gym.rules.length > 0
-    ? gym.rules
-    : DEFAULT_RULES;
+    // Unrated gym with 0 reviews
+    const zeroHist = [5, 4, 3, 2, 1].map((s) => ({
+      stars: s,
+      count: 0,
+      ratio: 0,
+      percent: '0%',
+    }));
 
-  const safety = Array.isArray(gym.safety) && gym.safety.length > 0
-    ? gym.safety
-    : Array.isArray(gym.safetyMeasures) && gym.safetyMeasures.length > 0
-    ? gym.safetyMeasures
-    : DEFAULT_SAFETY;
+    return {
+      rating: 'No ratings',
+      ratingNum: 0,
+      total: 0,
+      histograms: zeroHist,
+      hasReviews: false,
+    };
+  }, [reviews]);
+
+  const locationDisplayText =
+    typeof gym.location === 'string' && gym.location.trim().length > 0
+      ? gym.location
+      : gym.area
+      ? `${gym.area}, ${gym.city || 'Chennai'}`
+      : gym.city || 'Chennai, Tamil Nadu';
 
   const openingHoursText =
     typeof gym.openingHours === 'object' && gym.openingHours?.displayText
@@ -119,6 +230,17 @@ export const GymDetailsScreen = ({ route, navigation }) => {
       : typeof gym.openingHours === 'string' && gym.openingHours
       ? gym.openingHours
       : '05:30 AM - 10:30 PM';
+
+  const fullAddressText =
+    typeof gym.fullAddress === 'string' && gym.fullAddress.trim().length > 0
+      ? gym.fullAddress
+      : typeof gym.address === 'string' && gym.address.trim().length > 0
+      ? gym.address
+      : locationDisplayText;
+
+  const sessionPrice = Math.round(gym.singleSessionPrice || gym.pricePerSession || 199);
+  const gymDistance = gym.distance !== undefined && gym.distance !== null ? `${gym.distance} km` : 'Near You';
+  const badgeText = typeof gym.badgeText === 'string' && gym.badgeText.trim().length > 0 ? gym.badgeText : 'Verified Gym';
 
   const toggleBookmark = () => {
     setIsBookmarked(!isBookmarked);
@@ -132,54 +254,97 @@ export const GymDetailsScreen = ({ route, navigation }) => {
       await Share.share({
         message: `Check out ${gym.name} on GYMEZY! Book passes and memberships with instant QR entry.`,
       });
-    } catch (e) {
+    } catch {
       // ignore
     }
   };
 
-  const primaryNavy = isDark ? '#93C5FD' : '#003882';
+  const handleCall = () => {
+    const phone = gym.phone;
+    if (phone && phone.trim().length > 0) {
+      const cleanPhone = phone.replace(/[^\d+]/g, '');
+      Linking.openURL(`tel:${cleanPhone}`).catch(() => {
+        showToast({ message: `Contact: ${phone}`, isError: true });
+      });
+    } else {
+      showToast({ message: 'No phone number listed for this gym.', isError: true });
+    }
+  };
+
+  const handleDirections = () => {
+    const lat = gym.location?.coordinates?.[1] || gym.coords?.latitude;
+    const lng = gym.location?.coordinates?.[0] || gym.coords?.longitude;
+    const mapsUrl =
+      gym.googleMapsUrl ||
+      (lat && lng
+        ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddressText)}`);
+
+    Linking.openURL(mapsUrl).catch(() => {
+      showToast({ message: 'Unable to open maps', isError: true });
+    });
+  };
+
   const cardColor = isDark ? '#1E1E1E' : '#FFFFFF';
   const textColor = isDark ? '#FFFFFF' : '#0F172A';
   const subtitleColor = isDark ? 'rgba(255, 255, 255, 0.7)' : '#64748B';
   const borderColor = isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0';
   const accentIconColor = isDark ? '#93C5FD' : '#003882';
 
-  // Workouts icon map
-  const workoutIconMap = {
-    GYM: 'fitness-center',
-    Yoga: 'self-improvement',
-    Zumba: 'music-note',
-    CrossFit: 'offline-bolt',
-    Pilates: 'accessibility-new',
-    Boxing: 'sports-mma',
+  // Icon mapping helpers
+  const getWorkoutIcon = (name = '') => {
+    const n = String(name).toLowerCase();
+    if (n.includes('hiit') || n.includes('interval')) return 'flash-on';
+    if (n.includes('yoga') || n.includes('stretch') || n.includes('mobility')) return 'self-improvement';
+    if (n.includes('zumba') || n.includes('dance') || n.includes('aerobic')) return 'music-note';
+    if (n.includes('box') || n.includes('kickbox') || n.includes('mma') || n.includes('combat')) return 'sports-mma';
+    if (n.includes('crossfit') || n.includes('functional')) return 'sports-kabaddi';
+    if (n.includes('powerlift') || n.includes('deadlift')) return 'hardware';
+    if (n.includes('calisthenic') || n.includes('gymnast') || n.includes('bodyweight')) return 'sports-gymnastics';
+    if (n.includes('cardio') || n.includes('run')) return 'directions-run';
+    if (n.includes('pilates')) return 'accessibility';
+    if (n.includes('cycle') || n.includes('spin') || n.includes('bike')) return 'directions-bike';
+    if (n.includes('core') || n.includes('abs')) return 'center-focus-strong';
+    return 'fitness-center';
   };
 
-  // Facilities icon map
-  const facilityIconMap = {
-    'AC Gym': 'ac-unit',
-    'Locker Facility': 'lock-outline',
-    'Shower Available': 'shower',
-    'Changing Room': 'door-sliding',
-    'Steam Bath': 'hot-tub',
+  const getFacilityIcon = (name = '') => {
+    const n = String(name).toLowerCase();
+    if (n.includes('ac') || n.includes('air')) return 'ac-unit';
+    if (n.includes('lock') || n.includes('safe')) return 'lock-outline';
+    if (n.includes('show') || n.includes('bath')) return 'shower';
+    if (n.includes('chang') || n.includes('dress') || n.includes('room')) return 'checkroom';
+    if (n.includes('steam') || n.includes('sauna') || n.includes('spa')) return 'hot-tub';
+    if (n.includes('park') || n.includes('valet')) return 'local-parking';
+    if (n.includes('wifi') || n.includes('internet')) return 'wifi';
+    if (n.includes('music') || n.includes('audio') || n.includes('sound')) return 'music-note';
+    if (n.includes('dumbbell') || n.includes('weight') || n.includes('free weight')) return 'fitness-center';
+    if (n.includes('cardio') || n.includes('deck') || n.includes('treadmill')) return 'directions-run';
+    if (n.includes('olympic') || n.includes('platform') || n.includes('squat')) return 'sports-gymnastics';
+    if (n.includes('aid') || n.includes('medical')) return 'medical-services';
+    if (n.includes('water') || n.includes('drink')) return 'water-drop';
+    return 'verified';
   };
 
-  // Amenities icon map
-  const amenityIconMap = {
-    'Drinking Water': 'local-drink',
-    'Towel Service': 'layers',
-    'Parking Available': 'local-parking',
-    'Free Wi-Fi': 'wifi',
-    'Protein Bar': 'local-cafe',
+  const getAmenityIcon = (name = '') => {
+    const n = String(name).toLowerCase();
+    if (n.includes('water') || n.includes('ro')) return 'water-drop';
+    if (n.includes('towel')) return 'dry-cleaning';
+    if (n.includes('protein') || n.includes('shake')) return 'local-bar';
+    if (n.includes('juice') || n.includes('smoothie')) return 'local-cafe';
+    if (n.includes('personal lock') || n.includes('locker')) return 'lock-outline';
+    if (n.includes('inbody') || n.includes('bmi') || n.includes('weigh') || n.includes('scale')) return 'monitor-weight';
+    if (n.includes('nutrition') || n.includes('diet')) return 'assignment-ind';
+    if (n.includes('lounge') || n.includes('rest') || n.includes('relax')) return 'weekend';
+    if (n.includes('park')) return 'local-parking';
+    if (n.includes('wifi') || n.includes('internet')) return 'wifi';
+    if (n.includes('mat') || n.includes('sanitiz')) return 'clean-hands';
+    if (n.includes('aid') || n.includes('medic')) return 'medical-services';
+    if (n.includes('shower')) return 'shower';
+    if (n.includes('steam') || n.includes('sauna')) return 'hot-tub';
+    if (n.includes('ac') || n.includes('air')) return 'ac-unit';
+    return 'star';
   };
-
-  const coverImageUrl =
-    gym.coverPhoto?.fileData ||
-    (typeof gym.coverPhoto === 'string' && gym.coverPhoto.length > 0 ? gym.coverPhoto : null) ||
-    (gym.galleryPhotos && gym.galleryPhotos[0]?.fileData) ||
-    (Array.isArray(gym.images) && gym.images[0]) ||
-    gym.imageUrl ||
-    gym.image ||
-    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop';
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -187,19 +352,35 @@ export const GymDetailsScreen = ({ route, navigation }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* 1. TOP HERO IMAGE & ACTIONS */}
+        {/* 1. TOP HERO IMAGE CAROUSEL & ACTIONS */}
         <View style={styles.heroContainer}>
-          <Image
-            source={{ uri: coverImageUrl }}
-            style={styles.heroImage}
-            resizeMode="cover"
-          />
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={(e) => {
+              const offset = e.nativeEvent.contentOffset.x;
+              const idx = Math.round(offset / SCREEN_WIDTH);
+              setActivePhotoIdx(idx);
+            }}
+            scrollEventThrottle={16}
+          >
+            {photos.map((uri, idx) => (
+              <Image
+                key={idx}
+                source={{ uri }}
+                style={{ width: SCREEN_WIDTH, height: 280 }}
+                resizeMode="cover"
+              />
+            ))}
+          </ScrollView>
 
           {/* Gradient Scrim */}
           <LinearGradient
             colors={['rgba(0,0,0,0.45)', 'transparent', 'rgba(0,0,0,0.7)']}
             locations={[0.0, 0.5, 1.0]}
             style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
           />
 
           {/* Top Bar Floating Buttons */}
@@ -277,7 +458,9 @@ export const GymDetailsScreen = ({ route, navigation }) => {
           {/* Photo Count Pill */}
           <View style={styles.photosPill}>
             <MaterialIcons name="photo-library" size={13} color="#FFFFFF" style={{ marginRight: 5 }} />
-            <Text style={styles.photosPillText}>1 / 15 Photos</Text>
+            <Text style={styles.photosPillText}>
+              {activePhotoIdx + 1} / {photos.length} Photo{photos.length > 1 ? 's' : ''}
+            </Text>
           </View>
         </View>
 
@@ -296,11 +479,11 @@ export const GymDetailsScreen = ({ route, navigation }) => {
           <View style={styles.subtitleRow}>
             <MaterialIcons name="location-on" size={15} color={subtitleColor} />
             <Text style={[styles.locationText, { color: subtitleColor }]}>
-              {gym.location}
+              {locationDisplayText}
             </Text>
             <Text style={[styles.bulletText, { color: subtitleColor }]}>•</Text>
             <MaterialIcons name="verified" size={15} color="#00BF62" />
-            <Text style={styles.verifiedText}>Verified Gym</Text>
+            <Text style={styles.verifiedText}>{badgeText}</Text>
           </View>
 
           {/* 3. HORIZONTAL SCROLLING QUICK METRICS BADGES */}
@@ -313,7 +496,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
             <View style={[styles.metricBadge, { backgroundColor: cardColor, borderColor: borderColor }]}>
               <MaterialIcons name="bolt" size={16} color="#00BF62" style={{ marginRight: 4 }} />
               <Text style={[styles.metricBadgeBold, { color: textColor }]}>
-                ₹{Math.round(gym.pricePerSession)}
+                ₹{sessionPrice}
               </Text>
               <Text style={[styles.metricBadgeSub, { color: subtitleColor }]}> /session</Text>
             </View>
@@ -322,7 +505,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
             <View style={[styles.metricBadge, { backgroundColor: cardColor, borderColor: borderColor }]}>
               <MaterialIcons name="star" size={16} color="#F59E0B" style={{ marginRight: 4 }} />
               <Text style={[styles.metricBadgeBold, { color: textColor }]}>
-                {gym.rating} ({gym.reviewsCount})
+                {reviewStats.hasReviews ? `${reviewStats.rating} (${reviewStats.total})` : 'No ratings'}
               </Text>
             </View>
 
@@ -330,7 +513,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
             <View style={[styles.metricBadge, { backgroundColor: cardColor, borderColor: borderColor }]}>
               <MaterialIcons name="near-me" size={14} color={accentIconColor} style={{ marginRight: 4 }} />
               <Text style={[styles.metricBadgeBold, { color: textColor }]}>
-                {gym.distance} km
+                {gymDistance}
               </Text>
             </View>
 
@@ -367,12 +550,12 @@ export const GymDetailsScreen = ({ route, navigation }) => {
               <View style={styles.locationDetailsCol}>
                 <Text style={[styles.locationLabel, { color: subtitleColor }]}>Address</Text>
                 <Text style={[styles.locationAddressText, { color: textColor }]}>
-                  {gym.fullAddress}
+                  {fullAddressText}
                 </Text>
               </View>
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => showToast({ message: 'Opening Maps Directions...', isSuccess: true })}
+                onPress={handleDirections}
                 style={[styles.directionsBtn, { borderColor: accentIconColor }]}
               >
                 <Text style={[styles.directionsBtnText, { color: accentIconColor }]}>Directions</Text>
@@ -400,173 +583,191 @@ export const GymDetailsScreen = ({ route, navigation }) => {
             </View>
           </View>
 
-          {/* 5. WORKOUTS OFFERED */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={[styles.sectionTitle, { color: textColor }]}>Workouts Offered</Text>
-              <TouchableOpacity onPress={() => setShowWorkouts(true)} activeOpacity={0.7}>
-                <Text style={styles.viewAllText}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.squircleCardsRow}>
-              {workouts.slice(0, 3).map((w, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.squircleCard,
-                    { backgroundColor: cardColor, borderColor: borderColor },
-                  ]}
-                >
+          {/* 5. WORKOUTS OFFERED (from DB) */}
+          {workouts.length > 0 && (
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={[styles.sectionTitle, { color: textColor }]}>Workouts Offered</Text>
+                {workouts.length > 3 && (
+                  <TouchableOpacity onPress={() => setShowWorkouts(true)} activeOpacity={0.7}>
+                    <Text style={styles.viewAllText}>View All</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={styles.squircleCardsRow}>
+                {workouts.slice(0, 3).map((w, idx) => (
                   <View
+                    key={idx}
                     style={[
-                      styles.squircleIconCircle,
-                      {
-                        backgroundColor: isDark
-                          ? 'rgba(30, 58, 138, 0.35)'
-                          : 'rgba(0, 56, 130, 0.08)',
-                      },
+                      styles.squircleCard,
+                      { backgroundColor: cardColor, borderColor: borderColor },
                     ]}
                   >
-                    <MaterialIcons
-                      name={workoutIconMap[w] || 'fitness-center'}
-                      size={22}
-                      color={accentIconColor}
-                    />
+                    <View
+                      style={[
+                        styles.squircleIconCircle,
+                        {
+                          backgroundColor: isDark
+                            ? 'rgba(30, 58, 138, 0.35)'
+                            : 'rgba(0, 56, 130, 0.08)',
+                        },
+                      ]}
+                    >
+                      <MaterialIcons
+                        name={getWorkoutIcon(w)}
+                        size={22}
+                        color={accentIconColor}
+                      />
+                    </View>
+                    <Text
+                      style={[styles.squircleCardText, { color: textColor }]}
+                      numberOfLines={1}
+                    >
+                      {w}
+                    </Text>
                   </View>
-                  <Text
-                    style={[styles.squircleCardText, { color: textColor }]}
-                    numberOfLines={1}
-                  >
-                    {w}
-                  </Text>
-                </View>
-              ))}
+                ))}
+              </View>
             </View>
-          </View>
+          )}
 
-          {/* 6. FACILITIES SECTION */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={[styles.sectionTitle, { color: textColor }]}>Facilities</Text>
-              <TouchableOpacity onPress={() => setShowFacilities(true)} activeOpacity={0.7}>
-                <Text style={styles.viewAllText}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.squircleCardsRow}>
-              {facilities.slice(0, 3).map((f, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.squircleCard,
-                    { backgroundColor: cardColor, borderColor: borderColor },
-                  ]}
-                >
+          {/* 6. FACILITIES SECTION (from DB) */}
+          {facilities.length > 0 && (
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={[styles.sectionTitle, { color: textColor }]}>Facilities</Text>
+                {facilities.length > 3 && (
+                  <TouchableOpacity onPress={() => setShowFacilities(true)} activeOpacity={0.7}>
+                    <Text style={styles.viewAllText}>View All</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={styles.squircleCardsRow}>
+                {facilities.slice(0, 3).map((f, idx) => (
                   <View
+                    key={idx}
                     style={[
-                      styles.squircleIconCircle,
-                      {
-                        backgroundColor: isDark
-                          ? 'rgba(30, 58, 138, 0.35)'
-                          : 'rgba(0, 56, 130, 0.08)',
-                      },
+                      styles.squircleCard,
+                      { backgroundColor: cardColor, borderColor: borderColor },
                     ]}
                   >
-                    <MaterialIcons
-                      name={facilityIconMap[f] || 'ac-unit'}
-                      size={22}
-                      color={accentIconColor}
-                    />
+                    <View
+                      style={[
+                        styles.squircleIconCircle,
+                        {
+                          backgroundColor: isDark
+                            ? 'rgba(30, 58, 138, 0.35)'
+                            : 'rgba(0, 56, 130, 0.08)',
+                        },
+                      ]}
+                    >
+                      <MaterialIcons
+                        name={getFacilityIcon(f)}
+                        size={22}
+                        color={accentIconColor}
+                      />
+                    </View>
+                    <Text
+                      style={[styles.squircleCardText, { color: textColor }]}
+                      numberOfLines={1}
+                    >
+                      {f}
+                    </Text>
                   </View>
-                  <Text
-                    style={[styles.squircleCardText, { color: textColor }]}
-                    numberOfLines={1}
-                  >
-                    {f}
-                  </Text>
-                </View>
-              ))}
+                ))}
+              </View>
             </View>
-          </View>
+          )}
 
-          {/* 7. AMENITIES SECTION */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={[styles.sectionTitle, { color: textColor }]}>Amenities</Text>
-              <TouchableOpacity onPress={() => setShowAmenities(true)} activeOpacity={0.7}>
-                <Text style={styles.viewAllText}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.squircleCardsRow}>
-              {amenities.slice(0, 3).map((a, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.squircleCard,
-                    { backgroundColor: cardColor, borderColor: borderColor },
-                  ]}
-                >
+          {/* 7. AMENITIES SECTION (from DB) */}
+          {amenities.length > 0 && (
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={[styles.sectionTitle, { color: textColor }]}>Amenities</Text>
+                {amenities.length > 3 && (
+                  <TouchableOpacity onPress={() => setShowAmenities(true)} activeOpacity={0.7}>
+                    <Text style={styles.viewAllText}>View All</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={styles.squircleCardsRow}>
+                {amenities.slice(0, 3).map((a, idx) => (
                   <View
+                    key={idx}
                     style={[
-                      styles.squircleIconCircle,
-                      {
-                        backgroundColor: isDark
-                          ? 'rgba(30, 58, 138, 0.35)'
-                          : 'rgba(0, 56, 130, 0.08)',
-                      },
+                      styles.squircleCard,
+                      { backgroundColor: cardColor, borderColor: borderColor },
                     ]}
                   >
-                    <MaterialIcons
-                      name={amenityIconMap[a] || 'local-drink'}
-                      size={22}
-                      color={accentIconColor}
-                    />
+                    <View
+                      style={[
+                        styles.squircleIconCircle,
+                        {
+                          backgroundColor: isDark
+                            ? 'rgba(30, 58, 138, 0.35)'
+                            : 'rgba(0, 56, 130, 0.08)',
+                        },
+                      ]}
+                    >
+                      <MaterialIcons
+                        name={getAmenityIcon(a)}
+                        size={22}
+                        color={accentIconColor}
+                      />
+                    </View>
+                    <Text
+                      style={[styles.squircleCardText, { color: textColor }]}
+                      numberOfLines={1}
+                    >
+                      {a}
+                    </Text>
                   </View>
-                  <Text
-                    style={[styles.squircleCardText, { color: textColor }]}
-                    numberOfLines={1}
-                  >
-                    {a}
-                  </Text>
-                </View>
-              ))}
+                ))}
+              </View>
             </View>
-          </View>
+          )}
 
-          {/* 8. ABOUT SECTION */}
-          <View style={styles.sectionContainer}>
-            <Text style={[styles.sectionTitle, { color: textColor, marginBottom: 8 }]}>
-              About {gym.name}
-            </Text>
-            <Text style={[styles.aboutParagraph, { color: subtitleColor }]}>
-              {gym.aboutText}
-            </Text>
-          </View>
+          {/* 8. ABOUT SECTION (from DB) */}
+          {Boolean(gym.aboutText && gym.aboutText.trim().length > 0) && (
+            <View style={styles.sectionContainer}>
+              <Text style={[styles.sectionTitle, { color: textColor, marginBottom: 8 }]}>
+                About {gym.name}
+              </Text>
+              <Text style={[styles.aboutParagraph, { color: subtitleColor }]}>
+                {gym.aboutText}
+              </Text>
+            </View>
+          )}
 
-          {/* 9. CERTIFIED TRAINERS SECTION */}
+          {/* 9. CERTIFIED TRAINERS SECTION (from DB) */}
           {trainers.length > 0 && (
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeaderRow}>
                 <Text style={[styles.sectionTitle, { color: textColor }]}>Certified Trainers</Text>
-                <TouchableOpacity onPress={() => setShowTrainers(true)} activeOpacity={0.7}>
-                  <Text style={styles.viewAllText}>View All</Text>
-                </TouchableOpacity>
+                {trainers.length > 2 && (
+                  <TouchableOpacity onPress={() => setShowTrainers(true)} activeOpacity={0.7}>
+                    <Text style={styles.viewAllText}>View All</Text>
+                  </TouchableOpacity>
+                )}
               </View>
               <View style={styles.trainersRow}>
                 {trainers.slice(0, 2).map((tr, idx) => (
                   <TouchableOpacity
                     key={idx}
                     activeOpacity={0.8}
-                    onPress={() => {
-                      setSelectedTrainer(tr);
-                      setShowTrainerReviews(true);
-                    }}
+                    onPress={() => handleOpenTrainerReviews(tr)}
                     style={[
                       styles.trainerCard,
                       { backgroundColor: cardColor, borderColor: borderColor },
                     ]}
                   >
                     <Image
-                      source={{ uri: tr.imageUrl }}
+                      source={{
+                        uri:
+                          tr.imageUrl ||
+                          tr.image?.fileData ||
+                          'https://images.unsplash.com/photo-1567013127542-490d757e51fc?q=80&w=400&auto=format&fit=crop',
+                      }}
                       style={styles.trainerAvatar}
                       resizeMode="cover"
                     />
@@ -578,13 +779,21 @@ export const GymDetailsScreen = ({ route, navigation }) => {
                         {tr.name}
                       </Text>
                       <Text style={[styles.trainerExp, { color: subtitleColor }]}>
-                        {tr.experienceYears} Yrs Exp.
+                        {tr.experienceYears || 1} Yrs Exp.
                       </Text>
                       <View style={styles.trainerRatingRow}>
-                        <MaterialIcons name="star" size={12} color="#F59E0B" />
-                        <Text style={[styles.trainerRatingText, { color: textColor }]}>
-                          {tr.rating}
-                        </Text>
+                        {tr.rating !== undefined && tr.rating !== null && Number(tr.rating) > 0 ? (
+                          <>
+                            <MaterialIcons name="star" size={12} color="#F59E0B" />
+                            <Text style={[styles.trainerRatingText, { color: textColor }]}>
+                              {tr.rating}
+                            </Text>
+                          </>
+                        ) : (
+                          <Text style={[styles.trainerRatingText, { color: subtitleColor, fontSize: 11 }]}>
+                            No ratings
+                          </Text>
+                        )}
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -597,130 +806,162 @@ export const GymDetailsScreen = ({ route, navigation }) => {
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeaderRow}>
               <Text style={[styles.sectionTitle, { color: textColor }]}>Reviews & Ratings</Text>
-              <TouchableOpacity onPress={() => setShowAllReviews(true)} activeOpacity={0.7}>
-                <Text style={styles.viewAllText}>View All</Text>
-              </TouchableOpacity>
+              {reviews.length > 2 && (
+                <TouchableOpacity onPress={() => setShowAllReviews(true)} activeOpacity={0.7}>
+                  <Text style={styles.viewAllText}>View All</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
-            {/* Rating Overview Card */}
-            <View
-              style={[
-                styles.reviewsOverviewCard,
-                { backgroundColor: cardColor, borderColor: borderColor },
-              ]}
-            >
-              <View style={styles.reviewsOverviewLeft}>
-                <Text style={[styles.bigRatingText, { color: textColor }]}>
-                  {gym.rating}
-                </Text>
-                <View style={styles.starsRow}>
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <MaterialIcons
-                      key={s}
-                      name={s <= Math.floor(gym.rating) ? 'star' : 'star-border'}
-                      size={16}
-                      color="#F59E0B"
-                    />
-                  ))}
-                </View>
-                <Text style={[styles.reviewsCountText, { color: subtitleColor }]}>
-                  {gym.reviewsCount} reviews
-                </Text>
-              </View>
-
-              <View style={styles.histogramCol}>
-                {[
-                  { stars: 5, pct: 0.7, label: '70%' },
-                  { stars: 4, pct: 0.2, label: '20%' },
-                  { stars: 3, pct: 0.06, label: '6%' },
-                  { stars: 2, pct: 0.02, label: '2%' },
-                  { stars: 1, pct: 0.02, label: '2%' },
-                ].map((row) => (
-                  <View key={row.stars} style={styles.histogramRow}>
-                    <Text style={[styles.histStarNum, { color: textColor }]}>{row.stars}</Text>
-                    <MaterialIcons name="star" size={10} color="#F59E0B" style={{ marginHorizontal: 2 }} />
-                    <View style={[styles.histBarTrack, { backgroundColor: isDark ? '#333333' : '#E2E8F0' }]}>
-                      <View
-                        style={[
-                          styles.histBarFill,
-                          {
-                            width: `${row.pct * 100}%`,
-                            backgroundColor: isDark ? '#00BF62' : '#003882',
-                          },
-                        ]}
-                      />
+            {reviewStats.hasReviews ? (
+              <>
+                {/* Rating Overview Card */}
+                <View
+                  style={[
+                    styles.reviewsOverviewCard,
+                    { backgroundColor: cardColor, borderColor: borderColor },
+                  ]}
+                >
+                  <View style={styles.reviewsOverviewLeft}>
+                    <Text style={[styles.bigRatingText, { color: textColor }]}>
+                      {reviewStats.rating}
+                    </Text>
+                    <View style={styles.starsRow}>
+                      {[1, 2, 3, 4, 5].map((s) => {
+                        let iconName = 'star-border';
+                        if (s <= Math.floor(reviewStats.ratingNum)) {
+                          iconName = 'star';
+                        } else if (s - reviewStats.ratingNum < 1) {
+                          iconName = 'star-half';
+                        }
+                        return (
+                          <MaterialIcons
+                            key={s}
+                            name={iconName}
+                            size={16}
+                            color="#F59E0B"
+                          />
+                        );
+                      })}
                     </View>
-                    <Text style={[styles.histPercent, { color: subtitleColor }]}>{row.label}</Text>
+                    <Text style={[styles.reviewsCountText, { color: subtitleColor }]}>
+                      {reviewStats.total} review{reviewStats.total === 1 ? '' : 's'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.histogramCol}>
+                    {reviewStats.histograms.map((row) => (
+                      <View key={row.stars} style={styles.histogramRow}>
+                        <Text style={[styles.histStarNum, { color: textColor }]}>{row.stars}</Text>
+                        <MaterialIcons name="star" size={10} color="#F59E0B" style={{ marginHorizontal: 2 }} />
+                        <View style={[styles.histBarTrack, { backgroundColor: isDark ? '#333333' : '#E2E8F0' }]}>
+                          <View
+                            style={[
+                              styles.histBarFill,
+                              {
+                                width: `${row.ratio * 100}%`,
+                                backgroundColor: isDark ? '#00BF62' : '#003882',
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text style={[styles.histPercent, { color: subtitleColor }]}>{row.percent}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Individual Reviews from DB */}
+                {reviews.slice(0, 2).map((rev, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.reviewCard,
+                      { backgroundColor: cardColor, borderColor: borderColor },
+                    ]}
+                  >
+                    <View style={styles.reviewHeader}>
+                      <Image
+                        source={{
+                          uri:
+                            rev.userImageUrl ||
+                            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150&auto=format&fit=crop',
+                        }}
+                        style={styles.reviewAvatar}
+                      />
+                      <View style={{ flex: 1, marginLeft: 8 }}>
+                        <Text style={[styles.reviewAuthor, { color: textColor }]}>{rev.userName || 'Verified Member'}</Text>
+                        <View style={styles.reviewStarsRow}>
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <MaterialIcons
+                              key={s}
+                              name={s <= Math.floor(rev.rating || 5) ? 'star' : 'star-border'}
+                              size={11}
+                              color="#F59E0B"
+                            />
+                          ))}
+                        </View>
+                      </View>
+                      <Text style={[styles.reviewDate, { color: subtitleColor }]}>{rev.date || 'Recent'}</Text>
+                    </View>
+                    <Text style={[styles.reviewComment, { color: textColor }]}>{rev.comment}</Text>
                   </View>
                 ))}
+              </>
+            ) : (
+              <View style={[styles.noReviewsBox, { backgroundColor: cardColor, borderColor: borderColor }]}>
+                <MaterialIcons name="rate-review" size={26} color={subtitleColor} />
+                <Text style={[styles.noReviewsText, { color: subtitleColor, marginTop: 6 }]}>
+                  No ratings yet. Be the first to review after your workout!
+                </Text>
               </View>
-            </View>
+            )}
+          </View>
 
-            {/* Individual Reviews */}
-            {reviews.slice(0, 2).map((rev, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.reviewCard,
-                  { backgroundColor: cardColor, borderColor: borderColor },
-                ]}
-              >
-                <View style={styles.reviewHeader}>
-                  <Image source={{ uri: rev.userImageUrl }} style={styles.reviewAvatar} />
-                  <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Text style={[styles.reviewAuthor, { color: textColor }]}>{rev.userName}</Text>
-                    <View style={styles.reviewStarsRow}>
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <MaterialIcons
-                          key={s}
-                          name={s <= Math.floor(rev.rating || 5) ? 'star' : 'star-border'}
-                          size={11}
-                          color="#F59E0B"
-                        />
-                      ))}
+          {/* 11. RULES & SAFETY GUIDELINES (from DB) */}
+          {(rules.length > 0 || safety.length > 0) && (
+            <View style={styles.guidelinesRow}>
+              {/* Rules */}
+              {rules.length > 0 && (
+                <View style={[styles.guidelineCard, { backgroundColor: cardColor, borderColor: borderColor }]}>
+                  <Text style={[styles.guidelineTitle, { color: textColor }]}>Gym Rules</Text>
+                  {rules.slice(0, 3).map((r, i) => (
+                    <View key={i} style={styles.guidelineItem}>
+                      <MaterialIcons name="check-circle" size={13} color={accentIconColor} style={{ marginRight: 4, marginTop: 1 }} />
+                      <Text style={[styles.guidelineText, { color: subtitleColor }]} numberOfLines={2}>
+                        {r}
+                      </Text>
                     </View>
-                  </View>
-                  <Text style={[styles.reviewDate, { color: subtitleColor }]}>{rev.date}</Text>
+                  ))}
+                  {rules.length > 3 && (
+                    <TouchableOpacity onPress={() => setShowRules(true)} activeOpacity={0.7}>
+                      <Text style={[styles.viewRulesText, { color: accentIconColor }]}>View All Rules →</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-                <Text style={[styles.reviewComment, { color: textColor }]}>{rev.comment}</Text>
-              </View>
-            ))}
-          </View>
+              )}
 
-          {/* 11. RULES & SAFETY GUIDELINES */}
-          <View style={styles.guidelinesRow}>
-            {/* Rules */}
-            <View style={[styles.guidelineCard, { backgroundColor: cardColor, borderColor: borderColor }]}>
-              <Text style={[styles.guidelineTitle, { color: textColor }]}>Gym Rules</Text>
-              {rules.slice(0, 3).map((r, i) => (
-                <View key={i} style={styles.guidelineItem}>
-                  <MaterialIcons name="check-circle" size={13} color={accentIconColor} style={{ marginRight: 4, marginTop: 1 }} />
-                  <Text style={[styles.guidelineText, { color: subtitleColor }]} numberOfLines={2}>
-                    {r}
-                  </Text>
+              {/* Safety */}
+              {safety.length > 0 && (
+                <View style={[styles.guidelineCard, { backgroundColor: cardColor, borderColor: borderColor }]}>
+                  <Text style={[styles.guidelineTitle, { color: textColor }]}>Safety Measures</Text>
+                  {safety.slice(0, 3).map((s, i) => (
+                    <View key={i} style={styles.guidelineItem}>
+                      <MaterialIcons name="verified-user" size={13} color="#00BF62" style={{ marginRight: 4, marginTop: 1 }} />
+                      <Text style={[styles.guidelineText, { color: subtitleColor }]} numberOfLines={2}>
+                        {s}
+                      </Text>
+                    </View>
+                  ))}
+                  {safety.length > 3 && (
+                    <TouchableOpacity onPress={() => setShowSafety(true)} activeOpacity={0.7}>
+                      <Text style={[styles.viewRulesText, { color: '#00BF62' }]}>View All Safety →</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-              ))}
-              <TouchableOpacity onPress={() => setShowRules(true)} activeOpacity={0.7}>
-                <Text style={[styles.viewRulesText, { color: accentIconColor }]}>View All Rules →</Text>
-              </TouchableOpacity>
+              )}
             </View>
-
-            {/* Safety */}
-            <View style={[styles.guidelineCard, { backgroundColor: cardColor, borderColor: borderColor }]}>
-              <Text style={[styles.guidelineTitle, { color: textColor }]}>Safety Measures</Text>
-              {safety.slice(0, 3).map((s, i) => (
-                <View key={i} style={styles.guidelineItem}>
-                  <MaterialIcons name="verified-user" size={13} color="#00BF62" style={{ marginRight: 4, marginTop: 1 }} />
-                  <Text style={[styles.guidelineText, { color: subtitleColor }]} numberOfLines={2}>
-                    {s}
-                  </Text>
-                </View>
-              ))}
-              <TouchableOpacity onPress={() => setShowSafety(true)} activeOpacity={0.7}>
-                <Text style={[styles.viewRulesText, { color: '#00BF62' }]}>View All Safety →</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          )}
         </View>
       </ScrollView>
 
@@ -741,7 +982,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
         {/* Phone Button */}
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => showToast({ message: 'Calling gym front desk...' })}
+          onPress={handleCall}
           style={[
             styles.callBtn,
             {
@@ -753,7 +994,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
           <MaterialIcons name="phone" size={20} color={isDark ? '#FFFFFF' : '#003882'} />
         </TouchableOpacity>
 
-        {/* Book Session Button (Outlined Navy Blue) */}
+        {/* Book Session Button */}
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => navigation.navigate('BookingSession', { gym })}
@@ -781,7 +1022,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
           </Text>
         </TouchableOpacity>
 
-        {/* Buy Membership Button (Solid Green) */}
+        {/* Buy Membership Button */}
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => navigation.navigate('BuyMembership', { gym })}
@@ -816,15 +1057,14 @@ export const GymDetailsScreen = ({ route, navigation }) => {
         trainers={trainers}
         onTrainerTap={(trainer) => {
           setShowTrainers(false);
-          setSelectedTrainer(trainer);
-          setShowTrainerReviews(true);
+          handleOpenTrainerReviews(trainer);
         }}
       />
       <TrainerReviewsPopup
         visible={showTrainerReviews}
         onClose={() => setShowTrainerReviews(false)}
         trainer={selectedTrainer}
-        reviews={reviews}
+        reviews={trainerReviewsList}
         onBack={() => {
           setShowTrainerReviews(false);
           setShowTrainers(true);
@@ -833,9 +1073,10 @@ export const GymDetailsScreen = ({ route, navigation }) => {
       <AllReviewsPopup
         visible={showAllReviews}
         onClose={() => setShowAllReviews(false)}
-        rating={gym.rating || 4.8}
-        reviewsCount={gym.reviewsCount || reviews.length}
+        rating={reviewStats.rating}
+        reviewsCount={reviewStats.total}
         reviews={reviews}
+        histograms={reviewStats.histograms}
       />
       <RulesPopup
         visible={showRules}
@@ -865,10 +1106,6 @@ const styles = StyleSheet.create({
     height: 280,
     position: 'relative',
   },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-  },
   topBarSafe: {
     position: 'absolute',
     top: 0,
@@ -883,12 +1120,17 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   circleBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
   },
   topRightActions: {
     flexDirection: 'row',
@@ -904,13 +1146,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    borderWidth: 0.8,
-    borderColor: 'rgba(255, 255, 255, 0.24)',
   },
   photosPillText: {
     color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
 
   /* Body Content */
@@ -922,122 +1163,137 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 4,
   },
   gymTitle: {
-    fontSize: 26,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '800',
     letterSpacing: -0.4,
     flex: 1,
+    marginRight: 10,
   },
   openNowBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 191, 98, 0.12)',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 20,
-    marginLeft: 8,
+    borderRadius: 8,
   },
   openNowDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#00BF62',
     marginRight: 5,
   },
   openNowText: {
-    color: '#00BF62',
     fontSize: 11,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#00BF62',
   },
   subtitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
+    marginBottom: 16,
   },
   locationText: {
     fontSize: 13,
+    fontWeight: '500',
     marginLeft: 3,
   },
   bulletText: {
-    marginHorizontal: 8,
+    fontSize: 13,
+    marginHorizontal: 6,
   },
   verifiedText: {
-    color: '#00BF62',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#00BF62',
     marginLeft: 3,
   },
 
-  /* Key Metrics Horizontal Badges */
+  /* Metrics Badges */
   metricsBadgeRow: {
     flexDirection: 'row',
-    paddingVertical: 14,
     gap: 8,
+    paddingBottom: 16,
   },
   metricBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
     borderWidth: 1,
   },
   metricBadgeBold: {
-    fontSize: 12.5,
-    fontWeight: 'bold',
+    fontSize: 13,
+    fontWeight: '800',
   },
   metricBadgeSub: {
-    fontSize: 11,
+    fontSize: 12,
+    fontWeight: '500',
   },
 
   /* Location Card */
   locationCard: {
-    borderRadius: 20,
+    borderRadius: 16,
+    padding: 14,
     borderWidth: 1,
-    padding: 16,
-    marginTop: 6,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
   },
   locationCardRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   locationIconBox: {
-    padding: 8,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 12,
   },
   locationDetailsCol: {
     flex: 1,
   },
   locationLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginBottom: 2,
   },
   locationAddressText: {
     fontSize: 13,
     lineHeight: 18,
+    fontWeight: '500',
   },
   directionsBtn: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    marginLeft: 6,
+    marginLeft: 8,
   },
   directionsBtnText: {
-    fontSize: 11,
-    fontWeight: 'bold',
+    fontSize: 12,
+    fontWeight: '700',
   },
   cardDivider: {
     height: 1,
     marginVertical: 12,
   },
 
-  /* Feature Sections */
+  /* Common Section Layout */
   sectionContainer: {
-    marginTop: 24,
+    marginBottom: 22,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -1046,128 +1302,143 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
   viewAllText: {
-    color: '#00BF62',
     fontSize: 13,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#00BF62',
   },
+
+  /* Squircle Features Grid */
   squircleCardsRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   squircleCard: {
     flex: 1,
-    paddingVertical: 16,
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   squircleIconCircle: {
-    padding: 10,
-    borderRadius: 25,
-    marginBottom: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 8,
   },
   squircleCardText: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
     textAlign: 'center',
   },
+
+  /* About */
   aboutParagraph: {
-    fontSize: 13,
+    fontSize: 13.5,
     lineHeight: 20,
+    fontWeight: '400',
   },
 
   /* Trainers */
   trainersRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   trainerCard: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 1,
+    padding: 10,
   },
   trainerAvatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    marginRight: 8,
+    marginRight: 10,
   },
   trainerInfo: {
     flex: 1,
   },
   trainerName: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 2,
   },
   trainerExp: {
-    fontSize: 10,
-    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '500',
+    marginBottom: 3,
   },
   trainerRatingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
   },
   trainerRatingText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    marginLeft: 2,
+    fontSize: 11,
+    fontWeight: '700',
+    marginLeft: 3,
   },
 
-  /* Reviews Overview */
+  /* Reviews */
   reviewsOverviewCard: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 20,
+    borderRadius: 14,
     borderWidth: 1,
-    marginBottom: 14,
+    padding: 14,
+    marginBottom: 12,
+    alignItems: 'center',
   },
   reviewsOverviewLeft: {
     alignItems: 'center',
-    paddingRight: 20,
+    justifyContent: 'center',
+    paddingRight: 16,
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(0,0,0,0.08)',
   },
   bigRatingText: {
-    fontSize: 38,
-    fontWeight: 'bold',
+    fontSize: 32,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+    lineHeight: 36,
   },
   starsRow: {
     flexDirection: 'row',
-    marginTop: 4,
+    marginVertical: 4,
   },
   reviewsCountText: {
     fontSize: 11,
-    marginTop: 4,
+    fontWeight: '600',
   },
   histogramCol: {
     flex: 1,
+    paddingLeft: 14,
   },
   histogramRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 2,
+    marginVertical: 1.5,
   },
   histStarNum: {
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: '700',
     width: 8,
   },
   histBarTrack: {
     flex: 1,
     height: 5,
     borderRadius: 3,
-    marginHorizontal: 8,
     overflow: 'hidden',
+    marginHorizontal: 6,
   },
   histBarFill: {
     height: '100%',
@@ -1175,14 +1446,15 @@ const styles = StyleSheet.create({
   },
   histPercent: {
     fontSize: 10,
-    width: 25,
+    fontWeight: '600',
+    width: 24,
     textAlign: 'right',
   },
   reviewCard: {
-    padding: 14,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    marginBottom: 10,
+    padding: 12,
+    marginBottom: 8,
   },
   reviewHeader: {
     flexDirection: 'row',
@@ -1190,13 +1462,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   reviewAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   reviewAuthor: {
-    fontSize: 13,
-    fontWeight: 'bold',
+    fontSize: 12.5,
+    fontWeight: '700',
   },
   reviewStarsRow: {
     flexDirection: 'row',
@@ -1204,27 +1476,41 @@ const styles = StyleSheet.create({
   },
   reviewDate: {
     fontSize: 11,
+    fontWeight: '500',
   },
   reviewComment: {
-    fontSize: 12,
+    fontSize: 12.5,
     lineHeight: 18,
+  },
+  noReviewsBox: {
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noReviewsText: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 8,
+    textAlign: 'center',
   },
 
   /* Guidelines */
   guidelinesRow: {
     flexDirection: 'row',
-    marginTop: 24,
     gap: 10,
   },
   guidelineCard: {
     flex: 1,
-    padding: 14,
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 1,
+    padding: 12,
   },
   guidelineTitle: {
-    fontSize: 13,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '800',
     marginBottom: 8,
   },
   guidelineItem: {
@@ -1233,17 +1519,17 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   guidelineText: {
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 11.5,
+    lineHeight: 16,
     flex: 1,
   },
   viewRulesText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    marginTop: 4,
+    fontSize: 11.5,
+    fontWeight: '700',
+    marginTop: 6,
   },
 
-  /* Persistent Bottom Action Bar */
+  /* Bottom Bar */
   bottomBarContainer: {
     position: 'absolute',
     bottom: 0,
@@ -1253,51 +1539,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 14,
     borderTopWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 12,
+    gap: 10,
   },
   callBtn: {
-    width: 48,
-    height: 48,
+    width: 46,
+    height: 46,
     borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
   },
   bookSessionBtn: {
     flex: 1,
-    height: 48,
+    height: 46,
     borderRadius: 14,
     borderWidth: 1.5,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
-    paddingHorizontal: 4,
   },
   bookSessionBtnText: {
-    fontSize: 12.5,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '700',
   },
   buyMembershipBtn: {
     flex: 1.2,
-    height: 48,
+    height: 46,
     borderRadius: 14,
     backgroundColor: '#00BF62',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    shadowColor: '#00BF62',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
   },
   buyMembershipBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
     color: '#FFFFFF',
-    fontSize: 12.5,
-    fontWeight: 'bold',
   },
 });

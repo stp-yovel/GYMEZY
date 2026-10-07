@@ -52,13 +52,16 @@ const openingHoursSchema = new mongoose.Schema(
 const customPlanSchema = new mongoose.Schema(
   {
     id: { type: String, trim: true },
+    tierId: { type: String, trim: true }, // 'monthly' | 'quarterly' | 'half_yearly' | 'annual'
     name: { type: String, required: true, trim: true },
     badge: { type: String, trim: true, default: 'Monthly' },
     price: { type: Number, required: true, min: 0 },
     duration: { type: String, trim: true, default: '30 Days' },
+    months: { type: Number, default: 1, min: 1 },
     description: { type: String, trim: true, default: '' },
     features: [{ type: String, trim: true }],
     popular: { type: Boolean, default: false },
+    savingsText: { type: String, trim: true, default: '' },
   },
   { _id: false }
 );
@@ -153,14 +156,31 @@ const bankDetailsSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const reviewSchema = new mongoose.Schema(
+  {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
+    userName: { type: String, trim: true, default: '' },
+    userImageUrl: { type: String, trim: true, default: '' },
+    rating: { type: Number, required: true, min: 1, max: 5, default: 5 },
+    comment: { type: String, required: true, trim: true },
+    bookingType: { type: String, trim: true, default: 'Member' },
+    date: { type: String, trim: true, default: 'Recent' },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: true }
+);
+
 const trainerSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     specialty: { type: String, trim: true, default: 'General Fitness' },
     experienceYears: { type: Number, default: 1, min: 0 },
     rating: { type: Number, default: 4.9, min: 0, max: 5 },
+    reviewsCount: { type: Number, default: 0, min: 0 },
+    ratings: { type: [reviewSchema], default: [] },
     monthlyFee: { type: Number, default: 0, min: 0 },
     image: { type: fileAttachmentSchema, default: () => ({}) }, // { fileName: "{gymname}_trainer_{name}", fileData: "..." }
+    imageUrl: { type: String, trim: true, default: '' },
   },
   { _id: false }
 );
@@ -356,6 +376,8 @@ const gymSchema = new mongoose.Schema(
     remark: { type: String, trim: true, default: '' },
     rating: { type: Number, default: 4.9, min: 0, max: 5 },
     reviewsCount: { type: Number, default: 0, min: 0 },
+    ratings: { type: [reviewSchema], default: [] },
+    reviews: { type: [reviewSchema], default: [] },
     membersCount: { type: Number, default: 0, min: 0 },
     monthlyRevenue: { type: Number, default: 0, min: 0 },
     isActive: { type: Boolean, default: true, index: true },

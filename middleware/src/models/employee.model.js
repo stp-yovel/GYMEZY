@@ -151,6 +151,20 @@ const employeeSchema = new mongoose.Schema(
     previousCompany: { type: String, trim: true, default: '' },
     previousDesignation: { type: String, trim: true, default: '' },
     previousExp: { type: String, trim: true, default: '' },
+    rating: { type: Number, default: 4.9, min: 0, max: 5 },
+    reviewsCount: { type: Number, default: 0, min: 0 },
+    ratings: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        userName: { type: String, trim: true, default: 'Member' },
+        userImageUrl: { type: String, trim: true, default: '' },
+        rating: { type: Number, min: 1, max: 5, default: 5 },
+        comment: { type: String, trim: true, default: '' },
+        bookingType: { type: String, trim: true, default: 'Personal Training' },
+        date: { type: String, trim: true, default: 'Recent' },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
 
     // Emergency Contact
     emergencyContact: {
@@ -171,7 +185,7 @@ const employeeSchema = new mongoose.Schema(
     compensation: {
       payType: { type: String, enum: ['Hourly', 'Session', 'Daily', 'Monthly'], default: 'Monthly' },
       payAmount: { type: Number, default: 0, min: 0 },
-      payFreq: { type: String, enum: ['Daily', 'Weekly', 'Monthly'], default: 'Monthly' },
+      payFreq: { type: String, enum: ['Daily', 'Weekly', 'Monthly', 'Per Session', 'Per Hour'], default: 'Monthly' },
     },
     notes: { type: String, trim: true, default: '' },
 

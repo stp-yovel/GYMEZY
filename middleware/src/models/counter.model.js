@@ -26,9 +26,9 @@ counterSchema.statics.getNextSequence = async function (sequenceName) {
   const counter = await this.findByIdAndUpdate(
     sequenceName,
     { $inc: { seq: 1 } },
-    { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true }
+    { new: true, upsert: true, setDefaultsOnInsert: true }
   );
-  return counter.seq;
+  return counter ? counter.seq : 1;
 };
 
 export const Counter = mongoose.model('Counter', counterSchema);

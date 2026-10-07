@@ -263,10 +263,11 @@ export const ApplicationStatus = () => {
 
       const res = await apiClient.put(`/gyms/${gymId}`, payload);
       if (res.data?.success) {
+        const apiMsg = res.data?.message;
         message.success(
-          editResubmitFlag
+          apiMsg || (editResubmitFlag
             ? 'Gym details updated and application resubmitted for Super Admin review!'
-            : 'Gym details updated successfully.'
+            : 'Changes submitted successfully! Pending Super Admin approval.')
         );
         setIsEditModalOpen(false);
         await dispatch(refreshCurrentUser()).unwrap();

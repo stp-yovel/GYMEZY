@@ -22,6 +22,7 @@ import {
   Tooltip,
   InputNumber,
   Avatar,
+  Spin,
 } from 'antd';
 import {
   SearchOutlined,
@@ -98,23 +99,114 @@ const getGymInitials = (name) => {
 
 const getGymLogoSrc = (gym) => {
   if (!gym) return '';
-  if (typeof gym.logo === 'string' && gym.logo) return gym.logo;
-  if (gym.logo && typeof gym.logo.fileData === 'string' && gym.logo.fileData) return gym.logo.fileData;
-  if (typeof gym.logoUrl === 'string' && gym.logoUrl) return gym.logoUrl;
-  if (gym.coverPhoto && typeof gym.coverPhoto.fileData === 'string' && gym.coverPhoto.fileData) return gym.coverPhoto.fileData;
-  if (typeof gym.coverPhoto === 'string' && gym.coverPhoto) return gym.coverPhoto;
-  if (typeof gym.image === 'string' && gym.image) return gym.image;
+  // 1. Direct logo fileData (Base64 WebP/PNG)
+  if (gym.logo && typeof gym.logo.fileData === 'string' && gym.logo.fileData.trim()) {
+    return gym.logo.fileData.trim();
+  }
+  // 2. Direct logo URL/string
+  if (typeof gym.logo === 'string' && gym.logo.trim()) {
+    return gym.logo.trim();
+  }
+  // 3. logoUrl convenience field
+  if (typeof gym.logoUrl === 'string' && gym.logoUrl.trim()) {
+    return gym.logoUrl.trim();
+  }
+  // 4. coverPhoto fileData
+  if (gym.coverPhoto && typeof gym.coverPhoto.fileData === 'string' && gym.coverPhoto.fileData.trim()) {
+    return gym.coverPhoto.fileData.trim();
+  }
+  // 5. coverPhoto URL/string
+  if (typeof gym.coverPhoto === 'string' && gym.coverPhoto.trim()) {
+    return gym.coverPhoto.trim();
+  }
+  // 6. coverPhotoUrl convenience field
+  if (typeof gym.coverPhotoUrl === 'string' && gym.coverPhotoUrl.trim()) {
+    return gym.coverPhotoUrl.trim();
+  }
+  // 7. imageUrl or image
+  if (typeof gym.imageUrl === 'string' && gym.imageUrl.trim()) {
+    return gym.imageUrl.trim();
+  }
+  if (typeof gym.image === 'string' && gym.image.trim()) {
+    return gym.image.trim();
+  }
+  if (typeof gym.thumbnailImage === 'string' && gym.thumbnailImage.trim()) {
+    return gym.thumbnailImage.trim();
+  }
+  // 8. Gallery / images array
+  if (Array.isArray(gym.images) && gym.images.length > 0 && typeof gym.images[0] === 'string' && gym.images[0].trim()) {
+    return gym.images[0].trim();
+  }
+  if (Array.isArray(gym.galleryPhotos) && gym.galleryPhotos.length > 0 && gym.galleryPhotos[0]?.fileData) {
+    return gym.galleryPhotos[0].fileData.trim();
+  }
   return '';
 };
 
 const getGymImage = (gym) => {
-  if (!gym) return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=400&auto=format&fit=crop';
-  if (typeof gym.logo === 'string' && gym.logo) return gym.logo;
-  if (gym.logo && typeof gym.logo.fileData === 'string' && gym.logo.fileData) return gym.logo.fileData;
-  if (typeof gym.image === 'string' && gym.image) return gym.image;
-  if (typeof gym.coverPhoto === 'string' && gym.coverPhoto) return gym.coverPhoto;
-  if (gym.coverPhoto && typeof gym.coverPhoto.fileData === 'string' && gym.coverPhoto.fileData) return gym.coverPhoto.fileData;
+  const resolved = getGymLogoSrc(gym);
+  if (resolved) return resolved;
   return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=400&auto=format&fit=crop';
+};
+
+const GymLogoAvatar = ({ gym, isDarkMode, size = 38, onClick }) => {
+  const [hasError, setHasError] = useState(false);
+  const logoSrc = getGymLogoSrc(gym);
+  const initials = getGymInitials(gym?.name);
+
+  if (logoSrc && !hasError) {
+    return (
+      <div
+        onClick={onClick}
+        style={{
+          display: 'inline-flex',
+          cursor: onClick ? 'pointer' : 'default',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <img
+          src={logoSrc}
+          alt={gym?.name || 'Gym Logo'}
+          onError={() => setHasError(true)}
+          style={{
+            width: size,
+            height: size,
+            borderRadius: 8,
+            objectFit: 'cover',
+            border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+            backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display: 'inline-flex',
+        cursor: onClick ? 'pointer' : 'default',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Avatar
+        shape="square"
+        size={size}
+        style={{
+          backgroundColor: '#4338ca',
+          color: '#ffffff',
+          fontWeight: 800,
+          fontSize: Math.max(11, Math.round(size * 0.35)),
+          borderRadius: 8,
+        }}
+      >
+        {initials}
+      </Avatar>
+    </div>
+  );
 };
 
 export const GymsManagement = () => {
@@ -125,11 +217,11 @@ export const GymsManagement = () => {
   const currentTab = searchParams.get('tab') || 'all';
 
   // Redux Fleet Data directly from store (zero mock fallbacks)
-  const reduxGyms = useSelector((state) => state.gyms?.gyms) || [];
+  const { gyms: reduxGyms = [], loading = false } = useSelector((state) => state.gyms) || {};
 
   useEffect(() => {
-    dispatch(fetchGyms());
-  }, [dispatch]);
+    dispatch(fetchGyms({ force: true }));
+  }, [dispatch, currentTab]);
 
   // Navigation Views: 'list' | 'review' | 'timing_diff'
   const [currentView, setCurrentView] = useState('list');
@@ -148,6 +240,7 @@ export const GymsManagement = () => {
   const [isHoldModalOpen, setIsHoldModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
+  const [isProcessingStatus, setIsProcessingStatus] = useState(false);
   const [quickAddForm] = Form.useForm();
   const [rejectionReason, setRejectionReason] = useState('');
   const [holdNotes, setHoldNotes] = useState('');
@@ -186,7 +279,7 @@ export const GymsManagement = () => {
 
   useEffect(() => {
     fetchPendingTrainerApprovals();
-  }, [fetchPendingTrainerApprovals, currentTab]);
+  }, [fetchPendingTrainerApprovals]);
 
   const handleApproveTrainer = async (trainer) => {
     try {
@@ -310,16 +403,22 @@ export const GymsManagement = () => {
     const target = targetGym || selectedGym;
     if (target) {
       const id = target.id || target._id;
+      setIsProcessingStatus(true);
       try {
         await dispatch(updateGymStatusApi({ id, status: 'Approved', approvalStatus: 'Approved' })).unwrap();
         message.success(`Gym "${target.name}" approved and published to customer app!`);
         dispatch(fetchGyms());
+        setIsApproveModalOpen(false);
+        setCurrentView('list');
       } catch (err) {
         message.error(err || 'Failed to approve gym');
+      } finally {
+        setIsProcessingStatus(false);
       }
+    } else {
+      setIsApproveModalOpen(false);
+      setCurrentView('list');
     }
-    setIsApproveModalOpen(false);
-    setCurrentView('list');
   };
 
   const handleHold = async (targetGym, notes) => {
@@ -327,17 +426,24 @@ export const GymsManagement = () => {
     const finalNotes = notes !== undefined ? notes : holdNotes;
     if (target) {
       const id = target.id || target._id;
+      setIsProcessingStatus(true);
       try {
         await dispatch(updateGymStatusApi({ id, status: 'On Hold', approvalStatus: 'On Hold', remark: finalNotes, notes: finalNotes })).unwrap();
         message.info(`Gym "${target.name}" put on hold.`);
         dispatch(fetchGyms());
+        setIsHoldModalOpen(false);
+        setHoldNotes('');
+        setCurrentView('list');
       } catch (err) {
         message.error(err || 'Failed to put gym on hold');
+      } finally {
+        setIsProcessingStatus(false);
       }
+    } else {
+      setIsHoldModalOpen(false);
+      setHoldNotes('');
+      setCurrentView('list');
     }
-    setIsHoldModalOpen(false);
-    setHoldNotes('');
-    setCurrentView('list');
   };
 
   const handleReject = async (targetGym, notes) => {
@@ -345,17 +451,24 @@ export const GymsManagement = () => {
     const finalNotes = notes !== undefined ? notes : rejectionReason;
     if (target) {
       const id = target.id || target._id;
+      setIsProcessingStatus(true);
       try {
         await dispatch(updateGymStatusApi({ id, status: 'Rejected', approvalStatus: 'Rejected', rejectionReason: finalNotes, remark: finalNotes })).unwrap();
         message.warning(`Changes for "${target.name}" rejected. Notes sent to partner.`);
         dispatch(fetchGyms());
+        setIsRejectModalOpen(false);
+        setRejectionReason('');
+        setCurrentView('list');
       } catch (err) {
         message.error(err || 'Failed to reject gym');
+      } finally {
+        setIsProcessingStatus(false);
       }
+    } else {
+      setIsRejectModalOpen(false);
+      setRejectionReason('');
+      setCurrentView('list');
     }
-    setIsRejectModalOpen(false);
-    setRejectionReason('');
-    setCurrentView('list');
   };
 
   const handleDeleteGym = async (gymId, gymName) => {
@@ -795,6 +908,7 @@ export const GymsManagement = () => {
             'pendingChanges',
             'approvalStatus',
             'changesCount',
+            'customFacilities',
           ]);
 
           const gymDiffRows = isEditRequest
@@ -869,23 +983,80 @@ export const GymsManagement = () => {
                 </div>
               );
             }
-            if (fieldKey === 'pricingPlans' && Array.isArray(val)) {
+            if ((fieldKey === 'pricingPlans' || fieldKey === 'customPricingPlans') && Array.isArray(val)) {
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {val.map((p, i) => (
-                    <div key={p.id || i} style={{ fontSize: 12 }}>
-                      <strong>{p.name || p.badge}</strong>: ₹{p.price} ({p.duration})
+                    <div
+                      key={p.id || i}
+                      style={{
+                        fontSize: 12,
+                        padding: '6px 10px',
+                        borderRadius: 6,
+                        backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f8fafc',
+                        border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.08)' : '#e2e8f0'}`,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <span style={{ fontWeight: 700, color: '#3b82f6' }}>{p.name || p.badge || 'Plan'}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontWeight: 800, color: isDarkMode ? '#10b981' : '#059669' }}>
+                            ₹{p.price} {p.duration ? `(${p.duration})` : ''}
+                          </span>
+                          {p.savingsText && (
+                            <Tag color="green" style={{ fontSize: 10, margin: 0, padding: '0 4px', lineHeight: '16px' }}>
+                              {p.savingsText}
+                            </Tag>
+                          )}
+                        </div>
+                      </div>
+                      {p.description && (
+                        <div style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 2 }}>
+                          {p.description}
+                        </div>
+                      )}
+                      {Array.isArray(p.features) && p.features.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                          {p.features.map((feat, fIdx) => (
+                            <Tag key={fIdx} style={{ fontSize: 10, margin: 0 }}>
+                              {feat}
+                            </Tag>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               );
             }
-            if (fieldKey === 'facilities' && Array.isArray(val)) {
+            if (fieldKey === 'pricingPlans' && typeof val === 'object' && !Array.isArray(val)) {
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {Object.entries(val).map(([k, v]) => (
+                    <Tag key={k} color="blue" style={{ fontSize: 11, margin: 0 }}>
+                      <strong>{k.replace(/([A-Z])/g, ' $1')}:</strong> ₹{String(v)}
+                    </Tag>
+                  ))}
+                </div>
+              );
+            }
+            if ((fieldKey === 'facilities' || fieldKey === 'customFacilities') && Array.isArray(val)) {
               return (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                   {val.map((f, i) => (
                     <Tag key={i} color="blue" style={{ fontSize: 11, margin: 0 }}>
-                      {typeof f === 'string' ? f : `${f.name} (${f.count || 1})`}
+                      {typeof f === 'string' ? f : `${f.name || f.title || 'Facility'}${f.count ? ` (${f.count})` : ''}`}
+                    </Tag>
+                  ))}
+                </div>
+              );
+            }
+            if (['workouts', 'amenities', 'rules', 'safetyMeasures', 'slotsMorning', 'slotsEvening'].includes(fieldKey) && Array.isArray(val)) {
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {val.map((item, i) => (
+                    <Tag key={i} color="geekblue" style={{ fontSize: 11, margin: 0 }}>
+                      {typeof item === 'string' ? item : JSON.stringify(item)}
                     </Tag>
                   ))}
                 </div>
@@ -893,31 +1064,67 @@ export const GymsManagement = () => {
             }
             if (fieldKey === 'openingHours' && typeof val === 'object') {
               return (
-                <div style={{ fontSize: 12 }}>
-                  <div>Weekday: {val.weekdayOpen || '05:30 AM'} - {val.weekdayClose || '10:30 PM'}</div>
-                  <div>Weekend: {val.weekendOpen || '06:00 AM'} - {val.weekendClose || '09:00 PM'}</div>
+                <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div><strong>Weekday:</strong> {val.weekdayOpen || '05:30 AM'} - {val.weekdayClose || '10:30 PM'}</div>
+                  <div><strong>Weekend:</strong> {val.weekendOpen || '06:00 AM'} - {val.weekendClose || '09:00 PM'}</div>
+                  {val.is24Hours && <div><Tag color="green">24 Hours Open</Tag></div>}
+                  {Array.isArray(val.holidays) && val.holidays.length > 0 && (
+                    <div style={{ marginTop: 4 }}>
+                      <span style={{ fontWeight: 600, color: isDarkMode ? '#cbd5e1' : '#475569' }}>Holidays / Exceptions:</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+                        {val.holidays.map((h, i) => (
+                          <Tag key={h.id || i} color="volcano" style={{ fontSize: 11, margin: 0 }}>
+                            {h.title || h.date}: {h.hours || h.type}
+                          </Tag>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             }
             if (fieldKey === 'bankDetails' && typeof val === 'object') {
               return (
                 <div style={{ fontSize: 12 }}>
-                  <div><strong>{val.bankName}</strong> - {val.accountNumber}</div>
-                  <div>IFSC: {val.ifscCode} | UPI: {val.upiId || '—'}</div>
+                  <div><strong>{val.bankName || 'Bank'}</strong> - {val.accountNumber || '—'}</div>
+                  <div>IFSC: {val.ifscCode || '—'} | UPI: {val.upiId || '—'}</div>
+                  {val.accountHolderName && <div>Holder: {val.accountHolderName}</div>}
                 </div>
               );
             }
             if (fieldKey === 'socialLinks' && typeof val === 'object') {
               return (
-                <div style={{ fontSize: 12 }}>
-                  {val.instagramHandle && <div>Instagram: {val.instagramHandle}</div>}
-                  {val.whatsapp && <div>WhatsApp: {val.whatsapp}</div>}
-                  {val.website && <div>Web: {val.website}</div>}
+                <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {val.instagramHandle && <div><strong>Instagram:</strong> {val.instagramHandle}</div>}
+                  {val.whatsapp && <div><strong>WhatsApp:</strong> {val.whatsapp}</div>}
+                  {val.website && <div><strong>Website:</strong> {val.website}</div>}
+                  {val.facebook && <div><strong>Facebook:</strong> {val.facebook}</div>}
+                </div>
+              );
+            }
+            if (fieldKey === 'systemSettings' && typeof val === 'object') {
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {Object.entries(val).map(([k, v]) => (
+                    <Tag key={k} style={{ fontSize: 11, margin: 0 }}>
+                      <strong>{k.replace(/([A-Z])/g, ' $1')}:</strong> {typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v)}
+                    </Tag>
+                  ))}
                 </div>
               );
             }
             if (Array.isArray(val)) {
-              return <span>{val.join(', ') || '—'}</span>;
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {val.map((item, i) => (
+                    <Tag key={i} style={{ fontSize: 11, margin: 0 }}>
+                      {typeof item === 'object' && item !== null
+                        ? item.name || item.title || item.label || JSON.stringify(item)
+                        : String(item)}
+                    </Tag>
+                  ))}
+                </div>
+              );
             }
             if (typeof val === 'object') {
               return <span style={{ wordBreak: 'break-word', fontSize: 12 }}>{JSON.stringify(val)}</span>;
@@ -1105,7 +1312,9 @@ export const GymsManagement = () => {
         {/* Screen 4: Confirmation Modal */}
         <Modal
           open={isApproveModalOpen}
-          onCancel={() => setIsApproveModalOpen(false)}
+          onCancel={() => !isProcessingStatus && setIsApproveModalOpen(false)}
+          closable={!isProcessingStatus}
+          maskClosable={!isProcessingStatus}
           footer={null}
           centered
           width={440}
@@ -1136,6 +1345,7 @@ export const GymsManagement = () => {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Button
+                disabled={isProcessingStatus}
                 onClick={() => setIsApproveModalOpen(false)}
                 style={{ height: 42, borderRadius: 'var(--radius-base)', fontWeight: 600 }}
               >
@@ -1143,6 +1353,8 @@ export const GymsManagement = () => {
               </Button>
               <Button
                 type="primary"
+                loading={isProcessingStatus}
+                disabled={isProcessingStatus}
                 onClick={() => handleApproveAll(selectedGym)}
                 style={{
                   height: 42,
@@ -1162,7 +1374,9 @@ export const GymsManagement = () => {
         <Modal
           title="Put Gym on Hold"
           open={isHoldModalOpen}
-          onCancel={() => setIsHoldModalOpen(false)}
+          onCancel={() => !isProcessingStatus && setIsHoldModalOpen(false)}
+          closable={!isProcessingStatus}
+          maskClosable={!isProcessingStatus}
           footer={null}
           centered
           width={480}
@@ -1173,15 +1387,18 @@ export const GymsManagement = () => {
             </p>
             <TextArea
               rows={4}
+              disabled={isProcessingStatus}
               value={holdNotes}
               onChange={(e) => setHoldNotes(e.target.value)}
               placeholder="e.g. Please upload trade license with clear stamp, update opening hours..."
               style={{ marginBottom: 18 }}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <Button onClick={() => setIsHoldModalOpen(false)}>Cancel</Button>
+              <Button disabled={isProcessingStatus} onClick={() => setIsHoldModalOpen(false)}>Cancel</Button>
               <Button
                 type="primary"
+                loading={isProcessingStatus}
+                disabled={isProcessingStatus}
                 onClick={() => handleHold(selectedGym, holdNotes)}
                 style={{ fontWeight: 600, backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
               >
@@ -1195,7 +1412,9 @@ export const GymsManagement = () => {
         <Modal
           title="Reject Gym Changes"
           open={isRejectModalOpen}
-          onCancel={() => setIsRejectModalOpen(false)}
+          onCancel={() => !isProcessingStatus && setIsRejectModalOpen(false)}
+          closable={!isProcessingStatus}
+          maskClosable={!isProcessingStatus}
           footer={null}
           centered
           width={480}
@@ -1206,14 +1425,22 @@ export const GymsManagement = () => {
             </p>
             <TextArea
               rows={4}
+              disabled={isProcessingStatus}
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
               placeholder="e.g. Photo resolution too low, pricing does not adhere to platform standard..."
               style={{ marginBottom: 18 }}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <Button onClick={() => setIsRejectModalOpen(false)}>Cancel</Button>
-              <Button danger type="primary" onClick={() => handleReject(selectedGym, rejectionReason)} style={{ fontWeight: 600 }}>
+              <Button disabled={isProcessingStatus} onClick={() => setIsRejectModalOpen(false)}>Cancel</Button>
+              <Button
+                danger
+                type="primary"
+                loading={isProcessingStatus}
+                disabled={isProcessingStatus}
+                onClick={() => handleReject(selectedGym, rejectionReason)}
+                style={{ fontWeight: 600 }}
+              >
                 Confirm Rejection
               </Button>
             </div>
@@ -1694,8 +1921,17 @@ export const GymsManagement = () => {
           </Row>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 12, borderTop: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : '#f1f5f9'}` }}>
-            <div style={{ fontSize: 13, color: isDarkMode ? '#888' : '#64748b' }}>
-              Found <strong style={{ color: isDarkMode ? '#fff' : '#0f172a' }}>{filteredGyms.length}</strong> matching gyms
+            <div style={{ fontSize: 13, color: isDarkMode ? '#888' : '#64748b', display: 'flex', alignItems: 'center', gap: 8 }}>
+              {loading ? (
+                <>
+                  <Spin size="small" />
+                  <span>Loading gyms fleet...</span>
+                </>
+              ) : (
+                <>
+                  Found <strong style={{ color: isDarkMode ? '#fff' : '#0f172a' }}>{filteredGyms.length}</strong> matching gyms
+                </>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <Button
@@ -1849,7 +2085,7 @@ export const GymsManagement = () => {
                 width: 180,
                 render: (_, record) => {
                   if (record.pendingChanges && typeof record.pendingChanges === 'object') {
-                    const keys = Object.keys(record.pendingChanges).filter((k) => k !== '_id' && k !== 'id');
+                    const keys = Object.keys(record.pendingChanges).filter((k) => k !== '_id' && k !== 'id' && k !== 'customFacilities');
                     if (keys.length > 0) {
                       return (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -1954,6 +2190,11 @@ export const GymsManagement = () => {
             dataSource={filteredGyms}
             rowKey={(record) => record.id || record._id || String(Math.random())}
             pagination={false}
+            loading={{
+              spinning: loading,
+              tip: 'Loading pending approvals...',
+              size: 'large',
+            }}
             scroll={{ x: 1350 }}
             size="middle"
             columns={[
@@ -1993,44 +2234,13 @@ export const GymsManagement = () => {
                 key: 'logo',
                 width: 90,
                 align: 'center',
-                render: (_, record) => {
-                  const logoSrc = getGymLogoSrc(record);
-                  const initials = getGymInitials(record.name);
-                  return (
-                    <div
-                      onClick={() => handleOpenDetails(record)}
-                      style={{ display: 'inline-flex', cursor: 'pointer', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      {logoSrc ? (
-                        <img
-                          src={logoSrc}
-                          alt={record.name || 'Logo'}
-                          style={{
-                            width: 38,
-                            height: 38,
-                            borderRadius: 8,
-                            objectFit: 'cover',
-                            border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
-                          }}
-                        />
-                      ) : (
-                        <Avatar
-                          shape="square"
-                          size={38}
-                          style={{
-                            backgroundColor: '#4338ca',
-                            color: '#ffffff',
-                            fontWeight: 800,
-                            fontSize: 13,
-                            borderRadius: 8,
-                          }}
-                        >
-                          {initials}
-                        </Avatar>
-                      )}
-                    </div>
-                  );
-                },
+                render: (_, record) => (
+                  <GymLogoAvatar
+                    gym={record}
+                    isDarkMode={isDarkMode}
+                    onClick={() => handleOpenDetails(record)}
+                  />
+                ),
               },
               {
                 title: 'Gym Name',
@@ -2170,6 +2380,11 @@ export const GymsManagement = () => {
             dataSource={filteredGyms}
             rowKey={(record) => record.id || record._id || String(Math.random())}
             pagination={false}
+            loading={{
+              spinning: loading,
+              tip: 'Loading gyms fleet...',
+              size: 'large',
+            }}
             scroll={{ x: 1450 }}
             size="middle"
             columns={[
@@ -2209,44 +2424,13 @@ export const GymsManagement = () => {
                 key: 'logo',
                 width: 90,
                 align: 'center',
-                render: (_, record) => {
-                  const logoSrc = getGymLogoSrc(record);
-                  const initials = getGymInitials(record.name);
-                  return (
-                    <div
-                      onClick={() => handleOpenDetails(record)}
-                      style={{ display: 'inline-flex', cursor: 'pointer', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      {logoSrc ? (
-                        <img
-                          src={logoSrc}
-                          alt={record.name || 'Logo'}
-                          style={{
-                            width: 38,
-                            height: 38,
-                            borderRadius: 8,
-                            objectFit: 'cover',
-                            border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
-                          }}
-                        />
-                      ) : (
-                        <Avatar
-                          shape="square"
-                          size={38}
-                          style={{
-                            backgroundColor: '#4338ca',
-                            color: '#ffffff',
-                            fontWeight: 800,
-                            fontSize: 13,
-                            borderRadius: 8,
-                          }}
-                        >
-                          {initials}
-                        </Avatar>
-                      )}
-                    </div>
-                  );
-                },
+                render: (_, record) => (
+                  <GymLogoAvatar
+                    gym={record}
+                    isDarkMode={isDarkMode}
+                    onClick={() => handleOpenDetails(record)}
+                  />
+                ),
               },
               {
                 title: 'Gym Name',
@@ -2528,6 +2712,22 @@ export const GymsManagement = () => {
             }
             if (typeof val === 'boolean') {
               return <span>{val ? 'Yes' : 'No'}</span>;
+            }
+            if (fieldKey === 'status') {
+              const color = val === 'Active' ? 'green' : val === 'Inactive' ? 'default' : 'orange';
+              return <Tag color={color} style={{ fontWeight: 600 }}>{String(val)}</Tag>;
+            }
+            if (fieldKey === 'role') {
+              return <Tag color="blue" style={{ fontWeight: 600 }}>{String(val)}</Tag>;
+            }
+            if (fieldKey === 'accessType') {
+              return <Tag color="purple" style={{ fontWeight: 600 }}>{String(val)}</Tag>;
+            }
+            if (fieldKey === 'type') {
+              return <Tag color="cyan" style={{ fontWeight: 600 }}>{String(val)}</Tag>;
+            }
+            if (fieldKey === 'experienceYears') {
+              return <span>{val} {Number(val) === 1 ? 'Year' : 'Years'}</span>;
             }
             if (fieldKey.toLowerCase().includes('avatar') || (typeof val === 'string' && val.startsWith('data:image'))) {
               return (

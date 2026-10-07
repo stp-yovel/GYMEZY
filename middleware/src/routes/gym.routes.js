@@ -3,12 +3,19 @@ import {
   onboardGym,
   getGymZones,
   getGyms,
+  getAdminGymsFleet,
   getGymById,
   updateGym,
   updateGymStatus,
   resubmitGymApplication,
   deleteGym,
 } from '../controllers/gym.controller.js';
+import {
+  getGymReviews,
+  getTrainerReviews,
+  addGymReview,
+  addTrainerReview,
+} from '../controllers/gymReviews.controller.js';
 import { authenticate, optionalAuthenticate } from '../middlewares/auth.middleware.js';
 import { authorizeRoles } from '../middlewares/role.middleware.js';
 import { USER_ROLES } from '../models/user.model.js';
@@ -25,6 +32,27 @@ router.get('/popular-cities', getGymZones);
 
 // Public / Authenticated Gym Search & Proximity Discovery (Calculates distance via coordinates)
 router.get('/', optionalAuthenticate, getGyms);
+
+// Dedicated Super Admin Gym Fleet Endpoint (Full data, verification docs, logo URLs, audit records)
+router.get('/admin/fleet', optionalAuthenticate, getAdminGymsFleet);
+router.get('/admin/list', optionalAuthenticate, getAdminGymsFleet);
+
+// ==================== REVIEWS & RATINGS SEPARATE APIS ====================
+// Public: Get all ratings/reviews for a gym with reviewer user details and histograms
+router.get('/:id/reviews', optionalAuthenticate, getGymReviews);
+router.get('/:id/ratings', optionalAuthenticate, getGymReviews);
+
+// Public: Get all reviews for a specific trainer in a gym with reviewer user details
+router.get('/:id/trainers/:trainerId/reviews', optionalAuthenticate, getTrainerReviews);
+router.get('/:id/trainers/:trainerId/ratings', optionalAuthenticate, getTrainerReviews);
+
+// Authenticated: Submit a member rating/review for a gym
+router.post('/:id/reviews', authenticate, addGymReview);
+router.post('/:id/ratings', authenticate, addGymReview);
+
+// Authenticated: Submit a review for a specific trainer in a gym
+router.post('/:id/trainers/:trainerId/reviews', authenticate, addTrainerReview);
+router.post('/:id/trainers/:trainerId/ratings', authenticate, addTrainerReview);
 
 // Public / Authenticated Single Gym Details
 router.get('/:id', optionalAuthenticate, getGymById);

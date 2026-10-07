@@ -3,7 +3,13 @@ import { ENV } from './env.js';
 
 export const connectDatabase = async () => {
   try {
-    const connectionInstance = await mongoose.connect(ENV.MONGODB_URI);
+    const connectionInstance = await mongoose.connect(ENV.MONGODB_URI, {
+      family: 4,
+      maxPoolSize: 20,
+      minPoolSize: 2,
+      serverSelectionTimeoutMS: 15000,
+      socketTimeoutMS: 45000,
+    });
     console.log(`[DATABASE] Connected to MongoDB: ${connectionInstance.connection.host}/${connectionInstance.connection.name}`);
 
     mongoose.connection.on('error', (err) => {

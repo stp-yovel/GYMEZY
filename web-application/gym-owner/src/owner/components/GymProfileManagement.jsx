@@ -48,6 +48,7 @@ import {
   BarChartOutlined,
   ArrowRightOutlined,
   InfoCircleOutlined,
+  BulbOutlined,
   DownOutlined,
   PlusOutlined,
   TeamOutlined,
@@ -88,8 +89,9 @@ const { TextArea } = Input;
 const FACILITY_OPTIONS = [
   'AC Gym', 'Locker Facility', 'Shower Available', 'Changing Room',
   'Free Wi-Fi', 'Music System', 'Steam & Sauna', 'Ice Bath & Recovery',
-  'Dedicated Parking (2W/4W)', 'Turnstile Access Control', 'First Aid Kit',
-  'CCTV 24/7', 'Biometric Entry', 'Personal Trainers', 'Cardio Theater', 'Olympic Barbells Area',
+  'Parking Available', 'Dedicated Parking (2W/4W)', 'Turnstile Access Control', 'First Aid Kit',
+  'CCTV 24/7', 'Biometric Entry', 'Personal Trainers', 'Cardio Deck', 'Cardio Theater',
+  'Olympic Barbells Area', 'Heavy Dumbbells Zone', 'Olympic Lifting Platform',
 ];
 
 const AMENITY_OPTIONS = [
@@ -180,9 +182,238 @@ const getCategoryIcon = (category) => {
   if (cat.includes('tech') || cat.includes('turnstile')) return <IdcardOutlined />;
   if (cat.includes('nutrition') || cat.includes('bar')) return <ShopOutlined />;
   if (cat.includes('trainer') || cat.includes('training')) return <TeamOutlined />;
-  if (cat.includes('lock') || cat.includes('amenit')) return <LockOutlined />;
   return <ToolOutlined />;
 };
+
+const normalizeGymStandardPlans = (customPlans = [], flatPricing = {}) => {
+  const p = flatPricing || {};
+  const monthlyPrice = Number(p.monthly || 1299);
+  const quarterlyPrice = Number(p.quarterly || 3299);
+  const halfYearlyPrice = Number(p.halfYearly || 5999);
+  const annualPrice = Number(p.annual || 11999);
+
+  const planMap = {};
+  if (Array.isArray(customPlans)) {
+    customPlans.forEach((plan) => {
+      if (!plan) return;
+      const tId = plan.tierId || (
+        plan.badge?.toLowerCase().includes('month') || plan.duration?.includes('30') ? 'monthly' :
+          plan.badge?.toLowerCase().includes('quarter') || plan.duration?.includes('90') ? 'quarterly' :
+            plan.badge?.toLowerCase().includes('half') || plan.duration?.includes('180') ? 'half_yearly' :
+              plan.badge?.toLowerCase().includes('annual') || plan.badge?.toLowerCase().includes('year') || plan.duration?.includes('365') ? 'annual' : null
+      );
+      if (tId) planMap[tId] = plan;
+    });
+  }
+
+  const baseMonthly = planMap.monthly?.price !== undefined ? Number(planMap.monthly.price) : monthlyPrice;
+
+  const calcSavings = (price, months) => {
+    const fullVal = baseMonthly * months;
+    const diff = fullVal - price;
+    return diff > 0 ? `Save ₹${diff.toLocaleString('en-IN')}` : '';
+  };
+
+  const qPrice = planMap.quarterly?.price !== undefined ? Number(planMap.quarterly.price) : quarterlyPrice;
+  const hPrice = planMap.half_yearly?.price !== undefined ? Number(planMap.half_yearly.price) : (planMap.halfYearly?.price !== undefined ? Number(planMap.halfYearly.price) : halfYearlyPrice);
+  const aPrice = planMap.annual?.price !== undefined ? Number(planMap.annual.price) : annualPrice;
+
+  return [
+    {
+      id: 'plan-monthly',
+      tierId: 'monthly',
+      name: planMap.monthly?.name || 'Monthly Plan',
+      badge: 'Monthly',
+      price: baseMonthly,
+      duration: '30 Days',
+      months: 1,
+      description: planMap.monthly?.description || 'Standard 30-day recurring membership.',
+      features: Array.isArray(planMap.monthly?.features) && planMap.monthly.features.length > 0
+        ? planMap.monthly.features
+        : [
+          'Access to all gym facilities',
+          'Free group workout classes',
+          'Locker and shower facility',
+          'Trainer guidance on floor',
+        ],
+      popular: Boolean(planMap.monthly?.popular),
+      savingsText: '',
+    },
+    {
+      id: 'plan-quarterly',
+      tierId: 'quarterly',
+      name: planMap.quarterly?.name || 'Quarterly Plan',
+      badge: 'Quarterly',
+      price: qPrice,
+      duration: '90 Days',
+      months: 3,
+      description: planMap.quarterly?.description || '3-month structured fitness package.',
+      features: Array.isArray(planMap.quarterly?.features) && planMap.quarterly.features.length > 0
+        ? planMap.quarterly.features
+        : [
+          'Access to all gym facilities',
+          'Free group workout classes',
+          'Locker and shower facility',
+          '1 Guest pass per month',
+          '2 Complimentary PT Sessions',
+        ],
+      popular: Boolean(planMap.quarterly?.popular),
+      savingsText: calcSavings(qPrice, 3),
+    },
+    {
+      id: 'plan-half-yearly',
+      tierId: 'half_yearly',
+      name: planMap.half_yearly?.name || planMap.halfYearly?.name || 'Half Yearly Plan',
+      badge: 'Half Yearly',
+      price: hPrice,
+      duration: '180 Days',
+      months: 6,
+      description: planMap.half_yearly?.description || planMap.halfYearly?.description || '6-month transformation package.',
+      features: Array.isArray(planMap.half_yearly?.features || planMap.halfYearly?.features) && (planMap.half_yearly?.features || planMap.halfYearly?.features).length > 0
+        ? (planMap.half_yearly?.features || planMap.halfYearly?.features)
+        : [
+          'Access to all gym facilities',
+          'Free group workout classes',
+          'Locker and shower facility',
+          '1 Guest pass per month',
+          'Personalized nutrition guidance',
+          '4 Complimentary PT Sessions',
+        ],
+      popular: Boolean(planMap.half_yearly?.popular || planMap.halfYearly?.popular),
+      savingsText: calcSavings(hPrice, 6),
+    },
+    {
+      id: 'plan-annual',
+      tierId: 'annual',
+      name: planMap.annual?.name || 'Annual VIP Plan',
+      badge: 'Annual',
+      price: aPrice,
+      duration: '365 Days',
+      months: 12,
+      description: planMap.annual?.description || 'All-inclusive annual membership with priority perks.',
+      features: Array.isArray(planMap.annual?.features) && planMap.annual.features.length > 0
+        ? planMap.annual.features
+        : [
+          'Access to all gym facilities',
+          'Free group workout classes',
+          'Locker and shower facility',
+          '2 Guest passes per month',
+          'Personalized nutrition guidance',
+          'VIP Locker & Towel Service',
+          'Unlimited Steam & Sauna',
+        ],
+      popular: planMap.annual?.popular !== undefined ? Boolean(planMap.annual.popular) : true,
+      savingsText: calcSavings(aPrice, 12),
+    },
+  ];
+};
+
+const renderIconKeywordTooltip = () => (
+  <div style={{ fontSize: 12, lineHeight: 1.5, padding: '4px 2px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, marginBottom: 8, color: '#38bdf8' }}>
+      <BulbOutlined style={{ color: '#fbbf24', fontSize: 15 }} />
+      <span>Mobile App Icon Keywords</span>
+    </div>
+    <div style={{ marginBottom: 8, color: '#cbd5e1', fontSize: 11.5 }}>
+      The customer mobile app automatically matches icons based on keywords in each line:
+    </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {[
+        {
+          kw: 'access / unrestricted',
+          label: 'All Gym Floor',
+          color: '#38bdf8',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M18.6 6.62c-1.44 0-2.8.56-3.77 1.53L12 10.98l-2.83-2.83C8.2 7.18 6.84 6.62 5.4 6.62 2.42 6.62 0 9.04 0 12.02s2.42 5.4 5.4 5.4c1.44 0 2.8-.56 3.77-1.53L12 13.06l2.83 2.83c.97.97 2.33 1.53 3.77 1.53 2.98 0 5.4-2.42 5.4-5.4s-2.42-5.4-5.4-5.4zm-13.2 9c-1.99 0-3.6-1.61-3.6-3.6s1.61-3.6 3.6-3.6c.96 0 1.86.38 2.55 1.06L10.74 12l-2.79 2.56c-.69.68-1.59 1.06-2.55 1.06zm13.2 0c-.96 0-1.86-.38-2.55-1.06L13.26 12l2.79-2.56c.69-.68 1.59-1.06 2.55-1.06 1.99 0 3.6 1.61 3.6 3.6s-1.61 3.6-3.6 3.6z" />
+            </svg>
+          ),
+        },
+        {
+          kw: 'steam / sauna / spa',
+          label: 'Steam & Sauna',
+          color: '#fb7185',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <circle cx="7" cy="6" r="2" />
+              <path d="M11.15 12c-.31-.22-.59-.46-.82-.72l-1.4-1.55c-.19-.21-.43-.38-.69-.5-.29-.14-.62-.23-.96-.23h-.03C6.01 9 5 10.01 5 11.27V13h4.67c.54-.42 1.04-.76 1.48-1zm10.77 4.19c-.39-.41-1.03-.43-1.44-.04-.54.51-1.29.85-2.48.85s-1.94-.34-2.48-.85c-.41-.39-1.05-.37-1.44.04-.39.41-.37 1.05.04 1.44.89.84 2.12 1.37 3.88 1.37s2.99-.53 3.88-1.37c.41-.39.43-1.03.04-1.44zm-7.84 0c-.39-.41-1.03-.43-1.44-.04-.54.51-1.29.85-2.48.85s-1.94-.34-2.48-.85c-.41-.39-1.05-.37-1.44.04-.39.41-.37 1.05.04 1.44.89.84 2.12 1.37 3.88 1.37s2.99-.53 3.88-1.37c.41-.39.43-1.03.04-1.44zM2 20c.6 0 1.15-.17 1.68-.45.92-.48 2.06-.8 3.32-.8 1.26 0 2.4.32 3.32.8.91.48 2.03.8 3.28.8 1.25 0 2.37-.32 3.28-.8.92-.48 2.06-.8 3.32-.8s2.4.32 3.32.8c.53.28 1.08.45 1.68.45 1.1 0 2-.9 2-2v-4H1v4c0 1.1.9 2 2 2z" />
+            </svg>
+          ),
+        },
+        {
+          kw: 'locker / shower',
+          label: 'Locker & Shower',
+          color: '#38bdf8',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM8.9 6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2H8.9V6zM18 20H6V10h12v10z" />
+            </svg>
+          ),
+        },
+        {
+          kw: 'towel',
+          label: 'Towel Service',
+          color: '#a78bfa',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M19.56 11.36 13 8.44V7c0-.55-.45-1-1-1s-1 .45-1 1v1.44l-6.56 2.92C3.59 11.75 3 12.62 3 13.58V20c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6.42c0-.96-.59-1.83-1.44-2.22zM19 20H5v-6.42l7-3.11 7 3.11V20zM12 1c-1.66 0-3 1.34-3 3 0 .78.3 1.49.79 2.02l1.43-1.43C11.08 4.41 11 4.22 11 4c0-.55.45-1 1-1s1 .45 1 1c0 1.1-.9 2-2 2v2c2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3z" />
+            </svg>
+          ),
+        },
+        {
+          kw: 'wifi / wi-fi',
+          label: 'Free Wi-Fi',
+          color: '#34d399',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4zm0 4.2c3.04 0 5.86 1.07 8.08 2.87L12 19.15 3.92 11.07A12.7 12.7 0 0 1 12 8.2z" />
+            </svg>
+          ),
+        },
+        {
+          kw: 'group / class / pt',
+          label: 'Classes / Trainer',
+          color: '#60a5fa',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+            </svg>
+          ),
+        },
+        {
+          kw: 'guest / pass',
+          label: 'Guest Pass',
+          color: '#f472b6',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M22 10V6c0-1.11-.9-2-2-2H4c-1.1 0-1.99.89-1.99 2v4c1.1 0 1.99.9 1.99 2s-.89 2-2 2v4c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2v-4c-1.1 0-2-.9-2-2s.9-2 2-2zm-9 7.5h-2v-2h2v2zm0-4.5h-2v-2h2v2zm0-4.5h-2v-2h2v2z" />
+            </svg>
+          ),
+        },
+        {
+          kw: 'nutri / diet / meal',
+          label: 'Nutrition Guidance',
+          color: '#4ade80',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M8.1 13.34l2.83-2.83L3.91 3.5c-1.56 1.56-1.56 4.09 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z" />
+            </svg>
+          ),
+        },
+      ].map((item) => (
+        <div key={item.kw} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '3px 8px', borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.06)' }}>
+          <span style={{ color: '#93c5fd', fontWeight: 600, fontSize: 11.5 }}>{item.kw}:</span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: item.color }}>
+              {item.svg}
+            </span>
+            <span style={{ color: '#f1f5f9', fontSize: 11.5, fontWeight: 500 }}>{item.label}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 export const GymProfileManagement = () => {
   const { isDarkMode } = useTheme();
@@ -194,16 +425,31 @@ export const GymProfileManagement = () => {
     return (
       gymProfileFromRedux?._id ||
       gymProfileFromRedux?.id ||
+      gymProfileFromRedux?.partnerId ||
       gymProfileFromRedux?.mongoId ||
       user?.gym?._id ||
       user?.gym?.id ||
+      user?.gym?.partnerId ||
       user?.gymId ||
-      ''
+      user?.id ||
+      user?._id ||
+      'me'
     );
-  }, [gymProfileFromRedux, user]);
+  }, [
+    gymProfileFromRedux?._id,
+    gymProfileFromRedux?.id,
+    gymProfileFromRedux?.partnerId,
+    gymProfileFromRedux?.mongoId,
+    user?.gym?._id,
+    user?.gym?.id,
+    user?.gym?.partnerId,
+    user?.gymId,
+    user?.id,
+    user?._id,
+  ]);
 
   const [activeTab, setActiveTab] = useState('basic');
-  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSavingBasic, setIsSavingBasic] = useState(false);
   const [isSavingPricing, setIsSavingPricing] = useState(false);
   const [isSavingHours, setIsSavingHours] = useState(false);
@@ -212,8 +458,8 @@ export const GymProfileManagement = () => {
   const [isSavingFacility, setIsSavingFacility] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
 
-  // Core Gym Profile State
-  const [gymData, setGymData] = useState(null);
+  // Core Gym Profile State initialized with available Redux profile
+  const [gymData, setGymData] = useState(() => gymProfileFromRedux || user?.gym || null);
 
   // Tab Specific Working States
   const [facilities, setFacilities] = useState([]);
@@ -273,7 +519,6 @@ export const GymProfileManagement = () => {
   const [isAddPlanModalOpen, setIsAddPlanModalOpen] = useState(false);
   const [isEditPlanModalOpen, setIsEditPlanModalOpen] = useState(false);
   const [selectedPlanForEdit, setSelectedPlanForEdit] = useState(null);
-  const [isAddFacilityModalOpen, setIsAddFacilityModalOpen] = useState(false);
   const [isEditBankModalOpen, setIsEditBankModalOpen] = useState(false);
   const [isEditSocialModalOpen, setIsEditSocialModalOpen] = useState(false);
   const [isAddHolidayModalOpen, setIsAddHolidayModalOpen] = useState(false);
@@ -282,7 +527,6 @@ export const GymProfileManagement = () => {
   const [editForm] = Form.useForm();
   const [planForm] = Form.useForm();
   const [editPlanForm] = Form.useForm();
-  const [facilityForm] = Form.useForm();
   const [bankForm] = Form.useForm();
   const [socialForm] = Form.useForm();
   const [holidayForm] = Form.useForm();
@@ -290,153 +534,123 @@ export const GymProfileManagement = () => {
   // Helper to extract clean image url from backend format
   const extractImageUrl = (img) => {
     if (!img) return '';
-    if (typeof img === 'string') return img;
-    if (typeof img === 'object' && img.fileData) return img.fileData;
+    if (typeof img === 'string') return img.trim();
+    if (typeof img === 'object') {
+      if (img.fileData && typeof img.fileData === 'string') return img.fileData.trim();
+      if (img.url && typeof img.url === 'string') return img.url.trim();
+      if (img.logoUrl && typeof img.logoUrl === 'string') return img.logoUrl.trim();
+      if (img.coverPhotoUrl && typeof img.coverPhotoUrl === 'string') return img.coverPhotoUrl.trim();
+      if (img.imageUrl && typeof img.imageUrl === 'string') return img.imageUrl.trim();
+      if (img.uri && typeof img.uri === 'string') return img.uri.trim();
+      if (img.data && typeof img.data === 'string') return img.data.trim();
+      if (img.src && typeof img.src === 'string') return img.src.trim();
+    }
     return '';
   };
 
-  // Synchronize gym document into local states
+  // Synchronize gym document into local states (merging pending changes if under review)
   const applyGymData = useCallback((data) => {
     if (!data) return;
     setGymData(data);
+
+    const pending = (data.pendingChanges && typeof data.pendingChanges === 'object') ? data.pendingChanges : {};
+
+    const effectiveLogo = pending.logo !== undefined ? pending.logo : data.logo;
+    const effectiveCover = pending.coverPhoto !== undefined ? pending.coverPhoto : data.coverPhoto;
+    const effectiveName = pending.name !== undefined ? pending.name : data.name;
+    const effectiveAddress = pending.address !== undefined ? pending.address : data.address;
+    const effectiveArea = pending.area !== undefined ? pending.area : data.area;
+    const effectiveCity = pending.city !== undefined ? pending.city : data.city;
+    const effectiveFullAddress = pending.fullAddress !== undefined ? pending.fullAddress : data.fullAddress;
+    const effectiveOwnerName = pending.ownerName !== undefined ? pending.ownerName : data.ownerName;
+    const effectiveEmail = pending.email !== undefined ? pending.email : data.email;
+    const effectivePhone = pending.phone !== undefined ? pending.phone : data.phone;
+    const effectiveMaxFloorCapacity = pending.maxFloorCapacity !== undefined ? pending.maxFloorCapacity : data.maxFloorCapacity;
+    const effectiveWorkouts = pending.workouts !== undefined ? pending.workouts : data.workouts;
+    const effectiveAmenities = pending.amenities !== undefined ? pending.amenities : data.amenities;
+    const effectiveRules = pending.rules !== undefined ? pending.rules : data.rules;
+    const effectiveSafetyMeasures = pending.safetyMeasures !== undefined ? pending.safetyMeasures : data.safetyMeasures;
+    const effectiveFacilities = pending.facilities !== undefined ? pending.facilities : data.facilities;
+    const effectiveCustomFacilities = pending.customFacilities !== undefined ? pending.customFacilities : data.customFacilities;
+    const effectivePricingPlans = pending.pricingPlans !== undefined ? pending.pricingPlans : data.pricingPlans;
+    const effectiveCustomPricingPlans = pending.customPricingPlans !== undefined ? pending.customPricingPlans : data.customPricingPlans;
+    const effectiveOpeningHours = pending.openingHours !== undefined ? pending.openingHours : data.openingHours;
+    const effectiveBankDetails = pending.bankDetails !== undefined ? pending.bankDetails : data.bankDetails;
+    const effectiveSocialLinks = pending.socialLinks !== undefined ? pending.socialLinks : data.socialLinks;
+    const effectiveSystemSettings = pending.systemSettings !== undefined ? pending.systemSettings : data.systemSettings;
+
+    const resolvedLogo =
+      extractImageUrl(effectiveLogo) ||
+      data.logoUrl ||
+      extractImageUrl(effectiveCover) ||
+      data.coverPhotoUrl ||
+      data.image ||
+      data.imageUrl ||
+      '';
+    const resolvedCover =
+      extractImageUrl(effectiveCover) ||
+      data.coverPhotoUrl ||
+      extractImageUrl(effectiveLogo) ||
+      data.logoUrl ||
+      data.image ||
+      data.imageUrl ||
+      '';
 
     // Synchronize to Redux store
     dispatch(
       setGymProfile({
         id: data.id || data.partnerId || data._id,
         partnerId: data.partnerId || 'GYM1',
-        name: data.name || '',
-        logo: extractImageUrl(data.logo) || extractImageUrl(data.coverPhoto),
-        coverPhoto: extractImageUrl(data.coverPhoto) || extractImageUrl(data.logo),
-        branch: data.area ? `${data.area}, ${data.city || ''}` : data.city || data.fullAddress || '',
-        city: data.city || '',
-        fullAddress: data.fullAddress || data.address || '',
-        ownerName: data.ownerName || '',
-        email: data.email || '',
-        phone: data.phone || '',
-        floorCapacity: data.maxFloorCapacity || 50,
+        name: effectiveName || '',
+        logo: resolvedLogo,
+        coverPhoto: resolvedCover,
+        branch: effectiveArea ? `${effectiveArea}, ${effectiveCity || ''}` : effectiveCity || effectiveFullAddress || '',
+        city: effectiveCity || '',
+        fullAddress: effectiveFullAddress || effectiveAddress || '',
+        ownerName: effectiveOwnerName || '',
+        email: effectiveEmail || '',
+        phone: effectivePhone || '',
+        floorCapacity: effectiveMaxFloorCapacity || 50,
         rating: data.rating || 4.9,
         totalReviews: data.reviewsCount || 0,
         monthlyRevenue: data.monthlyRevenue || 0,
         membersCount: data.membersCount || 0,
-        facilities: data.facilities || [],
-        amenities: data.amenities || [],
-        workouts: data.workouts || [],
+        facilities: effectiveFacilities || [],
+        amenities: effectiveAmenities || [],
+        workouts: effectiveWorkouts || [],
       })
     );
 
-    // Facilities
-    if (Array.isArray(data.customFacilities) && data.customFacilities.length > 0) {
+    // Facilities (Array of strings like Workouts and Amenities)
+    if (Array.isArray(effectiveFacilities) && effectiveFacilities.length > 0) {
       setFacilities(
-        data.customFacilities.map((f, i) => ({
-          id: f.id || `fac-${i}`,
-          name: f.name || 'Facility',
-          category: f.category || 'General',
-          status: f.status || 'Active',
-          count: f.count || 1,
-          icon: getCategoryIcon(f.category),
-        }))
+        effectiveFacilities.map((f) => (typeof f === 'string' ? f : f?.name || String(f))).filter(Boolean)
       );
-    } else if (Array.isArray(data.facilities) && data.facilities.length > 0) {
+    } else if (Array.isArray(effectiveCustomFacilities) && effectiveCustomFacilities.length > 0) {
       setFacilities(
-        data.facilities.map((facName, i) => ({
-          id: `fac-${i}`,
-          name: facName,
-          category: 'General',
-          status: 'Active',
-          count: 1,
-          icon: getCategoryIcon(facName),
-        }))
+        effectiveCustomFacilities.map((f) => (typeof f === 'string' ? f : f?.name || String(f))).filter(Boolean)
       );
     } else {
       setFacilities([]);
     }
 
     // Workouts, Amenities, Rules & Safety
-    setGymWorkouts(Array.isArray(data.workouts) ? data.workouts : []);
-    setGymAmenities(Array.isArray(data.amenities) ? data.amenities : []);
-    setGymRules(Array.isArray(data.rules) && data.rules.length > 0 ? data.rules : DEFAULT_RULES);
-    setSafetyMeasures(Array.isArray(data.safetyMeasures) && data.safetyMeasures.length > 0 ? data.safetyMeasures : DEFAULT_SAFETY);
+    setGymWorkouts(Array.isArray(effectiveWorkouts) ? effectiveWorkouts : []);
+    setGymAmenities(Array.isArray(effectiveAmenities) ? effectiveAmenities : []);
+    setGymRules(Array.isArray(effectiveRules) && effectiveRules.length > 0 ? effectiveRules : DEFAULT_RULES);
+    setSafetyMeasures(Array.isArray(effectiveSafetyMeasures) && effectiveSafetyMeasures.length > 0 ? effectiveSafetyMeasures : DEFAULT_SAFETY);
 
-    // Pricing Plans
-    if (Array.isArray(data.customPricingPlans) && data.customPricingPlans.length > 0) {
-      setPricingPlans(data.customPricingPlans);
-    } else if (data.pricingPlans && typeof data.pricingPlans === 'object') {
-      const plansList = [];
-      const p = data.pricingPlans;
-      if (p.singleSession !== undefined) {
-        plansList.push({
-          id: 'plan-single',
-          name: 'Walk-In Day Pass',
-          badge: 'Walk-In',
-          price: Number(p.singleSession) || 199,
-          duration: '1 Day',
-          description: 'Single day full access workout pass.',
-          features: ['Gym Floor Access', 'Locker & Shower Access', 'Free Wi-Fi'],
-          popular: false,
-        });
-      }
-      if (p.weeklyPass !== undefined) {
-        plansList.push({
-          id: 'plan-weekly',
-          name: 'Weekly Workout Pass',
-          badge: 'Weekly',
-          price: Number(p.weeklyPass) || 799,
-          duration: '7 Days',
-          description: 'One week unlimited gym access.',
-          features: ['All Gym Floor Access', 'Locker Room Access', 'General Trainer Guidance'],
-          popular: false,
-        });
-      }
-      if (p.monthly !== undefined) {
-        plansList.push({
-          id: 'plan-monthly',
-          name: '1-Month Membership',
-          badge: 'Monthly',
-          price: Number(p.monthly) || 1999,
-          duration: '30 Days',
-          description: 'Standard monthly fitness membership.',
-          features: ['Unlimited Gym Access', 'General Trainer Support', 'Locker & Shower Access'],
-          popular: false,
-        });
-      }
-      if (p.quarterly !== undefined) {
-        plansList.push({
-          id: 'plan-quarterly',
-          name: '3-Month Fitness Pro',
-          badge: 'Quarterly',
-          price: Number(p.quarterly) || 4999,
-          duration: '90 Days',
-          description: 'Quarterly workout pass with steam room access.',
-          features: ['Unlimited Gym Access', '1 Free PT Session', 'Steam & Sauna Access', 'Diet Consultation'],
-          popular: true,
-        });
-      }
-      if (p.annual !== undefined) {
-        plansList.push({
-          id: 'plan-annual',
-          name: '12-Month Annual VIP',
-          badge: 'Annual VIP',
-          price: Number(p.annual) || 14999,
-          duration: '365 Days',
-          description: 'All-inclusive annual membership pass.',
-          features: ['All-Access 365 Days', '4 Free PT Sessions', 'Complete Diet Plan', 'Free Steam & Sauna'],
-          popular: false,
-        });
-      }
-      setPricingPlans(plansList);
-    } else {
-      setPricingPlans([]);
-    }
+    // Standardized 4-Tier Pricing Plans
+    setPricingPlans(normalizeGymStandardPlans(effectiveCustomPricingPlans, effectivePricingPlans));
 
     // Operating Hours
-    if (data.openingHours?.schedule && Array.isArray(data.openingHours.schedule) && data.openingHours.schedule.length > 0) {
-      setOperatingHours(data.openingHours.schedule);
+    if (effectiveOpeningHours?.schedule && Array.isArray(effectiveOpeningHours.schedule) && effectiveOpeningHours.schedule.length > 0) {
+      setOperatingHours(effectiveOpeningHours.schedule);
     } else {
-      const openW = data.openingHours?.weekdayOpen || '05:30 AM';
-      const closeW = data.openingHours?.weekdayClose || '10:30 PM';
-      const openWe = data.openingHours?.weekendOpen || '06:00 AM';
-      const closeWe = data.openingHours?.weekendClose || '09:00 PM';
+      const openW = effectiveOpeningHours?.weekdayOpen || '05:30 AM';
+      const closeW = effectiveOpeningHours?.weekdayClose || '10:30 PM';
+      const openWe = effectiveOpeningHours?.weekendOpen || '06:00 AM';
+      const closeWe = effectiveOpeningHours?.weekendClose || '09:00 PM';
       setOperatingHours([
         { day: 'Monday', isOpen: true, openTime: openW, closeTime: closeW },
         { day: 'Tuesday', isOpen: true, openTime: openW, closeTime: closeW },
@@ -448,48 +662,48 @@ export const GymProfileManagement = () => {
       ]);
     }
 
-    if (data.openingHours?.holidays && Array.isArray(data.openingHours.holidays)) {
-      setHolidayExceptions(data.openingHours.holidays);
+    if (effectiveOpeningHours?.holidays && Array.isArray(effectiveOpeningHours.holidays)) {
+      setHolidayExceptions(effectiveOpeningHours.holidays);
     } else {
       setHolidayExceptions([]);
     }
 
-    setIs24HoursOpen(Boolean(data.openingHours?.is24Hours));
-    setIsOpenHolidays(data.openingHours?.isOpenHolidays !== undefined ? Boolean(data.openingHours.isOpenHolidays) : true);
-    setIsSplitShift(Boolean(data.openingHours?.isSplitShift));
+    setIs24HoursOpen(Boolean(effectiveOpeningHours?.is24Hours));
+    setIsOpenHolidays(effectiveOpeningHours?.isOpenHolidays !== undefined ? Boolean(effectiveOpeningHours.isOpenHolidays) : true);
+    setIsSplitShift(Boolean(effectiveOpeningHours?.isSplitShift));
 
     // Bank Details
-    if (data.bankDetails) {
+    if (effectiveBankDetails) {
       setBankDetails({
-        accountHolder: data.bankDetails.accountHolder || data.ownerName || '',
-        bankName: data.bankDetails.bankName || '',
-        accountNumber: data.bankDetails.accountNumber || '',
-        ifscCode: data.bankDetails.ifscCode || '',
-        accountType: data.bankDetails.accountType || 'Current Account',
-        branch: data.bankDetails.branch || data.city || '',
-        upiId: data.bankDetails.upiId || '',
-        payoutSchedule: data.bankDetails.payoutSchedule || 'Daily T+1 Automated Direct Bank Deposit',
-        gstInvoiceEnabled: data.bankDetails.gstInvoiceEnabled !== undefined ? Boolean(data.bankDetails.gstInvoiceEnabled) : true,
+        accountHolder: effectiveBankDetails.accountHolder || effectiveOwnerName || '',
+        bankName: effectiveBankDetails.bankName || '',
+        accountNumber: effectiveBankDetails.accountNumber || '',
+        ifscCode: effectiveBankDetails.ifscCode || '',
+        accountType: effectiveBankDetails.accountType || 'Current Account',
+        branch: effectiveBankDetails.branch || effectiveCity || '',
+        upiId: effectiveBankDetails.upiId || '',
+        payoutSchedule: effectiveBankDetails.payoutSchedule || 'Daily T+1 Automated Direct Bank Deposit',
+        gstInvoiceEnabled: effectiveBankDetails.gstInvoiceEnabled !== undefined ? Boolean(effectiveBankDetails.gstInvoiceEnabled) : true,
       });
     }
 
     // Social Links
-    if (data.socialLinks) {
+    if (effectiveSocialLinks) {
       setSocialLinks({
-        instagram: data.socialLinks.instagram || '',
-        instagramHandle: data.socialLinks.instagramHandle || '',
-        facebook: data.socialLinks.facebook || '',
-        youtube: data.socialLinks.youtube || '',
-        whatsapp: data.socialLinks.whatsapp || data.phone || '',
-        website: data.socialLinks.website || '',
-        googleBusinessUrl: data.socialLinks.googleBusinessUrl || data.googleMapsUrl || '',
-        googleRating: String(data.socialLinks.googleRating || data.rating || '4.9'),
-        googleReviewCount: String(data.socialLinks.googleReviewCount || data.reviewsCount || '0'),
+        instagram: effectiveSocialLinks.instagram || '',
+        instagramHandle: effectiveSocialLinks.instagramHandle || '',
+        facebook: effectiveSocialLinks.facebook || '',
+        youtube: effectiveSocialLinks.youtube || '',
+        whatsapp: effectiveSocialLinks.whatsapp || effectivePhone || '',
+        website: effectiveSocialLinks.website || '',
+        googleBusinessUrl: effectiveSocialLinks.googleBusinessUrl || data.googleMapsUrl || '',
+        googleRating: String(effectiveSocialLinks.googleRating || data.rating || '4.9'),
+        googleReviewCount: String(effectiveSocialLinks.googleReviewCount || data.reviewsCount || '0'),
       });
     } else {
       setSocialLinks((prev) => ({
         ...prev,
-        whatsapp: data.phone || '',
+        whatsapp: effectivePhone || '',
         googleRating: String(data.rating || '4.9'),
         googleReviewCount: String(data.reviewsCount || '0'),
         googleBusinessUrl: data.googleMapsUrl || '',
@@ -497,15 +711,15 @@ export const GymProfileManagement = () => {
     }
 
     // System Settings
-    if (data.systemSettings) {
+    if (effectiveSystemSettings) {
       setSystemSettings({
-        turnstileTimeout: data.systemSettings.turnstileTimeout || 5,
-        renewalGracePeriod: data.systemSettings.renewalGracePeriod !== undefined ? data.systemSettings.renewalGracePeriod : 3,
-        autoCheckoutHours: data.systemSettings.autoCheckoutHours || 2.5,
-        smsCheckInAlerts: data.systemSettings.smsCheckInAlerts !== undefined ? data.systemSettings.smsCheckInAlerts : true,
-        whatsappAlerts: data.systemSettings.whatsappAlerts !== undefined ? data.systemSettings.whatsappAlerts : true,
-        audioChimeEnabled: data.systemSettings.audioChimeEnabled !== undefined ? data.systemSettings.audioChimeEnabled : true,
-        spotWalkInsAllowed: data.systemSettings.spotWalkInsAllowed !== undefined ? data.systemSettings.spotWalkInsAllowed : true,
+        turnstileTimeout: effectiveSystemSettings.turnstileTimeout || 5,
+        renewalGracePeriod: effectiveSystemSettings.renewalGracePeriod !== undefined ? effectiveSystemSettings.renewalGracePeriod : 3,
+        autoCheckoutHours: effectiveSystemSettings.autoCheckoutHours || 2.5,
+        smsCheckInAlerts: effectiveSystemSettings.smsCheckInAlerts !== undefined ? effectiveSystemSettings.smsCheckInAlerts : true,
+        whatsappAlerts: effectiveSystemSettings.whatsappAlerts !== undefined ? effectiveSystemSettings.whatsappAlerts : true,
+        audioChimeEnabled: effectiveSystemSettings.audioChimeEnabled !== undefined ? effectiveSystemSettings.audioChimeEnabled : true,
+        spotWalkInsAllowed: effectiveSystemSettings.spotWalkInsAllowed !== undefined ? effectiveSystemSettings.spotWalkInsAllowed : true,
       });
     }
 
@@ -531,7 +745,7 @@ export const GymProfileManagement = () => {
     }
   }, [dispatch]);
 
-  // Fetch Gym Profile from Backend API
+  // Fetch Gym Profile from Backend API (Single run per targetGymId)
   const fetchGymProfile = useCallback(async () => {
     if (!targetGymId) return;
     setIsLoadingProfile(true);
@@ -543,35 +757,66 @@ export const GymProfileManagement = () => {
       }
     } catch (err) {
       console.error('Failed to fetch gym profile from backend:', err);
-      // If error, check if we have Redux cache to fall back
-      if (gymProfileFromRedux) {
-        applyGymData(gymProfileFromRedux);
-      }
     } finally {
       setIsLoadingProfile(false);
     }
-  }, [targetGymId, applyGymData, gymProfileFromRedux]);
+  }, [targetGymId, applyGymData]);
 
+  // Initialize and fetch on mount
   useEffect(() => {
-    fetchGymProfile();
-  }, [fetchGymProfile]);
+    if (gymProfileFromRedux && !gymData) {
+      applyGymData(gymProfileFromRedux);
+    }
+    if (targetGymId) {
+      fetchGymProfile();
+    }
+  }, [targetGymId, fetchGymProfile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Derived active gym variables
+  const activeGym = useMemo(() => gymData || gymProfileFromRedux || user?.gym || {}, [gymData, gymProfileFromRedux, user?.gym]);
+
+  const gymName = activeGym?.name || user?.gymName || user?.name || 'My Gym';
+  const gymStatus = activeGym?.approvalStatus || activeGym?.status || activeGym?.subscriptionStatus || 'Active';
+  const gymLogoUrl =
+    extractImageUrl(activeGym?.logo) ||
+    activeGym?.logoUrl ||
+    extractImageUrl(activeGym?.coverPhoto) ||
+    activeGym?.coverPhotoUrl ||
+    activeGym?.image ||
+    activeGym?.imageUrl ||
+    '';
+  const gymCoverUrl =
+    extractImageUrl(activeGym?.coverPhoto) ||
+    activeGym?.coverPhotoUrl ||
+    extractImageUrl(activeGym?.logo) ||
+    activeGym?.logoUrl ||
+    activeGym?.image ||
+    activeGym?.imageUrl ||
+    '';
+  const rawGallery =
+    Array.isArray(activeGym?.galleryPhotos) && activeGym.galleryPhotos.length > 0
+      ? activeGym.galleryPhotos
+      : Array.isArray(activeGym?.images) && activeGym.images.length > 0
+        ? activeGym.images
+        : [];
+  const galleryPhotosList = rawGallery.map((img) => extractImageUrl(img)).filter(Boolean);
 
   // Dynamic Profile Completion Calculation
   const profileCompletionStats = useMemo(() => {
     const checks = [
-      { key: 'basic', label: 'Basic Information', done: Boolean(gymData?.name && gymData?.phone && gymData?.email), tab: 'basic' },
-      { key: 'address', label: 'Address & Location', done: Boolean(gymData?.address || gymData?.fullAddress || gymData?.city), tab: 'basic' },
-      { key: 'facilities', label: 'Facilities & Equipment', done: facilities.length > 0, tab: 'facilities' },
-      { key: 'pricing', label: 'Pricing & Passes', done: pricingPlans.length > 0, tab: 'pricing' },
-      { key: 'images', label: 'Images & Photos', done: Boolean(extractImageUrl(gymData?.logo) || extractImageUrl(gymData?.coverPhoto) || (gymData?.galleryPhotos && gymData.galleryPhotos.length > 0)), tab: 'images' },
-      { key: 'hours', label: 'Operating Hours', done: operatingHours.length > 0, tab: 'hours' },
+      { key: 'basic', label: 'Basic Information', done: Boolean(activeGym?.name && (activeGym?.phone || user?.phone) && (activeGym?.email || user?.email)), tab: 'basic' },
+      { key: 'address', label: 'Address & Location', done: Boolean(activeGym?.address || activeGym?.fullAddress || activeGym?.city || activeGym?.area), tab: 'basic' },
+      { key: 'facilities', label: 'Facilities & Equipment', done: facilities.length > 0 || (Array.isArray(activeGym?.facilities) && activeGym.facilities.length > 0), tab: 'facilities' },
+      { key: 'pricing', label: 'Pricing & Passes', done: pricingPlans.length > 0 || Boolean(activeGym?.pricingPlans), tab: 'pricing' },
+      { key: 'images', label: 'Images & Photos', done: Boolean(gymLogoUrl || gymCoverUrl || galleryPhotosList.length > 0), tab: 'images' },
+      { key: 'hours', label: 'Operating Hours', done: operatingHours.length > 0 || Boolean(activeGym?.openingHours), tab: 'hours' },
       { key: 'bank', label: 'Bank Details', done: Boolean(bankDetails.accountNumber && bankDetails.ifscCode), tab: 'bank' },
-      { key: 'social', label: 'Social Links', done: Boolean(socialLinks.instagramHandle || socialLinks.website || socialLinks.whatsapp), tab: 'social' },
+      { key: 'social', label: 'Social Links', done: Boolean(socialLinks.instagramHandle || socialLinks.website || socialLinks.whatsapp || activeGym?.googleMapsUrl), tab: 'social' },
     ];
     const completedCount = checks.filter((c) => c.done).length;
     const percentage = Math.round((completedCount / checks.length) * 100);
     return { checks, percentage };
-  }, [gymData, facilities, pricingPlans, operatingHours, bankDetails, socialLinks]);
+  }, [activeGym, user?.phone, user?.email, facilities, pricingPlans, operatingHours, bankDetails, socialLinks, gymLogoUrl, gymCoverUrl, galleryPhotosList]);
 
   // Save Gym Updates to Backend API
   const saveGymToBackend = async (updatePayload, successMsg = 'Changes submitted successfully! Pending Super Admin approval.') => {
@@ -618,7 +863,7 @@ export const GymProfileManagement = () => {
         genderAllowed: values.genderAllowed,
         aboutText: values.aboutText,
       };
-      const res = await saveGymToBackend(payload, 'Gym profile information updated successfully!');
+      const res = await saveGymToBackend(payload);
       if (res) {
         setIsEditModalOpen(false);
       }
@@ -732,7 +977,7 @@ export const GymProfileManagement = () => {
         isOpenHolidays: isOpenHolidays,
         isSplitShift: isSplitShift,
       };
-      await saveGymToBackend({ openingHours: payload, ...payload }, 'Operating hours and weekly schedule saved!');
+      await saveGymToBackend({ openingHours: payload }, 'Operating hours and weekly schedule saved!');
       try {
         confetti({ particleCount: 35, spread: 60, origin: { y: 0.85 } });
       } catch {
@@ -771,7 +1016,6 @@ export const GymProfileManagement = () => {
           ...(gymData?.openingHours || {}),
           holidays: updatedHolidays,
         },
-        holidays: updatedHolidays,
       },
       `Special holiday rule "${vals.title}" added!`
     );
@@ -787,67 +1031,24 @@ export const GymProfileManagement = () => {
           ...(gymData?.openingHours || {}),
           holidays: updated,
         },
-        holidays: updated,
       },
       'Holiday exception rule removed.'
     );
   };
 
-  // Add Facility Spec
-  const handleAddFacility = async (vals) => {
+  // Save Facilities & Equipment (Tag-based like Workouts/Amenities)
+  const handleSaveFacilities = async () => {
     setIsSavingFacility(true);
     try {
-      const newFac = {
-        id: `fac-${Date.now()}`,
-        name: vals.name,
-        category: vals.category || 'General',
-        status: 'Active',
-        count: vals.count || 1,
-        icon: getCategoryIcon(vals.category),
-      };
-      const updatedList = [...facilities, newFac];
-      setFacilities(updatedList);
-
-      const customFacPayload = updatedList.map((f) => ({
-        id: f.id,
-        name: f.name,
-        category: f.category,
-        status: f.status,
-        count: f.count,
-      }));
-
       await saveGymToBackend(
         {
-          customFacilities: customFacPayload,
-          facilities: updatedList.map((f) => f.name),
+          facilities,
         },
-        `Facility "${newFac.name}" added successfully!`
+        'Facilities & equipment updated successfully!'
       );
-      setIsAddFacilityModalOpen(false);
-      facilityForm.resetFields();
     } finally {
       setIsSavingFacility(false);
     }
-  };
-
-  // Delete Facility
-  const handleDeleteFacility = async (facilityId) => {
-    const updatedList = facilities.filter((f) => f.id !== facilityId);
-    setFacilities(updatedList);
-    const customFacPayload = updatedList.map((f) => ({
-      id: f.id,
-      name: f.name,
-      category: f.category,
-      status: f.status,
-      count: f.count,
-    }));
-    await saveGymToBackend(
-      {
-        customFacilities: customFacPayload,
-        facilities: updatedList.map((f) => f.name),
-      },
-      'Facility removed.'
-    );
   };
 
   // Add Pricing Tier
@@ -899,25 +1100,26 @@ export const GymProfileManagement = () => {
           .filter(Boolean)
         : selectedPlanForEdit?.features || [];
 
-      const updatedPlans = pricingPlans.map((p) =>
-        p.id === selectedPlanForEdit?.id
+      const rawUpdatedPlans = pricingPlans.map((p) =>
+        (p.id === selectedPlanForEdit?.id || (selectedPlanForEdit?.tierId && p.tierId === selectedPlanForEdit?.tierId))
           ? {
             ...p,
             name: vals.name,
-            badge: vals.badge,
+            badge: selectedPlanForEdit?.badge || vals.badge || p.badge,
             price: Number(vals.price),
-            duration: vals.duration,
+            duration: selectedPlanForEdit?.duration || p.duration,
             description: vals.description,
             features: updatedFeatures,
-            popular: vals.popular,
+            popular: Boolean(vals.popular),
           }
           : p
       );
-      setPricingPlans(updatedPlans);
+      const normalizedPlans = normalizeGymStandardPlans(rawUpdatedPlans);
+      setPricingPlans(normalizedPlans);
 
       await saveGymToBackend(
         {
-          customPricingPlans: updatedPlans,
+          customPricingPlans: normalizedPlans,
         },
         `Plan "${vals.name}" updated successfully!`
       );
@@ -1009,11 +1211,6 @@ export const GymProfileManagement = () => {
     await saveGymToBackend({ systemSettings: updatedSettings }, 'Turnstile and system preferences saved!');
   };
 
-  const gymName = gymData?.name || gymProfileFromRedux?.name || 'My Gym';
-  const gymStatus = gymData?.approvalStatus || gymData?.status || 'Active';
-  const gymLogoUrl = extractImageUrl(gymData?.logo) || extractImageUrl(gymData?.coverPhoto) || '';
-  const gymCoverUrl = extractImageUrl(gymData?.coverPhoto) || extractImageUrl(gymData?.logo) || '';
-  const galleryPhotosList = (gymData?.galleryPhotos || []).map((img) => extractImageUrl(img)).filter(Boolean);
 
   const editMenu = {
     items: [
@@ -1312,11 +1509,37 @@ export const GymProfileManagement = () => {
         })}
       </div>
 
-      {isLoadingProfile && !gymData ? (
-        <div style={{ padding: '80px 0', textAlign: 'center' }}>
+      {isLoadingProfile ? (
+        <div
+          style={{
+            padding: '90px 24px',
+            textAlign: 'center',
+            background: isDarkMode ? '#1a1d24' : '#ffffff',
+            borderRadius: 16,
+            border: `1px solid ${isDarkMode ? '#2d3748' : '#e2e8f0'}`,
+            marginTop: 20,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
+          }}
+        >
           <Spin size="large" />
-          <div style={{ marginTop: 16, color: isDarkMode ? '#aaaaaa' : '#64748b', fontSize: 14 }}>
-            Loading Gym Profile from Server...
+          <div
+            style={{
+              marginTop: 18,
+              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+              fontSize: 16,
+              fontWeight: 600,
+            }}
+          >
+            Loading complete gym profile & verified credentials...
+          </div>
+          <div
+            style={{
+              marginTop: 6,
+              color: isDarkMode ? '#94a3b8' : '#64748b',
+              fontSize: 13,
+            }}
+          >
+            Fetching floor facilities, membership plans, operating hours, and media from server
           </div>
         </div>
       ) : (
@@ -1480,34 +1703,34 @@ export const GymProfileManagement = () => {
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: isDarkMode ? '#aaaaaa' : '#64748b', fontSize: 12.5, marginBottom: 6 }}>
                           <EnvironmentOutlined style={{ color: 'var(--color-primary)' }} />
-                          <span>{gymData?.area ? `${gymData.area}, ${gymData.city || ''}` : gymData?.address || gymData?.city || 'Address not configured'}</span>
+                          <span>{activeGym?.area ? `${activeGym.area}, ${activeGym.city || ''}` : activeGym?.fullAddress || activeGym?.address || activeGym?.city || 'Address not configured'}</span>
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: isDarkMode ? '#aaaaaa' : '#64748b', fontSize: 12.5, marginBottom: 6 }}>
                           <PhoneOutlined style={{ color: 'var(--color-primary)' }} />
-                          <span>{gymData?.phone || 'Phone not provided'}</span>
+                          <span>{activeGym?.phone || user?.phone || 'Phone not provided'}</span>
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: isDarkMode ? '#aaaaaa' : '#64748b', fontSize: 12.5, marginBottom: 12 }}>
                           <MailOutlined style={{ color: 'var(--color-primary)' }} />
-                          <span>{gymData?.email || 'Email not provided'}</span>
+                          <span>{activeGym?.email || user?.email || 'Email not provided'}</span>
                         </div>
 
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           <Tag color="purple" style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}>
-                            {gymData?.businessType || 'Private Limited'}
+                            {activeGym?.businessType || 'Private Limited'}
                           </Tag>
                           <Tag color="blue" style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}>
-                            {gymData?.genderAllowed || 'Unisex'}
+                            {activeGym?.genderAllowed || 'Unisex'}
                           </Tag>
-                          {gymData?.yearEstablished && (
+                          {activeGym?.yearEstablished && (
                             <Tag color="cyan" style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}>
-                              Est. {gymData.yearEstablished}
+                              Est. {activeGym.yearEstablished}
                             </Tag>
                           )}
-                          {gymData?.gstNumber && (
+                          {activeGym?.gstNumber && (
                             <Tag color="orange" style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}>
-                              GST: {gymData.gstNumber}
+                              GST: {activeGym.gstNumber}
                             </Tag>
                           )}
                         </div>
@@ -1541,7 +1764,7 @@ export const GymProfileManagement = () => {
                       percent={profileCompletionStats.percentage}
                       showInfo={false}
                       strokeColor="var(--color-primary)"
-                      trailColor={isDarkMode ? '#222222' : '#f1f5f9'}
+                      railColor={isDarkMode ? '#222222' : '#f1f5f9'}
                       style={{ marginBottom: 14 }}
                     />
 
@@ -1602,11 +1825,11 @@ export const GymProfileManagement = () => {
                           styles={{ body: { padding: '16px' } }}
                         >
                           <Paragraph style={{ fontSize: 12.5, color: isDarkMode ? '#aaaaaa' : '#64748b', lineHeight: 1.5, marginBottom: 14, minHeight: 60 }}>
-                            {gymData?.aboutText || gymData?.description || 'No about summary added yet. Click Edit Profile to describe your facility and fitness mission.'}
+                            {activeGym?.aboutText || activeGym?.description || 'No about summary added yet. Click Edit Profile to describe your facility and fitness mission.'}
                           </Paragraph>
                           <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
                             <span style={{ color: isDarkMode ? '#888888' : '#94a3b8' }}>
-                              Owner: {gymData?.ownerName || 'Verified Partner'}
+                              Owner: {activeGym?.ownerName || user?.fullName || 'Verified Partner'}
                             </span>
                             <span style={{ color: isDarkMode ? '#888888' : '#94a3b8' }}>
                               Status: {gymStatus}
@@ -1685,7 +1908,7 @@ export const GymProfileManagement = () => {
                       styles={{ body: { padding: '16px' } }}
                     >
                       <Text style={{ fontSize: 13, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                        {gymData?.fullAddress || gymData?.address || `${gymData?.area || ''} ${gymData?.city || ''}`}
+                        {activeGym?.fullAddress || activeGym?.address || `${activeGym?.area || ''} ${activeGym?.city || ''}`}
                       </Text>
                       <div
                         style={{
@@ -1705,12 +1928,12 @@ export const GymProfileManagement = () => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: isDarkMode ? '#aaaaaa' : '#64748b' }}>
                           <EnvironmentOutlined style={{ color: 'var(--color-primary)', fontSize: 15 }} />
                           <span>
-                            {gymData?.city || 'City not set'} • {gymData?.state || 'Tamil Nadu'} • Pincode: {gymData?.pincode || '—'}
+                            {activeGym?.city || 'City not set'} • {activeGym?.state || 'Tamil Nadu'} • Pincode: {activeGym?.pincode || '—'}
                           </span>
                         </div>
-                        {gymData?.googleMapsUrl && (
+                        {activeGym?.googleMapsUrl && (
                           <a
-                            href={gymData.googleMapsUrl}
+                            href={activeGym.googleMapsUrl}
                             target="_blank"
                             rel="noreferrer"
                             style={{ color: 'var(--color-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
@@ -1737,13 +1960,13 @@ export const GymProfileManagement = () => {
                     >
                       <Row gutter={[20, 16]}>
                         {[
-                          { label: 'GYM TYPE', val: gymData?.businessType || 'Private Limited' },
-                          { label: 'GST NUMBER', val: gymData?.gstNumber || 'Not Specified' },
-                          { label: 'PAN NUMBER', val: gymData?.panNumber || 'Not Specified' },
-                          { label: 'ESTABLISHED ON', val: gymData?.yearEstablished ? `Est. ${gymData.yearEstablished}` : 'Not Specified' },
-                          { label: 'FLOOR AREA', val: gymData?.floorSpaceSqFt ? `${gymData.floorSpaceSqFt} Sq.Ft` : 'Not Specified' },
-                          { label: 'MAX FLOOR CAPACITY', val: gymData?.maxFloorCapacity ? `${gymData.maxFloorCapacity} Persons` : '50 Persons' },
-                          { label: 'GENDER ALLOWED', val: gymData?.genderAllowed || 'Unisex' },
+                          { label: 'GYM TYPE', val: activeGym?.businessType || 'Private Limited' },
+                          { label: 'GST NUMBER', val: activeGym?.gstNumber || 'Not Specified' },
+                          { label: 'PAN NUMBER', val: activeGym?.panNumber || 'Not Specified' },
+                          { label: 'ESTABLISHED ON', val: activeGym?.yearEstablished ? `Est. ${activeGym.yearEstablished}` : 'Not Specified' },
+                          { label: 'FLOOR AREA', val: activeGym?.floorSpaceSqFt ? `${activeGym.floorSpaceSqFt} Sq.Ft` : 'Not Specified' },
+                          { label: 'MAX FLOOR CAPACITY', val: activeGym?.maxFloorCapacity ? `${activeGym.maxFloorCapacity} Persons` : '50 Persons' },
+                          { label: 'GENDER ALLOWED', val: activeGym?.genderAllowed || 'Unisex' },
                           { label: 'ACTIVE FACILITIES', val: `${facilities.length} Categories` },
                         ].map((item, idx) => (
                           <Col xs={12} sm={6} key={idx}>
@@ -1784,7 +2007,7 @@ export const GymProfileManagement = () => {
                           <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Members</div>
                         </div>
                         <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                          {gymData?.membersCount || 0}
+                          {activeGym?.membersCount || 0}
                         </div>
                         <div style={{ fontSize: 10.5, color: '#00bf62', fontWeight: 600, marginTop: 2 }}>Registered</div>
                       </div>
@@ -1798,7 +2021,7 @@ export const GymProfileManagement = () => {
                           <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Floor Capacity</div>
                         </div>
                         <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                          {gymData?.maxFloorCapacity || 50}
+                          {activeGym?.maxFloorCapacity || 50}
                         </div>
                         <div style={{ fontSize: 10.5, color: 'var(--color-primary)', fontWeight: 600, marginTop: 2 }}>Max Limit</div>
                       </div>
@@ -1812,7 +2035,7 @@ export const GymProfileManagement = () => {
                           <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Floor Area</div>
                         </div>
                         <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                          {gymData?.floorSpaceSqFt ? `${gymData.floorSpaceSqFt}` : '—'}
+                          {activeGym?.floorSpaceSqFt ? `${activeGym.floorSpaceSqFt}` : '—'}
                         </div>
                         <div style={{ fontSize: 10.5, color: '#00bf62', fontWeight: 600, marginTop: 2 }}>Sq. Ft</div>
                       </div>
@@ -1826,10 +2049,10 @@ export const GymProfileManagement = () => {
                           <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Rating</div>
                         </div>
                         <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                          {gymData?.rating || '4.9'}
+                          {activeGym?.rating || '4.9'}
                         </div>
                         <div style={{ fontSize: 10.5, color: '#fa8c16', fontWeight: 600, marginTop: 2 }}>
-                          {gymData?.reviewsCount || 0} Reviews
+                          {activeGym?.reviewsCount || 0} Reviews
                         </div>
                       </div>
 
@@ -1856,7 +2079,7 @@ export const GymProfileManagement = () => {
                           <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Monthly Revenue</div>
                         </div>
                         <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                          ₹{Number(gymData?.monthlyRevenue || 0).toLocaleString('en-IN')}
+                          ₹{Number(activeGym?.monthlyRevenue || 0).toLocaleString('en-IN')}
                         </div>
                         <div style={{ fontSize: 10.5, color: '#00bf62', fontWeight: 600, marginTop: 2 }}>Live Status</div>
                       </div>
@@ -1868,102 +2091,78 @@ export const GymProfileManagement = () => {
           )}
 
           {/* ========================================================================= */}
-          {/* TAB 2: FACILITIES & AMENITIES */}
+          {/* ========================================================================= */}
+          {/* TAB 2: FACILITIES & EQUIPMENT */}
           {/* ========================================================================= */}
           {activeTab === 'facilities' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
                 <div>
                   <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    Facilities, Equipment & Amenities ({facilities.length})
+                    Facilities & Equipment ({facilities.length})
                   </Title>
                   <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
-                    Showcase gym capabilities, workout equipment count, and studio amenities.
+                    Select gym floor facilities, equipment, and member amenities available at your gym.
                   </Text>
                 </div>
                 <Button
                   type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => setIsAddFacilityModalOpen(true)}
+                  icon={<SaveOutlined />}
+                  loading={isSavingFacility}
+                  onClick={handleSaveFacilities}
                   style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
                 >
-                  Add Facility
+                  Save All Changes
                 </Button>
               </div>
 
-              {facilities.length > 0 ? (
-                <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                  {facilities.map((fac) => (
-                    <Col xs={24} sm={12} md={8} lg={6} key={fac.id}>
-                      <Card
-                        style={{
-                          backgroundColor: 'var(--bg-surface-elevated)',
-                          borderColor: 'var(--border-color)',
-                          borderRadius: 'var(--radius-base)',
-                          height: '100%',
-                          position: 'relative',
+              {/* Standard Preset Facilities Checkable Tags */}
+              <Card
+                style={{
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  borderColor: 'var(--border-color)',
+                  borderRadius: 'var(--radius-base)',
+                  marginBottom: 16,
+                }}
+                styles={{ body: { padding: '20px' } }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <ToolOutlined style={{ color: '#0EA5E9' }} /> Gym Floor Facilities & Equipment
+                </div>
+                <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b', marginBottom: 14 }}>
+                  Select all floor equipment and infrastructure available at your facility
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {FACILITY_OPTIONS.map((f) => {
+                    const selected = facilities.includes(f);
+                    return (
+                      <Tag.CheckableTag
+                        key={f}
+                        checked={selected}
+                        onChange={(chk) => {
+                          setFacilities(chk ? [...facilities, f] : facilities.filter((x) => x !== f));
                         }}
-                        styles={{ body: { padding: '16px' } }}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: 16,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          backgroundColor: selected ? '#0EA5E9' : (isDarkMode ? '#1e293b' : '#f0f9ff'),
+                          color: selected ? '#ffffff' : (isDarkMode ? '#cbd5e1' : '#0369a1'),
+                          border: `1px solid ${selected ? '#0EA5E9' : (isDarkMode ? '#334155' : '#bae6fd')}`,
+                        }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                          <div
-                            style={{
-                              width: 38,
-                              height: 38,
-                              borderRadius: 'var(--radius-base)',
-                              backgroundColor: 'var(--color-primary-bg)',
-                              color: 'var(--color-primary)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: 18,
-                            }}
-                          >
-                            {fac.icon || <ToolOutlined />}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Tag color="success" style={{ fontWeight: 700, borderRadius: 4, margin: 0 }}>
-                              {fac.status || 'Active'}
-                            </Tag>
-                            <Popconfirm
-                              title="Delete Facility"
-                              description={`Are you sure you want to remove ${fac.name}?`}
-                              onConfirm={() => handleDeleteFacility(fac.id)}
-                              okText="Delete"
-                              cancelText="Cancel"
-                            >
-                              <Button
-                                type="text"
-                                size="small"
-                                danger
-                                icon={<DeleteOutlined />}
-                                style={{ padding: '0 4px' }}
-                              />
-                            </Popconfirm>
-                          </div>
-                        </div>
-
-                        <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginTop: 12 }}>
-                          {fac.name}
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
-                          <span>Category: <strong>{fac.category || 'General'}</strong></span>
-                          <span>Units: <strong>{fac.count || 1}</strong></span>
-                        </div>
-                      </Card>
-                    </Col>
-                  ))}
-                </Row>
-              ) : (
-                <Empty
-                  description={
-                    <span style={{ color: isDarkMode ? '#888888' : '#64748b' }}>
-                      No facilities added yet. Click "Add Facility" to showcase equipment and amenities.
-                    </span>
-                  }
-                  style={{ margin: '40px 0' }}
-                />
-              )}
+                        {f}
+                      </Tag.CheckableTag>
+                    );
+                  })}
+                </div>
+                {facilities.length > 0 && (
+                  <div style={{ marginTop: 10, fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
+                    {facilities.length} facility item(s) selected
+                  </div>
+                )}
+              </Card>
             </div>
           )}
 
@@ -2170,20 +2369,12 @@ export const GymProfileManagement = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
                 <div>
                   <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    Membership Pricing & Workout Passes ({pricingPlans.length})
+                    Standard Membership Tiers ({pricingPlans.length})
                   </Title>
                   <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
-                    Configure membership tiers, daily walk-in passes, and workout packages.
+                    Standardized Monthly, Quarterly, Half Yearly, and Annual membership tiers.
                   </Text>
                 </div>
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => setIsAddPlanModalOpen(true)}
-                  style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
-                >
-                  Add Pricing Tier
-                </Button>
               </div>
 
               {pricingPlans.length > 0 ? (
@@ -2226,11 +2417,16 @@ export const GymProfileManagement = () => {
                           {plan.name}
                         </div>
 
-                        <div style={{ margin: '14px 0 10px 0' }}>
+                        <div style={{ margin: '14px 0 10px 0', display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 6 }}>
                           <span style={{ fontSize: 28, fontWeight: 900, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
                             ₹{Number(plan.price).toLocaleString('en-IN')}
                           </span>
                           <span style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}> / {plan.duration}</span>
+                          {plan.savingsText && (
+                            <Tag color="success" style={{ fontWeight: 700, fontSize: 11, borderRadius: 4, marginLeft: 2 }}>
+                              {plan.savingsText}
+                            </Tag>
+                          )}
                         </div>
 
                         <Text style={{ fontSize: 12, color: isDarkMode ? '#aaaaaa' : '#64748b', lineHeight: 1.4, marginBottom: 16 }}>
@@ -3383,8 +3579,18 @@ export const GymProfileManagement = () => {
           <Form.Item name="description" label="Short Description">
             <TextArea rows={2} placeholder="Brief summary of what's included..." />
           </Form.Item>
-          <Form.Item name="features" label="Included Features (one per line)">
-            <TextArea rows={4} placeholder="All Gym Floor Access&#10;Locker & Shower Access&#10;Steam & Sauna Access" />
+          <Form.Item
+            name="features"
+            label={
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span>Included Features (one per line)</span>
+                <Tooltip overlayStyle={{ maxWidth: 390 }} title={renderIconKeywordTooltip()}>
+                  <InfoCircleOutlined style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: 13 }} />
+                </Tooltip>
+              </span>
+            }
+          >
+            <TextArea rows={4} placeholder="Access to all gym facilities&#10;Free group workout classes&#10;VIP Locker & Towel Service&#10;Free Wi-Fi" />
           </Form.Item>
           <Form.Item name="popular" valuePropName="checked">
             <Checkbox>Mark as "Most Popular" Plan</Checkbox>
@@ -3414,15 +3620,8 @@ export const GymProfileManagement = () => {
               </Form.Item>
             </Col>
             <Col span={10}>
-              <Form.Item name="badge" label="Category / Badge" rules={[{ required: true }]}>
-                <Select>
-                  <Option value="Walk-In">Walk-In</Option>
-                  <Option value="Weekly">Weekly</Option>
-                  <Option value="Monthly">Monthly</Option>
-                  <Option value="Quarterly">Quarterly</Option>
-                  <Option value="Semi-Annual">Semi-Annual</Option>
-                  <Option value="Annual VIP">Annual VIP</Option>
-                </Select>
+              <Form.Item name="badge" label="Tier Badge">
+                <Input disabled />
               </Form.Item>
             </Col>
           </Row>
@@ -3433,84 +3632,39 @@ export const GymProfileManagement = () => {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="duration" label="Duration" rules={[{ required: true, message: 'Please enter duration' }]}>
-                <Input placeholder="e.g. 90 Days" />
+              <Form.Item name="duration" label="Duration (Standardized)">
+                <Input disabled />
               </Form.Item>
             </Col>
           </Row>
           <Form.Item name="description" label="Short Description">
             <TextArea rows={2} placeholder="Brief summary of what's included..." />
           </Form.Item>
-          <Form.Item name="features" label="Included Features (one per line)">
-            <TextArea rows={4} placeholder="All Gym Floor Access&#10;Locker & Shower Access&#10;Steam & Sauna Access" />
+          <Form.Item
+            name="features"
+            label={
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span>Included Features (one per line)</span>
+                <Tooltip overlayStyle={{ maxWidth: 390 }} title={renderIconKeywordTooltip()}>
+                  <InfoCircleOutlined style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: 13 }} />
+                </Tooltip>
+              </span>
+            }
+          >
+            <TextArea rows={4} placeholder="Access to all gym facilities&#10;Free group workout classes&#10;VIP Locker & Towel Service&#10;Free Wi-Fi" />
           </Form.Item>
           <Form.Item name="popular" valuePropName="checked">
             <Checkbox>Mark as "Most Popular" Plan</Checkbox>
           </Form.Item>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
-            <Button
-              danger
-              type="text"
-              icon={<DeleteOutlined />}
-              onClick={() => {
-                if (selectedPlanForEdit) {
-                  handleDeletePlan(selectedPlanForEdit.id);
-                  setIsEditPlanModalOpen(false);
-                }
-              }}
-            >
-              Delete Plan
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+            <Button onClick={() => setIsEditPlanModalOpen(false)}>Cancel</Button>
+            <Button type="primary" htmlType="submit" loading={isSavingPricing}>
+              Save Changes
             </Button>
-            <Space size={10}>
-              <Button onClick={() => setIsEditPlanModalOpen(false)}>Cancel</Button>
-              <Button type="primary" htmlType="submit" loading={isSavingPricing}>
-                Save Changes
-              </Button>
-            </Space>
           </div>
         </Form>
       </Modal>
 
-      {/* 4. ADD FACILITY MODAL */}
-      <Modal
-        title="Add Facility or Equipment Spec"
-        open={isAddFacilityModalOpen}
-        onCancel={() => setIsAddFacilityModalOpen(false)}
-        footer={null}
-      >
-        <Form form={facilityForm} layout="vertical" onFinish={handleAddFacility}>
-          <Form.Item name="name" label="Facility / Equipment Name" rules={[{ required: true, message: 'Please enter facility name' }]}>
-            <Input placeholder="e.g. Olympic Squat Platforms & Bumper Plates" />
-          </Form.Item>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="category" label="Category" initialValue="Strength">
-                <Select>
-                  <Option value="Cardio">Cardio Studio</Option>
-                  <Option value="Strength">Strength & Weights</Option>
-                  <Option value="Functional">Functional & Crossfit</Option>
-                  <Option value="Wellness">Wellness & Steam</Option>
-                  <Option value="Amenities">Amenities & Lockers</Option>
-                  <Option value="Nutrition">Juice & Nutrition Bar</Option>
-                  <Option value="Tech">Tech & Turnstiles</Option>
-                  <Option value="Training">Personal Training</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="count" label="Total Units / Count" initialValue={1}>
-                <InputNumber style={{ width: '100%' }} min={1} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-            <Button onClick={() => setIsAddFacilityModalOpen(false)}>Cancel</Button>
-            <Button type="primary" htmlType="submit" loading={isSavingFacility}>
-              Add Facility
-            </Button>
-          </div>
-        </Form>
-      </Modal>
 
       {/* 5. EDIT BANK DETAILS MODAL */}
       <Modal

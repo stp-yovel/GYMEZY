@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Gym from '../models/gym.model.js';
+import { Employee } from '../models/employee.model.js';
 import User, { USER_ROLES } from '../models/user.model.js';
 import Counter from '../models/counter.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
@@ -45,6 +46,130 @@ const extractCoordinatesFromMapsUrl = (url) => {
   }
 
   return null;
+};
+
+/**
+ * Standard 4-Tier Membership Plans Builder
+ * Generates/normalizes the 4 fixed standard tiers: Monthly, Quarterly, Half Yearly, Annual
+ */
+export const buildStandardCustomPricingPlans = (pricing = {}, customPlans = []) => {
+  const monthlyPrice = Number(pricing.monthly || pricing.monthlyPrice || 1299);
+  const quarterlyPrice = Number(pricing.quarterly || pricing.quarterlyPrice || 3299);
+  const halfYearlyPrice = Number(pricing.halfYearly || pricing.halfYearlyPrice || 5999);
+  const annualPrice = Number(pricing.annual || pricing.annualPrice || 11999);
+
+  const planMap = {};
+  if (Array.isArray(customPlans)) {
+    customPlans.forEach((p) => {
+      if (!p) return;
+      const tId = p.tierId || (
+        p.badge?.toLowerCase().includes('month') || p.duration?.includes('30') ? 'monthly' :
+        p.badge?.toLowerCase().includes('quarter') || p.duration?.includes('90') ? 'quarterly' :
+        p.badge?.toLowerCase().includes('half') || p.duration?.includes('180') ? 'half_yearly' :
+        p.badge?.toLowerCase().includes('annual') || p.badge?.toLowerCase().includes('year') || p.duration?.includes('365') ? 'annual' : null
+      );
+      if (tId) planMap[tId] = p;
+    });
+  }
+
+  const calcSavings = (price, months) => {
+    const fullVal = monthlyPrice * months;
+    const diff = fullVal - price;
+    return diff > 0 ? `Save ₹${diff.toLocaleString('en-IN')}` : '';
+  };
+
+  const qPrice = planMap.quarterly?.price !== undefined ? Number(planMap.quarterly.price) : quarterlyPrice;
+  const hPrice = (planMap.half_yearly?.price !== undefined ? Number(planMap.half_yearly.price) : (planMap.halfYearly?.price !== undefined ? Number(planMap.halfYearly.price) : halfYearlyPrice));
+  const aPrice = planMap.annual?.price !== undefined ? Number(planMap.annual.price) : annualPrice;
+
+  return [
+    {
+      id: 'plan-monthly',
+      tierId: 'monthly',
+      name: planMap.monthly?.name || 'Monthly Plan',
+      badge: 'Monthly',
+      price: planMap.monthly?.price !== undefined ? Number(planMap.monthly.price) : monthlyPrice,
+      duration: '30 Days',
+      months: 1,
+      description: planMap.monthly?.description || 'Standard 30-day recurring membership.',
+      features: Array.isArray(planMap.monthly?.features) && planMap.monthly.features.length > 0
+        ? planMap.monthly.features
+        : [
+            'Access to all gym facilities',
+            'Free group workout classes',
+            'Locker and shower facility',
+            'Trainer guidance on floor',
+          ],
+      popular: Boolean(planMap.monthly?.popular),
+      savingsText: '',
+    },
+    {
+      id: 'plan-quarterly',
+      tierId: 'quarterly',
+      name: planMap.quarterly?.name || 'Quarterly Plan',
+      badge: 'Quarterly',
+      price: qPrice,
+      duration: '90 Days',
+      months: 3,
+      description: planMap.quarterly?.description || '3-month structured fitness package.',
+      features: Array.isArray(planMap.quarterly?.features) && planMap.quarterly.features.length > 0
+        ? planMap.quarterly.features
+        : [
+            'Access to all gym facilities',
+            'Free group workout classes',
+            'Locker and shower facility',
+            '1 Guest pass per month',
+            '2 Complimentary PT Sessions',
+          ],
+      popular: Boolean(planMap.quarterly?.popular),
+      savingsText: calcSavings(qPrice, 3),
+    },
+    {
+      id: 'plan-half-yearly',
+      tierId: 'half_yearly',
+      name: planMap.half_yearly?.name || planMap.halfYearly?.name || 'Half Yearly Plan',
+      badge: 'Half Yearly',
+      price: hPrice,
+      duration: '180 Days',
+      months: 6,
+      description: planMap.half_yearly?.description || planMap.halfYearly?.description || '6-month transformation package.',
+      features: Array.isArray(planMap.half_yearly?.features || planMap.halfYearly?.features) && (planMap.half_yearly?.features || planMap.halfYearly?.features).length > 0
+        ? (planMap.half_yearly?.features || planMap.half_yearly?.features)
+        : [
+            'Access to all gym facilities',
+            'Free group workout classes',
+            'Locker and shower facility',
+            '1 Guest pass per month',
+            'Personalized nutrition guidance',
+            '4 Complimentary PT Sessions',
+          ],
+      popular: Boolean(planMap.half_yearly?.popular || planMap.halfYearly?.popular),
+      savingsText: calcSavings(hPrice, 6),
+    },
+    {
+      id: 'plan-annual',
+      tierId: 'annual',
+      name: planMap.annual?.name || 'Annual VIP Plan',
+      badge: 'Annual',
+      price: aPrice,
+      duration: '365 Days',
+      months: 12,
+      description: planMap.annual?.description || 'All-inclusive annual membership with priority perks.',
+      features: Array.isArray(planMap.annual?.features) && planMap.annual.features.length > 0
+        ? planMap.annual.features
+        : [
+            'Access to all gym facilities',
+            'Free group workout classes',
+            'Locker and shower facility',
+            '2 Guest passes per month',
+            'Personalized nutrition guidance',
+            'VIP Locker & Towel Service',
+            'Unlimited Steam & Sauna',
+          ],
+      popular: planMap.annual?.popular !== undefined ? Boolean(planMap.annual.popular) : true,
+      savingsText: calcSavings(aPrice, 12),
+    },
+  ];
 };
 
 /**
@@ -323,7 +448,7 @@ export const onboardGym = asyncHandler(async (req, res) => {
     tags: Array.isArray(tags) ? tags : [],
     badgeText: badgeText || 'Verified',
     aboutText: aboutText || '',
-    trainers: structuredTrainers,
+    trainers: [],
     openingHours: resolvedOpeningHours,
     slotDurationMinutes: Number(slotDurationMinutes) || 60,
     maxSlotCapacity: Number(maxSlotCapacity) || 25,
@@ -331,6 +456,7 @@ export const onboardGym = asyncHandler(async (req, res) => {
     slotsEvening: Array.isArray(slotsEvening) ? slotsEvening : [],
     singleSessionPrice: Number(singleSessionPrice) || resolvedPricing.singleSession || 199,
     pricingPlans: resolvedPricing,
+    customPricingPlans: buildStandardCustomPricingPlans(resolvedPricing, customPricingPlans),
     rules: Array.isArray(rules) ? rules : [],
     safetyMeasures: Array.isArray(safetyMeasures) ? safetyMeasures : [],
     freeCancellationHours: Number(freeCancellationHours) || 2,
@@ -355,6 +481,37 @@ export const onboardGym = asyncHandler(async (req, res) => {
 
   await newGym.save();
 
+  // Save any onboarded trainers directly into the Employee collection (SSOT)
+  if (Array.isArray(structuredTrainers) && structuredTrainers.length > 0) {
+    for (const t of structuredTrainers) {
+      if (!t || !t.name) continue;
+      const seq = await Counter.getNextSequence(`emp_${newGym.partnerId || newGym._id}`);
+      const employeeId = `TR${String(seq).padStart(3, '0')}`;
+      await Employee.create({
+        gymId: newGym._id,
+        gymPartnerId: newGym.partnerId || '',
+        gymName: newGym.name,
+        employeeId,
+        name: t.name.trim(),
+        role: 'Trainer',
+        avatar: t.image?.fileData || t.imageUrl || '',
+        specialty: t.specialty || 'General Fitness',
+        experienceYears: Number(t.experienceYears) || 1,
+        rating: Number(t.rating) || 4.9,
+        monthlyFee: Number(t.monthlyFee) || 0,
+        status: 'Active',
+        attendance: 'Present',
+        approvalStatus: resolvedApprovalStatus === 'Approved' ? 'Approved' : 'Pending Approval',
+        pendingAction: 'NONE',
+        type: 'Full-Time',
+        accessType: 'Employee',
+        joinDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        approvedBy: resolvedApprovalStatus === 'Approved' ? (req.user?.email || 'Super Admin') : '',
+        approvedAt: resolvedApprovalStatus === 'Approved' ? new Date() : null,
+      });
+    }
+  }
+
   // 5. Create Gym Owner User Account
   const gymOwnerUser = new User({
     fullName: finalOwnerName,
@@ -375,6 +532,8 @@ export const onboardGym = asyncHandler(async (req, res) => {
 
   const sanitizedGym = sanitizeDocument(newGym);
   const sanitizedOwner = sanitizeDocument(gymOwnerUser);
+
+  clearFleetCache();
 
   return res.status(201).json(
     ApiResponse.created(
@@ -428,7 +587,16 @@ export const getGymZones = asyncHandler(async (_req, res) => {
 
   // Aggregate active gym counts grouped by city and area from MongoDB
   const dbZones = await Gym.aggregate([
-    { $match: { status: 'Active', approvalStatus: 'Approved', isActive: true } },
+    {
+      $match: {
+        status: 'Active',
+        isActive: true,
+        $or: [
+          { approvalStatus: 'Approved' },
+          { partnerId: { $exists: true, $ne: null } },
+        ],
+      },
+    },
     {
       $group: {
         _id: {
@@ -487,6 +655,75 @@ export const getGymZones = asyncHandler(async (_req, res) => {
 });
 
 /**
+ * Helper to reliably resolve web-ready URLs/Base64 strings for gym media
+ */
+export const resolveGymMediaUrls = (gym) => {
+  const defaultFallbackImage =
+    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop';
+
+  let resolvedLogo = '';
+  if (gym?.logo) {
+    if (typeof gym.logo === 'string' && gym.logo.trim()) {
+      resolvedLogo = gym.logo.trim();
+    } else if (
+      typeof gym.logo === 'object' &&
+      gym.logo.fileData &&
+      typeof gym.logo.fileData === 'string' &&
+      gym.logo.fileData.trim()
+    ) {
+      resolvedLogo = gym.logo.fileData.trim();
+    }
+  }
+
+  let resolvedCover = '';
+  if (gym?.coverPhoto) {
+    if (typeof gym.coverPhoto === 'string' && gym.coverPhoto.trim()) {
+      resolvedCover = gym.coverPhoto.trim();
+    } else if (
+      typeof gym.coverPhoto === 'object' &&
+      gym.coverPhoto.fileData &&
+      typeof gym.coverPhoto.fileData === 'string' &&
+      gym.coverPhoto.fileData.trim()
+    ) {
+      resolvedCover = gym.coverPhoto.fileData.trim();
+    }
+  }
+
+  let resolvedImage = '';
+  if (typeof gym?.image === 'string' && gym.image.trim()) {
+    resolvedImage = gym.image.trim();
+  } else if (
+    Array.isArray(gym?.images) &&
+    gym.images.length > 0 &&
+    typeof gym.images[0] === 'string' &&
+    gym.images[0].trim()
+  ) {
+    resolvedImage = gym.images[0].trim();
+  } else if (
+    Array.isArray(gym?.galleryPhotos) &&
+    gym.galleryPhotos.length > 0 &&
+    gym.galleryPhotos[0]?.fileData
+  ) {
+    resolvedImage = gym.galleryPhotos[0].fileData.trim();
+  }
+
+  const finalLogoUrl = resolvedLogo || resolvedCover || resolvedImage || defaultFallbackImage;
+  const finalCoverUrl = resolvedCover || resolvedLogo || resolvedImage || defaultFallbackImage;
+  const finalImageUrl = resolvedImage || resolvedCover || resolvedLogo || defaultFallbackImage;
+
+  return {
+    logoUrl: finalLogoUrl,
+    coverPhotoUrl: finalCoverUrl,
+    imageUrl: finalImageUrl,
+    thumbnailImage: finalImageUrl,
+  };
+};
+
+// Fast in-memory cache for public customer discovery queries (30s TTL)
+const discoveryCache = new Map();
+const DISCOVERY_CACHE_TTL_MS = 30 * 1000;
+
+/**
  * GET /api/v1/gyms
  * List gyms with geospatial proximity sorting, category filter, facilities, search, and pagination
  */
@@ -518,14 +755,49 @@ export const getGyms = asyncHandler(async (req, res) => {
   const userLat = Number(lat || latitude);
   const userLng = Number(lng || longitude);
   const hasCoordinates = !Number.isNaN(userLat) && !Number.isNaN(userLng);
+  const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 50));
+  const skip = (pageNum - 1) * limitNum;
+  const maxRadius = Number(radius_km || radius);
+
+  // Fast in-memory cache lookup for public customer queries
+  const cacheKey = JSON.stringify({
+    role: req.user?.role || 'public',
+    status: status || '',
+    approvalStatus: approvalStatus || '',
+    city: city || '',
+    area: area || '',
+    category: category || '',
+    type: type || '',
+    genderAllowed: genderAllowed || '',
+    facility: facility || '',
+    workout: workout || '',
+    search: (search || '').trim().toLowerCase(),
+    lat: hasCoordinates ? userLat.toFixed(2) : '',
+    lng: hasCoordinates ? userLng.toFixed(2) : '',
+    radius: !Number.isNaN(maxRadius) && maxRadius > 0 ? maxRadius : '',
+    sortBy: sortBy || 'nearest',
+    page: pageNum,
+    limit: limitNum,
+    subscriptionType: subscriptionType || '',
+  });
+
+  const cached = discoveryCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && (now - cached.timestamp < DISCOVERY_CACHE_TTL_MS)) {
+    return res.status(200).json(cached.payload);
+  }
 
   const query = {};
 
-  // Status filtering: Public customers discovery gets only Active & Approved gyms
+  // Status filtering: Public customers discovery gets all Active verified gyms (even if edits are pending review)
   if (!isSuperAdmin) {
     query.status = 'Active';
-    query.approvalStatus = 'Approved';
     query.isActive = true;
+    query.$or = [
+      { approvalStatus: 'Approved' },
+      { partnerId: { $exists: true, $ne: null } },
+    ];
   } else {
     if (status && status !== 'All') query.status = status;
     if (approvalStatus && approvalStatus !== 'All') query.approvalStatus = approvalStatus;
@@ -628,14 +900,13 @@ export const getGyms = asyncHandler(async (req, res) => {
     ];
   }
 
-  const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
-  const limitNum = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 50));
-  const skip = (pageNum - 1) * limitNum;
+  // Optimized lean projection: fetch only essential card fields (exclude heavy photos, gallery, trainers, reviews, rules, documents)
+  const cardProjection =
+    'partnerId slug name location area city state address fullAddress phone email ownerName rating reviewsCount singleSessionPrice pricingPlans.singleSession pricingPlans.monthly monthlyPrice logo coverPhoto image images badgeText tags workouts businessType facilities subscriptionType status approvalStatus createdAt';
 
-  // Retrieve matching gyms from DB
   const [totalCount, rawGyms] = await Promise.all([
     Gym.countDocuments(query),
-    Gym.find(query).lean(),
+    Gym.find(query).select(cardProjection).lean(),
   ]);
 
   // Transform and calculate distance dynamically
@@ -647,57 +918,48 @@ export const getGyms = asyncHandler(async (req, res) => {
       ? calculateDistanceKm(userLat, userLng, gymLat, gymLng)
       : calculateDistanceKm(13.085, 80.2101, gymLat, gymLng);
 
-    const price = g.singleSessionPrice || g.pricingPlans?.singleSession || 199;
-    const displayLocation = g.area ? `${g.area}, ${g.city}` : g.city;
-    const coverImg =
-      g.coverPhoto?.fileData ||
-      (typeof g.coverPhoto === 'string' && g.coverPhoto.length > 0 ? g.coverPhoto : null) ||
-      (g.galleryPhotos && g.galleryPhotos[0]?.fileData) ||
-      (Array.isArray(g.images) && g.images[0]) ||
-      (g.image && g.image !== g.logo?.fileData ? g.image : null) ||
-      g.logo?.fileData ||
-      (typeof g.logo === 'string' && g.logo.length > 0 ? g.logo : null) ||
-      'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop';
+    const sessionPrice = g.singleSessionPrice || g.pricingPlans?.singleSession || 199;
+    const monthlyPrice = g.monthlyPrice || g.pricingPlans?.monthly || sessionPrice * 10;
+    const displayLocation = g.area ? `${g.area}, ${g.city}` : (g.city || 'Chennai');
+    const mediaUrls = resolveGymMediaUrls(g);
 
     return {
       index: skip + index + 1,
       id: g.partnerId || g._id.toString(),
+      _id: g._id.toString(),
       mongoId: g._id.toString(),
       partnerId: g.partnerId || '',
       name: g.name,
-      tagline: g.tagline || '',
       location: displayLocation,
+      place: displayLocation,
       area: g.area || '',
-      city: g.city,
+      city: g.city || '',
       state: g.state || 'Tamil Nadu',
-      address: g.address,
-      fullAddress: g.fullAddress || `${g.address}, ${displayLocation}`,
+      address: g.address || g.fullAddress || displayLocation,
+      fullAddress: g.fullAddress || g.address || displayLocation,
+      phone: g.phone || '',
+      email: g.email || '',
+      ownerName: g.ownerName || '',
       distance,
       distanceText: `${distance} km`,
       coords: { latitude: gymLat, longitude: gymLng },
-      rating: g.rating || 4.8,
-      reviewsCount: g.reviewsCount || 120,
-      pricePerSession: price,
-      singleSessionPrice: price,
-      imageUrl: coverImg,
-      coverPhoto: g.coverPhoto || {},
-      logo: g.logo || {},
-      galleryPhotos: g.galleryPhotos || [],
-      images: g.images || [],
-      badgeText: g.badgeText || (g.rating >= 4.8 ? 'Top Rated' : 'Verified'),
-      facilities: g.facilities || ['AC', 'Locker', 'Shower', 'Cardio', 'Weights'],
-      amenities: g.amenities || [],
-      workouts: g.workouts || ['Cardio', 'Strength', 'CrossFit'],
-      tags: g.tags || ['Strength', 'Cardio', 'Personal Training'],
-      pricingPlans: g.pricingPlans || {
-        singleSession: price,
-        weeklyPass: price * 4,
-        monthly: price * 10,
-      },
-      openingHours: g.openingHours || { displayText: '05:30 AM - 10:30 PM' },
-      trainers: g.trainers || [],
-      phone: g.phone || '',
-      email: g.email || '',
+      rating: g.rating || 0,
+      reviewsCount: g.reviewsCount || 0,
+      singleSessionPrice: sessionPrice,
+      pricePerSession: sessionPrice,
+      monthlyPrice: monthlyPrice,
+      membershipPrice: monthlyPrice,
+      logo: g.logo || mediaUrls.logoUrl,
+      coverPhoto: g.coverPhoto || mediaUrls.coverPhotoUrl,
+      logoUrl: mediaUrls.logoUrl,
+      coverPhotoUrl: mediaUrls.coverPhotoUrl,
+      imageUrl: mediaUrls.imageUrl,
+      thumbnailImage: mediaUrls.thumbnailImage,
+      badgeText: g.badgeText || (g.rating >= 4.8 ? 'Top Rated' : ''),
+      tags: g.tags || [],
+      workouts: g.workouts || [],
+      facilities: g.facilities || [],
+      subscriptionType: g.subscriptionType || 'Standard',
       status: g.status,
       approvalStatus: g.approvalStatus,
       createdAt: g.createdAt,
@@ -705,7 +967,6 @@ export const getGyms = asyncHandler(async (req, res) => {
   });
 
   // Filter by radius if provided
-  const maxRadius = Number(radius_km || radius);
   if (!Number.isNaN(maxRadius) && maxRadius > 0 && hasCoordinates) {
     processedGyms = processedGyms.filter((g) => g.distance <= maxRadius);
   }
@@ -725,34 +986,198 @@ export const getGyms = asyncHandler(async (req, res) => {
   // Pagination slice
   const paginatedGyms = processedGyms.slice(skip, skip + limitNum);
 
-  return res.status(200).json(
-    ApiResponse.success(
-      {
-        gyms: paginatedGyms,
-        pagination: {
-          total: processedGyms.length,
-          page: pageNum,
-          limit: limitNum,
-          pages: Math.ceil(processedGyms.length / limitNum) || 1,
-        },
+  const payload = ApiResponse.success(
+    {
+      gyms: paginatedGyms,
+      pagination: {
+        total: processedGyms.length,
+        page: pageNum,
+        limit: limitNum,
+        pages: Math.ceil(processedGyms.length / limitNum) || 1,
       },
-      'Gyms retrieved successfully'
-    )
+    },
+    'Gyms retrieved successfully'
   );
+
+  discoveryCache.set(cacheKey, {
+    timestamp: Date.now(),
+    payload,
+  });
+
+  return res.status(200).json(payload);
+});
+
+// Fast in-memory cache for Super Admin Fleet queries with automatic TTL and cache invalidation
+const fleetCache = new Map();
+const FLEET_CACHE_TTL_MS = 60 * 1000; // 1 minute TTL
+
+export const clearFleetCache = () => {
+  fleetCache.clear();
+  discoveryCache.clear();
+};
+
+/**
+ * GET /api/v1/gyms/admin/fleet (or GET /api/v1/admin/gyms)
+ * Dedicated Super Admin Fleet Management API
+ * Returns all gyms with complete administrative details, verification info, and resolved media URLs
+ */
+export const getAdminGymsFleet = asyncHandler(async (req, res) => {
+  const {
+    tab = 'all',
+    status,
+    approvalStatus,
+    subscriptionType,
+    search,
+    city,
+    page = 1,
+    limit = 100,
+    force,
+  } = req.query;
+
+  const cacheKey = JSON.stringify({ tab, status, approvalStatus, subscriptionType, search, city, page, limit });
+  const cached = fleetCache.get(cacheKey);
+  const now = Date.now();
+
+  if (!force && cached && (now - cached.timestamp < FLEET_CACHE_TTL_MS)) {
+    return res.status(200).json(cached.data);
+  }
+
+  const query = {};
+
+  // Tab filtering for Super Admin Dashboard
+  const activeTab = (tab || '').toLowerCase().trim();
+  if (activeTab === 'pending') {
+    query.approvalStatus = {
+      $in: ['Pending Approval', 'Pending Admin Review', 'On Hold', 'pending', 'under_review'],
+    };
+  } else if (activeTab === 'approved') {
+    query.approvalStatus = 'Approved';
+  } else if (activeTab === 'rejected') {
+    query.approvalStatus = 'Rejected';
+  } else if (activeTab === 'changes') {
+    query.$or = [
+      { changesCount: { $gt: 0 } },
+      { 'auditHistory.0': { $exists: true } },
+      { pendingChanges: { $exists: true, $ne: {} } },
+    ];
+  }
+
+  // Explicit status override
+  if (status && status !== 'All') {
+    query.status = status;
+  }
+  if (approvalStatus && approvalStatus !== 'All') {
+    query.approvalStatus = approvalStatus;
+  }
+  if (subscriptionType && subscriptionType !== 'All') {
+    query.subscriptionType = subscriptionType;
+  }
+  if (city && city !== 'All') {
+    query.city = new RegExp(city.trim(), 'i');
+  }
+
+  // Search filter across partner ID, gym name, owner name, email, phone, city, area
+  if (search && search.trim()) {
+    const s = search.trim();
+    const searchRegex = new RegExp(s, 'i');
+    query.$or = [
+      { partnerId: searchRegex },
+      { name: searchRegex },
+      { ownerName: searchRegex },
+      { email: searchRegex },
+      { phone: searchRegex },
+      { city: searchRegex },
+      { area: searchRegex },
+      { address: searchRegex },
+    ];
+  }
+
+  const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
+  const limitNum = Math.min(200, Math.max(1, Number.parseInt(limit, 10) || 100));
+  const skip = (pageNum - 1) * limitNum;
+
+  const [totalCount, rawGyms] = await Promise.all([
+    Gym.countDocuments(query),
+    Gym.find(query)
+      .select('-documents -galleryPhotos -auditHistory -images')
+      .sort({ createdAt: -1, partnerId: 1 })
+      .skip(skip)
+      .limit(limitNum)
+      .lean(),
+  ]);
+
+  const gyms = rawGyms.map((g) => {
+    const media = resolveGymMediaUrls(g);
+    const gymId = g.partnerId || g._id.toString();
+    const displayLocation = g.area ? `${g.area}, ${g.city}` : (g.city || 'Chennai');
+    const fullLocation = g.fullAddress || g.address || displayLocation;
+
+    return {
+      ...g,
+      id: gymId,
+      _id: g._id.toString(),
+      mongoId: g._id.toString(),
+      partnerId: g.partnerId || gymId,
+      location: displayLocation,
+      fullAddress: fullLocation,
+      address: g.address || fullLocation,
+      logoUrl: media.logoUrl,
+      coverPhotoUrl: media.coverPhotoUrl,
+      imageUrl: media.imageUrl,
+      thumbnailImage: media.thumbnailImage,
+    };
+  });
+
+  const responsePayload = ApiResponse.success(
+    {
+      gyms,
+      pagination: {
+        total: totalCount,
+        page: pageNum,
+        limit: limitNum,
+        pages: Math.ceil(totalCount / limitNum) || 1,
+      },
+    },
+    'Super Admin Gyms Fleet retrieved successfully'
+  );
+
+  fleetCache.set(cacheKey, {
+    timestamp: now,
+    data: responsePayload,
+  });
+
+  return res.status(200).json(responsePayload);
 });
 
 
 /**
  * GET /api/v1/gyms/:id
- * Retrieve a specific gym by its Mongo ID, partnerId, or slug
+ * Retrieve a specific gym by its Mongo ID, partnerId, slug, ownerId, or 'me'
  */
 export const getGymById = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   let gym;
-  if (mongoose.Types.ObjectId.isValid(id)) {
-    gym = await Gym.findById(id);
+
+  // Handle owner alias 'me' or 'my-gym' or 'profile'
+  if (id === 'me' || id === 'my-gym' || id === 'profile') {
+    if (req.user?.gymId) {
+      gym = await Gym.findById(req.user.gymId);
+    }
+    if (!gym && req.user?._id) {
+      gym = await Gym.findOne({ ownerId: req.user._id });
+    }
   }
+
+  // Handle Mongo ID (Gym _id or Owner _id)
+  if (!gym && mongoose.Types.ObjectId.isValid(id)) {
+    gym = await Gym.findById(id);
+    if (!gym) {
+      gym = await Gym.findOne({ ownerId: id });
+    }
+  }
+
+  // Handle partnerId or slug
   if (!gym) {
     gym = await Gym.findOne({
       $or: [{ partnerId: id }, { slug: id }],
@@ -763,8 +1188,82 @@ export const getGymById = asyncHandler(async (req, res) => {
     throw ApiError.notFound('Gym not found.');
   }
 
+  const media = resolveGymMediaUrls(gym);
+  const sanitized = sanitizeDocument(gym);
+
+  const isSuperAdmin = req.user?.role === USER_ROLES.SUPER_ADMIN;
+  const isOwner = req.user && (
+    (gym.ownerId && String(gym.ownerId) === String(req.user._id)) ||
+    (req.user.gymId && String(gym._id) === String(req.user.gymId))
+  );
+
+  if (!isSuperAdmin && !isOwner) {
+    delete sanitized.pendingChanges;
+    delete sanitized.auditHistory;
+  } else if (Array.isArray(sanitized.auditHistory)) {
+    sanitized.auditHistory = sanitized.auditHistory.slice(-15).map((log) => ({
+      _id: log._id,
+      changeType: log.changeType,
+      changedBy: log.changedBy,
+      changedByRole: log.changedByRole,
+      changedAt: log.changedAt,
+      field: log.field,
+      requestedOn: log.requestedOn,
+      approvalStatus: log.approvalStatus,
+      adminRemarks: log.adminRemarks,
+      reviewedBy: log.reviewedBy,
+      reviewedAt: log.reviewedAt,
+      editedFields: sanitizeSnapshotForAudit(log.editedFields || {}),
+    }));
+  }
+
+  // Merge & ensure active approved employee trainers are populated
+  try {
+    const isObjectId = mongoose.Types.ObjectId.isValid(gym._id);
+    const approvedEmployeeTrainers = await Employee.find({
+      $or: [
+        { gymPartnerId: gym.partnerId },
+        { gymId: isObjectId ? gym._id : null },
+        { gymId: String(gym._id) },
+      ].filter(Boolean),
+      role: 'Trainer',
+      status: 'Active',
+      approvalStatus: 'Approved',
+    }).lean();
+
+    if (approvedEmployeeTrainers && approvedEmployeeTrainers.length > 0) {
+      const defaultAvatar = 'https://images.unsplash.com/photo-1567013127542-490d757e51fc?q=80&w=400&auto=format&fit=crop';
+      sanitized.trainers = approvedEmployeeTrainers.map((emp) => ({
+        id: emp.id || emp.employeeId || emp._id,
+        _id: emp._id,
+        employeeId: emp.employeeId,
+        name: emp.name,
+        specialty: emp.specialty || emp.previousDesignation || 'Certified Fitness Trainer',
+        experienceYears: Number(emp.experienceYears) || 2,
+        rating: Number(emp.rating) || 4.9,
+        reviewsCount: Number(emp.reviewsCount) || 0,
+        ratings: Array.isArray(emp.ratings) ? emp.ratings : [],
+        monthlyFee: emp.compensation?.payAmount || 0,
+        imageUrl: emp.avatar || defaultAvatar,
+      }));
+    } else if (!Array.isArray(sanitized.trainers)) {
+      sanitized.trainers = [];
+    }
+  } catch (err) {
+    console.error('[GET_GYM_BY_ID] Error pulling employee trainers from SSOT:', err?.message);
+  }
+
   return res.status(200).json(
-    ApiResponse.success(sanitizeDocument(gym), 'Gym details retrieved successfully')
+    ApiResponse.success(
+      {
+        ...sanitized,
+        logoUrl: media.logoUrl,
+        coverPhotoUrl: media.coverPhotoUrl,
+        imageUrl: media.imageUrl,
+        thumbnailImage: media.thumbnailImage,
+      },
+      'Gym details retrieved successfully'
+    )
   );
 });
 
@@ -789,6 +1288,31 @@ const calculateGymFieldDiff = (previous, updated) => {
   });
 
   return diff;
+};
+
+/**
+ * Helper to recursively sanitize snapshot objects for audit history (strips large media base64)
+ */
+const sanitizeSnapshotForAudit = (obj = {}) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const clean = Array.isArray(obj) ? [] : {};
+  const binaryKeys = new Set([
+    'logo', 'coverPhoto', 'image', 'images', 'galleryPhotos', 'documents',
+    'logoUrl', 'coverPhotoUrl', 'imageUrl', 'thumbnailImage', 'fileData',
+  ]);
+
+  Object.entries(obj).forEach(([k, v]) => {
+    if (binaryKeys.has(k)) {
+      clean[k] = v ? '[Media Asset]' : null;
+    } else if (typeof v === 'string' && v.length > 500) {
+      clean[k] = v.startsWith('data:') ? '[Media Base64]' : v.substring(0, 200) + '...';
+    } else if (typeof v === 'object' && v !== null) {
+      clean[k] = sanitizeSnapshotForAudit(v);
+    } else {
+      clean[k] = v;
+    }
+  });
+  return clean;
 };
 
 /**
@@ -836,26 +1360,47 @@ const applyChangesToGymDocument = async (gym, changes) => {
   if (changes.floorSpaceSqFt !== undefined) gym.floorSpaceSqFt = Number(changes.floorSpaceSqFt);
   if (changes.maxFloorCapacity !== undefined) gym.maxFloorCapacity = Number(changes.maxFloorCapacity);
   if (changes.genderAllowed) gym.genderAllowed = changes.genderAllowed;
-  if (changes.aboutText !== undefined) gym.aboutText = changes.aboutText;
-  if (changes.facilities !== undefined) gym.facilities = changes.facilities;
-  if (changes.amenities !== undefined) gym.amenities = changes.amenities;
-  if (changes.workouts !== undefined) gym.workouts = changes.workouts;
-  if (changes.customFacilities !== undefined) gym.customFacilities = changes.customFacilities;
+  if (changes.facilities !== undefined) {
+    gym.facilities = changes.facilities;
+    gym.customFacilities = (Array.isArray(changes.facilities) ? changes.facilities : []).map((f, idx) => ({
+      id: `fac-${idx}`,
+      name: typeof f === 'string' ? f : f?.name || String(f),
+      category: 'General',
+      status: 'Active',
+      count: 1,
+    }));
+  } else if (changes.customFacilities !== undefined) {
+    gym.customFacilities = changes.customFacilities;
+  }
+  if (changes.slotDurationMinutes !== undefined) gym.slotDurationMinutes = Number(changes.slotDurationMinutes);
+  if (changes.maxSlotCapacity !== undefined) gym.maxSlotCapacity = Number(changes.maxSlotCapacity);
+  if (changes.slotsMorning !== undefined) gym.slotsMorning = changes.slotsMorning;
+  if (changes.slotsEvening !== undefined) gym.slotsEvening = changes.slotsEvening;
+  if (changes.freeCancellationHours !== undefined) gym.freeCancellationHours = Number(changes.freeCancellationHours);
+  if (changes.refundPercentage !== undefined) gym.refundPercentage = Number(changes.refundPercentage);
+  if (changes.rescheduleAllowedCount !== undefined) gym.rescheduleAllowedCount = Number(changes.rescheduleAllowedCount);
 
-  // Pricing Plans
-  if (changes.singleSessionPrice !== undefined) {
-    gym.singleSessionPrice = Number(changes.singleSessionPrice);
-    if (gym.pricingPlans) gym.pricingPlans.singleSession = Number(changes.singleSessionPrice);
-  }
-  if (changes.weeklyPassPrice !== undefined && gym.pricingPlans) gym.pricingPlans.weeklyPass = Number(changes.weeklyPassPrice);
-  if (changes.monthlyPrice !== undefined && gym.pricingPlans) gym.pricingPlans.monthly = Number(changes.monthlyPrice);
-  if (changes.quarterlyPrice !== undefined && gym.pricingPlans) gym.pricingPlans.quarterly = Number(changes.quarterlyPrice);
-  if (changes.halfYearlyPrice !== undefined && gym.pricingPlans) gym.pricingPlans.halfYearly = Number(changes.halfYearlyPrice);
-  if (changes.annualPrice !== undefined && gym.pricingPlans) gym.pricingPlans.annual = Number(changes.annualPrice);
-  if (changes.pricingPlans && typeof changes.pricingPlans === 'object') {
+  // Pricing Plans (4 Standardized Tiers: Monthly, Quarterly, Half-Yearly, Annual)
+  if (changes.customPricingPlans !== undefined && Array.isArray(changes.customPricingPlans)) {
+    const standardCustomPlans = buildStandardCustomPricingPlans(gym.pricingPlans || {}, changes.customPricingPlans);
+    gym.customPricingPlans = standardCustomPlans;
+
+    const mPlan = standardCustomPlans.find((p) => p.tierId === 'monthly');
+    const qPlan = standardCustomPlans.find((p) => p.tierId === 'quarterly');
+    const hPlan = standardCustomPlans.find((p) => p.tierId === 'half_yearly');
+    const aPlan = standardCustomPlans.find((p) => p.tierId === 'annual');
+
+    gym.pricingPlans = {
+      ...(gym.pricingPlans || {}),
+      monthly: mPlan ? mPlan.price : (gym.pricingPlans?.monthly || 1299),
+      quarterly: qPlan ? qPlan.price : (gym.pricingPlans?.quarterly || 3299),
+      halfYearly: hPlan ? hPlan.price : (gym.pricingPlans?.halfYearly || 5999),
+      annual: aPlan ? aPlan.price : (gym.pricingPlans?.annual || 11999),
+    };
+  } else if (changes.pricingPlans && typeof changes.pricingPlans === 'object') {
     gym.pricingPlans = { ...(gym.pricingPlans || {}), ...changes.pricingPlans };
+    gym.customPricingPlans = buildStandardCustomPricingPlans(gym.pricingPlans, gym.customPricingPlans);
   }
-  if (changes.customPricingPlans !== undefined) gym.customPricingPlans = changes.customPricingPlans;
 
   // Operations & Schedule
   if (changes.openingHours || changes.schedule || changes.holidays || changes.weekdayOpen || changes.weekdayClose) {
@@ -952,9 +1497,22 @@ export const updateGym = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   let gym;
-  if (mongoose.Types.ObjectId.isValid(id)) {
-    gym = await Gym.findById(id);
+  if (id === 'me' || id === 'my-gym' || id === 'profile') {
+    if (req.user?.gymId) {
+      gym = await Gym.findById(req.user.gymId);
+    }
+    if (!gym && req.user?._id) {
+      gym = await Gym.findOne({ ownerId: req.user._id });
+    }
   }
+
+  if (!gym && mongoose.Types.ObjectId.isValid(id)) {
+    gym = await Gym.findById(id);
+    if (!gym) {
+      gym = await Gym.findOne({ ownerId: id });
+    }
+  }
+
   if (!gym) {
     gym = await Gym.findOne({
       $or: [{ partnerId: id }, { slug: id }],
@@ -967,6 +1525,7 @@ export const updateGym = asyncHandler(async (req, res) => {
 
   // Check authorization for Gym Owner
   const isSuperAdmin = req.user.role === USER_ROLES.SUPER_ADMIN;
+  console.log(`[DEBUG updateGym] User: ${req.user.email}, Role: "${req.user.role}", isSuperAdmin: ${isSuperAdmin}, USER_ROLES.SUPER_ADMIN: "${USER_ROLES.SUPER_ADMIN}"`);
   if (!isSuperAdmin) {
     const isOwner =
       (gym.ownerId && String(gym.ownerId) === String(req.user._id)) ||
@@ -987,6 +1546,9 @@ export const updateGym = asyncHandler(async (req, res) => {
     gym.status = 'Active';
     gym.changesCount = 0;
 
+    const sanitizedPrev = sanitizeSnapshotForAudit(currentSnapshot);
+    const sanitizedNew = sanitizeSnapshotForAudit(gym.toObject());
+
     if (!gym.auditHistory) gym.auditHistory = [];
     gym.auditHistory.unshift({
       changeType: 'SUPER_ADMIN_DIRECT_EDIT',
@@ -996,13 +1558,14 @@ export const updateGym = asyncHandler(async (req, res) => {
       requestedOn: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
       field: 'Direct Super Admin Profile Update',
       editedFields: { directUpdate: { oldValue: null, newValue: 'Updated directly by Super Administrator' } },
-      previousSnapshot: currentSnapshot,
-      newSnapshot: gym.toObject(),
+      previousSnapshot: {},
+      newSnapshot: {},
       approvalStatus: 'Approved',
       reviewedBy: req.user.email,
       reviewedAt: new Date(),
       adminRemarks: 'Directly applied and approved by Super Administrator',
     });
+    gym.auditHistory = gym.auditHistory.slice(0, 10);
 
     await gym.save();
 
@@ -1064,13 +1627,15 @@ export const updateGym = asyncHandler(async (req, res) => {
     changedAt: new Date(),
     requestedOn: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
     field: Object.keys(onlyChangedFields).join(', ') || 'General Profile Update',
-    editedFields: editedDiff,
-    previousSnapshot: currentSnapshot,
-    newSnapshot: onlyChangedFields,
+    editedFields: sanitizeSnapshotForAudit(editedDiff),
+    previousSnapshot: {},
+    newSnapshot: {},
     approvalStatus: 'Pending Approval',
   });
+  gym.auditHistory = gym.auditHistory.slice(0, 10);
 
   await gym.save();
+  clearFleetCache();
 
   return res.status(200).json(
     ApiResponse.success(
@@ -1174,7 +1739,28 @@ export const updateGymStatus = asyncHandler(async (req, res) => {
     gym.status = status;
   }
 
-  await gym.save();
+  try {
+    await gym.save();
+  } catch (saveErr) {
+    if (saveErr.name === 'VersionError') {
+      const freshDoc = await Gym.findById(gym._id);
+      if (freshDoc) {
+        freshDoc.status = gym.status;
+        freshDoc.approvalStatus = gym.approvalStatus;
+        if (gym.partnerId) freshDoc.partnerId = gym.partnerId;
+        if (gym.remark !== undefined) freshDoc.remark = gym.remark;
+        if (gym.rejectionReason !== undefined) freshDoc.rejectionReason = gym.rejectionReason;
+        freshDoc.pendingChanges = gym.pendingChanges;
+        freshDoc.changesCount = gym.changesCount;
+        freshDoc.auditHistory = gym.auditHistory;
+        await freshDoc.save();
+        gym = freshDoc;
+      }
+    } else {
+      throw saveErr;
+    }
+  }
+  clearFleetCache();
 
   return res.status(200).json(
     ApiResponse.success(
@@ -1224,6 +1810,7 @@ export const resubmitGymApplication = asyncHandler(async (req, res) => {
   }
 
   await gym.save();
+  clearFleetCache();
 
   return res.status(200).json(
     ApiResponse.success(
@@ -1261,6 +1848,7 @@ export const deleteGym = asyncHandler(async (req, res) => {
   if (ownerId) {
     await User.findByIdAndDelete(ownerId);
   }
+  clearFleetCache();
 
   return res.status(200).json(
     ApiResponse.success(null, `Gym "${gymName}" and associated partner account deleted successfully`)

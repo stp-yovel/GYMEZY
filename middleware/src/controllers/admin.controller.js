@@ -46,7 +46,7 @@ export const getDashboardStats = asyncHandler(async (_req, res) => {
     topGymsList,
   ] = await Promise.all([
     Gym.countDocuments({}),
-    Gym.countDocuments({ status: 'Active', approvalStatus: 'Approved' }),
+    Gym.countDocuments({ status: 'Active' }),
     Gym.countDocuments({ status: 'Inactive' }),
     Gym.countDocuments({ approvalStatus: 'Pending Approval' }),
     Gym.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
@@ -59,7 +59,7 @@ export const getDashboardStats = asyncHandler(async (_req, res) => {
       .sort({ createdAt: -1 })
       .limit(5)
       .select('name phone email city createdAt subscriptionType'),
-    Gym.find({ approvalStatus: 'Approved' })
+    Gym.find({ status: 'Active' })
       .sort({ rating: -1, membersCount: -1 })
       .limit(5)
       .select('name rating reviewsCount membersCount monthlyRevenue city image'),

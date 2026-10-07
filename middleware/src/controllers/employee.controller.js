@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Employee } from '../models/employee.model.js';
 import { Gym } from '../models/gym.model.js';
 import { ApiError } from '../utils/apiError.js';
@@ -6,21 +7,87 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { USER_ROLES } from '../models/user.model.js';
 
 /**
+ * Synchronize approved trainers from Employee collection to the parent Gym's embedded trainers array
+ */
+export const syncGymTrainersFromEmployees = async (gymIdentifier) => {
+  if (!gymIdentifier) return;
+  try {
+    const isObjectId = typeof gymIdentifier === 'string' && gymIdentifier.match(/^[0-9a-fA-F]{24}$/);
+    const gym = await Gym.findOne({
+      $or: [
+        { partnerId: gymIdentifier },
+        { _id: isObjectId ? gymIdentifier : null },
+      ].filter(Boolean),
+    });
+    if (!gym) return;
+
+    const approvedTrainers = await Employee.find({
+      $or: [
+        { gymPartnerId: gym.partnerId },
+        { gymId: gym._id },
+        { gymId: String(gym._id) },
+      ].filter(Boolean),
+      role: 'Trainer',
+      status: 'Active',
+      approvalStatus: 'Approved',
+    }).lean();
+
+    const defaultAvatar = 'https://images.unsplash.com/photo-1567013127542-490d757e51fc?q=80&w=400&auto=format&fit=crop';
+    gym.trainers = approvedTrainers.map((emp) => ({
+      name: emp.name,
+      specialty: emp.specialty || emp.previousDesignation || 'Certified Fitness Trainer',
+      experienceYears: Number(emp.experienceYears) || 2,
+      rating: emp.rating || 4.9,
+      reviewsCount: emp.reviewsCount || 0,
+      ratings: Array.isArray(emp.ratings) ? emp.ratings : [],
+      monthlyFee: emp.compensation?.payAmount || 0,
+      imageUrl: emp.avatar || defaultAvatar,
+    }));
+
+    await gym.save();
+  } catch (err) {
+    console.error('[SYNC_GYM_TRAINERS] Error syncing trainers:', err?.message);
+  }
+};
+
+/**
+ * Deep-clean objects and subdocuments to remove internal Mongoose fields (_id, __v, dates) for accurate diffing
+ */
+const cleanForDiff = (val) => {
+  if (val === null || val === undefined) return null;
+  if (typeof val !== 'object') {
+    if (typeof val === 'string') return val.trim();
+    return val;
+  }
+  if (Array.isArray(val)) {
+    return val.map(cleanForDiff).filter((item) => item !== null && item !== undefined && item !== '');
+  }
+  const cleaned = {};
+  const ignoredSubKeys = new Set(['_id', 'id', '__v', 'createdAt', 'updatedAt']);
+  Object.keys(val).forEach((k) => {
+    if (!ignoredSubKeys.has(k)) {
+      cleaned[k] = cleanForDiff(val[k]);
+    }
+  });
+  return cleaned;
+};
+
+/**
  * Calculate precise field-level differences between previous and updated objects
  */
 const calculateFieldDiff = (previous, updated) => {
   const diff = {};
-  const ignoredKeys = new Set(['_id', 'id', 'key', 'updatedAt', 'createdAt', 'auditHistory', '__v']);
+  const ignoredKeys = new Set(['_id', 'id', 'key', 'updatedAt', 'createdAt', 'auditHistory', '__v', 'gymId', 'gymPartnerId', 'gymName']);
 
   Object.keys(updated).forEach((key) => {
     if (ignoredKeys.has(key)) return;
-    const oldVal = previous[key];
-    const newVal = updated[key];
+    const oldCleaned = cleanForDiff(previous[key]);
+    const newCleaned = cleanForDiff(updated[key]);
 
-    if (JSON.stringify(oldVal) !== JSON.stringify(newVal) && newVal !== undefined) {
+    if (JSON.stringify(oldCleaned) !== JSON.stringify(newCleaned) && updated[key] !== undefined) {
       diff[key] = {
-        oldValue: oldVal !== undefined ? oldVal : null,
-        newValue: newVal,
+        oldValue: previous[key] !== undefined ? previous[key] : null,
+        newValue: updated[key],
       };
     }
   });
@@ -223,6 +290,10 @@ export const createEmployee = asyncHandler(async (req, res) => {
   newEmployeeData.auditHistory = [initialAuditLog];
 
   const createdEmployee = await Employee.create(newEmployeeData);
+
+  if (createdEmployee.approvalStatus === 'Approved' && createdEmployee.role === 'Trainer') {
+    await syncGymTrainersFromEmployees(gymPartnerId || gymId);
+  }
 
   return res.status(201).json(
     ApiResponse.created(
@@ -538,7 +609,18 @@ export const reviewEmployeeApproval = asyncHandler(async (req, res) => {
 
   if (decision === 'Approved') {
     if (employee.pendingChanges && typeof employee.pendingChanges === 'object') {
-      Object.assign(employee, employee.pendingChanges);
+      Object.entries(employee.pendingChanges).forEach(([key, val]) => {
+        if (key && !key.startsWith('_')) {
+          employee.set(key, val);
+          employee.markModified(key);
+        }
+      });
+      // Align attendance if status was changed
+      if (employee.pendingChanges.status === 'Inactive' || employee.pendingChanges.status === 'Suspended') {
+        employee.attendance = '—';
+      } else if (employee.pendingChanges.status === 'Active' && employee.attendance === '—') {
+        employee.attendance = 'Present';
+      }
       employee.pendingChanges = null;
     }
     employee.approvalStatus = 'Approved';
@@ -564,6 +646,10 @@ export const reviewEmployeeApproval = asyncHandler(async (req, res) => {
 
   await employee.save();
 
+  if (employee.role === 'Trainer') {
+    await syncGymTrainersFromEmployees(employee.gymPartnerId || employee.gymId);
+  }
+
   return res.status(200).json(
     ApiResponse.success(
       employee,
@@ -587,7 +673,12 @@ export const deleteEmployee = asyncHandler(async (req, res) => {
   const isSuperAdmin = req.user?.role === USER_ROLES.SUPER_ADMIN;
 
   if (isSuperAdmin) {
+    const gymIdentifier = employee.gymPartnerId || employee.gymId;
+    const isTrainer = employee.role === 'Trainer';
     await Employee.findByIdAndDelete(id);
+    if (isTrainer) {
+      await syncGymTrainersFromEmployees(gymIdentifier);
+    }
     return res.status(200).json(ApiResponse.success(null, 'Employee deleted permanently.'));
   }
 

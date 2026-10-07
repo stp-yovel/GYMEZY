@@ -61,15 +61,49 @@ const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 
-// Helper function to extract gym logo
 const getGymLogoSrc = (gym) => {
   if (!gym) return '';
-  if (typeof gym.logo === 'string' && gym.logo) return gym.logo;
-  if (gym.logo && typeof gym.logo.fileData === 'string' && gym.logo.fileData) return gym.logo.fileData;
-  if (typeof gym.logoUrl === 'string' && gym.logoUrl) return gym.logoUrl;
-  if (gym.coverPhoto && typeof gym.coverPhoto.fileData === 'string' && gym.coverPhoto.fileData) return gym.coverPhoto.fileData;
-  if (typeof gym.coverPhoto === 'string' && gym.coverPhoto) return gym.coverPhoto;
-  if (typeof gym.image === 'string' && gym.image) return gym.image;
+  // 1. Direct logo fileData (Base64 WebP/PNG)
+  if (gym.logo && typeof gym.logo.fileData === 'string' && gym.logo.fileData.trim()) {
+    return gym.logo.fileData.trim();
+  }
+  // 2. Direct logo URL/string
+  if (typeof gym.logo === 'string' && gym.logo.trim()) {
+    return gym.logo.trim();
+  }
+  // 3. logoUrl convenience field
+  if (typeof gym.logoUrl === 'string' && gym.logoUrl.trim()) {
+    return gym.logoUrl.trim();
+  }
+  // 4. coverPhoto fileData
+  if (gym.coverPhoto && typeof gym.coverPhoto.fileData === 'string' && gym.coverPhoto.fileData.trim()) {
+    return gym.coverPhoto.fileData.trim();
+  }
+  // 5. coverPhoto URL/string
+  if (typeof gym.coverPhoto === 'string' && gym.coverPhoto.trim()) {
+    return gym.coverPhoto.trim();
+  }
+  // 6. coverPhotoUrl convenience field
+  if (typeof gym.coverPhotoUrl === 'string' && gym.coverPhotoUrl.trim()) {
+    return gym.coverPhotoUrl.trim();
+  }
+  // 7. imageUrl or image
+  if (typeof gym.imageUrl === 'string' && gym.imageUrl.trim()) {
+    return gym.imageUrl.trim();
+  }
+  if (typeof gym.image === 'string' && gym.image.trim()) {
+    return gym.image.trim();
+  }
+  if (typeof gym.thumbnailImage === 'string' && gym.thumbnailImage.trim()) {
+    return gym.thumbnailImage.trim();
+  }
+  // 8. Gallery / images array
+  if (Array.isArray(gym.images) && gym.images.length > 0 && typeof gym.images[0] === 'string' && gym.images[0].trim()) {
+    return gym.images[0].trim();
+  }
+  if (Array.isArray(gym.galleryPhotos) && gym.galleryPhotos.length > 0 && gym.galleryPhotos[0]?.fileData) {
+    return gym.galleryPhotos[0].fileData.trim();
+  }
   return '';
 };
 
@@ -170,6 +204,7 @@ export const GymDetailsView = ({
   const [holdNotes, setHoldNotes] = useState(gym?.remark || '');
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectNotes, setRejectNotes] = useState(gym?.remark || '');
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   // Edit Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -436,16 +471,18 @@ export const GymDetailsView = ({
             ))}
           </Select>
 
-          {gym.approvalStatus === 'Pending Approval' || gym.approvalStatus === 'On Hold' || gym.approvalStatus === 'Rejected' ? (
+          {(gym.approvalStatus === 'Pending Approval' || gym.approvalStatus === 'On Hold' || gym.approvalStatus === 'Rejected' || Boolean(gym.pendingChanges && Object.keys(gym.pendingChanges).length > 0) || Boolean(gym.changesCount > 0)) ? (
             <Space>
               <Button
                 danger
+                disabled={isProcessingAction}
                 onClick={() => setIsRejectModalOpen(true)}
                 style={{ fontWeight: 600, borderRadius: 'var(--radius-base)' }}
               >
                 Reject
               </Button>
               <Button
+                disabled={isProcessingAction}
                 onClick={() => setIsHoldModalOpen(true)}
                 style={{
                   fontWeight: 600,
@@ -458,7 +495,18 @@ export const GymDetailsView = ({
               </Button>
               <Button
                 type="primary"
-                onClick={() => onApprove && onApprove(gym)}
+                loading={isProcessingAction}
+                disabled={isProcessingAction}
+                onClick={async () => {
+                  if (onApprove) {
+                    setIsProcessingAction(true);
+                    try {
+                      await onApprove(gym);
+                    } finally {
+                      setIsProcessingAction(false);
+                    }
+                  }
+                }}
                 style={{
                   fontWeight: 700,
                   backgroundColor: '#16a34a',
@@ -642,7 +690,7 @@ export const GymDetailsView = ({
             <div style={{ padding: '12px 16px', borderRadius: 10, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc', border: `1px solid ${isDarkMode ? '#1e293b' : '#e2e8f0'}` }}>
               <Text type="secondary" style={{ fontSize: 11, fontWeight: 700 }}>ACTIVE MEMBERS</Text>
               <div style={{ fontSize: 20, fontWeight: 900, color: '#2563eb', marginTop: 4 }}>
-                {gym.membersCount || 42}
+                {gym.membersCount ?? gym.activeMembers ?? 0}
               </div>
             </div>
           </Col>
@@ -650,7 +698,7 @@ export const GymDetailsView = ({
             <div style={{ padding: '12px 16px', borderRadius: 10, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc', border: `1px solid ${isDarkMode ? '#1e293b' : '#e2e8f0'}` }}>
               <Text type="secondary" style={{ fontSize: 11, fontWeight: 700 }}>MONTHLY GMV</Text>
               <div style={{ fontSize: 20, fontWeight: 900, color: '#16a34a', marginTop: 4 }}>
-                ₹{(gym.monthlyRevenue || 45200).toLocaleString('en-IN')}
+                ₹{(gym.monthlyRevenue ?? gym.monthlyGmv ?? 0).toLocaleString('en-IN')}
               </div>
             </div>
           </Col>
@@ -658,7 +706,7 @@ export const GymDetailsView = ({
             <div style={{ padding: '12px 16px', borderRadius: 10, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc', border: `1px solid ${isDarkMode ? '#1e293b' : '#e2e8f0'}` }}>
               <Text type="secondary" style={{ fontSize: 11, fontWeight: 700 }}>TOTAL BOOKINGS</Text>
               <div style={{ fontSize: 20, fontWeight: 900, color: '#9333ea', marginTop: 4 }}>
-                {gym.totalBookings || 186}
+                {gym.totalBookings ?? gym.bookingsCount ?? 0}
               </div>
             </div>
           </Col>
@@ -666,7 +714,7 @@ export const GymDetailsView = ({
             <div style={{ padding: '12px 16px', borderRadius: 10, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc', border: `1px solid ${isDarkMode ? '#1e293b' : '#e2e8f0'}` }}>
               <Text type="secondary" style={{ fontSize: 11, fontWeight: 700 }}>SINGLE SESSION</Text>
               <div style={{ fontSize: 20, fontWeight: 900, color: '#f59e0b', marginTop: 4 }}>
-                ₹{gym.singleSessionPrice || 199}
+                ₹{gym.singleSessionPrice ?? gym.pricingPlans?.singleSession ?? (gym.customPricingPlans && gym.customPricingPlans.length > 0 ? gym.customPricingPlans[0].price : 0)}
               </div>
             </div>
           </Col>
@@ -674,7 +722,7 @@ export const GymDetailsView = ({
             <div style={{ padding: '12px 16px', borderRadius: 10, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc', border: `1px solid ${isDarkMode ? '#1e293b' : '#e2e8f0'}` }}>
               <Text type="secondary" style={{ fontSize: 11, fontWeight: 700 }}>COMMISSION RATE</Text>
               <div style={{ fontSize: 20, fontWeight: 900, color: '#06b6d4', marginTop: 4 }}>
-                {gym.platformCommission || 10}%
+                {gym.commissionRate ?? gym.platformCommission ?? 10}%
               </div>
             </div>
           </Col>
@@ -682,7 +730,7 @@ export const GymDetailsView = ({
             <div style={{ padding: '12px 16px', borderRadius: 10, backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc', border: `1px solid ${isDarkMode ? '#1e293b' : '#e2e8f0'}` }}>
               <Text type="secondary" style={{ fontSize: 11, fontWeight: 700 }}>SETTLEMENT</Text>
               <div style={{ fontSize: 20, fontWeight: 900, color: '#10b981', marginTop: 4 }}>
-                Daily (T+1)
+                {gym.settlementCycle || gym.bankDetails?.payoutSchedule || 'Daily (T+1)'}
               </div>
             </div>
           </Col>
@@ -931,70 +979,66 @@ export const GymDetailsView = ({
                 <DollarOutlined /> Plans & Pricing
               </span>
             ),
-            children: (
-              <Row gutter={[20, 20]}>
-                <Col xs={24} md={8}>
-                  <Card
-                    title="Single Day Session Pass"
-                    style={{
-                      borderRadius: 14,
-                      backgroundColor: 'var(--bg-surface-elevated)',
-                      borderColor: 'var(--border-color)',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <div style={{ fontSize: 36, fontWeight: 900, color: '#2563eb', margin: '16px 0' }}>
-                      ₹{gym.singleSessionPrice || 199}
-                      <span style={{ fontSize: 14, fontWeight: 500, color: '#64748b' }}> / visit</span>
-                    </div>
-                    <p style={{ color: '#64748b', fontSize: 13 }}>
-                      Allows customer full 1-day access to gym facilities, lockers, and workout floor.
-                    </p>
-                    <Tag color="green">Instant Booking Active</Tag>
-                  </Card>
-                </Col>
-                <Col xs={24} md={8}>
-                  <Card
-                    title="1-Month Unlimited Pass"
-                    style={{
-                      borderRadius: 14,
-                      backgroundColor: 'var(--bg-surface-elevated)',
-                      borderColor: 'var(--border-color)',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <div style={{ fontSize: 36, fontWeight: 900, color: '#16a34a', margin: '16px 0' }}>
-                      ₹1,499
-                      <span style={{ fontSize: 14, fontWeight: 500, color: '#64748b' }}> / month</span>
-                    </div>
-                    <p style={{ color: '#64748b', fontSize: 13 }}>
-                      Unlimited monthly check-ins with access to cardio studio, strength floor, and trainer guidance.
-                    </p>
-                    <Tag color="blue">Best Value</Tag>
-                  </Card>
-                </Col>
-                <Col xs={24} md={8}>
-                  <Card
-                    title="Quarterly Pass (3 Months)"
-                    style={{
-                      borderRadius: 14,
-                      backgroundColor: 'var(--bg-surface-elevated)',
-                      borderColor: 'var(--border-color)',
-                      textAlign: 'center',
-                    }}
-                  >
-                    <div style={{ fontSize: 36, fontWeight: 900, color: '#9333ea', margin: '16px 0' }}>
-                      ₹3,999
-                      <span style={{ fontSize: 14, fontWeight: 500, color: '#64748b' }}> / 3 months</span>
-                    </div>
-                    <p style={{ color: '#64748b', fontSize: 13 }}>
-                      Quarterly subscription including personal diet consultation and locker assignment.
-                    </p>
-                    <Tag color="purple">Popular Membership</Tag>
-                  </Card>
-                </Col>
-              </Row>
-            ),
+            children: (() => {
+              const plans = (Array.isArray(gym.customPricingPlans) && gym.customPricingPlans.length > 0)
+                ? gym.customPricingPlans
+                : [
+                    { name: 'Monthly Plan', badge: 'Monthly', duration: '30 Days', price: gym.pricingPlans?.monthly || 1299, description: 'Standard 30-day recurring membership.', features: ['Access to all gym facilities', 'Free group workout classes', 'Locker and shower facility', 'Trainer guidance on floor'] },
+                    { name: 'Quarterly Plan', badge: 'Quarterly', duration: '90 Days', price: gym.pricingPlans?.quarterly || 3299, savingsText: gym.pricingPlans?.monthly ? `Save ₹${Math.max(0, (gym.pricingPlans.monthly * 3 - (gym.pricingPlans?.quarterly || 3299))).toLocaleString('en-IN')}` : '', description: '3-month structured fitness package.', features: ['Access to all gym facilities', 'Free group workout classes', 'Locker and shower facility', '1 Guest pass per month', '2 Complimentary PT Sessions'] },
+                    { name: 'Half Yearly Plan', badge: 'Half Yearly', duration: '180 Days', price: gym.pricingPlans?.halfYearly || 5999, savingsText: gym.pricingPlans?.monthly ? `Save ₹${Math.max(0, (gym.pricingPlans.monthly * 6 - (gym.pricingPlans?.halfYearly || 5999))).toLocaleString('en-IN')}` : '', description: '6-month transformation package.', features: ['Access to all gym facilities', 'Free group workout classes', 'Locker and shower facility', '1 Guest pass per month', 'Personalized nutrition guidance', '4 Complimentary PT Sessions'] },
+                    { name: 'Annual Plan', badge: 'Annual', duration: '365 Days', price: gym.pricingPlans?.annual || 11999, savingsText: gym.pricingPlans?.monthly ? `Save ₹${Math.max(0, (gym.pricingPlans.monthly * 12 - (gym.pricingPlans?.annual || 11999))).toLocaleString('en-IN')}` : '', description: 'All-inclusive annual membership with priority perks.', features: ['Access to all gym facilities', 'Free group workout classes', 'Locker and shower facility', '2 Guest passes per month', 'Personalized nutrition guidance', 'Free steam & sauna access'] },
+                  ];
+
+              return (
+                <Row gutter={[20, 20]}>
+                  {plans.map((p, idx) => (
+                    <Col xs={24} sm={12} lg={6} key={p.id || p.tierId || idx}>
+                      <Card
+                        title={
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 700 }}>{p.name || p.badge}</span>
+                            {p.popular && <Tag color="blue" style={{ fontSize: 10, fontWeight: 700 }}>MOST POPULAR</Tag>}
+                          </div>
+                        }
+                        style={{
+                          borderRadius: 14,
+                          backgroundColor: 'var(--bg-surface-elevated)',
+                          borderColor: p.popular ? 'var(--color-primary)' : 'var(--border-color)',
+                          borderWidth: p.popular ? 2 : 1,
+                          height: '100%',
+                        }}
+                      >
+                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase' }}>
+                          {p.badge || 'Tier'}
+                        </div>
+                        <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--color-primary)', margin: '8px 0 4px 0' }}>
+                          ₹{Number(p.price || 0).toLocaleString('en-IN')}
+                          <span style={{ fontSize: 12, fontWeight: 500, color: '#64748b' }}> / {p.duration}</span>
+                        </div>
+                        {p.savingsText && (
+                          <Tag color="success" style={{ fontWeight: 700, marginBottom: 8, borderRadius: 4 }}>
+                            {p.savingsText}
+                          </Tag>
+                        )}
+                        <p style={{ color: '#64748b', fontSize: 12, minHeight: 36, marginTop: 4 }}>
+                          {p.description || 'Full gym floor access & workout facilities.'}
+                        </p>
+                        {Array.isArray(p.features) && p.features.length > 0 && (
+                          <div style={{ marginTop: 12, borderTop: '1px solid var(--border-color)', paddingTop: 10 }}>
+                            {p.features.map((feat, fIdx) => (
+                              <div key={fIdx} style={{ fontSize: 12, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                <CheckCircleOutlined style={{ color: '#00bf62', fontSize: 12 }} />
+                                <span>{feat}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              );
+            })(),
           },
           {
             key: 'gallery',
@@ -1410,7 +1454,9 @@ export const GymDetailsView = ({
       <Modal
         title="Put Gym on Hold"
         open={isHoldModalOpen}
-        onCancel={() => setIsHoldModalOpen(false)}
+        onCancel={() => !isProcessingAction && setIsHoldModalOpen(false)}
+        closable={!isProcessingAction}
+        maskClosable={!isProcessingAction}
         footer={null}
         centered
         width={480}
@@ -1421,18 +1467,28 @@ export const GymDetailsView = ({
           </p>
           <TextArea
             rows={4}
+            disabled={isProcessingAction}
             value={holdNotes}
             onChange={(e) => setHoldNotes(e.target.value)}
             placeholder="e.g. Please upload clear trade license, verify gym timings..."
             style={{ marginBottom: 18 }}
           />
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <Button onClick={() => setIsHoldModalOpen(false)}>Cancel</Button>
+            <Button disabled={isProcessingAction} onClick={() => setIsHoldModalOpen(false)}>Cancel</Button>
             <Button
               type="primary"
-              onClick={() => {
-                if (onHold) onHold(gym, holdNotes);
-                setIsHoldModalOpen(false);
+              loading={isProcessingAction}
+              disabled={isProcessingAction}
+              onClick={async () => {
+                if (onHold) {
+                  setIsProcessingAction(true);
+                  try {
+                    await onHold(gym, holdNotes);
+                    setIsHoldModalOpen(false);
+                  } finally {
+                    setIsProcessingAction(false);
+                  }
+                }
               }}
               style={{ fontWeight: 600, backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
             >
@@ -1446,7 +1502,9 @@ export const GymDetailsView = ({
       <Modal
         title="Reject Gym Application"
         open={isRejectModalOpen}
-        onCancel={() => setIsRejectModalOpen(false)}
+        onCancel={() => !isProcessingAction && setIsRejectModalOpen(false)}
+        closable={!isProcessingAction}
+        maskClosable={!isProcessingAction}
         footer={null}
         centered
         width={480}
@@ -1457,19 +1515,29 @@ export const GymDetailsView = ({
           </p>
           <TextArea
             rows={4}
+            disabled={isProcessingAction}
             value={rejectNotes}
             onChange={(e) => setRejectNotes(e.target.value)}
             placeholder="e.g. Incomplete documentation, equipment does not meet platform standards..."
             style={{ marginBottom: 18 }}
           />
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <Button onClick={() => setIsRejectModalOpen(false)}>Cancel</Button>
+            <Button disabled={isProcessingAction} onClick={() => setIsRejectModalOpen(false)}>Cancel</Button>
             <Button
               danger
               type="primary"
-              onClick={() => {
-                if (onReject) onReject(gym, rejectNotes);
-                setIsRejectModalOpen(false);
+              loading={isProcessingAction}
+              disabled={isProcessingAction}
+              onClick={async () => {
+                if (onReject) {
+                  setIsProcessingAction(true);
+                  try {
+                    await onReject(gym, rejectNotes);
+                    setIsRejectModalOpen(false);
+                  } finally {
+                    setIsProcessingAction(false);
+                  }
+                }
               }}
               style={{ fontWeight: 600 }}
             >

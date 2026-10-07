@@ -1,10 +1,19 @@
+import { ApiError } from '../utils/apiError.js';
+import { verifyToken } from '../utils/jwtHelper.js';
+import { COOKIE_NAME } from '../utils/cookieHelper.js';
+import User from '../models/user.model.js';
+
 /**
  * Helper to extract auth token from request
  */
 const extractAuthToken = (req) => {
-  let token = req.cookies?.[COOKIE_NAME] || req.cookies?.authToken || req.cookies?.token;
+  // IMPORTANT: Check Authorization header FIRST, before cookies.
+  // Both Super Admin and Gym Owner portals share the same cookie domain (localhost),
+  // so the authToken cookie may belong to a different user/role.
+  // The Authorization header from localStorage is portal-specific and takes priority.
+  let token = null;
 
-  if (!token && req.headers?.authorization) {
+  if (req.headers?.authorization) {
     const authHeader = req.headers.authorization.trim();
     if (/^bearer\s+/i.test(authHeader)) {
       token = authHeader.replace(/^bearer\s+/i, '').trim();
@@ -19,6 +28,11 @@ const extractAuthToken = (req) => {
 
   if (!token && req.headers?.['x-auth-token']) {
     token = String(req.headers['x-auth-token']).trim();
+  }
+
+  // Fall back to cookies only if no header token was provided
+  if (!token) {
+    token = req.cookies?.[COOKIE_NAME] || req.cookies?.authToken || req.cookies?.token;
   }
 
   return token || null;

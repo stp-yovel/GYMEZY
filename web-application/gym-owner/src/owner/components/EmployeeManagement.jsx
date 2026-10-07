@@ -478,38 +478,46 @@ export const EmployeeManagement = ({
       gymId,
       gymPartnerId,
       gymName,
-      name: values.name ? values.name.trim() : selectedEmployee.name,
+      name: values.name ? values.name.trim() : (selectedEmployee.name || ''),
       phone: formattedPhone,
-      email: values.email ? values.email.trim() : selectedEmployee.email,
-      role: detailRole || values.role || selectedEmployee.role,
-      accessType: detailAccessType || values.accessType || selectedEmployee.accessType,
-      gender: values.gender || selectedEmployee.gender || 'Male',
+      email: values.email ? values.email.trim() : (selectedEmployee.email || ''),
+      role: detailRole || values.role || selectedEmployee.role || 'Trainer',
+      accessType: detailAccessType || values.accessType || selectedEmployee.accessType || 'Employee',
+      gender: values.gender || selectedEmployee.gender || 'All',
       type: values.type || selectedEmployee.type || 'Full-Time',
       status: values.status || selectedEmployee.status || 'Active',
-      avatar: editPhoto || selectedEmployee.avatar || '',
-      specialty: values.specialty || selectedEmployee.specialty || '',
-      experienceYears: typeof values.experienceYears === 'number' ? values.experienceYears : Number(parseInt(values.experienceYears, 10)) || 1,
-      previousCompany: values.prevCompany || selectedEmployee.previousCompany || '',
-      previousDesignation: values.prevDesignation || selectedEmployee.previousDesignation || '',
-      previousExp: values.prevExp || selectedEmployee.previousExp || '',
+      avatar: editPhoto !== null ? editPhoto : (selectedEmployee.avatar || ''),
+      specialty: values.specialty !== undefined ? values.specialty.trim() : (selectedEmployee.specialty || ''),
+      experienceYears: values.experienceYears !== undefined
+        ? (Number(values.experienceYears) || 0)
+        : (Number(selectedEmployee.experienceYears) || 1),
+      previousCompany: values.prevCompany !== undefined ? values.prevCompany.trim() : (selectedEmployee.previousCompany || ''),
+      previousDesignation: values.prevDesignation !== undefined ? values.prevDesignation.trim() : (selectedEmployee.previousDesignation || ''),
+      previousExp: values.prevExp !== undefined ? values.prevExp.trim() : (selectedEmployee.previousExp || ''),
       schedule: {
-        workingDays: editWorkingDays,
-        workingTimeStart: values.workingTimeStart || '06:00 AM',
-        workingTimeEnd: values.workingTimeEnd || '02:00 PM',
-        isDifferentDays: false,
+        workingDays: editWorkingDays && editWorkingDays.length > 0
+          ? editWorkingDays
+          : (Array.isArray(selectedEmployee.schedule?.workingDays) ? selectedEmployee.schedule.workingDays : []),
+        workingTimeStart: values.workingTimeStart || selectedEmployee.schedule?.workingTimeStart || '09:00 AM',
+        workingTimeEnd: values.workingTimeEnd || selectedEmployee.schedule?.workingTimeEnd || '06:00 PM',
+        isDifferentDays: selectedEmployee.schedule?.isDifferentDays || false,
       },
       compensation: {
-        payType: values.payType || 'Monthly',
-        payAmount: Number(values.payAmount) || 0,
-        payFreq: values.payType === 'Monthly' ? 'Monthly' : 'Per Session',
+        payType: values.payType || selectedEmployee.compensation?.payType || 'Monthly',
+        payAmount: values.payAmount !== undefined && values.payAmount !== null && values.payAmount !== ''
+          ? Number(values.payAmount)
+          : (Number(selectedEmployee.compensation?.payAmount) || 0),
+        payFreq: (values.payType || selectedEmployee.compensation?.payType) === 'Monthly'
+          ? 'Monthly'
+          : (selectedEmployee.compensation?.payFreq || 'Monthly'),
       },
       emergencyContact: {
-        name: values.emergencyName || '',
-        relationship: values.emergencyRel || '',
-        phone: values.emergencyPhone || '',
+        name: values.emergencyName !== undefined ? values.emergencyName.trim() : (selectedEmployee.emergencyContact?.name || ''),
+        relationship: values.emergencyRel !== undefined ? values.emergencyRel.trim() : (selectedEmployee.emergencyContact?.relationship || ''),
+        phone: values.emergencyPhone !== undefined ? values.emergencyPhone.trim() : (selectedEmployee.emergencyContact?.phone || ''),
       },
-      documents: editEmpDocs,
-      notes: values.notes || '',
+      documents: editEmpDocs && editEmpDocs.length > 0 ? editEmpDocs : (selectedEmployee.documents || []),
+      notes: values.notes !== undefined ? values.notes : (selectedEmployee.notes || ''),
     };
 
     try {
@@ -1660,6 +1668,7 @@ export const EmployeeManagement = ({
             {/* Comprehensive Tabbed Sections */}
             <Tabs
               defaultActiveKey="basic"
+              destroyInactiveTabPane={false}
               items={[
                 {
                   key: 'basic',

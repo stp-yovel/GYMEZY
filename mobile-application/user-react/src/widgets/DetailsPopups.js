@@ -72,53 +72,101 @@ const BasePopupModal = ({ visible, onClose, title, children, showBack = false, o
   );
 };
 
+// Helper resolvers for relatable icons and descriptions
+const getFacilityData = (item = '') => {
+  const n = String(item).toLowerCase();
+  if (n.includes('ac') || n.includes('air')) return { icon: 'ac-unit', desc: 'Fully air-conditioned workout area' };
+  if (n.includes('lock') || n.includes('safe')) return { icon: 'lock-outline', desc: 'Secure lockers for your belongings' };
+  if (n.includes('show') || n.includes('bath')) return { icon: 'shower', desc: 'Clean hot & cold showers available' };
+  if (n.includes('chang') || n.includes('dress') || n.includes('room')) return { icon: 'checkroom', desc: 'Spacious and hygienic changing rooms' };
+  if (n.includes('steam') || n.includes('sauna') || n.includes('spa')) return { icon: 'hot-tub', desc: 'Rejuvenating steam & sauna facility' };
+  if (n.includes('park') || n.includes('valet')) return { icon: 'local-parking', desc: 'Safe & dedicated vehicle parking' };
+  if (n.includes('wifi') || n.includes('internet')) return { icon: 'wifi', desc: 'High-speed Wi-Fi internet for members' };
+  if (n.includes('music') || n.includes('sound') || n.includes('audio')) return { icon: 'music-note', desc: 'Premium surround sound system' };
+  if (n.includes('dumbbell') || n.includes('free weight') || n.includes('weight')) return { icon: 'fitness-center', desc: 'Complete free weights & dumbbell station' };
+  if (n.includes('cardio') || n.includes('treadmill') || n.includes('deck')) return { icon: 'directions-run', desc: 'Advanced cardio deck & machines' };
+  if (n.includes('olympic') || n.includes('platform') || n.includes('squat')) return { icon: 'sports-gymnastics', desc: 'Olympic lifting platforms & power racks' };
+  if (n.includes('aid') || n.includes('medical')) return { icon: 'medical-services', desc: 'Emergency first aid station on floor' };
+  if (n.includes('water') || n.includes('drink')) return { icon: 'water-drop', desc: 'Purified drinking water dispenser' };
+  return { icon: 'verified', desc: 'Verified gym floor facility' };
+};
+
+const getAmenityData = (item = '') => {
+  const n = String(item).toLowerCase();
+  if (n.includes('water') || n.includes('ro')) return { icon: 'water-drop', desc: 'RO purified drinking water' };
+  if (n.includes('towel')) return { icon: 'dry-cleaning', desc: 'Clean sanitized workout towels provided' };
+  if (n.includes('protein') || n.includes('shake')) return { icon: 'local-bar', desc: 'Fresh protein shakes & recovery drinks' };
+  if (n.includes('juice') || n.includes('smoothie')) return { icon: 'local-cafe', desc: 'Freshly pressed juices & fruit smoothies' };
+  if (n.includes('personal lock') || n.includes('locker rent') || n.includes('locker')) return { icon: 'lock-outline', desc: 'Private personal locker storage' };
+  if (n.includes('inbody') || n.includes('bmi') || n.includes('weigh') || n.includes('scan') || n.includes('scale')) return { icon: 'monitor-weight', desc: 'InBody body composition & BMI analysis' };
+  if (n.includes('nutrition') || n.includes('diet')) return { icon: 'assignment-ind', desc: 'Certified nutritionist & diet planning desk' };
+  if (n.includes('lounge') || n.includes('rest') || n.includes('relax')) return { icon: 'weekend', desc: 'Comfortable member lounge & chill-out area' };
+  if (n.includes('park')) return { icon: 'local-parking', desc: 'Safe vehicle parking' };
+  if (n.includes('wifi') || n.includes('internet')) return { icon: 'wifi', desc: 'High-speed Wi-Fi internet zone' };
+  if (n.includes('mat') || n.includes('sanitiz')) return { icon: 'clean-hands', desc: 'Sanitized workout mats and equipment wipes' };
+  if (n.includes('aid') || n.includes('medic')) return { icon: 'medical-services', desc: 'First aid and emergency medical kit' };
+  if (n.includes('shower')) return { icon: 'shower', desc: 'Clean hot showers and toiletries' };
+  if (n.includes('steam') || n.includes('sauna')) return { icon: 'hot-tub', desc: 'Relaxing steam room and sauna' };
+  if (n.includes('ac') || n.includes('air')) return { icon: 'ac-unit', desc: 'Comfortable AC environment' };
+  return { icon: 'star', desc: 'Premium member amenity' };
+};
+
+const getWorkoutData = (item = '') => {
+  const n = String(item).toLowerCase();
+  if (n.includes('hiit') || n.includes('interval')) return { icon: 'flash-on', desc: 'High-intensity interval conditioning' };
+  if (n.includes('yoga') || n.includes('stretch') || n.includes('mobility')) return { icon: 'self-improvement', desc: 'Flexibility, core mobility & mindful yoga' };
+  if (n.includes('zumba') || n.includes('dance') || n.includes('aerobic')) return { icon: 'music-note', desc: 'High-energy dance fitness & cardio beats' };
+  if (n.includes('box') || n.includes('kickbox') || n.includes('mma') || n.includes('combat') || n.includes('martial')) return { icon: 'sports-mma', desc: 'Boxing, kickboxing & combat striking' };
+  if (n.includes('crossfit') || n.includes('functional')) return { icon: 'sports-kabaddi', desc: 'Functional strength training for all levels' };
+  if (n.includes('powerlift') || n.includes('deadlift') || n.includes('squat')) return { icon: 'hardware', desc: 'Heavy barbell & strength powerlifting' };
+  if (n.includes('bodybuild') || n.includes('hypertrophy') || n.includes('muscle')) return { icon: 'fitness-center', desc: 'Targeted muscle hypertrophy & sculpting' };
+  if (n.includes('calisthenic') || n.includes('bodyweight') || n.includes('gymnast')) return { icon: 'sports-gymnastics', desc: 'Bodyweight control & bar strength' };
+  if (n.includes('cardio') || n.includes('endurance') || n.includes('run')) return { icon: 'directions-run', desc: 'Cardiovascular endurance & fat loss' };
+  if (n.includes('pilates')) return { icon: 'accessibility', desc: 'Core stability, posture & spine alignment' };
+  if (n.includes('cycle') || n.includes('spin') || n.includes('bike')) return { icon: 'directions-bike', desc: 'Indoor cycling & heart-rate endurance' };
+  if (n.includes('core') || n.includes('abs')) return { icon: 'center-focus-strong', desc: 'Core strength & abdominal definition' };
+  if (n.includes('gym') || n.includes('weight') || n.includes('strength')) return { icon: 'fitness-center', desc: 'Complete strength & conditioning routines' };
+  return { icon: 'fitness-center', desc: 'Professional guided workout routine' };
+};
+
 // 1. Facilities Popup
 export const FacilitiesPopup = ({ visible, onClose, facilities = [] }) => {
   const { colors, isDark } = useTheme();
 
-  const descMap = {
-    'AC Gym': 'Fully air-conditioned workout area',
-    'Locker Facility': 'Secure lockers for your belongings',
-    'Shower Available': 'Clean showers available',
-    'Changing Room': 'Spacious and clean changing rooms',
-    'Free Wi-Fi': 'High-speed internet for members',
-    'Music System': 'Premium sound system',
-  };
-
-  const iconMap = {
-    'AC Gym': 'ac-unit',
-    'Locker Facility': 'lock-outline',
-    'Shower Available': 'shower',
-    'Changing Room': 'checkroom',
-    'Free Wi-Fi': 'wifi',
-    'Music System': 'music-note',
-  };
-
   return (
     <BasePopupModal visible={visible} onClose={onClose} title="All Facilities">
       <ScrollView contentContainerStyle={styles.gridContainer}>
-        {facilities.map((item, idx) => (
-          <View
-            key={idx}
-            style={[
-              styles.featureCard,
-              {
-                backgroundColor: colors.card,
-                borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.border,
-              },
-            ]}
-          >
-            <MaterialIcons
-              name={iconMap[item] || 'help-outline'}
-              size={28}
-              color={AppColors.accentColor}
-            />
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{item}</Text>
-            <Text style={[styles.cardDesc, { color: colors.subtitle }]} numberOfLines={2}>
-              {descMap[item] || 'Available feature'}
-            </Text>
-          </View>
-        ))}
+        {facilities.length > 0 ? (
+          facilities.map((item, idx) => {
+            const data = getFacilityData(item);
+            return (
+              <View
+                key={idx}
+                style={[
+                  styles.featureCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.border,
+                  },
+                ]}
+              >
+                <MaterialIcons
+                  name={data.icon}
+                  size={28}
+                  color={AppColors.accentColor}
+                />
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{item}</Text>
+                <Text style={[styles.cardDesc, { color: colors.subtitle }]} numberOfLines={2}>
+                  {data.desc}
+                </Text>
+              </View>
+            );
+          })
+        ) : (
+          <Text style={{ color: colors.subtitle, padding: 20, textAlign: 'center' }}>
+            No custom facilities listed for this gym.
+          </Text>
+        )}
       </ScrollView>
     </BasePopupModal>
   );
@@ -128,53 +176,34 @@ export const FacilitiesPopup = ({ visible, onClose, facilities = [] }) => {
 export const AmenitiesPopup = ({ visible, onClose, amenities = [] }) => {
   const { colors, isDark } = useTheme();
 
-  const descMap = {
-    'Drinking Water': 'RO purified drinking water',
-    'Towel Service': 'Clean towels provided',
-    'Parking Available': 'Safe vehicle parking',
-    'Air Conditioned': 'Comfortable AC environment',
-    'Protein Bar': 'Healthy protein snacks & drinks',
-    'Juice Bar': 'Fresh juices and shakes',
-    'First Aid Kit': 'First aid kit available',
-    'Weighing Machine': 'Body weight monitoring',
-  };
-
-  const iconMap = {
-    'Drinking Water': 'water-drop',
-    'Towel Service': 'dry-cleaning',
-    'Parking Available': 'local-parking',
-    'Air Conditioned': 'ac-unit',
-    'Protein Bar': 'restaurant-menu',
-    'Juice Bar': 'local-cafe',
-    'First Aid Kit': 'medical-services',
-    'Weighing Machine': 'monitor-weight',
-  };
-
   return (
     <BasePopupModal visible={visible} onClose={onClose} title="All Amenities">
       <ScrollView contentContainerStyle={styles.gridContainer}>
-        {amenities.map((item, idx) => (
-          <View
-            key={idx}
-            style={[
-              styles.featureCard,
-              {
-                backgroundColor: colors.card,
-                borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.border,
-              },
-            ]}
-          >
-            <MaterialIcons
-              name={iconMap[item] || 'help-outline'}
-              size={28}
-              color={AppColors.accentColor}
-            />
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{item}</Text>
-            <Text style={[styles.cardDesc, { color: colors.subtitle }]} numberOfLines={2}>
-              {descMap[item] || 'Available feature'}
-            </Text>
-          </View>
-        ))}
+        {amenities.map((item, idx) => {
+          const data = getAmenityData(item);
+          return (
+            <View
+              key={idx}
+              style={[
+                styles.featureCard,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.border,
+                },
+              ]}
+            >
+              <MaterialIcons
+                name={data.icon}
+                size={28}
+                color={AppColors.accentColor}
+              />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{item}</Text>
+              <Text style={[styles.cardDesc, { color: colors.subtitle }]} numberOfLines={2}>
+                {data.desc}
+              </Text>
+            </View>
+          );
+        })}
       </ScrollView>
     </BasePopupModal>
   );
@@ -184,57 +213,34 @@ export const AmenitiesPopup = ({ visible, onClose, amenities = [] }) => {
 export const WorkoutsPopup = ({ visible, onClose, workouts = [] }) => {
   const { colors, isDark } = useTheme();
 
-  const descMap = {
-    'GYM': 'Strength & conditioning workouts',
-    'Yoga': 'Improve flexibility, strength & balance',
-    'Zumba': 'Fun dance workout for all',
-    'HIIT': 'High intensity interval training',
-    'CrossFit': 'Functional training for all fitness levels',
-    'Dance': 'Various dance workout styles',
-    'Pilates': 'Core strength & posture',
-    'Boxing': 'Cardio & strength boxing training',
-    'Functional Training': 'Full body functional exercises',
-    'Core Training': 'Focus on core strength',
-  };
-
-  const iconMap = {
-    'GYM': 'fitness-center',
-    'Yoga': 'self-improvement',
-    'Zumba': 'sports-gymnastics',
-    'HIIT': 'directions-run',
-    'CrossFit': 'fitness-center',
-    'Dance': 'music-note',
-    'Pilates': 'accessibility',
-    'Boxing': 'sports-mma',
-    'Functional Training': 'sports-kabaddi',
-    'Core Training': 'center-focus-strong',
-  };
-
   return (
     <BasePopupModal visible={visible} onClose={onClose} title="All Workouts Offered">
       <ScrollView contentContainerStyle={styles.gridContainer}>
-        {workouts.map((item, idx) => (
-          <View
-            key={idx}
-            style={[
-              styles.featureCard,
-              {
-                backgroundColor: colors.card,
-                borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.border,
-              },
-            ]}
-          >
-            <MaterialIcons
-              name={iconMap[item] || 'help-outline'}
-              size={28}
-              color={AppColors.accentColor}
-            />
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{item}</Text>
-            <Text style={[styles.cardDesc, { color: colors.subtitle }]} numberOfLines={2}>
-              {descMap[item] || 'Training course'}
-            </Text>
-          </View>
-        ))}
+        {workouts.map((item, idx) => {
+          const data = getWorkoutData(item);
+          return (
+            <View
+              key={idx}
+              style={[
+                styles.featureCard,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.border,
+                },
+              ]}
+            >
+              <MaterialIcons
+                name={data.icon}
+                size={28}
+                color={AppColors.accentColor}
+              />
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{item}</Text>
+              <Text style={[styles.cardDesc, { color: colors.subtitle }]} numberOfLines={2}>
+                {data.desc}
+              </Text>
+            </View>
+          );
+        })}
       </ScrollView>
     </BasePopupModal>
   );
@@ -259,7 +265,15 @@ export const TrainersPopup = ({ visible, onClose, trainers = [], onTrainerTap })
               },
             ]}
           >
-            <Image source={{ uri: trainer.imageUrl }} style={styles.trainerAvatar} />
+            <Image
+              source={{
+                uri:
+                  trainer.imageUrl ||
+                  trainer.image?.fileData ||
+                  'https://images.unsplash.com/photo-1567013127542-490d757e51fc?q=80&w=400&auto=format&fit=crop',
+              }}
+              style={styles.trainerAvatar}
+            />
             <View style={styles.trainerInfo}>
               <Text style={[styles.trainerName, { color: colors.text }]}>{trainer.name}</Text>
               <View style={styles.trainerMetaRow}>
@@ -272,10 +286,19 @@ export const TrainersPopup = ({ visible, onClose, trainers = [], onTrainerTap })
                 </View>
               </View>
               <View style={styles.ratingRow}>
-                <MaterialIcons name="star" size={14} color="#F59E0B" />
-                <Text style={[styles.ratingVal, { color: colors.text }]}>
-                  {trainer.rating} ({trainer.reviewsCount})
-                </Text>
+                {trainer.rating !== undefined && trainer.rating !== null && Number(trainer.rating) > 0 ? (
+                  <>
+                    <MaterialIcons name="star" size={14} color="#F59E0B" />
+                    <Text style={[styles.ratingVal, { color: colors.text }]}>
+                      {trainer.rating}
+                      {trainer.reviewsCount ? ` (${trainer.reviewsCount})` : ''}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={[styles.ratingVal, { color: colors.subtitle, fontSize: 12 }]}>
+                    No ratings
+                  </Text>
+                )}
               </View>
             </View>
             <MaterialIcons name="chevron-right" size={24} color={AppColors.accentColor} />
@@ -320,10 +343,19 @@ export const TrainerReviewsPopup = ({ visible, onClose, trainer, reviews = [], o
               {trainer.experienceYears} Years Experience
             </Text>
             <View style={styles.ratingRow}>
-              <MaterialIcons name="star" size={14} color="#F59E0B" />
-              <Text style={[styles.ratingVal, { color: colors.text }]}>
-                {trainer.rating} ({trainer.reviewsCount} Reviews)
-              </Text>
+              {trainer.rating !== undefined && trainer.rating !== null && Number(trainer.rating) > 0 ? (
+                <>
+                  <MaterialIcons name="star" size={14} color="#F59E0B" />
+                  <Text style={[styles.ratingVal, { color: colors.text }]}>
+                    {trainer.rating}
+                    {trainer.reviewsCount ? ` (${trainer.reviewsCount} Reviews)` : ''}
+                  </Text>
+                </>
+              ) : (
+                <Text style={[styles.ratingVal, { color: colors.subtitle, fontSize: 12 }]}>
+                  No ratings
+                </Text>
+              )}
             </View>
           </View>
         </View>
@@ -377,112 +409,140 @@ export const TrainerReviewsPopup = ({ visible, onClose, trainer, reviews = [], o
 };
 
 // 6. All Reviews Popup with Score Histogram
-export const AllReviewsPopup = ({ visible, onClose, rating = 4.5, reviewsCount = 256, reviews = [] }) => {
+export const AllReviewsPopup = ({
+  visible,
+  onClose,
+  rating = '0.0',
+  reviewsCount = 0,
+  reviews = [],
+  histograms = null,
+}) => {
   const { colors, isDark } = useTheme();
 
-  const histograms = [
-    { stars: 5, ratio: 0.70, percent: '70%' },
-    { stars: 4, ratio: 0.20, percent: '20%' },
-    { stars: 3, ratio: 0.06, percent: '6%' },
-    { stars: 2, ratio: 0.02, percent: '2%' },
-    { stars: 1, ratio: 0.02, percent: '2%' },
-  ];
+  const activeHistograms = Array.isArray(histograms) && histograms.length > 0
+    ? histograms
+    : [5, 4, 3, 2, 1].map((s) => ({ stars: s, ratio: 0, percent: '0%' }));
+
+  const numericRating = Number(rating) || 0;
+  const hasReviews = reviewsCount > 0 || reviews.length > 0;
 
   return (
     <BasePopupModal visible={visible} onClose={onClose} title="All Reviews">
       <ScrollView contentContainerStyle={styles.listContainer}>
         {/* Score Summary Dashboard */}
-        <View style={styles.scoreRow}>
-          <View style={styles.scoreNumberCol}>
-            <Text style={[styles.scoreBigNum, { color: colors.text }]}>{rating}</Text>
-            <View style={styles.starsRow}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <MaterialIcons
-                  key={i}
-                  name={i < Math.floor(rating) ? 'star' : 'star-border'}
-                  size={16}
-                  color="#F59E0B"
-                />
-              ))}
-            </View>
-            <Text style={[styles.reviewsCountText, { color: colors.subtitle }]}>
-              ({reviewsCount} Reviews)
-            </Text>
-          </View>
-
-          {/* Histograms */}
-          <View style={styles.histogramsCol}>
-            {histograms.map((h) => (
-              <View key={h.stars} style={styles.histoRow}>
-                <Text style={[styles.histoStarNum, { color: colors.text }]}>{h.stars}</Text>
-                <MaterialIcons name="star" size={10} color="#F59E0B" style={{ marginLeft: 2 }} />
-                <View
-                  style={[
-                    styles.histoBarBg,
-                    { backgroundColor: isDark ? '#262626' : '#E2E8F0' },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.histoBarFill,
-                      {
-                        width: `${h.ratio * 100}%`,
-                        backgroundColor: AppColors.accentColor,
-                      },
-                    ]}
-                  />
+        {hasReviews ? (
+          <>
+            <View style={styles.scoreRow}>
+              <View style={styles.scoreNumberCol}>
+                <Text style={[styles.scoreBigNum, { color: colors.text }]}>
+                  {rating}
+                </Text>
+                <View style={styles.starsRow}>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <MaterialIcons
+                      key={i}
+                      name={
+                        i < Math.floor(numericRating)
+                          ? 'star'
+                          : i < numericRating
+                          ? 'star-half'
+                          : 'star-border'
+                      }
+                      size={16}
+                      color="#F59E0B"
+                    />
+                  ))}
                 </View>
-                <Text style={[styles.histoPercent, { color: colors.subtitle }]}>
-                  {h.percent}
+                <Text style={[styles.reviewsCountText, { color: colors.subtitle }]}>
+                  ({reviewsCount} Reviews)
                 </Text>
               </View>
-            ))}
-          </View>
-        </View>
 
-        {/* List of Reviews */}
-        {reviews.map((rev, idx) => (
-          <View
-            key={idx}
-            style={[
-              styles.reviewItemCard,
-              {
-                backgroundColor: colors.card,
-                borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.border,
-              },
-            ]}
-          >
-            <View style={styles.revHeaderRow}>
-              <View style={styles.revUserRow}>
-                <Image source={{ uri: rev.userImageUrl }} style={styles.revUserAvatar} />
-                <View style={styles.revUserNameCol}>
-                  <Text style={[styles.revUserName, { color: colors.text }]}>
-                    {rev.userName}
-                  </Text>
-                  <View style={styles.starsRow}>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <MaterialIcons
-                        key={i}
-                        name={i < Math.floor(rev.rating) ? 'star' : 'star-border'}
-                        size={10}
-                        color="#F59E0B"
+              {/* Histograms */}
+              <View style={styles.histogramsCol}>
+                {activeHistograms.map((h) => (
+                  <View key={h.stars} style={styles.histoRow}>
+                    <Text style={[styles.histoStarNum, { color: colors.text }]}>{h.stars}</Text>
+                    <MaterialIcons name="star" size={10} color="#F59E0B" style={{ marginLeft: 2 }} />
+                    <View
+                      style={[
+                        styles.histoBarBg,
+                        { backgroundColor: isDark ? '#262626' : '#E2E8F0' },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.histoBarFill,
+                          {
+                            width: `${(h.ratio || 0) * 100}%`,
+                            backgroundColor: AppColors.accentColor,
+                          },
+                        ]}
                       />
-                    ))}
+                    </View>
+                    <Text style={[styles.histoPercent, { color: colors.subtitle }]}>
+                      {h.percent}
+                    </Text>
                   </View>
-                </View>
-              </View>
-
-              <View style={styles.revTypeCol}>
-                <View style={styles.bookingTypeBadge}>
-                  <Text style={styles.bookingTypeText}>{rev.bookingType}</Text>
-                </View>
-                <Text style={[styles.revDate, { color: colors.subtitle }]}>{rev.date}</Text>
+                ))}
               </View>
             </View>
 
-            <Text style={[styles.revComment, { color: colors.text }]}>{rev.comment}</Text>
+            {/* List of Reviews */}
+            {reviews.map((rev, idx) => (
+              <View
+                key={idx}
+                style={[
+                  styles.reviewItemCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.border,
+                  },
+                ]}
+              >
+                <View style={styles.revHeaderRow}>
+                  <View style={styles.revUserRow}>
+                    <Image source={{ uri: rev.userImageUrl }} style={styles.revUserAvatar} />
+                    <View style={styles.revUserNameCol}>
+                      <Text style={[styles.revUserName, { color: colors.text }]}>
+                        {rev.userName}
+                      </Text>
+                      <View style={styles.starsRow}>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <MaterialIcons
+                            key={i}
+                            name={i < Math.floor(rev.rating) ? 'star' : 'star-border'}
+                            size={10}
+                            color="#F59E0B"
+                          />
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.revTypeCol}>
+                    <View style={styles.bookingTypeBadge}>
+                      <Text style={styles.bookingTypeText}>{rev.bookingType || 'Member'}</Text>
+                    </View>
+                    <Text style={[styles.revDate, { color: colors.subtitle }]}>{rev.date || 'Recent'}</Text>
+                  </View>
+                </View>
+
+                <Text style={[styles.revComment, { color: colors.text }]}>{rev.comment}</Text>
+              </View>
+            ))}
+          </>
+        ) : (
+          <View style={{ paddingVertical: 48, alignItems: 'center', justifyContent: 'center' }}>
+            <MaterialIcons name="rate-review" size={36} color={colors.subtitle} />
+            <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700', marginTop: 12 }}>
+              No ratings yet
+            </Text>
+            <Text style={{ color: colors.subtitle, fontSize: 13, marginTop: 4, textAlign: 'center' }}>
+              Be the first member to rate and review after your workout!
+            </Text>
           </View>
-        ))}
+        )}
       </ScrollView>
     </BasePopupModal>
   );

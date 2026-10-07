@@ -5,13 +5,22 @@ export const fetchGyms = createAsyncThunk(
   'gyms/fetchGyms',
   async (params, { rejectWithValue }) => {
     try {
-      const response = await apiClient.get('/gyms', { params });
+      const response = await apiClient.get('/gyms/admin/fleet', { params });
       return response.data?.data?.gyms || response.data?.data || [];
     } catch (err) {
       return rejectWithValue(
         err.response?.data?.message || err.message || 'Failed to fetch gyms fleet'
       );
     }
+  },
+  {
+    condition: (params, { getState }) => {
+      const { loading } = getState().gyms || {};
+      // If a fetch is already in flight, skip duplicate parallel triggers unless forced
+      if (loading && !params?.force) {
+        return false;
+      }
+    },
   }
 );
 
@@ -29,8 +38,9 @@ export const updateGymStatusApi = createAsyncThunk(
         payload.rejectionReason = finalRemark;
       }
       const response = await apiClient.patch(`/gyms/${id}/status`, payload);
-      dispatch(fetchGyms());
-      return response.data?.data;
+      const updatedGym = response.data?.data;
+      dispatch(fetchGyms({ force: true }));
+      return updatedGym;
     } catch (err) {
       return rejectWithValue(
         err.response?.data?.message || err.message || 'Failed to update gym status'
@@ -144,6 +154,24 @@ export const gymSlice = createSlice({
       .addCase(fetchGyms.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+      .addCase(updateGymStatusApi.fulfilled, (state, action) => {
+        if (action.payload) {
+          const updated = action.payload;
+          const index = state.gyms.findIndex(
+            (g) => (g.id || g._id) === (updated.id || updated._id) || (g.partnerId && g.partnerId === updated.partnerId)
+          );
+          if (index !== -1) {
+            state.gyms[index] = { ...state.gyms[index], ...updated };
+          }
+          if (
+            state.selectedGym &&
+            ((state.selectedGym.id || state.selectedGym._id) === (updated.id || updated._id) ||
+              (state.selectedGym.partnerId && state.selectedGym.partnerId === updated.partnerId))
+          ) {
+            state.selectedGym = { ...state.selectedGym, ...updated };
+          }
+        }
       });
   },
 });
