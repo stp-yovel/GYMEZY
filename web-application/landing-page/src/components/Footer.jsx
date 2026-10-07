@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { MapsLocation02Icon } from '@hugeicons/core-free-icons';
+import { MapsLocation02Icon, Call02Icon, Mail01Icon } from '@hugeicons/core-free-icons';
 import gymezyLogo from '../assets/logo/gymezy.png';
 import './Footer.css';
 
@@ -26,10 +26,8 @@ export default function Footer() {
             <h3 className="footer-col-header">Explore</h3>
             <Link to="/">Home</Link>
             <Link to="/about">About GYMEZY</Link>
-            <Link to="/customers">For Customers</Link>
-            <Link to="/gym-owners">For Gym Owners</Link>
             <Link to="/trainers">For Trainers</Link>
-            <a href="/#app">Mobile App</a>
+            <a href="/#faq">FAQ</a>
           </div>
 
           {/* Partnerships Column */}
@@ -55,18 +53,18 @@ export default function Footer() {
                 className="footer-map-link"
                 title="View on Google Maps"
               >
-                <HugeiconsIcon icon={MapsLocation02Icon} size={15} />
+                <HugeiconsIcon icon={MapsLocation02Icon} size={15} className="footer-map-icon" />
                 <span>Map</span>
               </a>
             </div>
-            <div className="footer-contact-item-stacked">
-              <span className="contact-col-label">Phone Number:</span>
+            <div className="footer-contact-item-inline">
+              <HugeiconsIcon icon={Call02Icon} size={16} className="footer-contact-icon" />
               <span className="contact-col-val">
                 <a href="tel:9150955071">9150955071</a> / <a href="tel:9884881983">9884881983</a>
               </span>
             </div>
-            <div className="footer-contact-item-stacked">
-              <span className="contact-col-label">Email:</span>
+            <div className="footer-contact-item-inline">
+              <HugeiconsIcon icon={Mail01Icon} size={16} className="footer-contact-icon" />
               <span className="contact-col-val">
                 <a href="mailto:praveen.k@gymezy.com">praveen.k@gymezy.com</a>
               </span>
@@ -75,7 +73,9 @@ export default function Footer() {
         </div>
 
         <div className="footer-bottom-copyright">
-          <span>© {new Date().getFullYear()} GYMEZY Fitness Network. All rights reserved.</span>
+          <span>
+            © {new Date().getFullYear()} GYMEZY Fitness Network. All rights reserved. | Empowering athletes, gyms, and coaches everywhere.
+          </span>
           <span className="footer-craft-tag">
             <span className="footer-crafted-by">Crafted by</span>{' '}
             <strong className="footer-softrate-brand">Softrate</strong>{' '}
@@ -88,8 +88,7 @@ export default function Footer() {
               aria-hidden="true"
             >
               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-            </svg>{' '}
-            | Empowering athletes, gyms, and coaches everywhere.
+            </svg>
           </span>
         </div>
       </div>

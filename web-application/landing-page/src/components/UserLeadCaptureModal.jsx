@@ -291,7 +291,6 @@ export default function UserLeadCaptureModal({
                           type="text"
                           name="name"
                           className="lead-input"
-                          placeholder="Praveen Kumar"
                           value={formData.name}
                           onChange={handleChange}
                           onBlur={handleBlur}
@@ -316,7 +315,6 @@ export default function UserLeadCaptureModal({
                           type="tel"
                           name="mobile"
                           className="lead-input lead-phone-input"
-                          placeholder="9887625362"
                           value={formData.mobile}
                           onChange={handleChange}
                           onBlur={handleBlur}
@@ -344,7 +342,6 @@ export default function UserLeadCaptureModal({
                           type="email"
                           name="email"
                           className="lead-input"
-                          placeholder="praveen@gmail.com"
                           value={formData.email}
                           onChange={handleChange}
                           onBlur={handleBlur}
@@ -368,7 +365,6 @@ export default function UserLeadCaptureModal({
                           type="text"
                           name="place"
                           className="lead-input"
-                          placeholder="Chennai / Anna Nagar"
                           value={formData.place}
                           onChange={handleChange}
                           onBlur={handleBlur}

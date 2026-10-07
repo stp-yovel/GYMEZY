@@ -328,7 +328,6 @@ export default function LeadCaptureModal({
                           type="text"
                           name="gymName"
                           className="lead-input"
-                          placeholder="FitZone Gym"
                           value={formData.gymName}
                           onChange={handleChange}
                           onBlur={handleBlur}
@@ -350,7 +349,6 @@ export default function LeadCaptureModal({
                           type="text"
                           name="ownerName"
                           className="lead-input"
-                          placeholder="Praveen Kumar"
                           value={formData.ownerName}
                           onChange={handleChange}
                           onBlur={handleBlur}
@@ -376,7 +374,6 @@ export default function LeadCaptureModal({
                           type="tel"
                           name="mobile"
                           className="lead-input lead-phone-input"
-                          placeholder="9150955071"
                           value={formData.mobile}
                           onChange={handleChange}
                           onBlur={handleBlur}
@@ -399,7 +396,6 @@ export default function LeadCaptureModal({
                           type="email"
                           name="email"
                           className="lead-input"
-                          placeholder="praveen.k@gymezy.com"
                           value={formData.email}
                           onChange={handleChange}
                           onBlur={handleBlur}
@@ -448,7 +444,6 @@ export default function LeadCaptureModal({
                           type="text"
                           name="area"
                           className="lead-input"
-                          placeholder="Anna Nagar"
                           value={formData.area}
                           onChange={handleChange}
                           onBlur={handleBlur}
@@ -517,7 +512,6 @@ export default function LeadCaptureModal({
                       className="lead-textarea"
                       rows="3"
                       style={{ resize: 'none' }}
-                      placeholder="We are a premium fitness center with spacious workout areas and certified trainers."
                       value={formData.notes}
                       onChange={handleChange}
                     />
