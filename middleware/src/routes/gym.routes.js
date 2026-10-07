@@ -6,6 +6,7 @@ import {
   getAdminGymsFleet,
   getGymById,
   updateGym,
+  updateGymTrainerPricing,
   updateGymStatus,
   resubmitGymApplication,
   deleteGym,
@@ -74,6 +75,20 @@ router.patch(
   authenticate,
   authorizeRoles(USER_ROLES.GYM_OWNER, USER_ROLES.SUPER_ADMIN),
   updateGym
+);
+
+// Update trainer-membership tier pricing mapping for trainers
+router.put(
+  '/:id/trainer-pricing',
+  authenticate,
+  authorizeRoles(USER_ROLES.GYM_OWNER, USER_ROLES.SUPER_ADMIN),
+  updateGymTrainerPricing
+);
+router.patch(
+  '/:id/trainer-pricing',
+  authenticate,
+  authorizeRoles(USER_ROLES.GYM_OWNER, USER_ROLES.SUPER_ADMIN),
+  updateGymTrainerPricing
 );
 
 // Partner Owner or Super Admin application resubmission

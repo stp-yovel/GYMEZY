@@ -469,8 +469,9 @@ export const GymProfileManagement = () => {
   const [safetyMeasures, setSafetyMeasures] = useState(DEFAULT_SAFETY);
   const [isSavingWorkoutsRules, setIsSavingWorkoutsRules] = useState(false);
   const [newRuleInput, setNewRuleInput] = useState('');
-  const [newSafetyInput, setNewSafetyInput] = useState('');
   const [pricingPlans, setPricingPlans] = useState([]);
+  const [gymTrainersPricing, setGymTrainersPricing] = useState([]);
+  const [isSavingTrainerPricing, setIsSavingTrainerPricing] = useState(false);
   const [operatingHours, setOperatingHours] = useState(DEFAULT_DAYS);
   const [holidayExceptions, setHolidayExceptions] = useState([]);
   const [is24HoursOpen, setIs24HoursOpen] = useState(false);
@@ -642,6 +643,25 @@ export const GymProfileManagement = () => {
 
     // Standardized 4-Tier Pricing Plans
     setPricingPlans(normalizeGymStandardPlans(effectiveCustomPricingPlans, effectivePricingPlans));
+
+    // Active Trainers Tier Pricing Mapping
+    if (Array.isArray(data.trainers) && data.trainers.length > 0) {
+      setGymTrainersPricing(
+        data.trainers.map((t) => ({
+          employeeId: t.employeeId || t.id || t._id,
+          name: t.name,
+          specialty: t.specialty,
+          imageUrl: t.imageUrl || t.image?.fileData,
+          trainerPricing: {
+            monthly: t.trainerPricing?.monthly || t.monthlyFee || 0,
+            quarterly: t.trainerPricing?.quarterly || 0,
+            halfYearly: t.trainerPricing?.halfYearly || 0,
+            annual: t.trainerPricing?.annual || 0,
+            singleSession: t.trainerPricing?.singleSession || 0,
+          },
+        }))
+      );
+    }
 
     // Operating Hours
     if (effectiveOpeningHours?.schedule && Array.isArray(effectiveOpeningHours.schedule) && effectiveOpeningHours.schedule.length > 0) {
@@ -1139,6 +1159,44 @@ export const GymProfileManagement = () => {
       },
       'Membership plan removed.'
     );
+  };
+
+  // Save all trainer tier pricing mappings
+  const handleSaveAllTrainerPricing = async () => {
+    if (!targetGymId) return;
+    setIsSavingTrainerPricing(true);
+    try {
+      const payload = {
+        trainerPricing: gymTrainersPricing.map((t) => ({
+          employeeId: t.employeeId,
+          trainerPricing: t.trainerPricing,
+        })),
+      };
+      const res = await apiClient.put(`/gyms/${targetGymId}/trainer-pricing`, payload);
+      message.success('Trainer membership tier pricing mapping updated successfully!');
+      if (res.data?.data?.trainers) {
+        setGymTrainersPricing(
+          res.data.data.trainers.map((t) => ({
+            employeeId: t.employeeId || t.id || t._id,
+            name: t.name,
+            specialty: t.specialty,
+            imageUrl: t.imageUrl || t.image?.fileData,
+            trainerPricing: {
+              monthly: t.trainerPricing?.monthly || t.monthlyFee || 0,
+              quarterly: t.trainerPricing?.quarterly || 0,
+              halfYearly: t.trainerPricing?.halfYearly || 0,
+              annual: t.trainerPricing?.annual || 0,
+              singleSession: t.trainerPricing?.singleSession || 0,
+            },
+          }))
+        );
+      }
+    } catch (err) {
+      console.error('Failed to update trainer tier pricing:', err);
+      message.error(err?.response?.data?.message || err.message || 'Failed to update trainer tier pricing.');
+    } finally {
+      setIsSavingTrainerPricing(false);
+    }
   };
 
   // Save Workouts, Amenities, Rules & Safety
@@ -2475,6 +2533,175 @@ export const GymProfileManagement = () => {
                     </span>
                   }
                   style={{ margin: '40px 0' }}
+                />
+              )}
+
+              {/* Divider between gym plans and trainer pricing */}
+              <Divider style={{ margin: '36px 0 24px 0', borderColor: isDarkMode ? '#222222' : '#e2e8f0' }} />
+
+              {/* Trainer-Membership Tier Pricing Mapping */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    Trainer Membership Tier Pricing Mapping ({gymTrainersPricing.length})
+                  </Title>
+                  <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
+                    Configure specific rates charged to members when selecting individual trainers for each membership tier.
+                  </Text>
+                </div>
+                {gymTrainersPricing.length > 0 && (
+                  <Button
+                    type="primary"
+                    icon={<SaveOutlined />}
+                    loading={isSavingTrainerPricing}
+                    onClick={handleSaveAllTrainerPricing}
+                    style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
+                  >
+                    Save Trainer Pricing
+                  </Button>
+                )}
+              </div>
+
+              {gymTrainersPricing.length > 0 ? (
+                <div style={{ overflowX: 'auto' }}>
+                  <Table
+                    size="middle"
+                    bordered
+                    pagination={false}
+                    dataSource={gymTrainersPricing}
+                    rowKey={(r) => r.employeeId || r.name}
+                    columns={[
+                      {
+                        title: 'Trainer Details',
+                        key: 'trainer',
+                        width: 240,
+                        render: (_, record) => (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <Avatar src={record.imageUrl} size={42} style={{ border: '2px solid #722ed1', flexShrink: 0 }}>
+                              {record.name?.[0]?.toUpperCase()}
+                            </Avatar>
+                            <div>
+                              <div style={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', fontSize: 14 }}>
+                                {record.name}
+                              </div>
+                              <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
+                                {record.specialty || 'Personal Trainer'}
+                              </div>
+                            </div>
+                          </div>
+                        ),
+                      },
+                      {
+                        title: 'Monthly Plan (₹)',
+                        key: 'monthly',
+                        render: (_, record, index) => (
+                          <InputNumber
+                            prefix="₹"
+                            min={0}
+                            value={record.trainerPricing?.monthly || 0}
+                            onChange={(val) => {
+                              const updated = [...gymTrainersPricing];
+                              updated[index] = {
+                                ...updated[index],
+                                trainerPricing: { ...updated[index].trainerPricing, monthly: Number(val) || 0 },
+                              };
+                              setGymTrainersPricing(updated);
+                            }}
+                            style={{ width: '100%', minWidth: 110, borderRadius: 'var(--radius-base)' }}
+                          />
+                        ),
+                      },
+                      {
+                        title: 'Quarterly Plan (₹)',
+                        key: 'quarterly',
+                        render: (_, record, index) => (
+                          <InputNumber
+                            prefix="₹"
+                            min={0}
+                            value={record.trainerPricing?.quarterly || 0}
+                            onChange={(val) => {
+                              const updated = [...gymTrainersPricing];
+                              updated[index] = {
+                                ...updated[index],
+                                trainerPricing: { ...updated[index].trainerPricing, quarterly: Number(val) || 0 },
+                              };
+                              setGymTrainersPricing(updated);
+                            }}
+                            style={{ width: '100%', minWidth: 110, borderRadius: 'var(--radius-base)' }}
+                          />
+                        ),
+                      },
+                      {
+                        title: 'Half Yearly Plan (₹)',
+                        key: 'halfYearly',
+                        render: (_, record, index) => (
+                          <InputNumber
+                            prefix="₹"
+                            min={0}
+                            value={record.trainerPricing?.halfYearly || 0}
+                            onChange={(val) => {
+                              const updated = [...gymTrainersPricing];
+                              updated[index] = {
+                                ...updated[index],
+                                trainerPricing: { ...updated[index].trainerPricing, halfYearly: Number(val) || 0 },
+                              };
+                              setGymTrainersPricing(updated);
+                            }}
+                            style={{ width: '100%', minWidth: 110, borderRadius: 'var(--radius-base)' }}
+                          />
+                        ),
+                      },
+                      {
+                        title: 'Annual Plan (₹)',
+                        key: 'annual',
+                        render: (_, record, index) => (
+                          <InputNumber
+                            prefix="₹"
+                            min={0}
+                            value={record.trainerPricing?.annual || 0}
+                            onChange={(val) => {
+                              const updated = [...gymTrainersPricing];
+                              updated[index] = {
+                                ...updated[index],
+                                trainerPricing: { ...updated[index].trainerPricing, annual: Number(val) || 0 },
+                              };
+                              setGymTrainersPricing(updated);
+                            }}
+                            style={{ width: '100%', minWidth: 110, borderRadius: 'var(--radius-base)' }}
+                          />
+                        ),
+                      },
+                      {
+                        title: 'Single Session (₹)',
+                        key: 'singleSession',
+                        render: (_, record, index) => (
+                          <InputNumber
+                            prefix="₹"
+                            min={0}
+                            value={record.trainerPricing?.singleSession || 0}
+                            onChange={(val) => {
+                              const updated = [...gymTrainersPricing];
+                              updated[index] = {
+                                ...updated[index],
+                                trainerPricing: { ...updated[index].trainerPricing, singleSession: Number(val) || 0 },
+                              };
+                              setGymTrainersPricing(updated);
+                            }}
+                            style={{ width: '100%', minWidth: 110, borderRadius: 'var(--radius-base)' }}
+                          />
+                        ),
+                      },
+                    ]}
+                  />
+                </div>
+              ) : (
+                <Empty
+                  description={
+                    <span style={{ color: isDarkMode ? '#888888' : '#64748b' }}>
+                      No active trainers found for this gym. Add trainers in Employee Management to configure their tier pricing.
+                    </span>
+                  }
+                  style={{ margin: '30px 0' }}
                 />
               )}
             </div>

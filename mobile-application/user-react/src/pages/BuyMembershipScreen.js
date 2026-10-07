@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -185,28 +185,77 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
   // Selected Plan
   const [selectedPlan, setSelectedPlan] = useState('Annual');
 
+  const plans = useMemo(() => buildGymPlans(gym), [gym]);
+  const planPrice = plans[selectedPlan]?.price || 11999.0;
+
+  // Active trainers from gym (with fallback)
+  const trainersList = useMemo(() => {
+    const rawTrainers = Array.isArray(gym?.trainers) && gym.trainers.length > 0 ? gym.trainers : TRAINERS;
+    const formatted = rawTrainers.map((t) => ({
+      id: t.id || t._id || t.employeeId || t.name,
+      name: t.name,
+      exp: t.experienceYears ? `${t.experienceYears} Yrs Exp` : (t.exp || 'Certified'),
+      specialty: t.specialty || 'Personal Trainer',
+      rating: Number(t.rating) || 4.8,
+      reviews: Number(t.reviewsCount || t.reviews) || 24,
+      image: t.imageUrl || t.avatar || t.image || null,
+      trainerPricing: t.trainerPricing || {},
+      monthlyFee: Number(t.monthlyFee || t.price) || 999,
+      aboutText: t.aboutText || t.notes || '',
+    }));
+    if (!formatted.some((t) => t.name === 'No Personal Trainer')) {
+      formatted.push({
+        id: 'no-trainer',
+        name: 'No Personal Trainer',
+        exp: '',
+        specialty: 'I will train on my own',
+        rating: 0,
+        reviews: 0,
+        image: null,
+        trainerPricing: { monthly: 0, quarterly: 0, halfYearly: 0, annual: 0, singleSession: 0 },
+        monthlyFee: 0,
+        aboutText: '',
+      });
+    }
+    return formatted;
+  }, [gym?.trainers]);
+
+  // Compute trainer rate mapped to the chosen membership tier
+  const getTrainerFeeForPlan = useCallback((trainer, planKey) => {
+    if (!trainer || trainer.name === 'No Personal Trainer') return 0;
+    const pricing = trainer.trainerPricing || {};
+    const baseMonthly = Number(pricing.monthly) > 0 ? Number(pricing.monthly) : (Number(trainer.monthlyFee) || 999);
+
+    if (planKey === 'Monthly') {
+      return Number(pricing.monthly) > 0 ? Number(pricing.monthly) : baseMonthly;
+    }
+    if (planKey === 'Quarterly') {
+      return Number(pricing.quarterly) > 0 ? Number(pricing.quarterly) : baseMonthly * 3;
+    }
+    if (planKey === 'Half Yearly') {
+      return Number(pricing.halfYearly) > 0 ? Number(pricing.halfYearly) : baseMonthly * 6;
+    }
+    if (planKey === 'Annual') {
+      return Number(pricing.annual) > 0 ? Number(pricing.annual) : baseMonthly * 12;
+    }
+    return baseMonthly;
+  }, []);
+
   // Trainer Selection
   const [trainerGoal, setTrainerGoal] = useState('Weight Loss');
-  const [selectedTrainer, setSelectedTrainer] = useState('Rohit Sharma');
-  const [trainerFee, setTrainerFee] = useState(999.0);
+  const [selectedTrainer, setSelectedTrainer] = useState(trainersList[0]?.name || 'Rohit Sharma');
   const [selectedSlot, setSelectedSlot] = useState('5:00 PM - 6:00 PM');
   const trainerSchedule = 'Mon, Wed, Fri • 5:00 PM - 6:00 PM';
 
-  // Dates
-  const [startDate, setStartDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000));
+  const activeSelectedTrainerObj = useMemo(() => {
+    return trainersList.find((t) => t.name === selectedTrainer) || trainersList[0];
+  }, [trainersList, selectedTrainer]);
 
-  // Payment
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('UPI');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [confirmedMembership, setConfirmedMembership] = useState(null);
-  const [selectedModalTrainer, setSelectedModalTrainer] = useState(null);
+  const actualTrainerFee = useMemo(() => {
+    if (!withTrainer || selectedTrainer === 'No Personal Trainer') return 0.0;
+    return getTrainerFeeForPlan(activeSelectedTrainerObj, selectedPlan);
+  }, [withTrainer, selectedTrainer, activeSelectedTrainerObj, selectedPlan, getTrainerFeeForPlan]);
 
-  const totalSteps = withTrainer ? 6 : 4;
-
-  const plans = useMemo(() => buildGymPlans(gym), [gym]);
-  const planPrice = plans[selectedPlan]?.price || 11999.0;
-  const actualTrainerFee =
-    withTrainer && selectedTrainer !== 'No Personal Trainer' ? trainerFee : 0.0;
   const totalAmount = planPrice + actualTrainerFee;
 
   const getDurationDays = () => {
@@ -597,16 +646,16 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
 
             <Text style={[styles.sectionSubtitle, { color: textColor }]}>Top Trainers</Text>
 
-            {TRAINERS.map((t, idx) => {
+            {trainersList.map((t, idx) => {
               const isSel = selectedTrainer === t.name;
               const isNone = t.name === 'No Personal Trainer';
+              const tFee = getTrainerFeeForPlan(t, selectedPlan);
               return (
                 <TouchableOpacity
-                  key={idx}
+                  key={t.id || idx}
                   activeOpacity={0.85}
                   onPress={() => {
                     setSelectedTrainer(t.name);
-                    setTrainerFee(t.price);
                   }}
                   style={[
                     styles.trainerSelectCard,
@@ -631,7 +680,7 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
                       {!isNone && (
                         <TouchableOpacity onPress={() => setSelectedModalTrainer(t)}>
                           <Text style={[styles.aboutTrainerLink, { color: isDark ? '#93C5FD' : '#003882' }]}>
-                            About Me
+                            Rates & Bio
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -645,7 +694,7 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
                         <Text style={[styles.trainerRatingScore, { color: textColor }]}>
                           {t.rating} ({t.reviews})
                         </Text>
-                        <Text style={styles.trainerPriceText}>₹{Math.round(t.price)} / Month</Text>
+                        <Text style={styles.trainerPriceText}>₹{Math.round(tFee)} / {selectedPlan}</Text>
                       </View>
                     )}
                   </View>
@@ -925,7 +974,9 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
                 <>
                   <View style={[styles.receiptDivider, { backgroundColor: borderColor }]} />
                   <View style={styles.receiptRow}>
-                    <Text style={[styles.receiptLabel, { color: subtitleColor }]}>Personal Trainer</Text>
+                    <Text style={[styles.receiptLabel, { color: subtitleColor }]}>
+                      Personal Trainer ({selectedTrainer} • {selectedPlan})
+                    </Text>
                     <Text style={[styles.receiptValue, { color: textColor }]}>₹{Math.round(actualTrainerFee)}</Text>
                   </View>
                 </>
@@ -1010,8 +1061,32 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
 
                 <Text style={[styles.sectionSubtitle, { color: textColor }]}>About Me</Text>
                 <Text style={[styles.modalAboutText, { color: subtitleColor }]}>
-                  Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.
+                  {selectedModalTrainer.aboutText ||
+                    'Certified fitness trainer helping clients achieve their fitness goals through personalized training and nutrition guidance.'}
                 </Text>
+
+                <Text style={[styles.sectionSubtitle, { color: textColor, marginTop: 16 }]}>
+                  Tiered Membership Add-on Rates
+                </Text>
+                <View style={{ marginTop: 8, padding: 12, borderRadius: 8, backgroundColor: isDark ? '#1E293B' : '#F8FAFC' }}>
+                  <Text style={{ fontSize: 13, color: textColor, marginBottom: 6 }}>
+                    • Monthly Plan: ₹{Math.round(getTrainerFeeForPlan(selectedModalTrainer, 'Monthly'))}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: textColor, marginBottom: 6 }}>
+                    • Quarterly Plan: ₹{Math.round(getTrainerFeeForPlan(selectedModalTrainer, 'Quarterly'))}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: textColor, marginBottom: 6 }}>
+                    • Half Yearly Plan: ₹{Math.round(getTrainerFeeForPlan(selectedModalTrainer, 'Half Yearly'))}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: textColor, marginBottom: 6 }}>
+                    • Annual Plan: ₹{Math.round(getTrainerFeeForPlan(selectedModalTrainer, 'Annual'))}
+                  </Text>
+                  {selectedModalTrainer.trainerPricing?.singleSession > 0 && (
+                    <Text style={{ fontSize: 13, color: textColor }}>
+                      • Single Session: ₹{Math.round(selectedModalTrainer.trainerPricing.singleSession)}
+                    </Text>
+                  )}
+                </View>
               </ScrollView>
             </View>
           </View>

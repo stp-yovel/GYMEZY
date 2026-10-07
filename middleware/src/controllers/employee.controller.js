@@ -34,13 +34,21 @@ export const syncGymTrainersFromEmployees = async (gymIdentifier) => {
 
     const defaultAvatar = 'https://images.unsplash.com/photo-1567013127542-490d757e51fc?q=80&w=400&auto=format&fit=crop';
     gym.trainers = approvedTrainers.map((emp) => ({
+      employeeId: emp.employeeId || emp._id?.toString() || '',
       name: emp.name,
       specialty: emp.specialty || emp.previousDesignation || 'Certified Fitness Trainer',
       experienceYears: Number(emp.experienceYears) || 2,
       rating: emp.rating || 4.9,
       reviewsCount: emp.reviewsCount || 0,
       ratings: Array.isArray(emp.ratings) ? emp.ratings : [],
-      monthlyFee: emp.compensation?.payAmount || 0,
+      monthlyFee: emp.trainerPricing?.monthly || emp.compensation?.payAmount || 0,
+      trainerPricing: {
+        monthly: Number(emp.trainerPricing?.monthly) || 0,
+        quarterly: Number(emp.trainerPricing?.quarterly) || 0,
+        halfYearly: Number(emp.trainerPricing?.halfYearly) || 0,
+        annual: Number(emp.trainerPricing?.annual) || 0,
+        singleSession: Number(emp.trainerPricing?.singleSession) || 0,
+      },
       imageUrl: emp.avatar || defaultAvatar,
     }));
 
@@ -256,6 +264,7 @@ export const createEmployee = asyncHandler(async (req, res) => {
     emergencyContact: emergencyContact || {},
     schedule: schedule || {},
     compensation: compensation || {},
+    trainerPricing: req.body.trainerPricing || {},
     notes: notes || '',
     documents: Array.isArray(documents) ? documents : [],
     trainerCerts: Array.isArray(trainerCerts) ? trainerCerts : [],
@@ -504,6 +513,7 @@ export const updateEmployee = asyncHandler(async (req, res) => {
     'emergencyContact',
     'schedule',
     'compensation',
+    'trainerPricing',
     'notes',
     'documents',
     'trainerCerts',

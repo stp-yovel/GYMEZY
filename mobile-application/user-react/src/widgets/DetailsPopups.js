@@ -299,6 +299,11 @@ export const TrainersPopup = ({ visible, onClose, trainers = [], onTrainerTap })
                     No ratings
                   </Text>
                 )}
+                {(trainer.trainerPricing?.monthly || trainer.monthlyFee) ? (
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#00BF62', marginLeft: 8 }}>
+                    ₹{Math.round(trainer.trainerPricing?.monthly || trainer.monthlyFee)}/mo
+                  </Text>
+                ) : null}
               </View>
             </View>
             <MaterialIcons name="chevron-right" size={24} color={AppColors.accentColor} />

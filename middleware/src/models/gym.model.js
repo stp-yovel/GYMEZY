@@ -172,6 +172,7 @@ const reviewSchema = new mongoose.Schema(
 
 const trainerSchema = new mongoose.Schema(
   {
+    employeeId: { type: String, trim: true, default: '' },
     name: { type: String, required: true, trim: true },
     specialty: { type: String, trim: true, default: 'General Fitness' },
     experienceYears: { type: Number, default: 1, min: 0 },
@@ -179,6 +180,13 @@ const trainerSchema = new mongoose.Schema(
     reviewsCount: { type: Number, default: 0, min: 0 },
     ratings: { type: [reviewSchema], default: [] },
     monthlyFee: { type: Number, default: 0, min: 0 },
+    trainerPricing: {
+      monthly: { type: Number, default: 0, min: 0 },
+      quarterly: { type: Number, default: 0, min: 0 },
+      halfYearly: { type: Number, default: 0, min: 0 },
+      annual: { type: Number, default: 0, min: 0 },
+      singleSession: { type: Number, default: 0, min: 0 },
+    },
     image: { type: fileAttachmentSchema, default: () => ({}) }, // { fileName: "{gymname}_trainer_{name}", fileData: "..." }
     imageUrl: { type: String, trim: true, default: '' },
   },

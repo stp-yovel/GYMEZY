@@ -23,8 +23,10 @@ import {
   message,
   Space,
   Spin,
+  Alert,
 } from 'antd';
 import {
+  DollarOutlined,
   PlusOutlined,
   SearchOutlined,
   FilterOutlined,
@@ -457,6 +459,11 @@ export const EmployeeManagement = ({
       workingTimeEnd: record.schedule?.workingTimeEnd || '02:00 PM',
       payType: record.compensation?.payType || 'Monthly',
       payAmount: record.compensation?.payAmount || record.salary || 25000,
+      trainerMonthly: record.trainerPricing?.monthly ?? 0,
+      trainerQuarterly: record.trainerPricing?.quarterly ?? 0,
+      trainerHalfYearly: record.trainerPricing?.halfYearly ?? 0,
+      trainerAnnual: record.trainerPricing?.annual ?? 0,
+      trainerSingleSession: record.trainerPricing?.singleSession ?? 0,
       emergencyName: record.emergencyContact?.name || '',
       emergencyRel: record.emergencyContact?.relationship || '',
       emergencyPhone: record.emergencyContact?.phone || '',
@@ -510,6 +517,23 @@ export const EmployeeManagement = ({
         payFreq: (values.payType || selectedEmployee.compensation?.payType) === 'Monthly'
           ? 'Monthly'
           : (selectedEmployee.compensation?.payFreq || 'Monthly'),
+      },
+      trainerPricing: {
+        monthly: values.trainerMonthly !== undefined && values.trainerMonthly !== null && values.trainerMonthly !== ''
+          ? Number(values.trainerMonthly)
+          : (Number(selectedEmployee.trainerPricing?.monthly) || 0),
+        quarterly: values.trainerQuarterly !== undefined && values.trainerQuarterly !== null && values.trainerQuarterly !== ''
+          ? Number(values.trainerQuarterly)
+          : (Number(selectedEmployee.trainerPricing?.quarterly) || 0),
+        halfYearly: values.trainerHalfYearly !== undefined && values.trainerHalfYearly !== null && values.trainerHalfYearly !== ''
+          ? Number(values.trainerHalfYearly)
+          : (Number(selectedEmployee.trainerPricing?.halfYearly) || 0),
+        annual: values.trainerAnnual !== undefined && values.trainerAnnual !== null && values.trainerAnnual !== ''
+          ? Number(values.trainerAnnual)
+          : (Number(selectedEmployee.trainerPricing?.annual) || 0),
+        singleSession: values.trainerSingleSession !== undefined && values.trainerSingleSession !== null && values.trainerSingleSession !== ''
+          ? Number(values.trainerSingleSession)
+          : (Number(selectedEmployee.trainerPricing?.singleSession) || 0),
       },
       emergencyContact: {
         name: values.emergencyName !== undefined ? values.emergencyName.trim() : (selectedEmployee.emergencyContact?.name || ''),
@@ -2093,6 +2117,110 @@ export const EmployeeManagement = ({
                     </div>
                   ),
                 },
+                ...((detailRole === 'Trainer' || selectedEmployee?.role === 'Trainer')
+                  ? [
+                      {
+                        key: 'trainer_pricing',
+                        label: (
+                          <span style={{ fontWeight: 600, fontSize: 13, color: '#722ed1' }}>
+                            <DollarOutlined /> Membership Tier Rates
+                          </span>
+                        ),
+                        children: (
+                          <div style={{ paddingTop: 8 }}>
+                            <Alert
+                              type="info"
+                              showIcon
+                              message="Member Personal Training Pricing per Membership Tier"
+                              description="Specify what members are charged when they add this trainer to their Standard Membership package. These rates reflect directly in the user mobile app booking screen."
+                              style={{ marginBottom: 16, borderRadius: 'var(--radius-base)' }}
+                            />
+                            <Row gutter={16}>
+                              <Col xs={24} sm={12}>
+                                <Form.Item
+                                  label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Monthly Plan Add-on (₹)</span>}
+                                  name="trainerMonthly"
+                                  initialValue={0}
+                                  style={{ marginBottom: 14 }}
+                                >
+                                  <InputNumber
+                                    prefix="₹"
+                                    placeholder="e.g. 1500"
+                                    min={0}
+                                    style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
+                                  />
+                                </Form.Item>
+                              </Col>
+                              <Col xs={24} sm={12}>
+                                <Form.Item
+                                  label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Quarterly Plan Add-on (₹)</span>}
+                                  name="trainerQuarterly"
+                                  initialValue={0}
+                                  style={{ marginBottom: 14 }}
+                                >
+                                  <InputNumber
+                                    prefix="₹"
+                                    placeholder="e.g. 4000"
+                                    min={0}
+                                    style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
+                                  />
+                                </Form.Item>
+                              </Col>
+                            </Row>
+                            <Row gutter={16}>
+                              <Col xs={24} sm={12}>
+                                <Form.Item
+                                  label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Half Yearly Plan Add-on (₹)</span>}
+                                  name="trainerHalfYearly"
+                                  initialValue={0}
+                                  style={{ marginBottom: 14 }}
+                                >
+                                  <InputNumber
+                                    prefix="₹"
+                                    placeholder="e.g. 7500"
+                                    min={0}
+                                    style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
+                                  />
+                                </Form.Item>
+                              </Col>
+                              <Col xs={24} sm={12}>
+                                <Form.Item
+                                  label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Annual Plan Add-on (₹)</span>}
+                                  name="trainerAnnual"
+                                  initialValue={0}
+                                  style={{ marginBottom: 14 }}
+                                >
+                                  <InputNumber
+                                    prefix="₹"
+                                    placeholder="e.g. 14000"
+                                    min={0}
+                                    style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
+                                  />
+                                </Form.Item>
+                              </Col>
+                            </Row>
+                            <Row gutter={16}>
+                              <Col xs={24} sm={12}>
+                                <Form.Item
+                                  label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Single Session Rate (₹)</span>}
+                                  name="trainerSingleSession"
+                                  initialValue={0}
+                                  style={{ marginBottom: 14 }}
+                                >
+                                  <InputNumber
+                                    prefix="₹"
+                                    placeholder="e.g. 200"
+                                    min={0}
+                                    style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
+                                  />
+                                </Form.Item>
+                              </Col>
+                            </Row>
+                          </div>
+                        ),
+                      },
+                    ]
+                  : []),
               ]}
             />
 

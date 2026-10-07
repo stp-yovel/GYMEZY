@@ -3,6 +3,7 @@ import Gym from '../models/gym.model.js';
 import { Employee } from '../models/employee.model.js';
 import User, { USER_ROLES } from '../models/user.model.js';
 import Counter from '../models/counter.model.js';
+import { syncGymTrainersFromEmployees } from './employee.controller.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 import { ApiError } from '../utils/apiError.js';
@@ -1243,7 +1244,14 @@ export const getGymById = asyncHandler(async (req, res) => {
         rating: Number(emp.rating) || 4.9,
         reviewsCount: Number(emp.reviewsCount) || 0,
         ratings: Array.isArray(emp.ratings) ? emp.ratings : [],
-        monthlyFee: emp.compensation?.payAmount || 0,
+        monthlyFee: emp.trainerPricing?.monthly || emp.compensation?.payAmount || 0,
+        trainerPricing: {
+          monthly: Number(emp.trainerPricing?.monthly) || 0,
+          quarterly: Number(emp.trainerPricing?.quarterly) || 0,
+          halfYearly: Number(emp.trainerPricing?.halfYearly) || 0,
+          annual: Number(emp.trainerPricing?.annual) || 0,
+          singleSession: Number(emp.trainerPricing?.singleSession) || 0,
+        },
         imageUrl: emp.avatar || defaultAvatar,
       }));
     } else if (!Array.isArray(sanitized.trainers)) {
@@ -1646,6 +1654,92 @@ export const updateGym = asyncHandler(async (req, res) => {
 });
 
 /**
+ * PUT /api/v1/gyms/:id/trainer-pricing
+ * Update trainer-to-membership tier pricing mapping for active trainers in a gym
+ */
+export const updateGymTrainerPricing = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { trainerPricing, trainers } = req.body;
+
+  let gym = null;
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    gym = await Gym.findById(id);
+  }
+  if (!gym) {
+    gym = await Gym.findOne({ partnerId: id });
+  }
+  if (!gym) {
+    throw ApiError.notFound('Gym not found.');
+  }
+
+  // Authorization check: Owner or Super Admin
+  if (req.user?.role !== USER_ROLES.SUPER_ADMIN) {
+    const isOwner =
+      (gym.ownerId && String(gym.ownerId) === String(req.user?.userId || req.user?._id)) ||
+      (req.user?.gymId && (String(req.user.gymId) === String(gym._id) || req.user.gymId === gym.partnerId));
+    if (!isOwner) {
+      throw ApiError.forbidden('You do not have permission to update trainer pricing for this gym.');
+    }
+  }
+
+  const items = Array.isArray(trainerPricing) ? trainerPricing : (Array.isArray(trainers) ? trainers : []);
+  if (items.length === 0) {
+    throw ApiError.badRequest('No trainer pricing updates provided.');
+  }
+
+  const updatedTrainers = [];
+  for (const item of items) {
+    const empIdentifier = item.employeeId || item.id || item._id;
+    if (!empIdentifier) continue;
+
+    const query = {
+      $or: [
+        { employeeId: empIdentifier },
+        { _id: mongoose.Types.ObjectId.isValid(empIdentifier) ? empIdentifier : null },
+      ].filter(Boolean),
+      $and: [
+        {
+          $or: [
+            { gymId: gym._id },
+            { gymId: String(gym._id) },
+            { gymPartnerId: gym.partnerId },
+          ],
+        },
+      ],
+    };
+
+    const employee = await Employee.findOne(query);
+    if (!employee) continue;
+
+    const pricingObj = item.trainerPricing || item.pricing || {};
+    employee.trainerPricing = {
+      monthly: Number(pricingObj.monthly) >= 0 ? Number(pricingObj.monthly) : (employee.trainerPricing?.monthly || 0),
+      quarterly: Number(pricingObj.quarterly) >= 0 ? Number(pricingObj.quarterly) : (employee.trainerPricing?.quarterly || 0),
+      halfYearly: Number(pricingObj.halfYearly) >= 0 ? Number(pricingObj.halfYearly) : (employee.trainerPricing?.halfYearly || 0),
+      annual: Number(pricingObj.annual) >= 0 ? Number(pricingObj.annual) : (employee.trainerPricing?.annual || 0),
+      singleSession: Number(pricingObj.singleSession) >= 0 ? Number(pricingObj.singleSession) : (employee.trainerPricing?.singleSession || 0),
+    };
+
+    employee.markModified('trainerPricing');
+    await employee.save();
+    updatedTrainers.push(employee);
+  }
+
+  await syncGymTrainersFromEmployees(gym.partnerId || gym._id);
+
+  const freshGym = await Gym.findById(gym._id).lean();
+  return res.status(200).json(
+    ApiResponse.success(
+      {
+        trainers: freshGym?.trainers || [],
+        count: updatedTrainers.length,
+      },
+      'Trainer tier pricing updated and synchronized successfully.'
+    )
+  );
+});
+
+/**
  * PATCH /api/v1/gyms/:id/status
  * Super Admin Decision Engine: Approve, Hold, or Reject Gym Registration / Edits
  */
@@ -1667,7 +1761,9 @@ export const updateGymStatus = asyncHandler(async (req, res) => {
     throw ApiError.notFound('Gym not found.');
   }
 
-  const finalRemark = remark !== undefined ? remark : (notes !== undefined ? notes : rejectionReason);
+  let finalRemark = rejectionReason;
+  if (notes !== undefined) finalRemark = notes;
+  if (remark !== undefined) finalRemark = remark;
   const reviewerName = req.user?.fullName || req.user?.name || req.user?.email || 'Super Admin';
 
   if (approvalStatus === 'Approved') {

@@ -187,6 +187,14 @@ const employeeSchema = new mongoose.Schema(
       payAmount: { type: Number, default: 0, min: 0 },
       payFreq: { type: String, enum: ['Daily', 'Weekly', 'Monthly', 'Per Session', 'Per Hour'], default: 'Monthly' },
     },
+    // Standard Membership Tier Pricing Mapping (for trainers)
+    trainerPricing: {
+      monthly: { type: Number, default: 0, min: 0 },
+      quarterly: { type: Number, default: 0, min: 0 },
+      halfYearly: { type: Number, default: 0, min: 0 },
+      annual: { type: Number, default: 0, min: 0 },
+      singleSession: { type: Number, default: 0, min: 0 },
+    },
     notes: { type: String, trim: true, default: '' },
 
     // Uploaded Documents & Certificates
