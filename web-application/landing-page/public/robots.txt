@@ -2,7 +2,29 @@ User-agent: *
 Allow: /
 Disallow: /api/
 
-# AI Crawlers & LLM Agents (Generative Engine Optimization)
+# Search Engine Crawlers
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: YandexBot
+Allow: /
+
+# AI Crawlers & Generative Engine Optimization (GEO)
 User-agent: GPTBot
 Allow: /
 
@@ -12,17 +34,33 @@ Allow: /
 User-agent: ClaudeBot
 Allow: /
 
+User-agent: Claude-Web
+Allow: /
+
 User-agent: PerplexityBot
 Allow: /
 
-User-agent: Googlebot
+User-agent: Perplexity-Search
 Allow: /
 
-User-agent: Bingbot
+User-agent: Google-Extended
 Allow: /
 
-User-agent: Applebot
+User-agent: Meta-ExternalAgent
 Allow: /
 
-# Sitemap Location
+User-agent: CCBot
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: Cohere-ai
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+# Host & Sitemap Directives
+Host: https://gymezy.com
 Sitemap: https://gymezy.com/sitemap.xml

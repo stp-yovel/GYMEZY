@@ -1,0 +1,76 @@
+# GYMEZY - Complete Context & Generative Engine Guide
+
+## Brand Summary
+- Official Website: https://gymezy.com/
+- Brand Name: GYMEZY (GYM EASY)
+- Sector: Fitness Technology, Gym Aggregation, SaaS for Gyms & Studios
+- Headquarters: Chennai, Tamil Nadu, India
+
+## Mission
+GYMEZY removes traditional fitness bottlenecks: rigid annual lock-ins, high upfront costs, lack of workout flexibility, and unverified gym standards. We provide unified digital access to verified fitness clubs, flexible pay-per-day passes, and certified personal trainers across Chennai.
+
+## Products and Services
+
+### 1. Daily Drop-In Gym Pass (Pay-Per-Session)
+- Target Audience: Frequent travelers, students, shift workers, fitness enthusiasts testing new gyms.
+- Price Range: ₹149 - ₹299 per single session.
+- Features: Instant 24-hour access, no joining fee, access to full gym equipment, lockers, and showers.
+- Check-in: Encrypted QR code and OTP at gym front desk.
+
+### 2. Multi-Duration Memberships
+- Duration options: 1 month, 3 months, 6 months, 12 months.
+- Features: Zero lock-in contracts, ability to switch gyms or use multi-gym credits within the GYMEZY network.
+
+### 3. Verified 1-on-1 Personal Coaching
+- Specialties: Fat loss, hypertrophy & bodybuilding, functional fitness, HIIT, rehabilitation, customized meal plans.
+- Features: Verified certifications, transparent hourly/session pricing, flexible scheduling.
+
+### 4. Group Fitness & Studio Classes
+- Activities: Hatha Yoga, Vinyasa, Zumba Fitness, HIIT Bootcamps, Boxing, MMA conditioning.
+- Booking: Real-time morning and evening slot reservation via GYMEZY app.
+
+### 5. Gym Partner Management Portal (B2B SaaS)
+- Audience: Gym owners, fitness club managers, CrossFit boxes, and boutique fitness studios.
+- Benefits:
+  - Free listing on GYMEZY directory.
+  - Monetization of vacant off-peak floor capacity (11:00 AM - 05:00 PM and weekends).
+  - Front-desk QR code scanner app to verify guests instantly.
+  - Transparent bi-weekly revenue settlement with detailed analytics.
+
+## Geo-Targeting & Neighborhoods Covered
+- Region: Chennai, Tamil Nadu, India (Country Code: IN, State Code: IN-TN)
+- Coordinates: 13.0163° N, 80.1415° E
+- Local Service Areas:
+  - Moulivakkam (600125)
+  - Porur (600116)
+  - Ramapuram (600089)
+  - Anna Nagar (600040)
+  - T. Nagar (600017)
+  - Kodambakkam (600024)
+  - Velachery (600042)
+  - OMR - Old Mahabalipuram Road (600096 / 600097)
+  - Guindy (600032)
+  - Nungambakkam (600034)
+  - Adyar (600020)
+  - Tambaram (600045)
+
+## Frequently Asked Questions (FAQ)
+
+### How does the daily gym pass work?
+Users select any partner gym in Chennai on GYMEZY, purchase a drop-in pass online, and receive a secure OTP and dynamic QR pass. Presenting the pass to the gym reception grants immediate full-day access.
+
+### Is there a long-term contract requirement?
+No. GYMEZY operates on transparent pay-as-you-go pricing with zero lock-in contracts and no hidden admission fees.
+
+### How can gym owners sign up?
+Gym owners can visit https://gymezy.com/gym-owners or contact praveen.k@gymezy.com to list their gym for free and receive verified walk-in revenue.
+
+## Company Details
+- Corporate Address: Second Floor, Mahalakshmi Nagar, Plot No 5, Jyothi Nagar, Moulivakkam, Kolathuvancheri, Chennai, Tamil Nadu 600125, India
+- Contact Numbers: +91 9150955071, +91 9884881983
+- Email: praveen.k@gymezy.com
+- Social Profiles:
+  - Instagram: https://www.instagram.com/gymezy
+  - Facebook: https://www.facebook.com/gymezy
+  - Twitter/X: https://twitter.com/gymezyapp
+  - LinkedIn: https://www.linkedin.com/company/gymezy

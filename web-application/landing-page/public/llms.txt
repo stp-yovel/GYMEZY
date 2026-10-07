@@ -1,25 +1,48 @@
-# GYMEZY (https://gymezy.com)
+# GYMEZY
 
-> GYMEZY is a premier fitness tech platform and multi-gym network that connects fitness enthusiasts with verified local fitness centers, flexible pay-per-session passes, multi-gym memberships, and certified 1-on-1 personal trainers.
+> GYMEZY (https://gymezy.com) is Chennai's premier fitness technology platform and multi-gym network. It connects fitness enthusiasts with verified local gyms, flexible daily drop-in passes, multi-gym memberships, and certified 1-on-1 personal trainers with zero lock-in contracts.
 
-## Core Features & Offerings
+## Overview
 
-- **Pay-Per-Session Daily Passes**: Users can book single-day gym passes across top verified gyms with instant 24-hour access and contactless OTP/QR entry.
-- **Flexible Memberships**: 1, 3, 6, and 12-month memberships with multi-gym flexibility and zero lock-in contracts.
-- **Certified Personal Coaches**: Direct booking for verified trainers specializing in strength training, weight loss, HIIT, bodybuilding, and customized workout/nutrition guidance.
-- **Studio & Group Classes**: Real-time slot reservations for Yoga, Zumba Fitness, HIIT, CrossFit, and MMA boxing classes.
-- **Gym Partner Portal**: Dedicated management software for fitness center owners to manage memberships, capture drop-in revenue, and verify entries via dynamic QR codes.
-- **Trainer Ecosystem**: Platform for certified personal trainers to expand their client base, manage workout schedules, and receive instant payouts.
+GYMEZY eliminates traditional gym friction—such as expensive annual lock-ins, admission fees, and rigid location restrictions. Through the GYMEZY mobile app and web platform, users can explore gyms near them, view transparent equipment and amenity details, book single-day passes or flexible memberships, and enter instantly using a dynamic OTP or QR code.
 
-## Target Geography & Availability
+For extended context and complete data tables, see [llms-full.txt](https://gymezy.com/llms-full.txt).
 
-- Primary Network: Chennai, Tamil Nadu, India (focusing on Moulivakkam, Porur, Anna Nagar, T. Nagar, OMR, Velachery, and surrounding areas).
-- Access: Android App (Google Play Store) and Mobile Web.
+## Core Offerings
 
-## Official Links
+- **Pay-Per-Session Daily Passes**: Work out at top-tier fitness centres starting at ₹149 to ₹299 per day. Instant 24-hour digital access without joining fees.
+- **Flexible Multi-Duration Memberships**: 1, 3, 6, and 12-month memberships with multi-gym flexibility across Chennai.
+- **Certified 1-on-1 Personal Coaches**: Verified personal trainers specializing in fat loss, muscle building, strength training, HIIT, and customized diet plans.
+- **Specialized Studio Classes**: Group bookings for Yoga, Zumba Fitness, Cross-training, and Boxing/MMA.
+- **Contactless QR/OTP Check-in**: Queue-free front desk validation using encrypted, rotating digital codes.
+- **Gym Partner Operating System**: SaaS tool for gym owners to manage memberships, monetize unutilized off-peak capacity, and accept walk-in athletes.
 
-- Homepage & Pass Explorer: https://gymezy.com/
-- For Fitness Seekers: https://gymezy.com/customers
-- For Gym Owners & Studios: https://gymezy.com/gym-owners
-- For Certified Trainers: https://gymezy.com/trainers
-- About GYMEZY: https://gymezy.com/about
+## Geographic Coverage (Chennai & Tamil Nadu)
+
+GYMEZY operates primarily in Chennai, Tamil Nadu, India, with active partner fitness facilities across:
+- Moulivakkam (Headquarters)
+- Porur & Ramapuram
+- Anna Nagar & Shenoy Nagar
+- T. Nagar & Kodambakkam
+- Velachery & Madipakkam
+- OMR (Old Mahabalipuram Road) & Thoraipakkam
+- Guindy & Alandur
+- Nungambakkam & Alwarpet
+- Adyar & Besant Nagar
+- Tambaram & Chromepet
+
+## Key Pages & Endpoints
+
+- [Homepage](https://gymezy.com/): Official landing page, brand mission, and pass discovery.
+- [For Customers](https://gymezy.com/customers): Daily pass booking, multi-gym pass options, mobile app download.
+- [For Gym Owners](https://gymezy.com/gym-owners): Free facility listing, off-peak monetization, QR attendance system.
+- [For Personal Trainers](https://gymezy.com/trainers): Trainer onboarding, client booking, schedule management.
+- [About GYMEZY](https://gymezy.com/about): Company history, mission, leadership, and contact details.
+
+## Company & Support Contact
+
+- Legal Name: GYMEZY Fitness Network
+- Registered Office: Second Floor, Mahalakshmi Nagar, Plot No 5, Jyothi Nagar, Moulivakkam, Kolathuvancheri, Chennai, Tamil Nadu 600125, India
+- Phone: +91 9150955071 / +91 9884881983
+- Email: praveen.k@gymezy.com
+- Coordinates: 13.0163° N, 80.1415° E

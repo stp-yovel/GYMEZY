@@ -1,0 +1,27 @@
+{
+  "name": "GYMEZY - Best Gyms & Personal Trainers in Chennai",
+  "short_name": "GYMEZY",
+  "description": "Find top gyms in Chennai. Book daily drop-in passes, flexible multi-gym memberships, and personal trainers with zero lock-in contracts.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0b0e",
+  "theme_color": "#00BF62",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/gymezy.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["fitness", "health", "sports", "lifestyle"],
+  "lang": "en-IN"
+}
