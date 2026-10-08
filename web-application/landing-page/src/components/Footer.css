@@ -51,6 +51,71 @@
   margin-top: 14px;
 }
 
+.footer-social-wrapper {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footer-social-title {
+  font-family: var(--font-primary, 'Plus Jakarta Sans', sans-serif);
+  font-weight: 500;
+  color: var(--color-light-subtitle, #64748b);
+  font-size: var(--font-size-body, 13px);
+  line-height: 1.2;
+}
+
+.footer-social-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.footer-social-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #003882;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  transform: none !important;
+  -webkit-transform: none !important;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.footer-social-btn:hover {
+  transform: translateY(-2px) !important;
+  -webkit-transform: translateY(-2px) !important;
+}
+
+.footer-social-btn.footer-social-instagram:hover {
+  color: #E4405F !important;
+}
+
+.footer-social-btn.footer-social-x:hover {
+  color: #000000 !important;
+}
+
+.footer-social-btn.footer-social-linkedin:hover {
+  color: #0A66C2 !important;
+}
+
+.footer-social-btn.footer-social-whatsapp:hover {
+  color: #25D366 !important;
+}
+
+.footer-social-btn.footer-social-youtube:hover {
+  color: #FF0000 !important;
+}
+
+.footer-social-btn svg {
+  display: block;
+  flex-shrink: 0;
+}
+
 .footer-col-header {
   font-family: var(--font-title, 'Urbanist', 'Plus Jakarta Sans', sans-serif);
   font-size: 16px;
@@ -214,11 +279,28 @@
   font-size: 13.5px;
 }
 
+.footer-softrate-link {
+  text-decoration: none !important;
+  display: inline-flex;
+  align-items: center;
+  transform: none !important;
+  -webkit-transform: none !important;
+  cursor: pointer;
+}
+
 .footer-softrate-brand {
   color: #0f172a;
   font-weight: 800;
   font-size: 14px;
   letter-spacing: -0.2px;
+  transition: all 0.25s ease;
+}
+
+.footer-softrate-link:hover .footer-softrate-brand {
+  background: linear-gradient(135deg, #e6007a 0%, #7928ca 48%, #00a3ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .footer-heart-svg {

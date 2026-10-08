@@ -14,6 +14,8 @@
   z-index: 99999;
   padding: 20px;
   animation: leadModalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  overscroll-behavior: contain;
+  touch-action: none;
 }
 
 @keyframes leadModalFadeIn {
@@ -39,6 +41,7 @@
   color: #0f172a;
   overflow: hidden;
   animation: leadModalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  overscroll-behavior: contain;
 }
 
 @keyframes leadModalSlideUp {
@@ -67,8 +70,19 @@
   max-height: 92vh;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   background: #ffffff;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+.lead-modal-form-col::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* Right Visual Column */
