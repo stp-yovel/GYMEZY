@@ -1,6 +1,7 @@
 import app from './src/app.js';
 import { ENV } from './src/config/env.js';
 import { connectDatabase } from './src/config/db.js';
+import { initAttendanceCron } from './src/services/attendanceCron.service.js';
 
 let server;
 
@@ -8,6 +9,7 @@ let server;
 const startServer = async () => {
   try {
     await connectDatabase();
+    initAttendanceCron();
 
     server = app.listen(ENV.PORT, '0.0.0.0', () => {
       console.log(`[SERVER] GYMEZY API Server running on port ${ENV.PORT} [0.0.0.0] [${ENV.NODE_ENV}]`);

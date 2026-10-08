@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { ApiError } from '../utils/apiError.js';
 import { verifyToken } from '../utils/jwtHelper.js';
 import { COOKIE_NAME } from '../utils/cookieHelper.js';
@@ -55,7 +56,11 @@ export const authenticate = async (req, _res, next) => {
       throw ApiError.unauthorized('Invalid or expired authentication token. Please sign in again.');
     }
 
-    const user = await User.findById(decoded.userId);
+    if (!mongoose.Types.ObjectId.isValid(decoded.userId)) {
+      throw ApiError.unauthorized('Invalid user ID in token.');
+    }
+
+    const user = await User.findById(decoded.userId).lean().maxTimeMS(5000);
     if (!user) {
       throw ApiError.unauthorized('User account no longer exists.');
     }
@@ -96,8 +101,8 @@ export const optionalAuthenticate = async (req, _res, next) => {
 
     if (token) {
       const decoded = verifyToken(token);
-      if (decoded?.userId) {
-        const user = await User.findById(decoded.userId);
+      if (decoded?.userId && mongoose.Types.ObjectId.isValid(decoded.userId)) {
+        const user = await User.findById(decoded.userId).lean().maxTimeMS(3000);
         if (user?.isActive) {
           req.user = {
             _id: user._id.toString(),
@@ -114,7 +119,7 @@ export const optionalAuthenticate = async (req, _res, next) => {
   } catch (_err) {
     // Silently continue for optional authentication
   }
-  next();
+  return next();
 };
 
 export default authenticate;

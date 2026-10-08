@@ -335,6 +335,61 @@ class ApiService {
       message: result.message || 'Employee deactivation requested. Pending Super Admin approval.',
     };
   }
+
+  // --- ATTENDANCE METHODS ---
+  async checkInMember(payload) {
+    const response = await this.executeFetch('/attendance/check-in', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Check-in failed. Please verify the code/OTP.');
+    }
+    return result.data;
+  }
+
+  async checkOutMember(payload) {
+    const response = await this.executeFetch('/attendance/check-out', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Check-out failed.');
+    }
+    return result.data;
+  }
+
+  async getTodayAttendance(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const endpoint = query ? `/attendance/today?${query}` : '/attendance/today';
+    const response = await this.executeFetch(endpoint, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || "Failed to retrieve today's attendance logs.");
+    }
+    return result.data;
+  }
+
+  async searchAttendanceMembers(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const endpoint = query ? `/attendance/members?${query}` : '/attendance/members';
+    const response = await this.executeFetch(endpoint, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to search members.');
+    }
+    return result.data;
+  }
 }
 
 export const apiService = new ApiService();

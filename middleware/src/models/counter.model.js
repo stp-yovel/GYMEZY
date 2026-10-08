@@ -23,12 +23,17 @@ const counterSchema = new mongoose.Schema(
  * @returns {Promise<number>} Next sequence integer
  */
 counterSchema.statics.getNextSequence = async function (sequenceName) {
-  const counter = await this.findByIdAndUpdate(
-    sequenceName,
-    { $inc: { seq: 1 } },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
-  );
-  return counter ? counter.seq : 1;
+  try {
+    const counter = await this.findByIdAndUpdate(
+      sequenceName,
+      { $inc: { seq: 1 } },
+      { returnDocument: 'after', new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+    return counter?.seq || 1;
+  } catch (error) {
+    console.warn('[COUNTER] getNextSequence fallback:', error.message);
+    return Math.floor(100 + Math.random() * 900);
+  }
 };
 
 export const Counter = mongoose.model('Counter', counterSchema);

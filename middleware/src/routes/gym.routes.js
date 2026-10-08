@@ -5,6 +5,7 @@ import {
   getGyms,
   getAdminGymsFleet,
   getGymById,
+  getGymTrainers,
   updateGym,
   updateGymTrainerPricing,
   updateGymStatus,
@@ -57,6 +58,9 @@ router.post('/:id/trainers/:trainerId/ratings', authenticate, addTrainerReview);
 
 // Public / Authenticated Single Gym Details
 router.get('/:id', optionalAuthenticate, getGymById);
+
+// Public / Authenticated Gym Trainers Endpoint (SSOT from Employee model)
+router.get('/:id/trainers', optionalAuthenticate, getGymTrainers);
 
 // ==================== PROTECTED / ADMIN & OWNER ROUTES ====================
 // Onboard new gym partner (Authenticated via Super Admin JWT)

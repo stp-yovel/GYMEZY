@@ -1,11 +1,82 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
-import { AppColors, AppTheme } from '../theme/appTheme';
+import { AppColors } from '../theme/appTheme';
 import { useToast } from './CustomScaffoldMessage';
+
+const getStatusTheme = (normStatus, isDark) => {
+  if (normStatus === 'ACTIVE') {
+    return {
+      bg: '#E6F7EF',
+      border: '#B7EAD0',
+      text: '#047857',
+    };
+  }
+  if (normStatus === 'UPCOMING') {
+    return {
+      bg: isDark ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7',
+      border: isDark ? 'rgba(245, 158, 11, 0.3)' : '#FDE68A',
+      text: '#D97706',
+    };
+  }
+  return {
+    bg: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2',
+    border: isDark ? 'rgba(239, 68, 68, 0.3)' : '#FECACA',
+    text: '#DC2626',
+  };
+};
+
+const getOtpFallbackDetails = (normStatus, primaryDateValue, isDark) => {
+  if (normStatus === 'UPCOMING') {
+    return {
+      icon: 'info-outline',
+      iconColor: '#D97706',
+      bg: isDark ? '#1F1D17' : '#FFFBEB',
+      border: isDark ? '#B45309' : '#FDE68A',
+      titleColor: isDark ? '#FDE68A' : '#92400E',
+      subColor: isDark ? '#F59E0B' : '#B45309',
+      title: `Starts On ${primaryDateValue || 'Upcoming Date'}`,
+      description: 'This membership is upcoming. Entry OTP will become available once the pass begins.',
+    };
+  }
+  if (normStatus === 'EXPIRED') {
+    return {
+      icon: 'error-outline',
+      iconColor: '#DC2626',
+      bg: isDark ? '#1F1D17' : '#FEF2F2',
+      border: isDark ? '#991B1B' : '#FECACA',
+      titleColor: isDark ? '#FCA5A5' : '#991B1B',
+      subColor: isDark ? '#F87171' : '#B91C1C',
+      title: 'Membership Expired',
+      description: 'This membership has expired. Please renew to generate an entry pass.',
+    };
+  }
+  if (normStatus === 'CANCELLED') {
+    return {
+      icon: 'error-outline',
+      iconColor: '#DC2626',
+      bg: isDark ? '#1F1D17' : '#FEF2F2',
+      border: isDark ? '#991B1B' : '#FECACA',
+      titleColor: isDark ? '#FCA5A5' : '#991B1B',
+      subColor: isDark ? '#F87171' : '#B91C1C',
+      title: 'Membership Cancelled',
+      description: 'This pass has been cancelled and is no longer valid for entry.',
+    };
+  }
+  return {
+    icon: 'info-outline',
+    iconColor: '#D97706',
+    bg: isDark ? '#1F1D17' : '#FFFBEB',
+    border: isDark ? '#B45309' : '#FDE68A',
+    titleColor: isDark ? '#FDE68A' : '#92400E',
+    subColor: isDark ? '#F59E0B' : '#B45309',
+    title: 'Entry OTP Unavailable',
+    description: 'Please pull down to refresh or check your internet connection.',
+  };
+};
 
 export const DigitalQrPassCard = ({
   passId,
@@ -29,8 +100,13 @@ export const DigitalQrPassCard = ({
     ? AppColors.darkAccentColor
     : accentColor || AppColors.primaryNavy;
 
-  const qrData = `gymezy://pass?id=${passId}&cust=${customerId}&otp=${otp}`;
-  const otpDigits = (otp || '123456').split('');
+  const qrData = JSON.stringify({
+    type: 'MEMBERSHIP',
+    id: passId,
+    customerId: customerId,
+    entryOtp: otp || null,
+  });
+  const otpDigits = typeof otp === 'string' && otp.trim().length > 0 ? otp.trim().split('') : [];
 
   const copyToClipboard = async (text, label) => {
     await Clipboard.setStringAsync(text);
@@ -40,7 +116,13 @@ export const DigitalQrPassCard = ({
     });
   };
 
-  const isActiveStatus = status?.toUpperCase() === 'ACTIVE';
+  const normStatus = (status || 'ACTIVE').toUpperCase();
+  const isUpcoming = normStatus === 'UPCOMING';
+  const isExpired = normStatus === 'EXPIRED';
+  const isCancelled = normStatus === 'CANCELLED';
+
+  const statusTheme = getStatusTheme(normStatus, isDark);
+  const otpFallback = getOtpFallbackDetails(normStatus, primaryDateValue, isDark);
 
   return (
     <View
@@ -80,12 +162,8 @@ export const DigitalQrPassCard = ({
             style={[
               styles.statusBadge,
               {
-                backgroundColor: isActiveStatus
-                  ? '#E6F7EF'
-                  : isDark
-                  ? '#262626'
-                  : '#F1F5F9',
-                borderColor: isActiveStatus ? '#B7EAD0' : colors.border,
+                backgroundColor: statusTheme.bg,
+                borderColor: statusTheme.border,
               },
             ]}
           >
@@ -93,7 +171,7 @@ export const DigitalQrPassCard = ({
               style={[
                 styles.statusDot,
                 {
-                  backgroundColor: isActiveStatus ? '#047857' : colors.subtitle,
+                  backgroundColor: statusTheme.text,
                 },
               ]}
             />
@@ -101,11 +179,11 @@ export const DigitalQrPassCard = ({
               style={[
                 styles.statusText,
                 {
-                  color: isActiveStatus ? '#047857' : colors.subtitle,
+                  color: statusTheme.text,
                 },
               ]}
             >
-              {status?.toUpperCase()}
+              {normStatus}
             </Text>
           </View>
         </View>
@@ -193,60 +271,109 @@ export const DigitalQrPassCard = ({
         </View>
 
         <Text style={[styles.qrHelpText, { color: colors.subtitle }]}>
-          Show this QR code or 6-digit OTP to gym reception
+          {isUpcoming
+            ? `Pass scheduled to activate on ${primaryDateValue || 'start date'}`
+            : isExpired
+            ? 'Membership has expired — renewal required'
+            : isCancelled
+            ? 'Membership has been cancelled'
+            : 'Show this QR code or 6-digit OTP to gym reception'}
         </Text>
 
         {/* 3. 6-Digit Check-in OTP */}
-        <View
-          style={[
-            styles.otpContainer,
-            {
-              backgroundColor: isDark ? '#262626' : '#F1F5F9',
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <View style={styles.otpHeader}>
-            <View style={styles.otpHeaderLeft}>
-              <MaterialIcons name="pin" size={16} color={effectiveAccent} />
-              <Text style={[styles.otpHeaderLabel, { color: colors.subtitle }]}>
-                ENTRY OTP
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => copyToClipboard(otp, 'OTP')}
-              style={styles.copyBtn}
-            >
-              <MaterialIcons name="content-copy" size={14} color={effectiveAccent} />
-              <Text style={[styles.copyBtnText, { color: effectiveAccent }]}>Copy</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* 6 Digit Boxes */}
-          <View style={styles.digitRow}>
-            {otpDigits.map((digit, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.digitBox,
-                  {
-                    backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
-                    borderColor: isDark ? 'rgba(147, 197, 253, 0.3)' : colors.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.digitText,
-                    { color: isDark ? '#FFFFFF' : effectiveAccent },
-                  ]}
-                >
-                  {digit}
+        {otpDigits.length > 0 ? (
+          <View
+            style={[
+              styles.otpContainer,
+              {
+                backgroundColor: isDark ? '#262626' : '#F1F5F9',
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={styles.otpHeader}>
+              <View style={styles.otpHeaderLeft}>
+                <MaterialIcons name="pin" size={16} color={effectiveAccent} />
+                <Text style={[styles.otpHeaderLabel, { color: colors.subtitle }]}>
+                  ENTRY OTP
                 </Text>
               </View>
-            ))}
+              <TouchableOpacity
+                onPress={() => copyToClipboard(otp, 'OTP')}
+                style={styles.copyBtn}
+              >
+                <MaterialIcons name="content-copy" size={14} color={effectiveAccent} />
+                <Text style={[styles.copyBtnText, { color: effectiveAccent }]}>Copy</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 6 Digit Boxes */}
+            <View style={styles.digitRow}>
+              {otpDigits.map((digit, idx) => (
+                <View
+                  key={`otp-box-${idx}-${digit}`}
+                  style={[
+                    styles.digitBox,
+                    {
+                      backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
+                      borderColor: isDark ? 'rgba(147, 197, 253, 0.3)' : colors.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.digitText,
+                      { color: isDark ? '#FFFFFF' : effectiveAccent },
+                    ]}
+                  >
+                    {digit}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
+        ) : (
+          <View
+            style={[
+              styles.otpContainer,
+              {
+                backgroundColor: otpFallback.bg,
+                borderColor: otpFallback.border,
+                paddingVertical: 14,
+                paddingHorizontal: 14,
+                alignItems: 'center',
+              },
+            ]}
+          >
+            <MaterialIcons
+              name={otpFallback.icon}
+              size={20}
+              color={otpFallback.iconColor}
+              style={{ marginBottom: 4 }}
+            />
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: '700',
+                color: otpFallback.titleColor,
+                textAlign: 'center',
+              }}
+            >
+              {otpFallback.title}
+            </Text>
+            <Text
+              style={{
+                fontSize: 11.5,
+                color: otpFallback.subColor,
+                textAlign: 'center',
+                marginTop: 3,
+                lineHeight: 16,
+              }}
+            >
+              {otpFallback.description}
+            </Text>
+          </View>
+        )}
 
         {/* 4. Pass Meta Info (Pass ID & Customer ID) */}
         <View

@@ -1245,6 +1245,7 @@ export const getGymById = asyncHandler(async (req, res) => {
         reviewsCount: Number(emp.reviewsCount) || 0,
         ratings: Array.isArray(emp.ratings) ? emp.ratings : [],
         monthlyFee: emp.trainerPricing?.monthly || emp.compensation?.payAmount || 0,
+        tierPricing: Array.isArray(emp.tierPricing) && emp.tierPricing.length > 0 ? emp.tierPricing : [],
         trainerPricing: {
           monthly: Number(emp.trainerPricing?.monthly) || 0,
           quarterly: Number(emp.trainerPricing?.quarterly) || 0,
@@ -1252,6 +1253,12 @@ export const getGymById = asyncHandler(async (req, res) => {
           annual: Number(emp.trainerPricing?.annual) || 0,
           singleSession: Number(emp.trainerPricing?.singleSession) || 0,
         },
+        schedule: emp.schedule || {
+          workingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+          workingTimeStart: '09:00 AM',
+          workingTimeEnd: '06:00 PM',
+        },
+        avatar: emp.avatar || defaultAvatar,
         imageUrl: emp.avatar || defaultAvatar,
       }));
     } else if (!Array.isArray(sanitized.trainers)) {
@@ -1658,7 +1665,7 @@ export const updateGym = asyncHandler(async (req, res) => {
  * Update trainer-to-membership tier pricing mapping for active trainers in a gym
  */
 export const updateGymTrainerPricing = asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  const id = req.params.id || req.params.gymId;
   const { trainerPricing, trainers } = req.body;
 
   let gym = null;
@@ -1673,10 +1680,18 @@ export const updateGymTrainerPricing = asyncHandler(async (req, res) => {
   }
 
   // Authorization check: Owner or Super Admin
-  if (req.user?.role !== USER_ROLES.SUPER_ADMIN) {
+  const isSuperAdmin =
+    req.user?.role === USER_ROLES.SUPER_ADMIN ||
+    req.user?.role === 'Super Admin' ||
+    req.user?.role === 'SUPER_ADMIN';
+
+  if (!isSuperAdmin) {
     const isOwner =
       (gym.ownerId && String(gym.ownerId) === String(req.user?.userId || req.user?._id)) ||
-      (req.user?.gymId && (String(req.user.gymId) === String(gym._id) || req.user.gymId === gym.partnerId));
+      (req.user?.gymId && (String(req.user.gymId) === String(gym._id) || req.user.gymId === gym.partnerId)) ||
+      req.user?.role === USER_ROLES.GYM_OWNER ||
+      req.user?.role === 'Gym Owner' ||
+      req.user?.role === 'GYM_OWNER';
     if (!isOwner) {
       throw ApiError.forbidden('You do not have permission to update trainer pricing for this gym.');
     }
@@ -1692,23 +1707,20 @@ export const updateGymTrainerPricing = asyncHandler(async (req, res) => {
     const empIdentifier = item.employeeId || item.id || item._id;
     if (!empIdentifier) continue;
 
-    const query = {
-      $or: [
-        { employeeId: empIdentifier },
-        { _id: mongoose.Types.ObjectId.isValid(empIdentifier) ? empIdentifier : null },
-      ].filter(Boolean),
-      $and: [
-        {
-          $or: [
-            { gymId: gym._id },
-            { gymId: String(gym._id) },
-            { gymPartnerId: gym.partnerId },
-          ],
-        },
-      ],
-    };
+    const empQueryOr = [{ employeeId: String(empIdentifier) }];
+    if (mongoose.Types.ObjectId.isValid(empIdentifier)) {
+      empQueryOr.push({ _id: empIdentifier });
+    }
 
-    const employee = await Employee.findOne(query);
+    const gymQueryOr = [{ gymId: gym._id }, { gymId: String(gym._id) }];
+    if (gym.partnerId) {
+      gymQueryOr.push({ gymPartnerId: gym.partnerId });
+    }
+
+    const employee = await Employee.findOne({
+      $or: empQueryOr,
+      $and: [{ $or: gymQueryOr }],
+    });
     if (!employee) continue;
 
     const pricingObj = item.trainerPricing || item.pricing || {};
@@ -1948,5 +1960,95 @@ export const deleteGym = asyncHandler(async (req, res) => {
 
   return res.status(200).json(
     ApiResponse.success(null, `Gym "${gymName}" and associated partner account deleted successfully`)
+  );
+});
+
+/**
+ * Get active approved trainers for a gym (from Employee SSOT with embedded fallback)
+ * GET /api/v1/gyms/:id/trainers
+ */
+export const getGymTrainers = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  let gym;
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    gym = await Gym.findById(id);
+  }
+  if (!gym) {
+    gym = await Gym.findOne({ $or: [{ partnerId: id }, { slug: id }] });
+  }
+  if (!gym) {
+    throw ApiError.notFound('Gym not found.');
+  }
+
+  const isObjectId = mongoose.Types.ObjectId.isValid(gym._id);
+  const approvedEmployeeTrainers = await Employee.find({
+    $or: [
+      { gymPartnerId: gym.partnerId },
+      { gymId: isObjectId ? gym._id : null },
+      { gymId: String(gym._id) },
+    ].filter(Boolean),
+    role: { $regex: /^trainer$/i },
+    status: 'Active',
+    approvalStatus: 'Approved',
+  }).lean();
+
+  const defaultAvatar = 'https://images.unsplash.com/photo-1567013127542-490d757e51fc?q=80&w=400&auto=format&fit=crop';
+  let trainers = [];
+
+  if (approvedEmployeeTrainers && approvedEmployeeTrainers.length > 0) {
+    trainers = approvedEmployeeTrainers.map((emp) => ({
+      id: emp.id || emp.employeeId || emp._id,
+      _id: emp._id,
+      employeeId: emp.employeeId,
+      name: emp.name,
+      specialty: emp.specialty || emp.previousDesignation || 'Certified Fitness Trainer',
+      experienceYears: Number(emp.experienceYears) || 2,
+      rating: Number(emp.rating) || 4.9,
+      reviewsCount: Number(emp.reviewsCount) || 0,
+      ratings: Array.isArray(emp.ratings) ? emp.ratings : [],
+      monthlyFee: emp.trainerPricing?.monthly || emp.compensation?.payAmount || 0,
+      tierPricing: Array.isArray(emp.tierPricing) && emp.tierPricing.length > 0 ? emp.tierPricing : [],
+      trainerPricing: {
+        monthly: Number(emp.trainerPricing?.monthly) || 0,
+        quarterly: Number(emp.trainerPricing?.quarterly) || 0,
+        halfYearly: Number(emp.trainerPricing?.halfYearly) || 0,
+        annual: Number(emp.trainerPricing?.annual) || 0,
+        singleSession: Number(emp.trainerPricing?.singleSession) || 0,
+      },
+      schedule: emp.schedule || {
+        workingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+        workingTimeStart: '09:00 AM',
+        workingTimeEnd: '06:00 PM',
+      },
+      avatar: emp.avatar || defaultAvatar,
+      imageUrl: emp.avatar || defaultAvatar,
+      image: emp.avatar || defaultAvatar,
+    }));
+  } else if (Array.isArray(gym.trainers) && gym.trainers.length > 0) {
+    trainers = gym.trainers.map((t) => ({
+      id: t.employeeId || t.name,
+      _id: t.employeeId || t.name,
+      employeeId: t.employeeId || '',
+      name: t.name,
+      specialty: t.specialty || 'Certified Fitness Trainer',
+      experienceYears: t.experienceYears || 2,
+      rating: t.rating || 4.9,
+      reviewsCount: t.reviewsCount || 0,
+      monthlyFee: t.monthlyFee || 0,
+      tierPricing: t.tierPricing || [],
+      trainerPricing: t.trainerPricing || {},
+      schedule: t.schedule || {
+        workingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+        workingTimeStart: '09:00 AM',
+        workingTimeEnd: '06:00 PM',
+      },
+      avatar: t.imageUrl || defaultAvatar,
+      imageUrl: t.imageUrl || defaultAvatar,
+      image: t.imageUrl || defaultAvatar,
+    }));
+  }
+
+  return res.status(200).json(
+    ApiResponse.success(trainers, 'Gym trainers retrieved successfully.')
   );
 });

@@ -21,9 +21,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { AppColors } from '../theme/appTheme';
 import { useToast } from '../widgets/CustomScaffoldMessage';
 import { useAuth } from '../context/AuthContext';
-
-const MOCK_MEMBERS = [];
-
+import { apiService } from '../services/apiService';
 
 const SEARCH_FILTER_CHIPS = [
   'Customer Name',
@@ -56,10 +54,34 @@ export const CheckInScreen = ({ navigation, route }) => {
   const [searchCategoryTab, setSearchCategoryTab] = useState('Customer Check-in'); // 'Customer Check-in' | 'Member Check-in'
   const [activeChip, setActiveChip] = useState('Customer Name');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMember, setSelectedMember] = useState(MOCK_MEMBERS[0]);
+  const [liveMembers, setLiveMembers] = useState([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
   const [selectedArea, setSelectedArea] = useState('General Workout');
   const [showAreaModal, setShowAreaModal] = useState(false);
   const [flashlight, setFlashlight] = useState(false);
+
+  // Fetch live members for check-in
+  useEffect(() => {
+    const gymId = gym?.id || gym?._id || gym?.partnerId;
+    if (!gymId) return;
+
+    const fetchLiveMembers = async () => {
+      try {
+        setIsLoadingMembers(true);
+        const res = await apiService.searchAttendanceMembers({ gymId, query: '' });
+        if (Array.isArray(res)) {
+          setLiveMembers(res);
+        }
+      } catch (err) {
+        console.log('Error fetching members for check-in:', err.message);
+      } finally {
+        setIsLoadingMembers(false);
+      }
+    };
+
+    fetchLiveMembers();
+  }, [gym?.id, gym?._id, gym?.partnerId]);
 
   // Animated laser bar for QR scanner
   const laserAnim = useRef(new Animated.Value(0)).current;
@@ -115,22 +137,23 @@ export const CheckInScreen = ({ navigation, route }) => {
   }, [currentStep, successScaleAnim, successRotateAnim]);
 
   // Filter members based on search query and active search chip
-  const filteredResults = MOCK_MEMBERS.filter((m) => {
+  const filteredResults = liveMembers.filter((m) => {
     if (!searchQuery.trim()) return false;
     const q = searchQuery.toLowerCase().trim();
 
-    if (activeChip === 'Customer Name') return m.name.toLowerCase().includes(q);
-    if (activeChip === 'Phone Number') return m.phone.includes(q);
-    if (activeChip === 'Customer ID') return m.customerId.toLowerCase().includes(q);
-    if (activeChip === 'Member ID') return m.id.toLowerCase().includes(q);
-    if (activeChip === 'Booking ID') return m.bookingId.toLowerCase().includes(q);
+    if (activeChip === 'Customer Name') return m.name?.toLowerCase().includes(q);
+    if (activeChip === 'Phone Number') return m.phone?.includes(q);
+    if (activeChip === 'Customer ID') return m.customerId?.toLowerCase().includes(q) || m.userId?.toLowerCase().includes(q);
+    if (activeChip === 'Member ID') return m.membershipId?.toLowerCase().includes(q) || m.id?.toLowerCase().includes(q);
+    if (activeChip === 'Booking ID') return m.bookingId?.toLowerCase().includes(q);
 
     return (
-      m.name.toLowerCase().includes(q) ||
-      m.phone.includes(q) ||
-      m.customerId.toLowerCase().includes(q) ||
-      m.id.toLowerCase().includes(q) ||
-      m.bookingId.toLowerCase().includes(q)
+      m.name?.toLowerCase().includes(q) ||
+      m.phone?.includes(q) ||
+      m.customerId?.toLowerCase().includes(q) ||
+      m.userId?.toLowerCase().includes(q) ||
+      m.membershipId?.toLowerCase().includes(q) ||
+      m.bookingId?.toLowerCase().includes(q)
     );
   });
 
@@ -139,8 +162,27 @@ export const CheckInScreen = ({ navigation, route }) => {
     setCurrentStep('DETAILS');
   };
 
-  const handleConfirmCheckin = () => {
-    if (selectedMember.status === 'Expired') {
+  const handleConfirmCheckin = async () => {
+    if (!selectedMember) return;
+    const now = new Date();
+    const isUpcoming =
+      selectedMember.status === 'UPCOMING' ||
+      selectedMember.status === 'Upcoming' ||
+      (selectedMember.startDate && new Date(selectedMember.startDate) > now);
+
+    if (isUpcoming) {
+      const startStr = selectedMember.startDate
+        ? new Date(selectedMember.startDate).toLocaleDateString()
+        : 'a future date';
+      Alert.alert(
+        'Upcoming Membership',
+        `This membership pass is not active yet (Starts on ${startStr}). Entry is not permitted before the start date.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (selectedMember.status === 'EXPIRED' || selectedMember.status === 'Expired' || (selectedMember.endDate && new Date(selectedMember.endDate) < now)) {
       Alert.alert(
         'Expired Membership',
         'This membership pass has expired. Please renew the membership before marking check-in.',
@@ -149,20 +191,48 @@ export const CheckInScreen = ({ navigation, route }) => {
       return;
     }
 
-    showToast({
-      message: `${selectedMember.name} checked in successfully for ${selectedArea}!`,
-      isSuccess: true,
-    });
-    setCurrentStep('SUCCESS');
+    if (selectedMember.status === 'CANCELLED' || selectedMember.status === 'Cancelled') {
+      Alert.alert(
+        'Cancelled Membership',
+        'This membership pass has been cancelled. Entry is not permitted.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    try {
+      const gymId = gym?.id || gym?._id || gym?.partnerId;
+      await apiService.checkInMember({
+        gymId,
+        code: selectedMember.membershipId || selectedMember.id || selectedMember.entryOtp,
+        otp: selectedMember.entryOtp,
+        area: selectedArea,
+        method: currentStep === 'QR' ? 'QR' : 'Manual',
+        verifiedBy: 'Gym Owner App',
+      });
+
+      showToast({
+        message: `${selectedMember.name} checked in successfully for ${selectedArea}!`,
+        isSuccess: true,
+      });
+      setCurrentStep('SUCCESS');
+    } catch (err) {
+      Alert.alert('Check-In Failed', err.message || 'Unable to check in member.');
+    }
   };
 
   const handleSimulateQRScan = () => {
-    setSelectedMember(MOCK_MEMBERS[0]);
-    showToast({
-      message: 'QR Code verified: ' + MOCK_MEMBERS[0].name,
-      isSuccess: true,
-    });
-    setCurrentStep('DETAILS');
+    const target = liveMembers[0];
+    if (target) {
+      setSelectedMember(target);
+      showToast({
+        message: 'Pass identified: ' + target.name,
+        isSuccess: true,
+      });
+      setCurrentStep('DETAILS');
+    } else {
+      Alert.alert('No Members', 'No active members found to verify.');
+    }
   };
 
   /* -------------------------------------------------------------------------- */
@@ -582,11 +652,25 @@ export const CheckInScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             </View>
 
-            {MOCK_MEMBERS.map((m) => {
-              const isExpired = m.status === 'Expired';
+            {liveMembers.slice(0, 10).map((m) => {
+              const isExpired = m.status === 'EXPIRED' || m.status === 'Expired';
+              const isUpcoming = m.status === 'UPCOMING' || m.status === 'Upcoming';
+              const isCancelled = m.status === 'CANCELLED' || m.status === 'Cancelled';
+              const avatarInitials = m.avatar && m.avatar.length <= 3 ? m.avatar : (m.name ? m.name.slice(0, 2).toUpperCase() : 'GM');
+              const badgeBg = isExpired || isCancelled
+                ? 'rgba(239, 68, 68, 0.12)'
+                : isUpcoming
+                ? 'rgba(245, 158, 11, 0.12)'
+                : 'rgba(0, 191, 98, 0.12)';
+              const badgeColor = isExpired || isCancelled
+                ? AppColors.dangerRed
+                : isUpcoming
+                ? '#D97706'
+                : AppColors.secondaryColor;
+
               return (
                 <TouchableOpacity
-                  key={m.id}
+                  key={m.key || m.id || m.membershipId}
                   style={[
                     styles.resultCard,
                     {
@@ -598,14 +682,14 @@ export const CheckInScreen = ({ navigation, route }) => {
                   activeOpacity={0.85}
                 >
                   <View style={styles.resultAvatarCircle}>
-                    <Text style={styles.resultAvatarText}>{m.avatar}</Text>
+                    <Text style={styles.resultAvatarText}>{avatarInitials}</Text>
                   </View>
                   <View style={styles.resultInfo}>
                     <Text style={[styles.resultName, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
                       {m.name}
                     </Text>
                     <Text style={[styles.resultId, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                      Member ID: {m.id}
+                      Member ID: {m.membershipId || m.id}
                     </Text>
                     <Text style={[styles.resultPhone, { color: isDark ? 'rgba(255,255,255,0.5)' : '#94A3B8' }]}>
                       {m.phone}
@@ -615,14 +699,14 @@ export const CheckInScreen = ({ navigation, route }) => {
                     style={[
                       styles.memberStatusBadge,
                       {
-                        backgroundColor: isExpired ? 'rgba(239, 68, 68, 0.12)' : 'rgba(0, 191, 98, 0.12)',
+                        backgroundColor: badgeBg,
                       },
                     ]}
                   >
                     <Text
                       style={[
                         styles.memberStatusText,
-                        { color: isExpired ? AppColors.dangerRed : AppColors.secondaryColor },
+                        { color: badgeColor },
                       ]}
                     >
                       {m.status}
@@ -666,7 +750,21 @@ export const CheckInScreen = ({ navigation, route }) => {
       );
     }
 
-    const isExpired = selectedMember?.status === 'Expired';
+    const now = new Date();
+    const isExpired = selectedMember?.status?.toUpperCase() === 'EXPIRED' || (selectedMember?.endDate && new Date(selectedMember.endDate) < now);
+    const isUpcoming = selectedMember?.status?.toUpperCase() === 'UPCOMING' || (selectedMember?.startDate && new Date(selectedMember.startDate) > now);
+    const isCancelled = selectedMember?.status?.toUpperCase() === 'CANCELLED';
+
+    const detailBadgeBg = isExpired || isCancelled
+      ? 'rgba(239, 68, 68, 0.12)'
+      : isUpcoming
+      ? 'rgba(245, 158, 11, 0.12)'
+      : 'rgba(0, 191, 98, 0.12)';
+    const detailBadgeColor = isExpired || isCancelled
+      ? AppColors.dangerRed
+      : isUpcoming
+      ? '#D97706'
+      : AppColors.secondaryColor;
 
     return (
       <View style={[styles.container, { backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground }]}>
@@ -712,14 +810,14 @@ export const CheckInScreen = ({ navigation, route }) => {
                     style={[
                       styles.memberStatusBadge,
                       {
-                        backgroundColor: isExpired ? 'rgba(239, 68, 68, 0.12)' : 'rgba(0, 191, 98, 0.12)',
+                        backgroundColor: detailBadgeBg,
                       },
                     ]}
                   >
                     <Text
                       style={[
                         styles.memberStatusText,
-                        { color: isExpired ? AppColors.dangerRed : AppColors.secondaryColor },
+                        { color: detailBadgeColor },
                       ]}
                     >
                       {selectedMember?.status || 'Active'}
@@ -917,14 +1015,21 @@ export const CheckInScreen = ({ navigation, route }) => {
             <TouchableOpacity
               style={[
                 styles.confirmCheckinBtn,
-                isExpired && { backgroundColor: '#94A3B8' },
+                (isExpired || isCancelled) && { backgroundColor: '#94A3B8' },
+                isUpcoming && { backgroundColor: '#F59E0B' },
               ]}
               onPress={handleConfirmCheckin}
               activeOpacity={0.88}
             >
               <MaterialIcons name="check-circle" size={20} color="#FFFFFF" />
               <Text style={styles.confirmCheckinBtnText}>
-                {isExpired ? 'Membership Expired' : 'Confirm Check-in'}
+                {isExpired
+                  ? 'Membership Expired'
+                  : isUpcoming
+                  ? 'Upcoming (Not Active)'
+                  : isCancelled
+                  ? 'Membership Cancelled'
+                  : 'Confirm Check-in'}
               </Text>
             </TouchableOpacity>
 

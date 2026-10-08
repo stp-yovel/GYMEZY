@@ -34,7 +34,11 @@ export const MembershipDetailsScreen = ({ route, navigation }) => {
   const { showToast } = useToast();
 
   const membership =
-    memberships.find((m) => m.id === initialMbr.id) || initialMbr;
+    memberships.find(
+      (m) =>
+        (m._id && initialMbr._id && String(m._id) === String(initialMbr._id)) ||
+        (m.id && initialMbr.id && String(m.id) === String(initialMbr.id))
+    ) || initialMbr;
 
   const [showCancelSheet, setShowCancelSheet] = useState(false);
   const [selectedReason, setSelectedReason] = useState(CANCEL_REASONS[0]);
@@ -59,7 +63,7 @@ export const MembershipDetailsScreen = ({ route, navigation }) => {
   };
 
   const handleConfirmCancel = () => {
-    cancelMembership(membership.id, selectedReason);
+    cancelMembership(membership._id || membership.id, selectedReason);
     setShowCancelSheet(false);
     showToast({
       message: 'Cancellation request submitted successfully',
@@ -198,11 +202,11 @@ export const MembershipDetailsScreen = ({ route, navigation }) => {
               <Text style={[styles.detailLabel, { color: colors.subtitle }]}>Membership ID</Text>
             </View>
             <TouchableOpacity
-              onPress={() => copyToClipboard(membership.id, 'Membership ID')}
+              onPress={() => copyToClipboard(membership.membershipId || membership.id, 'Membership ID')}
               style={styles.copyIdRow}
               activeOpacity={0.7}
             >
-              <Text style={[styles.idValueText, { color: primaryNavy }]}>{membership.id}</Text>
+              <Text style={[styles.idValueText, { color: primaryNavy }]}>{membership.membershipId || membership.id}</Text>
               <MaterialIcons
                 name="content-copy"
                 size={14}
@@ -344,7 +348,7 @@ export const MembershipDetailsScreen = ({ route, navigation }) => {
         {/* 4. Digital Entry Pass QR & OTP */}
         <View style={{ marginTop: 20 }}>
           <DigitalQrPassCard
-            passId={membership.id}
+            passId={membership.membershipId || membership.id}
             customerId={membership.customerId}
             otp={membership.otp}
             gymName={membership.gymName}

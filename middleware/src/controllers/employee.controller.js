@@ -12,12 +12,12 @@ import { USER_ROLES } from '../models/user.model.js';
 export const syncGymTrainersFromEmployees = async (gymIdentifier) => {
   if (!gymIdentifier) return;
   try {
-    const isObjectId = typeof gymIdentifier === 'string' && gymIdentifier.match(/^[0-9a-fA-F]{24}$/);
+    const isObjectId = mongoose.isValidObjectId(gymIdentifier);
     const gym = await Gym.findOne({
       $or: [
-        { partnerId: gymIdentifier },
-        { _id: isObjectId ? gymIdentifier : null },
-      ].filter(Boolean),
+        { partnerId: String(gymIdentifier) },
+        ...(isObjectId ? [{ _id: gymIdentifier }] : []),
+      ],
     });
     if (!gym) return;
 
@@ -27,30 +27,58 @@ export const syncGymTrainersFromEmployees = async (gymIdentifier) => {
         { gymId: gym._id },
         { gymId: String(gym._id) },
       ].filter(Boolean),
-      role: 'Trainer',
+      role: { $regex: /^trainer$/i },
       status: 'Active',
       approvalStatus: 'Approved',
     }).lean();
 
     const defaultAvatar = 'https://images.unsplash.com/photo-1567013127542-490d757e51fc?q=80&w=400&auto=format&fit=crop';
-    gym.trainers = approvedTrainers.map((emp) => ({
-      employeeId: emp.employeeId || emp._id?.toString() || '',
-      name: emp.name,
-      specialty: emp.specialty || emp.previousDesignation || 'Certified Fitness Trainer',
-      experienceYears: Number(emp.experienceYears) || 2,
-      rating: emp.rating || 4.9,
-      reviewsCount: emp.reviewsCount || 0,
-      ratings: Array.isArray(emp.ratings) ? emp.ratings : [],
-      monthlyFee: emp.trainerPricing?.monthly || emp.compensation?.payAmount || 0,
-      trainerPricing: {
-        monthly: Number(emp.trainerPricing?.monthly) || 0,
-        quarterly: Number(emp.trainerPricing?.quarterly) || 0,
-        halfYearly: Number(emp.trainerPricing?.halfYearly) || 0,
-        annual: Number(emp.trainerPricing?.annual) || 0,
-        singleSession: Number(emp.trainerPricing?.singleSession) || 0,
-      },
-      imageUrl: emp.avatar || defaultAvatar,
-    }));
+    gym.trainers = approvedTrainers.map((emp) => {
+      const tierPricingList = Array.isArray(emp.tierPricing) && emp.tierPricing.length > 0
+        ? emp.tierPricing
+        : [
+            { tier: 'Monthly', fee: Number(emp.trainerPricing?.monthly) || Number(emp.personalTrainingFee) || 0, durationDays: 30 },
+            { tier: 'Quarterly', fee: Number(emp.trainerPricing?.quarterly) || 0, durationDays: 90 },
+            { tier: 'Half-Yearly', fee: Number(emp.trainerPricing?.halfYearly) || 0, durationDays: 180 },
+            { tier: 'Annual', fee: Number(emp.trainerPricing?.annual) || 0, durationDays: 365 },
+          ];
+
+      const monthlyFee = tierPricingList.find((t) => t.tier === 'Monthly')?.fee
+        || Number(emp.trainerPricing?.monthly)
+        || Number(emp.personalTrainingFee)
+        || Number(emp.compensation?.payAmount)
+        || 0;
+
+      const quarterlyFee = tierPricingList.find((t) => t.tier === 'Quarterly')?.fee || Number(emp.trainerPricing?.quarterly) || 0;
+      const halfYearlyFee = tierPricingList.find((t) => t.tier === 'Half-Yearly')?.fee || Number(emp.trainerPricing?.halfYearly) || 0;
+      const annualFee = tierPricingList.find((t) => t.tier === 'Annual')?.fee || Number(emp.trainerPricing?.annual) || 0;
+
+      return {
+        employeeId: emp.employeeId || emp._id?.toString() || '',
+        name: emp.name,
+        specialty: emp.specialty || emp.previousDesignation || 'Certified Fitness Trainer',
+        experienceYears: Number(emp.experienceYears) || 2,
+        rating: emp.rating || 4.9,
+        reviewsCount: emp.reviewsCount || 0,
+        ratings: Array.isArray(emp.ratings) ? emp.ratings : [],
+        monthlyFee,
+        personalTrainingFee: monthlyFee,
+        tierPricing: tierPricingList,
+        trainerPricing: {
+          monthly: monthlyFee,
+          quarterly: quarterlyFee,
+          halfYearly: halfYearlyFee,
+          annual: annualFee,
+          singleSession: Number(emp.trainerPricing?.singleSession) || 0,
+        },
+        schedule: emp.schedule || {
+          workingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+          workingTimeStart: '09:00 AM',
+          workingTimeEnd: '06:00 PM',
+        },
+        imageUrl: emp.avatar || defaultAvatar,
+      };
+    });
 
     await gym.save();
   } catch (err) {
@@ -83,7 +111,7 @@ const cleanForDiff = (val) => {
 /**
  * Calculate precise field-level differences between previous and updated objects
  */
-const calculateFieldDiff = (previous, updated) => {
+export const calculateFieldDiff = (previous, updated) => {
   const diff = {};
   const ignoredKeys = new Set(['_id', 'id', 'key', 'updatedAt', 'createdAt', 'auditHistory', '__v', 'gymId', 'gymPartnerId', 'gymName']);
 

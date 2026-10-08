@@ -86,6 +86,17 @@ const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 
+const formatAmountWithCommas = (val) => {
+  if (val === undefined || val === null || val === '') return '';
+  const str = String(val).replace(/,/g, '');
+  const [intPart, decimalPart] = str.split('.');
+  const parsed = Number(intPart);
+  const formattedInt = Number.isNaN(parsed) ? intPart : parsed.toLocaleString('en-IN');
+  return decimalPart !== undefined ? `${formattedInt}.${decimalPart}` : formattedInt;
+};
+
+const parseAmountWithoutCommas = (val) => (val ? String(val).replace(/[^0-9.]/g, '') : '');
+
 const FACILITY_OPTIONS = [
   'AC Gym', 'Locker Facility', 'Shower Available', 'Changing Room',
   'Free Wi-Fi', 'Music System', 'Steam & Sauna', 'Ice Bath & Recovery',
@@ -2598,12 +2609,15 @@ export const GymProfileManagement = () => {
                           <InputNumber
                             prefix="₹"
                             min={0}
+                            formatter={formatAmountWithCommas}
+                            parser={parseAmountWithoutCommas}
                             value={record.trainerPricing?.monthly || 0}
                             onChange={(val) => {
+                              const cleanVal = Number(String(val || 0).replace(/,/g, '')) || 0;
                               const updated = [...gymTrainersPricing];
                               updated[index] = {
                                 ...updated[index],
-                                trainerPricing: { ...updated[index].trainerPricing, monthly: Number(val) || 0 },
+                                trainerPricing: { ...updated[index].trainerPricing, monthly: cleanVal },
                               };
                               setGymTrainersPricing(updated);
                             }}
@@ -2618,12 +2632,15 @@ export const GymProfileManagement = () => {
                           <InputNumber
                             prefix="₹"
                             min={0}
+                            formatter={formatAmountWithCommas}
+                            parser={parseAmountWithoutCommas}
                             value={record.trainerPricing?.quarterly || 0}
                             onChange={(val) => {
+                              const cleanVal = Number(String(val || 0).replace(/,/g, '')) || 0;
                               const updated = [...gymTrainersPricing];
                               updated[index] = {
                                 ...updated[index],
-                                trainerPricing: { ...updated[index].trainerPricing, quarterly: Number(val) || 0 },
+                                trainerPricing: { ...updated[index].trainerPricing, quarterly: cleanVal },
                               };
                               setGymTrainersPricing(updated);
                             }}
@@ -2638,12 +2655,15 @@ export const GymProfileManagement = () => {
                           <InputNumber
                             prefix="₹"
                             min={0}
+                            formatter={formatAmountWithCommas}
+                            parser={parseAmountWithoutCommas}
                             value={record.trainerPricing?.halfYearly || 0}
                             onChange={(val) => {
+                              const cleanVal = Number(String(val || 0).replace(/,/g, '')) || 0;
                               const updated = [...gymTrainersPricing];
                               updated[index] = {
                                 ...updated[index],
-                                trainerPricing: { ...updated[index].trainerPricing, halfYearly: Number(val) || 0 },
+                                trainerPricing: { ...updated[index].trainerPricing, halfYearly: cleanVal },
                               };
                               setGymTrainersPricing(updated);
                             }}
@@ -2658,12 +2678,15 @@ export const GymProfileManagement = () => {
                           <InputNumber
                             prefix="₹"
                             min={0}
+                            formatter={formatAmountWithCommas}
+                            parser={parseAmountWithoutCommas}
                             value={record.trainerPricing?.annual || 0}
                             onChange={(val) => {
+                              const cleanVal = Number(String(val || 0).replace(/,/g, '')) || 0;
                               const updated = [...gymTrainersPricing];
                               updated[index] = {
                                 ...updated[index],
-                                trainerPricing: { ...updated[index].trainerPricing, annual: Number(val) || 0 },
+                                trainerPricing: { ...updated[index].trainerPricing, annual: cleanVal },
                               };
                               setGymTrainersPricing(updated);
                             }}
@@ -2678,12 +2701,15 @@ export const GymProfileManagement = () => {
                           <InputNumber
                             prefix="₹"
                             min={0}
+                            formatter={formatAmountWithCommas}
+                            parser={parseAmountWithoutCommas}
                             value={record.trainerPricing?.singleSession || 0}
                             onChange={(val) => {
+                              const cleanVal = Number(String(val || 0).replace(/,/g, '')) || 0;
                               const updated = [...gymTrainersPricing];
                               updated[index] = {
                                 ...updated[index],
-                                trainerPricing: { ...updated[index].trainerPricing, singleSession: Number(val) || 0 },
+                                trainerPricing: { ...updated[index].trainerPricing, singleSession: cleanVal },
                               };
                               setGymTrainersPricing(updated);
                             }}

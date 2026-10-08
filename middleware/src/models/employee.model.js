@@ -187,7 +187,16 @@ const employeeSchema = new mongoose.Schema(
       payAmount: { type: Number, default: 0, min: 0 },
       payFreq: { type: String, enum: ['Daily', 'Weekly', 'Monthly', 'Per Session', 'Per Hour'], default: 'Monthly' },
     },
-    // Standard Membership Tier Pricing Mapping (for trainers)
+    // Standard Membership Tier Pricing Mapping & Trainer Fee (for trainers)
+    trainerFee: { type: Number, default: 0, min: 0 },
+    personalTrainingFee: { type: Number, default: 0, min: 0 },
+    tierPricing: [
+      {
+        tier: { type: String, required: true, trim: true },
+        fee: { type: Number, required: true, default: 0, min: 0 },
+        durationDays: { type: Number, default: 30, min: 1 },
+      },
+    ],
     trainerPricing: {
       monthly: { type: Number, default: 0, min: 0 },
       quarterly: { type: Number, default: 0, min: 0 },
@@ -227,6 +236,53 @@ const employeeSchema = new mongoose.Schema(
 
 employeeSchema.index({ gymId: 1, approvalStatus: 1 });
 employeeSchema.index({ gymPartnerId: 1, employeeId: 1 });
+
+employeeSchema.pre('save', function () {
+  if (this.role === 'Trainer') {
+    const monthly = Number(this.trainerPricing?.monthly) || Number(this.trainerFee) || Number(this.personalTrainingFee) || 0;
+    const quarterly = Number(this.trainerPricing?.quarterly) || 0;
+    const halfYearly = Number(this.trainerPricing?.halfYearly) || 0;
+    const annual = Number(this.trainerPricing?.annual) || 0;
+
+    if (!this.trainerFee && monthly) this.trainerFee = monthly;
+    if (!this.personalTrainingFee && monthly) this.personalTrainingFee = monthly;
+
+    if (!this.trainerPricing) {
+      this.trainerPricing = {
+        monthly,
+        quarterly,
+        halfYearly,
+        annual,
+        singleSession: 0,
+      };
+    } else if (!this.trainerPricing.monthly && this.trainerFee) {
+      this.trainerPricing.monthly = this.trainerFee;
+    }
+
+    if (!Array.isArray(this.tierPricing) || this.tierPricing.length === 0) {
+      this.tierPricing = [
+        { tier: 'Monthly', fee: monthly, durationDays: 30 },
+        { tier: 'Quarterly', fee: quarterly, durationDays: 90 },
+        { tier: 'Half-Yearly', fee: halfYearly, durationDays: 180 },
+        { tier: 'Annual', fee: annual, durationDays: 365 },
+      ];
+    } else {
+      const mTier = this.tierPricing.find((t) => t.tier === 'Monthly');
+      const qTier = this.tierPricing.find((t) => t.tier === 'Quarterly');
+      const hTier = this.tierPricing.find((t) => t.tier === 'Half-Yearly');
+      const aTier = this.tierPricing.find((t) => t.tier === 'Annual');
+
+      if (mTier) {
+        this.trainerFee = mTier.fee;
+        this.personalTrainingFee = mTier.fee;
+        if (this.trainerPricing) this.trainerPricing.monthly = mTier.fee;
+      }
+      if (qTier && this.trainerPricing) this.trainerPricing.quarterly = qTier.fee;
+      if (hTier && this.trainerPricing) this.trainerPricing.halfYearly = hTier.fee;
+      if (aTier && this.trainerPricing) this.trainerPricing.annual = aTier.fee;
+    }
+  }
+});
 
 const sanitizeJsonTransform = (_doc, ret) => {
   if (ret._id) {

@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { apiClient } from '../../services/apiClient';
 import {
   Card,
   Table,
@@ -124,10 +126,57 @@ export const MembersManagement = ({
   onExtendMembership,
 }) => {
   const { isDarkMode } = useTheme();
+  const { user } = useSelector((state) => state.auth || {});
+  const gym = user?.gym || {};
+  const gymId = gym._id || gym.id || user?.gymId || user?.partnerId;
+
   const [form] = Form.useForm();
   const [extendForm] = Form.useForm();
 
   const [membersList, setMembersList] = useState(initialData);
+
+  useEffect(() => {
+    if (!gymId) return;
+    const fetchGymMemberships = async () => {
+      try {
+        const res = await apiClient.get(`/memberships/gym/${gymId}`);
+        const data = res.data?.data?.memberships;
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped = data.map((m) => {
+            const startStr = m.startDate
+              ? new Date(m.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+              : '';
+            const endStr = m.endDate
+              ? new Date(m.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+              : '';
+            const daysRemaining = Math.max(0, Math.ceil((new Date(m.endDate) - new Date()) / (1000 * 60 * 60 * 24)));
+            return {
+              key: m._id,
+              memberId: m.membershipId,
+              name: m.userId?.fullName || 'Member',
+              phone: m.userId?.phone || '',
+              email: m.userId?.email || '',
+              avatar:
+                m.userId?.profilePicture ||
+                'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop',
+              plan: `${m.membershipTier} (${m.durationDays || 30} Days)`,
+              startDate: startStr,
+              expiryDate: endStr,
+              daysLeft: `${daysRemaining} days left`,
+              status: m.status,
+              paymentType: m.payment?.method || 'Online',
+              amount: `₹${m.pricing?.totalAmount || 0}`,
+              trainerName: m.trainerId?.name || (m.hasTrainer ? 'Assigned' : 'None'),
+            };
+          });
+          setMembersList(mapped);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch gym memberships:', err);
+      }
+    };
+    void fetchGymMemberships();
+  }, [gymId]);
   const [activeTab, setActiveTab] = useState('members'); // 'members' | 'cancellations'
   const [namePhoneSearch, setNamePhoneSearch] = useState('');
   const [memberIdSearch, setMemberIdSearch] = useState('');

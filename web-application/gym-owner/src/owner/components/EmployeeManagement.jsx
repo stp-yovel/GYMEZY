@@ -83,6 +83,17 @@ const getGymInitials = (name) => {
 
 export const INITIAL_EMPLOYEES = [];
 
+export const formatAmountWithCommas = (val) => {
+  if (val === undefined || val === null || val === '') return '';
+  const str = String(val).replace(/,/g, '');
+  const [intPart, decimalPart] = str.split('.');
+  const parsed = Number(intPart);
+  const formattedInt = Number.isNaN(parsed) ? intPart : parsed.toLocaleString('en-IN');
+  return decimalPart !== undefined ? `${formattedInt}.${decimalPart}` : formattedInt;
+};
+
+export const parseAmountWithoutCommas = (val) => (val ? String(val).replace(/[^0-9.]/g, '') : '');
+
 // Canvas Confetti Popper Trigger
 export const triggerConfettiPopper = () => {
   try {
@@ -459,11 +470,11 @@ export const EmployeeManagement = ({
       workingTimeEnd: record.schedule?.workingTimeEnd || '02:00 PM',
       payType: record.compensation?.payType || 'Monthly',
       payAmount: record.compensation?.payAmount || record.salary || 25000,
-      trainerMonthly: record.trainerPricing?.monthly ?? 0,
-      trainerQuarterly: record.trainerPricing?.quarterly ?? 0,
-      trainerHalfYearly: record.trainerPricing?.halfYearly ?? 0,
-      trainerAnnual: record.trainerPricing?.annual ?? 0,
-      trainerSingleSession: record.trainerPricing?.singleSession ?? 0,
+      trainerMonthly: record.trainerPricing?.monthly ?? (typeof record.personalTrainingFee === 'number' ? record.personalTrainingFee : (record.personalTrainingFee?.monthly ?? 0)),
+      trainerQuarterly: record.trainerPricing?.quarterly ?? (record.personalTrainingFee?.quarterly ?? 0),
+      trainerHalfYearly: record.trainerPricing?.halfYearly ?? (record.personalTrainingFee?.halfYearly ?? 0),
+      trainerAnnual: record.trainerPricing?.annual ?? (record.personalTrainingFee?.annual ?? 0),
+      trainerSingleSession: record.trainerPricing?.singleSession ?? (record.personalTrainingFee?.singleSession ?? 0),
       emergencyName: record.emergencyContact?.name || '',
       emergencyRel: record.emergencyContact?.relationship || '',
       emergencyPhone: record.emergencyContact?.phone || '',
@@ -520,21 +531,24 @@ export const EmployeeManagement = ({
       },
       trainerPricing: {
         monthly: values.trainerMonthly !== undefined && values.trainerMonthly !== null && values.trainerMonthly !== ''
-          ? Number(values.trainerMonthly)
+          ? Number(String(values.trainerMonthly).replace(/,/g, ''))
           : (Number(selectedEmployee.trainerPricing?.monthly) || 0),
         quarterly: values.trainerQuarterly !== undefined && values.trainerQuarterly !== null && values.trainerQuarterly !== ''
-          ? Number(values.trainerQuarterly)
+          ? Number(String(values.trainerQuarterly).replace(/,/g, ''))
           : (Number(selectedEmployee.trainerPricing?.quarterly) || 0),
         halfYearly: values.trainerHalfYearly !== undefined && values.trainerHalfYearly !== null && values.trainerHalfYearly !== ''
-          ? Number(values.trainerHalfYearly)
+          ? Number(String(values.trainerHalfYearly).replace(/,/g, ''))
           : (Number(selectedEmployee.trainerPricing?.halfYearly) || 0),
         annual: values.trainerAnnual !== undefined && values.trainerAnnual !== null && values.trainerAnnual !== ''
-          ? Number(values.trainerAnnual)
+          ? Number(String(values.trainerAnnual).replace(/,/g, ''))
           : (Number(selectedEmployee.trainerPricing?.annual) || 0),
         singleSession: values.trainerSingleSession !== undefined && values.trainerSingleSession !== null && values.trainerSingleSession !== ''
-          ? Number(values.trainerSingleSession)
+          ? Number(String(values.trainerSingleSession).replace(/,/g, ''))
           : (Number(selectedEmployee.trainerPricing?.singleSession) || 0),
       },
+      personalTrainingFee: values.trainerMonthly !== undefined && values.trainerMonthly !== null && values.trainerMonthly !== ''
+        ? Number(String(values.trainerMonthly).replace(/,/g, ''))
+        : (Number(selectedEmployee.trainerPricing?.monthly) || Number(selectedEmployee.personalTrainingFee) || 0),
       emergencyContact: {
         name: values.emergencyName !== undefined ? values.emergencyName.trim() : (selectedEmployee.emergencyContact?.name || ''),
         relationship: values.emergencyRel !== undefined ? values.emergencyRel.trim() : (selectedEmployee.emergencyContact?.relationship || ''),
@@ -1964,7 +1978,12 @@ export const EmployeeManagement = ({
                         </Col>
                         <Col xs={24} sm={12}>
                           <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Salary / Pay Amount (₹)</span>} name="payAmount" initialValue={25000} style={{ marginBottom: 14 }}>
-                            <InputNumber prefix="₹" style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }} />
+                            <InputNumber
+                              prefix="₹"
+                              formatter={formatAmountWithCommas}
+                              parser={parseAmountWithoutCommas}
+                              style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
+                            />
                           </Form.Item>
                         </Col>
                       </Row>
@@ -2145,8 +2164,10 @@ export const EmployeeManagement = ({
                                 >
                                   <InputNumber
                                     prefix="₹"
-                                    placeholder="e.g. 1500"
+                                    placeholder="e.g. 1,500"
                                     min={0}
+                                    formatter={formatAmountWithCommas}
+                                    parser={parseAmountWithoutCommas}
                                     style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
                                   />
                                 </Form.Item>
@@ -2160,8 +2181,10 @@ export const EmployeeManagement = ({
                                 >
                                   <InputNumber
                                     prefix="₹"
-                                    placeholder="e.g. 4000"
+                                    placeholder="e.g. 4,000"
                                     min={0}
+                                    formatter={formatAmountWithCommas}
+                                    parser={parseAmountWithoutCommas}
                                     style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
                                   />
                                 </Form.Item>
@@ -2177,8 +2200,10 @@ export const EmployeeManagement = ({
                                 >
                                   <InputNumber
                                     prefix="₹"
-                                    placeholder="e.g. 7500"
+                                    placeholder="e.g. 7,500"
                                     min={0}
+                                    formatter={formatAmountWithCommas}
+                                    parser={parseAmountWithoutCommas}
                                     style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
                                   />
                                 </Form.Item>
@@ -2192,8 +2217,10 @@ export const EmployeeManagement = ({
                                 >
                                   <InputNumber
                                     prefix="₹"
-                                    placeholder="e.g. 14000"
+                                    placeholder="e.g. 14,000"
                                     min={0}
+                                    formatter={formatAmountWithCommas}
+                                    parser={parseAmountWithoutCommas}
                                     style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
                                   />
                                 </Form.Item>
@@ -2211,6 +2238,8 @@ export const EmployeeManagement = ({
                                     prefix="₹"
                                     placeholder="e.g. 200"
                                     min={0}
+                                    formatter={formatAmountWithCommas}
+                                    parser={parseAmountWithoutCommas}
                                     style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
                                   />
                                 </Form.Item>

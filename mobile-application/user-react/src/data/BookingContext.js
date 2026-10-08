@@ -33,13 +33,22 @@ export const BookingProvider = ({ children }) => {
   };
 
   const updateMembership = (updated) => {
-    setMemberships((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+    setMemberships((prev) =>
+      prev.map((m) =>
+        (updated._id && m._id && String(m._id) === String(updated._id)) ||
+        (m.id && updated.id && String(m.id) === String(updated.id))
+          ? updated
+          : m
+      )
+    );
   };
 
   const cancelMembership = (membershipId, reason) => {
     setMemberships((prev) =>
       prev.map((m) =>
-        m.id === membershipId
+        m.id === membershipId ||
+        (m._id && String(m._id) === String(membershipId)) ||
+        m.membershipId === membershipId
           ? {
               ...m,
               status: 'Cancelled',
@@ -50,6 +59,10 @@ export const BookingProvider = ({ children }) => {
     );
   };
 
+  const setAllMemberships = (items) => {
+    setMemberships(Array.isArray(items) ? items : []);
+  };
+
   const contextValue = useMemo(
     () => ({
       bookings,
@@ -58,6 +71,7 @@ export const BookingProvider = ({ children }) => {
       updateBooking,
       cancelBooking,
       addMembership,
+      setAllMemberships,
       updateMembership,
       cancelMembership,
     }),

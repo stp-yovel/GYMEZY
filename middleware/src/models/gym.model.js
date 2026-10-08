@@ -180,12 +180,25 @@ const trainerSchema = new mongoose.Schema(
     reviewsCount: { type: Number, default: 0, min: 0 },
     ratings: { type: [reviewSchema], default: [] },
     monthlyFee: { type: Number, default: 0, min: 0 },
+    personalTrainingFee: { type: Number, default: 0, min: 0 },
+    tierPricing: [
+      {
+        tier: { type: String, required: true, trim: true },
+        fee: { type: Number, required: true, default: 0, min: 0 },
+        durationDays: { type: Number, default: 30, min: 1 },
+      },
+    ],
     trainerPricing: {
       monthly: { type: Number, default: 0, min: 0 },
       quarterly: { type: Number, default: 0, min: 0 },
       halfYearly: { type: Number, default: 0, min: 0 },
       annual: { type: Number, default: 0, min: 0 },
       singleSession: { type: Number, default: 0, min: 0 },
+    },
+    schedule: {
+      workingDays: [{ type: String, trim: true }],
+      workingTimeStart: { type: String, trim: true, default: '09:00 AM' },
+      workingTimeEnd: { type: String, trim: true, default: '06:00 PM' },
     },
     image: { type: fileAttachmentSchema, default: () => ({}) }, // { fileName: "{gymname}_trainer_{name}", fileData: "..." }
     imageUrl: { type: String, trim: true, default: '' },

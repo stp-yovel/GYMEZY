@@ -97,7 +97,7 @@ class ApiService {
   async executeFetch(endpoint, options = {}, timeoutMs = 15000) {
     const metroHost = getMetroHost();
 
-    // Priority candidates: Verified base, ADB reverse localhost, Metro host IP, WiFi LAN IP, Android emulator 10.0.2.2
+    // Priority candidates: Verified base, ADB reverse localhost (USB), Metro host IP, WiFi LAN IP, Android emulator 10.0.2.2
     const candidateBases = [
       this.verifiedBase,
       `http://localhost:${BACKEND_PORT}/api/v1`,
@@ -114,10 +114,11 @@ class ApiService {
       const currentBase = uniqueBases[i];
       const targetUrl = `${currentBase}${endpoint}`;
       try {
+        const attemptTimeout = this.verifiedBase === currentBase ? timeoutMs : 10000;
         const response = await fetchWithTimeout(
           targetUrl,
           options,
-          i === 0 && this.verifiedBase ? timeoutMs : 8000
+          attemptTimeout
         );
 
         // Handle 401 Unauthorized globally
@@ -273,6 +274,26 @@ class ApiService {
       throw new Error(json.message || 'Failed to fetch gym reviews.');
     }
     return json.data;
+  }
+
+  /**
+   * Fetch Active Approved Trainers for a specific Gym
+   */
+  async getGymTrainers(gymId) {
+    try {
+      const response = await this.executeFetch(`/gyms/${gymId}/trainers`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+      const json = await response.json();
+      if (response.ok && json.success && Array.isArray(json.data)) {
+        return json.data;
+      }
+      return [];
+    } catch (error) {
+      console.warn('[API SERVICE] getGymTrainers error:', error?.message);
+      return [];
+    }
   }
 
   /**
