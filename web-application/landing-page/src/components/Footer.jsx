@@ -47,7 +47,7 @@ export default function Footer() {
                 Second Floor, Mahalakshmi Nagar, Plot No 5, Jyothi Nagar, Moulivakkam, Kolathuvancheri, Tamil Nadu 600125
               </span>
               <a
-                href="https://maps.app.goo.gl/dr3vvVmQom43A1Yz7"
+                href="https://www.google.com/maps/place/Gymezy+Fitness+Solutions/@13.02381,80.1342988,1189m/data=!3m2!1e3!4b1!4m6!3m5!1s0x3a5261997ee89085:0x98061ceda000a86d!8m2!3d13.0238048!4d80.1368791!16s%2Fg%2F11zgv3d1_x?entry=tts&g_ep=EgoyMDI2MDkyMy4wIPu8ASoASAFQAw%3D%3D&skid=753a0790-e509-4a06-b142-2a1ce24f00dc"
                 target="_blank"
                 rel="nofollow noopener noreferrer"
                 className="footer-map-link"
