@@ -1,16 +1,8 @@
 /**
  * ==============================================================================
- * GYMEZY LANDING PAGE - GOOGLE APPS SCRIPT FOR GOOGLE SHEETS INTEGRATION
+ * GYMEZY - GYM OWNER & TRAINER LEAD CAPTURE (GOOGLE APPS SCRIPT)
  * ==============================================================================
- *
- * This script intelligently handles submissions for both:
- * 1. Gym Owners / Trainers (Lead Capture & Partner Onboarding)
- * 2. Customers (Launch Offers & Early VIP Pass Reservations)
- *
- * If you use separate tabs in your Google Sheet:
- * - "Gym Leads" tab for Gym Owners / Trainers
- * - "Customer Leads" tab for Customers
- * (Or if only one tab exists, it will record into the Active Sheet automatically)
+ * Web App URL used by: VITE_GOOGLE_SHEET_WEBAPP_URL
  * ==============================================================================
  */
 
@@ -19,98 +11,78 @@ function doPost(e) {
   lock.tryLock(10000); // Prevent concurrent write race conditions
 
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var data = {};
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
 
+    // Auto-create comprehensive header row if sheet is completely empty
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow([
+        "Timestamp",
+        "Category",
+        "Plan",
+        "Gym / Fitness Center Name",
+        "Contact / Trainer Name",
+        "Mobile Number",
+        "Email Address",
+        "City",
+        "Area / Location",
+        "Gym Type",
+        "Current Members",
+        "Trainer Specialization",
+        "Coaching Experience",
+        "Notes / Requirement",
+        "Page URL"
+      ]);
+
+      // Format header row (15 columns)
+      var headerRange = sheet.getRange(1, 1, 1, 15);
+      headerRange.setBackground("#00bf62");
+      headerRange.setFontColor("#080c14");
+      headerRange.setFontWeight("bold");
+      headerRange.setHorizontalAlignment("center");
+      sheet.setFrozenRows(1);
+    }
+
+    var data = {};
     if (e.postData && e.postData.contents) {
-      data = JSON.parse(e.postData.contents);
+      try {
+        data = JSON.parse(e.postData.contents);
+      } catch (err) {
+        data = e.parameter || {};
+      }
     } else if (e.parameter) {
       data = e.parameter;
     }
 
-    var isCustomer = data.category === 'Customer' || data.type === 'Customer Launch Offer Registration' || !!data.place || !!data.experience;
-    var sheetName = isCustomer ? "Customer Leads" : "Gym Leads";
-    var sheet = ss.getSheetByName(sheetName) || ss.getActiveSheet();
-
-    // Auto-create header row if sheet is completely empty
-    if (sheet.getLastRow() === 0) {
-      if (isCustomer) {
-        sheet.appendRow([
-          "Timestamp",
-          "Type",
-          "Full Name",
-          "Mobile Number",
-          "Email Address",
-          "City / Location",
-          "Fitness Experience",
-          "Age Group",
-          "Fitness Goal",
-          "Source URL"
-        ]);
-        var headerRange = sheet.getRange(1, 1, 1, 10);
-        headerRange.setBackground("#00bf62");
-        headerRange.setFontColor("#080c14");
-        headerRange.setFontWeight("bold");
-        sheet.setFrozenRows(1);
-      } else {
-        sheet.appendRow([
-          "Timestamp",
-          "Category",
-          "Plan",
-          "Gym / Fitness Center Name",
-          "Owner / Contact Person",
-          "Mobile Number",
-          "Email Address",
-          "City",
-          "Area / Location",
-          "Notes / Requirement",
-          "Page URL"
-        ]);
-        var headerRange = sheet.getRange(1, 1, 1, 11);
-        headerRange.setBackground("#00bf62");
-        headerRange.setFontColor("#080c14");
-        headerRange.setFontWeight("bold");
-        sheet.setFrozenRows(1);
-      }
-    }
-
+    // Format phone number to preserve leading +, zeros, and spacing in Google Sheets
     var mobileValue = data.mobile ? data.mobile.toString().trim() : "";
-    if (mobileValue.startsWith("+") || mobileValue.startsWith("=") || mobileValue.startsWith("-")) {
+    if (mobileValue && !mobileValue.startsWith("'")) {
       mobileValue = "'" + mobileValue;
     }
 
-    var row;
-    if (isCustomer) {
-      row = [
-        data.timestamp || new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
-        data.type || "Customer Launch Offer Registration",
-        data.name || "",
-        mobileValue,
-        data.email || "",
-        data.place || "",
-        data.experience || "",
-        data.age || "",
-        data.goal || "",
-        data.pageUrl || ""
-      ];
-    } else {
-      row = [
-        data.timestamp || new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
-        data.category || "Gym Owner / Trainer",
-        data.plan || "Partner Network",
-        data.gymName || "",
-        data.ownerName || "",
-        mobileValue,
-        data.email || "",
-        data.city || "",
-        data.area || "",
-        data.notes || "",
-        data.pageUrl || ""
-      ];
-    }
+    // Determine contact name based on role
+    var contactName = data.ownerName || data.trainerName || data.name || "";
+
+    var row = [
+      data.timestamp || new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+      data.category || "General Inquiry",
+      data.plan || "Standard",
+      data.gymName || "-",
+      contactName,
+      mobileValue,
+      data.email || "",
+      data.city || data.place || "",
+      data.area || "",
+      data.gymType || "-",
+      data.membersCount || "-",
+      data.specialization || "-",
+      data.experience || "-",
+      data.notes || "",
+      data.pageUrl || ""
+    ];
 
     sheet.appendRow(row);
 
+    // Return clean JSON response
     return ContentService
       .createTextOutput(JSON.stringify({ result: "success", row: sheet.getLastRow() }))
       .setMimeType(ContentService.MimeType.JSON);
