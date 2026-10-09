@@ -210,7 +210,7 @@ export default function UserLeadCaptureModal({
     setLoading(true);
 
     const payload = {
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
       type: 'User Launch Offer Registration',
       offer: offerTag,
       name: formData.name.trim(),

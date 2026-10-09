@@ -53,7 +53,7 @@ function doPost(e) {
     }
     
     // Extract fields safely
-    var timestamp = data.timestamp || new Date().toISOString();
+    var timestamp = data.timestamp || new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
     var type = data.type || "User Launch Offer Registration";
     var offer = data.offer || "Launch Offer";
     var name = data.name || "";

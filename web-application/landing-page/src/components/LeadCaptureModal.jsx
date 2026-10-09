@@ -310,7 +310,7 @@ export default function LeadCaptureModal({
 
     if (isCustomer) {
       payload = {
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
         type: 'Customer Launch Offer Registration',
         category: 'Customer',
         name: customerData.name.trim(),
