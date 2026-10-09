@@ -4,14 +4,14 @@ import trainerImg from '../assets/trainer.png';
 import gymezyLogo from '../assets/logo/gymezy.png';
 import './LeadCaptureModal.css';
 
-// Default Google Apps Script Web App URLs
+// Dedicated Google Apps Script Web App URLs
 const GOOGLE_SCRIPT_URL =
   import.meta.env.VITE_GOOGLE_SHEET_WEBAPP_URL ||
   'https://script.google.com/macros/s/AKfycbwRuYiEoxBfDcERbsg5IxbGZpKZH_ho9zwq8K-Csur6-RfgviGpi2Rg1WtkGY8IfxIpsA/exec';
 
 const GOOGLE_USER_SCRIPT_URL =
   import.meta.env.VITE_USER_LAUNCH_GOOGLE_SHEET_WEBAPP_URL ||
-  GOOGLE_SCRIPT_URL;
+  'https://script.google.com/macros/s/AKfycbzh4NVp8z_wKP1Mnk-mI1861kmoYboMQV36kQ4ArI6c_latldMzGzC-MUuY_blyISklaw/exec';
 
 function triggerSuccessConfetti() {
   try {
