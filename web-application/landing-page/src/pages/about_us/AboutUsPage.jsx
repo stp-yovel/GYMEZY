@@ -1,12 +1,11 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import gymModelThumb from '../../assets/gym_model.jpg';
 import StorySplitSection from '../../components/StorySplitSection';
 import DualEcosystemSection from '../../components/DualEcosystemSection';
 import GymAlertsBanner from '../../components/GymAlertsBanner';
 import Footer from '../../components/Footer';
-import { openLeadModal, openVideoModal } from '../../utils/modalUtils';
+import { openWelcomeModal, openVideoModal } from '../../utils/modalUtils';
 import './AboutUsPage.css';
 
 export default function AboutUsPage() {
@@ -109,7 +108,7 @@ export default function AboutUsPage() {
             <div className="about-hero-cta-row">
               <button
                 type="button"
-                onClick={() => openLeadModal({ category: 'partner', plan: 'About Us Hero Partner Onboarding' })}
+                onClick={() => openWelcomeModal()}
                 className="about-primary-btn lg-btn"
                 style={{ border: 'none', outline: 'none', cursor: 'pointer' }}
               >

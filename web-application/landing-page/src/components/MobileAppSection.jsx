@@ -87,20 +87,6 @@ export default function MobileAppSection({ id = 'app' }) {
                 <span>Claim Free Launch Pass</span>
               </button>
             </div>
-
-            {/* Social Proof Stats */}
-            <div className="app-social-proof-row">
-              <div className="app-stars-badge">
-                <span className="app-star">★</span>
-                <span className="app-star">★</span>
-                <span className="app-star">★</span>
-                <span className="app-star">★</span>
-                <span className="app-star">★</span>
-                <span className="app-rating-number">4.9 / 5.0</span>
-              </div>
-              <span className="app-proof-separator">•</span>
-              <span className="app-downloads-count">50K+ Active Athletes</span>
-            </div>
           </div>
         </div>
       </div>

@@ -49,11 +49,11 @@ export default function Footer() {
                 </svg>
               </a>
               <a
-                href="https://www.linkedin.com/search/results/all/?keywords=Gymezy%20Fitness%20Solutions"
+                href="https://www.linkedin.com/company/gymezy-fitness-solutions"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="footer-social-btn footer-social-linkedin"
-                aria-label="Find GYMEZY on LinkedIn"
+                aria-label="Follow GYMEZY on LinkedIn"
                 title="LinkedIn"
               >
                 <svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true">
@@ -65,8 +65,8 @@ export default function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="footer-social-btn footer-social-whatsapp"
-                aria-label="Contact GYMEZY on WhatsApp"
-                title="WhatsApp"
+                aria-label="Chat with GYMEZY on WhatsApp"
+                title="Chat on WhatsApp"
               >
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
                   <path d="M17.472 14.382c-.301-.15-1.782-.879-2.058-.979-.276-.1-.477-.15-.678.15-.201.3-.778.979-.954 1.18-.175.2-.351.225-.652.075-.301-.15-1.272-.469-2.423-1.496-.896-.799-1.501-1.787-1.677-2.088-.175-.301-.019-.464.132-.614.136-.135.301-.351.452-.527.15-.175.201-.301.301-.501.101-.2.05-.376-.025-.527-.075-.15-.678-1.634-.929-2.241-.244-.59-.493-.51-.678-.52-.175-.009-.376-.01-.577-.01-.201 0-.527.075-.803.376-.276.301-1.054 1.03-1.054 2.512 0 1.482 1.079 2.912 1.23 3.113.15.201 2.124 3.243 5.145 4.549.719.31 1.28.496 1.718.635.722.23 1.378.197 1.898.12.579-.087 1.782-.728 2.033-1.431.251-.703.251-1.305.175-1.431-.075-.125-.276-.2-.577-.35zM12.042 21.75c-1.745 0-3.456-.468-4.965-1.353l-.356-.21-3.693.968.986-3.6-.231-.368A9.704 9.704 0 0 1 2.25 12.042C2.25 6.643 6.643 2.25 12.042 2.25c2.617 0 5.076 1.018 6.927 2.87 1.85 1.85 2.87 4.31 2.87 6.922 0 5.4-4.394 9.708-9.797 9.708zm8.35-18.067C18.17 1.463 15.228.25 12.042.25 5.53.25.25 5.531.25 12.042c0 2.08.543 4.11 1.573 5.901L0 24l6.236-1.636a11.75 11.75 0 0 0 5.806 1.53h.005c6.51 0 11.792-5.281 11.792-11.793 0-3.15-1.226-6.11-3.447-8.418z" />

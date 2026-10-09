@@ -2,33 +2,66 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './PhilosophyCarousel.css';
 
-export default function PhilosophyCarousel({ items = [] }) {
+export const DEFAULT_PHILOSOPHY_ITEMS = [
+  {
+    id: 1,
+    num: '01',
+    title: 'Verified Fitness Centres',
+    tag: 'Flexible Access',
+    desc: 'Pay only for the sessions you use. Full gym floor & equipment access with instant OTP entry.',
+    mission: 'Eliminate fitness barriers by connecting you with top gym facilities, certified coaches, and flexible passes across your city.',
+    img: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1200&q=80',
+    link: '#services'
+  },
+  {
+    id: 2,
+    num: '02',
+    title: 'Certified Personal Trainers',
+    tag: '1-on-1 Coaching',
+    desc: 'Book certified coaches for strength, weight loss, HIIT, and customized nutrition guidance.',
+    mission: 'Empower your fitness journey with certified personal trainers, tailored 1-on-1 workouts, and expert nutrition guidance.',
+    img: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&w=800&q=80',
+    link: '#services'
+  },
+  {
+    id: 3,
+    num: '03',
+    title: 'Group Classes & Studios',
+    tag: 'Yoga, Zumba & HIIT',
+    desc: 'Join high-energy group fitness classes led by certified studio instructors.',
+    mission: 'Build vibrant fitness communities by connecting you with top group studios, energized Zumba, Yoga, and HIIT sessions.',
+    img: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=80',
+    link: '#services'
+  }
+];
+
+export default function PhilosophyCarousel({ items = DEFAULT_PHILOSOPHY_ITEMS }) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  if (!items || items.length === 0) return null;
+  const activeItems = items && items.length > 0 ? items : DEFAULT_PHILOSOPHY_ITEMS;
 
   const handleNext = () => {
-    setCurrentIndex((prev) => (prev + 1) % items.length);
+    setCurrentIndex((prev) => (prev + 1) % activeItems.length);
   };
 
   const handlePrev = () => {
-    setCurrentIndex((prev) => (prev - 1 + items.length) % items.length);
+    setCurrentIndex((prev) => (prev - 1 + activeItems.length) % activeItems.length);
   };
 
   const handleCardClick = (offset) => {
     if (offset === 0) return; // Already featured
-    setCurrentIndex((prev) => (prev + offset + items.length) % items.length);
+    setCurrentIndex((prev) => (prev + offset + activeItems.length) % activeItems.length);
   };
 
   // Re-ordered 3 cards according to active index:
   // Slot 0 (Featured Left), Slot 1 (Right 1), Slot 2 (Right 2)
   const orderedItems = [
-    { item: items[currentIndex], slot: 0 },
-    { item: items[(currentIndex + 1) % items.length], slot: 1 },
-    { item: items[(currentIndex + 2) % items.length], slot: 2 }
+    { item: activeItems[currentIndex % activeItems.length], slot: 0 },
+    { item: activeItems[(currentIndex + 1) % activeItems.length], slot: 1 },
+    { item: activeItems[(currentIndex + 2) % activeItems.length], slot: 2 }
   ];
 
-  const featuredItem = items[currentIndex];
+  const featuredItem = activeItems[currentIndex % activeItems.length];
 
   const springConfig = {
     type: 'spring',
@@ -75,15 +108,15 @@ export default function PhilosophyCarousel({ items = [] }) {
         </div>
       </div>
 
-      {/* Unified 3-Card Layout with Framer Motion FLIP Physical Swap */}
+        {/* Unified 3-Card Layout with Framer Motion FLIP Physical Swap */}
       <div className="philosophy-asymmetric-grid">
         {orderedItems.map(({ item, slot }, index) => {
           const isFeatured = slot === 0;
           const slotClass = isFeatured
             ? 'slot-featured'
             : slot === 1
-            ? 'slot-sm-1'
-            : 'slot-sm-2';
+              ? 'slot-sm-1'
+              : 'slot-sm-2';
 
           return (
             <motion.div
@@ -143,6 +176,19 @@ export default function PhilosophyCarousel({ items = [] }) {
             </motion.div>
           );
         })}
+
+        {/* Mobile Pagination Dots */}
+        <div className="philosophy-mobile-dots-wrapper">
+          {activeItems.map((item, idx) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`philosophy-dot ${currentIndex % activeItems.length === idx ? 'active' : ''}`}
+              onClick={() => setCurrentIndex(idx)}
+              aria-label={`Go to slide ${idx + 1}`}
+            />
+          ))}
+        </div>
 
         {/* Mission Text Below Cards */}
         <div className="philosophy-mission-block">

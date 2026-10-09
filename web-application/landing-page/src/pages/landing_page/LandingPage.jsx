@@ -11,7 +11,7 @@ import MobileAppSection from '../../components/MobileAppSection';
 import GymAlertsBanner from '../../components/GymAlertsBanner';
 import FAQSection from '../../components/FAQSection';
 import Footer from '../../components/Footer';
-import { openLeadModal, openUserLeadModal, openVideoModal } from '../../utils/modalUtils';
+import { openWelcomeModal, openLeadModal, openUserLeadModal, openVideoModal } from '../../utils/modalUtils';
 
 export default function LandingPage() {
   const [activeService, setActiveService] = useState(0);
@@ -72,39 +72,6 @@ export default function LandingPage() {
     }
   ];
 
-  const galleryItems = [
-    {
-      id: 1,
-      num: '01',
-      title: 'Verified Fitness Centres',
-      tag: 'Flexible Access',
-      desc: 'Pay only for the sessions you use. Full gym floor & equipment access with instant OTP entry.',
-      mission: 'Our mission is to eliminate fitness barriers by connecting you with top gym facilities, certified coaches, and flexible passes across your city',
-      img: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1200&q=80',
-      link: '#services'
-    },
-    {
-      id: 2,
-      num: '02',
-      title: 'Certified Personal Trainers',
-      tag: '1-on-1 Coaching',
-      desc: 'Book certified coaches for strength, weight loss, HIIT, and customized nutrition guidance.',
-      mission: 'Our mission is to empower your fitness journey with certified personal trainers, tailored 1-on-1 workouts, and expert nutrition guidance.',
-      img: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&w=800&q=80',
-      link: '#services'
-    },
-    {
-      id: 3,
-      num: '03',
-      title: 'Group Classes & Studios',
-      tag: 'Yoga, Zumba & HIIT',
-      desc: 'Join high-energy group fitness classes led by certified studio instructors.',
-      mission: 'Our mission is to build vibrant fitness communities by connecting you with top group studios, energized Zumba, Yoga, and HIIT sessions.',
-      img: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=80',
-      link: '#services'
-    }
-  ];
-
   return (
     <ConfigProvider
       theme={{
@@ -129,7 +96,7 @@ export default function LandingPage() {
           <Navbar
             ctaText="GET STARTED"
             ctaLink="#lead-modal"
-            onCtaClick={() => openLeadModal({ category: 'demo', plan: 'General Onboarding' })}
+            onCtaClick={() => openWelcomeModal()}
           />
 
           {/* Hero Content Area */}
@@ -149,7 +116,7 @@ export default function LandingPage() {
               <div className="fitnova-hero-cta-row">
                 <button
                   type="button"
-                  onClick={() => openLeadModal({ category: 'demo', plan: 'Gym & Fitness Network' })}
+                  onClick={() => openWelcomeModal()}
                   className="fitnova-primary-btn lg-btn"
                   style={{ border: 'none', outline: 'none', cursor: 'pointer' }}
                 >
@@ -160,14 +127,12 @@ export default function LandingPage() {
           </div>
         </section>
 
-
-
         {/* =================================================================
             3. PHILOSOPHY / ABOUT SECTION
             ================================================================= */}
         <section className="philosophy-section" id="about">
           <div className="section-container">
-            <PhilosophyCarousel items={galleryItems} />
+            <PhilosophyCarousel />
           </div>
         </section>
 

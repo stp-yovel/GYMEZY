@@ -1,10 +1,18 @@
 /**
+ * Global helper to trigger the Welcome Role Selection Modal ("How would you like to join?")
+ */
+export function openWelcomeModal() {
+  const event = new CustomEvent('gymezy:open-welcome-modal');
+  window.dispatchEvent(event);
+}
+
+/**
  * Global helper to trigger the GYMEZY Lead Capture Modal (Gym Owners / Trainers)
  * @param {Object} options
- * @param {'demo' | 'interest'} [options.category='demo']
+ * @param {string} [options.category='Gym Owner / Trainer']
  * @param {string} [options.plan='']
  */
-export function openLeadModal({ category = 'demo', plan = '' } = {}) {
+export function openLeadModal({ category = 'Gym Owner / Trainer', plan = '' } = {}) {
   const event = new CustomEvent('gymezy:open-lead-modal', {
     detail: { category, plan }
   });
@@ -37,6 +45,7 @@ export function openVideoModal({ video = 'reason' } = {}) {
 
 // Attach to window object for non-React callers or inline clicks
 if (typeof window !== 'undefined') {
+  window.openGymezyWelcomeModal = openWelcomeModal;
   window.openGymezyLeadModal = openLeadModal;
   window.openGymezyUserModal = openUserLeadModal;
   window.openGymezyVideoModal = openVideoModal;

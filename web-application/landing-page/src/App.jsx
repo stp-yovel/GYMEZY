@@ -10,6 +10,7 @@ import TrainersPage from './pages/trainers';
 import LeadCaptureModal from './components/LeadCaptureModal';
 import UserLeadCaptureModal from './components/UserLeadCaptureModal';
 import VideoModal from './components/VideoModal';
+import WelcomeRoleModal from './components/WelcomeRoleModal';
 
 function ScrollToTop() {
   const { pathname, hash } = useLocation();
@@ -29,10 +30,13 @@ function ScrollToTop() {
 }
 
 export default function App() {
+  // Welcome Role Selection Modal State (shown when user clicks GET STARTED)
+  const [welcomeModalOpen, setWelcomeModalOpen] = useState(false);
+
   // Gym Owners / Trainers Lead Modal State
   const [modalState, setModalState] = useState({
     isOpen: false,
-    category: 'demo',
+    category: 'Gym Owner / Trainer',
     plan: ''
   });
 
@@ -50,7 +54,7 @@ export default function App() {
 
   useEffect(() => {
     const handleOpenEvent = (e) => {
-      const { category = 'demo', plan = '' } = e.detail || {};
+      const { category = 'Gym Owner / Trainer', plan = '' } = e.detail || {};
       setModalState({
         isOpen: true,
         category,
@@ -74,16 +78,44 @@ export default function App() {
       });
     };
 
+    const handleOpenWelcomeEvent = () => {
+      setWelcomeModalOpen(true);
+    };
+
     window.addEventListener('gymezy:open-lead-modal', handleOpenEvent);
     window.addEventListener('gymezy:open-user-lead-modal', handleOpenUserEvent);
     window.addEventListener('gymezy:open-video-modal', handleOpenVideoEvent);
+    window.addEventListener('gymezy:open-welcome-modal', handleOpenWelcomeEvent);
 
     return () => {
       window.removeEventListener('gymezy:open-lead-modal', handleOpenEvent);
       window.removeEventListener('gymezy:open-user-lead-modal', handleOpenUserEvent);
       window.removeEventListener('gymezy:open-video-modal', handleOpenVideoEvent);
+      window.removeEventListener('gymezy:open-welcome-modal', handleOpenWelcomeEvent);
     };
   }, []);
+
+  const handleCloseWelcomeModal = () => {
+    setWelcomeModalOpen(false);
+  };
+
+  const handleSelectCustomer = () => {
+    setWelcomeModalOpen(false);
+    setModalState({
+      isOpen: true,
+      category: 'Customer',
+      plan: 'Customer Launch Offer'
+    });
+  };
+
+  const handleSelectOwner = () => {
+    setWelcomeModalOpen(false);
+    setModalState({
+      isOpen: true,
+      category: 'Gym Owner / Business Owner',
+      plan: 'Gym Partner Network'
+    });
+  };
 
   const handleCloseModal = () => {
     setModalState((prev) => ({ ...prev, isOpen: false }));
@@ -111,6 +143,14 @@ export default function App() {
           <Route path="*" element={<LandingPage />} />
         </Routes>
       </div>
+
+      {/* Entry Welcome Role Selection Modal */}
+      <WelcomeRoleModal
+        isOpen={welcomeModalOpen}
+        onClose={handleCloseWelcomeModal}
+        onSelectCustomer={handleSelectCustomer}
+        onSelectOwner={handleSelectOwner}
+      />
 
       {/* Gym Owners & Trainers Partner Lead Capture Modal */}
       <LeadCaptureModal

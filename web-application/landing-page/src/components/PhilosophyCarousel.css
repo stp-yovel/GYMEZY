@@ -239,6 +239,32 @@
   margin: 0;
 }
 
+/* Mobile Pagination Dots */
+.philosophy-mobile-dots-wrapper {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  grid-column: 1 / -1;
+}
+
+.philosophy-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #cbd5e1;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.philosophy-dot.active {
+  width: 24px;
+  background: var(--brand-color, #00bf62);
+}
+
 /* Responsive Media Queries */
 @media (max-width: 1024px) {
   .philosophy-asymmetric-grid {
@@ -271,43 +297,57 @@
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .philosophy-header-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .philosophy-title {
+    font-size: clamp(1.6rem, 5.5vw, 2.1rem);
+    line-height: 1.2;
   }
 
   .philosophy-asymmetric-grid {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto auto;
-    gap: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
   }
 
+  /* Show only one featured card on mobile */
   .philosophy-swap-card.slot-featured {
-    grid-column: 1 / 2;
-    grid-row: 1 / 2;
-    height: 340px;
+    display: block;
+    width: 100%;
+    height: 360px;
+    border-radius: 22px;
   }
 
-  .philosophy-swap-card.slot-sm-1 {
-    grid-column: 1 / 2;
-    grid-row: 2 / 3;
-    height: 240px;
-  }
-
+  /* Hide secondary 2 cards on mobile */
+  .philosophy-swap-card.slot-sm-1,
   .philosophy-swap-card.slot-sm-2 {
-    grid-column: 1 / 2;
-    grid-row: 3 / 4;
-    height: 240px;
+    display: none !important;
+  }
+
+  .philosophy-mobile-dots-wrapper {
+    display: flex;
   }
 
   .philosophy-mission-block {
-    grid-column: 1 / 2;
-    grid-row: 4 / 5;
+    display: block;
+    padding: 6px 0 0 0;
+    min-height: auto;
   }
 
   .philosophy-mission-text {
-    font-size: 16px;
+    font-size: 15.5px;
+    line-height: 1.55;
+  }
+
+  .carousel-arrow-btn {
+    width: 42px;
+    height: 42px;
   }
 }

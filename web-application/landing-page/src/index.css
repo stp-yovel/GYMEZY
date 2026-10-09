@@ -76,6 +76,12 @@
   padding: 0 24px;
 }
 
+@media (max-width: 640px) {
+  .section-container {
+    padding: 0 16px;
+  }
+}
+
 html,
 body {
   width: 100%;

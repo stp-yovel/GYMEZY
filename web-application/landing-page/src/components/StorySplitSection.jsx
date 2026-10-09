@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import gymezyLogo from '../assets/logo/gymezy.png';
 import './StorySplitSection.css';
 
 export default function StorySplitSection({ id = 'story' }) {
@@ -93,7 +94,7 @@ export default function StorySplitSection({ id = 'story' }) {
 
               <div className="story-author-profile">
                 <img
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"
+                  src={gymezyLogo}
                   alt="GYMEZY Team"
                   className="story-author-avatar"
                 />

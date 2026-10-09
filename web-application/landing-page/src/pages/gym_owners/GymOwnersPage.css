@@ -17,7 +17,7 @@
   min-height: 100vh;
   display: flex;
   align-items: center;
-  padding: 100px 0 60px;
+  padding: 135px 0 60px;
   background: #090e17;
   color: #ffffff;
   position: relative;
@@ -854,6 +854,9 @@
    ========================================================================== */
 
 @media (max-width: 1024px) {
+  .owner-hero-split-section {
+    padding: 125px 0 50px;
+  }
   .owner-hero-split-grid {
     grid-template-columns: 1fr;
     gap: 48px;
@@ -867,6 +870,7 @@
   }
   .hero-checklist-items {
     align-items: flex-start;
+    margin: 0 auto 32px auto;
   }
   .hero-split-buttons {
     justify-content: center;
@@ -874,25 +878,131 @@
   .device-showcase-wrapper {
     margin: 0 auto;
   }
-  .footer-links-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 36px;
-  }
 }
 
 @media (max-width: 768px) {
+  .owner-hero-split-section {
+    padding: 120px 0 40px;
+    min-height: auto;
+  }
+  .owner-hero-split-grid {
+    gap: 36px;
+  }
   .hero-split-headline {
-    font-size: 38px;
+    font-size: clamp(30px, 8vw, 42px);
+    line-height: 1.15;
+    letter-spacing: -0.8px;
+    margin-bottom: 16px;
+  }
+  .hero-split-subtext {
+    font-size: 14.5px;
+    line-height: 1.6;
+    margin-bottom: 24px;
+    color: rgba(255, 255, 255, 0.78);
+  }
+  .hero-checklist-items {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 0 auto 28px auto;
+    width: 100%;
+    max-width: 360px;
+  }
+  .hero-checklist-items li {
+    font-size: 13.5px;
+    gap: 10px;
+    text-align: left;
+  }
+  .check-circle-icon {
+    width: 20px;
+    height: 20px;
+  }
+  .check-circle-icon svg {
+    width: 10px;
+    height: 10px;
+  }
+  .hero-split-buttons {
+    width: 100%;
+    justify-content: center;
+  }
+  .hero-btn-primary {
+    width: 100%;
+    max-width: 290px;
+    justify-content: center;
+    padding: 13px 22px;
+    font-size: 14px;
+  }
+
+  /* Laptop Frame Mobile Responsive Scaling */
+  .device-showcase-wrapper {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+    overflow: hidden;
+  }
+  .laptop-device-frame {
+    width: 100%;
+  }
+  .laptop-screen-bezel {
+    border: 5px solid transparent;
+    border-bottom: 3px solid transparent;
+    border-radius: 14px 14px 0 0;
+  }
+  .laptop-camera-notch {
+    width: 48px;
+    height: 7px;
+    border-radius: 0 0 4px 4px;
+  }
+  .laptop-camera-lens {
+    width: 3px;
+    height: 3px;
+  }
+  .laptop-sensor-dot {
+    width: 2px;
+    height: 2px;
+  }
+  .laptop-base-stand {
+    height: 8px;
+    border-radius: 0 0 12px 12px;
+  }
+  .laptop-notch-cutout {
+    width: 48px;
+    height: 3px;
   }
   .laptop-screen-content {
-    height: 320px;
+    height: 290px;
+    font-size: 10px;
+    overflow: hidden !important;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
   .laptop-sidebar {
-    width: 90px;
-    padding: 8px 4px;
+    width: 38px;
+    padding: 8px 3px;
+    align-items: center;
+    overflow: hidden !important;
+  }
+  .sidebar-brand {
+    padding-left: 0;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+  .sidebar-logo-icon {
+    height: 16px;
   }
   .sidebar-brand-name {
     display: none;
+  }
+  .sidebar-menu {
+    overflow: hidden !important;
+    overflow-y: hidden !important;
+  }
+  .sidebar-item {
+    padding: 5px 3px;
+    justify-content: center;
+    border-radius: 5px;
   }
   .sidebar-item span:not(.sidebar-icon) {
     display: none;
@@ -900,23 +1010,157 @@
   .sidebar-badge {
     display: none;
   }
-  .sidebar-item {
-    justify-content: center;
-    padding: 6px;
+  .sidebar-icon {
+    width: 13px;
+    height: 13px;
+  }
+  .sidebar-icon svg {
+    width: 12px;
+    height: 12px;
+  }
+  .laptop-main-dashboard {
+    padding: 8px 10px;
+    gap: 7px;
+    overflow: hidden !important;
+    overflow-y: hidden !important;
+    pointer-events: none;
+  }
+  .dashboard-top-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  .dashboard-page-title {
+    font-size: 11px;
+  }
+  .dashboard-controls-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+  }
+  .date-picker-badge {
+    padding: 3px 6px;
+    font-size: 8px;
+    gap: 3px;
+  }
+  .picker-svg-icon {
+    width: 9px;
+    height: 9px;
+  }
+  .chevron-svg-icon {
+    width: 7px;
+    height: 7px;
+  }
+  .export-report-btn {
+    padding: 3px 8px;
+    font-size: 8px;
   }
   .dashboard-stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .dashboard-stats-grid .dash-metric-card:nth-child(n+3) {
+    display: none;
+  }
+  .dash-metric-card {
+    padding: 5px 7px;
+    border-radius: 6px;
+  }
+  .dash-metric-label {
+    font-size: 7.5px;
+    margin-bottom: 2px;
+  }
+  .dash-metric-val {
+    font-size: 12px;
+    margin-bottom: 1px;
+  }
+  .dash-metric-trend {
+    font-size: 7px;
+  }
+  .dash-recent-bookings-box {
+    padding: 5px 7px;
+    border-radius: 6px;
+  }
+  .bookings-header-flex {
+    margin-bottom: 3px;
+  }
+  .bookings-table-title {
+    font-size: 9px;
+  }
+  .bookings-view-all {
+    font-size: 7.5px;
+  }
+  .bookings-table {
+    font-size: 7.5px;
+  }
+  .bookings-table th {
+    padding: 2px 3px;
+    font-size: 7px;
+  }
+  .bookings-table td {
+    padding: 2.5px 3px;
+    font-size: 7.5px;
+  }
+  .bookings-table th:nth-child(3),
+  .bookings-table td:nth-child(3) {
+    display: none;
+  }
+  .bookings-table tbody tr:nth-child(n+4) {
+    display: none;
+  }
+  .status-badge {
+    padding: 1px 5px;
+    font-size: 7px;
   }
   .mobile-device-frame {
     display: none;
   }
-  .footer-links-grid {
-    grid-template-columns: 1fr;
+}
+
+@media (max-width: 480px) {
+  .owner-hero-split-section {
+    padding: 110px 0 35px;
+  }
+  .owner-hero-split-grid {
     gap: 28px;
   }
-  .footer-bottom-copyright {
-    flex-direction: column;
+  .hero-split-headline {
+    font-size: clamp(26px, 7.5vw, 34px);
+  }
+  .hero-split-subtext {
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  .hero-checklist-items {
+    max-width: 320px;
     gap: 10px;
-    text-align: center;
+  }
+  .hero-checklist-items li {
+    font-size: 12.5px;
+  }
+  .laptop-screen-content {
+    height: 270px;
+    overflow: hidden !important;
+    pointer-events: none;
+  }
+  .laptop-sidebar {
+    width: 34px;
+    padding: 6px 2px;
+    overflow: hidden !important;
+  }
+  .laptop-main-dashboard {
+    padding: 6px 8px;
+    gap: 6px;
+    overflow: hidden !important;
+    overflow-y: hidden !important;
+    pointer-events: none;
+  }
+  .dash-metric-card {
+    padding: 5px 6px;
+  }
+  .dash-metric-val {
+    font-size: 11px;
   }
 }

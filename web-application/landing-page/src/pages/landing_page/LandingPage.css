@@ -706,13 +706,14 @@
 }
 
 .move-card-accent-box {
-  background: var(--brand-color);
+  background: var(--color-dark-card, #1E1E1E);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 22px;
   padding: 28px 24px;
   height: 170px;
   display: flex;
   align-items: center;
-  box-shadow: 0 10px 30px rgba(0, 191, 98, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 
 .move-accent-box-text {
@@ -720,7 +721,7 @@
   font-size: 20px;
   font-weight: 700;
   line-height: 1.3;
-  color: var(--color-dark-text);
+  color: #ffffff;
   letter-spacing: -0.4px;
 }
 

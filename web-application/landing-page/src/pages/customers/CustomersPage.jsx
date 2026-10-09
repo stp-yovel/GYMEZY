@@ -9,39 +9,6 @@ import './CustomersPage.css';
 
 export default function CustomersPage() {
 
-  const galleryItems = [
-    {
-      id: 1,
-      num: '01',
-      title: 'Verified Fitness Centres',
-      tag: 'Flexible Access',
-      desc: 'Pay only for the sessions you use. Full gym floor & equipment access with instant OTP entry.',
-      mission: 'Our mission is to eliminate fitness barriers by connecting you with top gym facilities, certified coaches, and flexible passes across your city.',
-      img: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1200&q=80',
-      link: '#app'
-    },
-    {
-      id: 2,
-      num: '02',
-      title: 'Certified Personal Trainers',
-      tag: '1-on-1 Coaching',
-      desc: 'Book certified coaches for strength, weight loss, HIIT, and customized nutrition guidance.',
-      mission: 'Our mission is to empower your fitness journey with certified personal trainers, tailored 1-on-1 workouts, and expert nutrition guidance.',
-      img: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?auto=format&fit=crop&w=800&q=80',
-      link: '#app'
-    },
-    {
-      id: 3,
-      num: '03',
-      title: 'Group Classes & Studios',
-      tag: 'High Energy',
-      desc: 'Reserve your spot for high-octane Yoga, Zumba, HIIT, and Boxing studio classes.',
-      mission: 'Our mission is to build an inspiring community where group fitness and dynamic studio workouts are accessible to everyone, everywhere.',
-      img: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=80',
-      link: '#app'
-    }
-  ];
-
   return (
     <ConfigProvider
       theme={{
@@ -331,7 +298,7 @@ export default function CustomersPage() {
             ================================================================= */}
         <section className="philosophy-section" id="about">
           <div className="section-container">
-            <PhilosophyCarousel items={galleryItems} />
+            <PhilosophyCarousel />
           </div>
         </section>
 
