@@ -11,7 +11,7 @@ const { Content } = Layout;
 export const OwnerLayout = () => {
   const { isDarkMode } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
-  const { user } = useSelector((state) => state.auth);
+  const { user } = useSelector((state) => state.auth || {});
 
   const approvalStatus = user?.gym?.approvalStatus || 'Approved';
   const isPendingOrRejected =

@@ -6,13 +6,17 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Image,
   Animated,
   StatusBar,
   Platform,
   Alert,
   Modal,
+  PermissionsAndroid,
+  Dimensions,
 } from 'react-native';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('screen');
+import Camera from 'react-native-camera-kit/dist/Camera.android';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -60,6 +64,8 @@ export const CheckInScreen = ({ navigation, route }) => {
   const [selectedArea, setSelectedArea] = useState('General Workout');
   const [showAreaModal, setShowAreaModal] = useState(false);
   const [flashlight, setFlashlight] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState(null);
+  const isScanningRef = useRef(false);
 
   // Fetch live members for check-in
   useEffect(() => {
@@ -94,6 +100,36 @@ export const CheckInScreen = ({ navigation, route }) => {
     insets.top,
     Platform.OS === 'android' ? (StatusBar.currentHeight || 36) : 44
   );
+
+  // Check and request camera permission on QR screen
+  useEffect(() => {
+    if (currentStep === 'QR') {
+      isScanningRef.current = false;
+      const checkPermission = async () => {
+        if (Platform.OS === 'android') {
+          try {
+            const has = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.CAMERA);
+            if (has) {
+              setHasCameraPermission(true);
+            } else {
+              const res = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA, {
+                title: 'Camera Access Needed',
+                message: 'GYMEZY requires camera access to scan member QR passes.',
+                buttonPositive: 'Allow',
+                buttonNegative: 'Cancel',
+              });
+              setHasCameraPermission(res === PermissionsAndroid.RESULTS.GRANTED);
+            }
+          } catch {
+            setHasCameraPermission(false);
+          }
+        } else {
+          setHasCameraPermission(true);
+        }
+      };
+      checkPermission();
+    }
+  }, [currentStep]);
 
   // Laser scanner loop animation
   useEffect(() => {
@@ -221,17 +257,70 @@ export const CheckInScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleSimulateQRScan = () => {
-    const target = liveMembers[0];
-    if (target) {
-      setSelectedMember(target);
+  // Live QR Code Scanner detection handler
+  const handleScanCode = async (rawCode) => {
+    if (!rawCode || isScanningRef.current) return;
+    const cleanCode = String(rawCode).trim();
+    isScanningRef.current = true;
+
+    let codeToSend = cleanCode;
+    let otpToSend = null;
+    try {
+      if (cleanCode.startsWith('{') && cleanCode.endsWith('}')) {
+        const parsed = JSON.parse(cleanCode);
+        codeToSend = parsed.id || parsed.membershipId || parsed.code || cleanCode;
+        otpToSend = parsed.entryOtp || parsed.otp || null;
+      }
+    } catch {}
+
+    try {
+      const gymId = gym?.id || gym?._id || gym?.partnerId;
+      const res = await apiService.checkInMember({
+        gymId,
+        code: codeToSend,
+        otp: otpToSend,
+        area: selectedArea,
+        method: 'QR',
+        verifiedBy: 'Mobile QR Camera Scanner',
+      });
+
+      const memberData = res?.member || {};
+      setSelectedMember({
+        id: memberData.membershipId || memberData.id || codeToSend,
+        membershipId: memberData.membershipId || codeToSend,
+        name: memberData.name || 'Gym Member',
+        plan: memberData.tier ? `${memberData.tier} Pass` : 'Gym Access Pass',
+        avatar: (memberData.name || 'M').charAt(0).toUpperCase(),
+        phone: memberData.phone || '',
+        status: 'Active',
+        entryOtp: memberData.entryOtp || otpToSend || codeToSend,
+      });
+
       showToast({
-        message: 'Pass identified: ' + target.name,
+        message: `${memberData.name || 'Member'} verified successfully!`,
         isSuccess: true,
       });
-      setCurrentStep('DETAILS');
-    } else {
-      Alert.alert('No Members', 'No active members found to verify.');
+      setCurrentStep('SUCCESS');
+    } catch (err) {
+      Alert.alert(
+        'QR Code Not Recognized',
+        err.message || 'Could not find an active membership pass for this QR code.',
+        [
+          {
+            text: 'Try Again',
+            onPress: () => {
+              isScanningRef.current = false;
+            },
+          },
+          {
+            text: 'Manual Search',
+            onPress: () => {
+              isScanningRef.current = false;
+              setCurrentStep('SEARCH');
+            },
+          },
+        ]
+      );
     }
   };
 
@@ -352,20 +441,45 @@ export const CheckInScreen = ({ navigation, route }) => {
     <View style={styles.qrContainer}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Mock Camera Background Overlay */}
-      <View style={styles.cameraBackground}>
-        <Image
-          source={{
-            uri: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop',
+      {/* 1. Real Device Camera Feed (or Permission fallback) */}
+      {hasCameraPermission ? (
+        <Camera
+          style={[StyleSheet.absoluteFillObject, { width: SCREEN_WIDTH, height: SCREEN_HEIGHT }]}
+          cameraType="back"
+          scanBarcode={true}
+          showFrame={false}
+          torchMode={flashlight ? 'on' : 'off'}
+          onReadCode={(event) => {
+            const scanned = event?.nativeEvent?.codeStringValue;
+            if (scanned) {
+              handleScanCode(scanned).catch(() => {});
+            }
           }}
-          style={styles.cameraImage}
-          resizeMode="cover"
         />
-        <View style={styles.darkCameraBackdrop} />
-      </View>
+      ) : (
+        <View style={styles.permissionContainer}>
+          <MaterialIcons name="camera-alt" size={56} color="#818CF8" />
+          <Text style={styles.permissionTitle}>Camera Access Required</Text>
+          <Text style={styles.permissionSubtitle}>
+            GYMEZY requires camera access to scan member QR passes in real time.
+          </Text>
+          <TouchableOpacity
+            style={styles.grantPermissionBtn}
+            onPress={async () => {
+              if (Platform.OS === 'android') {
+                const res = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+                setHasCameraPermission(res === PermissionsAndroid.RESULTS.GRANTED);
+              }
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.grantPermissionText}>Grant Permission</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
-      {/* Top Floating Controls */}
-      <View style={[styles.qrTopBar, { top: topInset + 10 }]}>
+      {/* 2. Top Floating Controls with Status Bar Clearance */}
+      <View style={[styles.qrTopBar, { paddingTop: Math.max(topInset + 8, 48) }]}>
         <TouchableOpacity
           style={styles.qrGlassBtn}
           onPress={() => setCurrentStep('HUB')}
@@ -374,10 +488,13 @@ export const CheckInScreen = ({ navigation, route }) => {
           <MaterialIcons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
 
-        <Text style={styles.qrHeaderTitle}>Scan Member Pass</Text>
+        <View style={styles.qrHeaderTitleContainer}>
+          <Text style={styles.qrHeaderTitle}>Scan Member Pass</Text>
+          <Text style={styles.qrHeaderSubtitle}>Optical Turnstile Fast Entry</Text>
+        </View>
 
         <TouchableOpacity
-          style={[styles.qrGlassBtn, flashlight && { backgroundColor: 'rgba(245, 158, 11, 0.4)' }]}
+          style={[styles.qrGlassBtn, flashlight && { backgroundColor: 'rgba(245, 158, 11, 0.5)' }]}
           onPress={() => setFlashlight(!flashlight)}
           activeOpacity={0.8}
         >
@@ -385,23 +502,14 @@ export const CheckInScreen = ({ navigation, route }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Center Viewfinder with Laser Scanner */}
+      {/* 3. Center Viewfinder with Laser Scanner */}
       <View style={styles.viewfinderWrapper}>
-        <TouchableOpacity
-          style={styles.viewfinderFrame}
-          onPress={handleSimulateQRScan}
-          activeOpacity={0.9}
-        >
+        <View style={styles.viewfinderFrame}>
           {/* Neon Border Corners */}
           <View style={[styles.frameCorner, styles.cornerTL]} />
           <View style={[styles.frameCorner, styles.cornerTR]} />
           <View style={[styles.frameCorner, styles.cornerBL]} />
           <View style={[styles.frameCorner, styles.cornerBR]} />
-
-          {/* QR Code Illustration */}
-          <View style={styles.qrIllustrationBox}>
-            <Ionicons name="qr-code-outline" size={160} color="#FFFFFF" style={{ opacity: 0.9 }} />
-          </View>
 
           {/* Animated Laser Bar */}
           <Animated.View
@@ -412,22 +520,13 @@ export const CheckInScreen = ({ navigation, route }) => {
               },
             ]}
           />
-        </TouchableOpacity>
+        </View>
 
-        <Text style={styles.viewfinderHint}>Align the QR code within the frame to scan</Text>
-
-        <TouchableOpacity
-          style={styles.simulateScanPill}
-          onPress={handleSimulateQRScan}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="sparkles" size={16} color="#FFFFFF" />
-          <Text style={styles.simulateScanText}>Tap to Simulate Scan</Text>
-        </TouchableOpacity>
+        <Text style={styles.viewfinderHint}>Align member's QR code within the frame</Text>
       </View>
 
-      {/* Bottom Switch to Manual Check-in */}
-      <View style={[styles.qrBottomBar, { paddingBottom: insets.bottom + 24 }]}>
+      {/* 4. Bottom Switch to Manual Check-in */}
+      <View style={[styles.qrBottomBar, { paddingBottom: Math.max(insets.bottom + 16, 24) }]}>
         <TouchableOpacity
           style={styles.switchToManualBtn}
           onPress={() => setCurrentStep('SEARCH')}
@@ -1372,114 +1471,176 @@ const styles = StyleSheet.create({
   qrContainer: {
     flex: 1,
     backgroundColor: '#000000',
+    position: 'relative',
   },
-  cameraBackground: {
+  permissionContainer: {
     ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0B0F19',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
   },
-  cameraImage: {
-    width: '100%',
-    height: '100%',
+  permissionTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  darkCameraBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+  permissionSubtitle: {
+    color: '#94A3B8',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  grantPermissionBtn: {
+    backgroundColor: AppColors.primaryColor,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  grantPermissionText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
   qrTopBar: {
     position: 'absolute',
-    left: 20,
-    right: 20,
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    zIndex: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    zIndex: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  qrHeaderTitleContainer: {
+    alignItems: 'center',
+  },
+  qrHeaderTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  qrHeaderSubtitle: {
+    color: 'rgba(255, 255, 255, 0.65)',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
   },
   qrGlassBtn: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  qrHeaderTitle: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '700',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   viewfinderWrapper: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
+    zIndex: 10,
+    backgroundColor: 'transparent',
+    pointerEvents: 'box-none',
   },
   viewfinderFrame: {
-    width: 250,
-    height: 250,
+    width: 260,
+    height: 260,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    backgroundColor: 'transparent',
     borderRadius: 24,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   frameCorner: {
     position: 'absolute',
-    width: 32,
-    height: 32,
-    borderColor: '#818CF8',
+    width: 36,
+    height: 36,
+    borderColor: '#38BDF8',
   },
   cornerTL: {
     top: 0,
     left: 0,
     borderTopWidth: 4,
     borderLeftWidth: 4,
-    borderTopLeftRadius: 18,
+    borderTopLeftRadius: 20,
   },
   cornerTR: {
     top: 0,
     right: 0,
     borderTopWidth: 4,
     borderRightWidth: 4,
-    borderTopRightRadius: 18,
+    borderTopRightRadius: 20,
   },
   cornerBL: {
     bottom: 0,
     left: 0,
     borderBottomWidth: 4,
     borderLeftWidth: 4,
-    borderBottomLeftRadius: 18,
+    borderBottomLeftRadius: 20,
   },
   cornerBR: {
     bottom: 0,
     right: 0,
     borderBottomWidth: 4,
     borderRightWidth: 4,
-    borderBottomRightRadius: 18,
-  },
-  qrIllustrationBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderBottomRightRadius: 20,
   },
   laserLine: {
     position: 'absolute',
-    top: 25,
+    top: 20,
     left: 15,
     right: 15,
     height: 3,
     backgroundColor: '#38BDF8',
     shadowColor: '#38BDF8',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
+    shadowOpacity: 1,
     shadowRadius: 10,
     borderRadius: 2,
+    elevation: 4,
   },
   viewfinderHint: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
-    marginTop: 24,
+    marginTop: 22,
     textAlign: 'center',
-    opacity: 0.85,
+    opacity: 0.9,
+  },
+  areaSelectorPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  areaSelectorText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
   },
   simulateScanPill: {
     flexDirection: 'row',
@@ -1489,7 +1650,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    marginTop: 18,
+    marginTop: 14,
   },
   simulateScanText: {
     color: '#FFFFFF',
@@ -1497,15 +1658,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   qrBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 20,
+    paddingTop: 16,
     alignItems: 'center',
+    zIndex: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   switchToManualBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    height: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    height: 52,
     width: '100%',
     borderRadius: 16,
     gap: 8,

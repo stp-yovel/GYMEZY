@@ -45,6 +45,7 @@ import {
   CloseCircleOutlined,
 } from '@ant-design/icons';
 import confetti from 'canvas-confetti';
+import jsQR from 'jsqr';
 import { useTheme } from '../theme/ThemeContext';
 import { recordCheckIn, recordCheckOut } from '../redux/slices/gymSlice';
 import { apiClient } from '../services/apiClient';
@@ -79,8 +80,19 @@ export const QrCheckIn = () => {
   const videoRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const [cameraState, setCameraState] = useState('idle'); // 'idle' | 'requesting' | 'active' | 'denied'
+  const cameraStateRef = useRef('idle');
+  const animFrameIdRef = useRef(null);
+  const canvasRef = useRef(null);
+  const barcodeDetectorRef = useRef(null);
+  const isScanningCooldownRef = useRef(false);
 
+  const [qrDetectedHighlight, setQrDetectedHighlight] = useState(false);
+  const [lastScannedCode, setLastScannedCode] = useState('');
   const [lastVerified, setLastVerified] = useState(null);
+
+  useEffect(() => {
+    cameraStateRef.current = cameraState;
+  }, [cameraState]);
 
   const fireSuccessConfetti = () => {
     try {
@@ -92,6 +104,136 @@ export const QrCheckIn = () => {
       });
     } catch (e) {
       // safe fallback
+    }
+  };
+
+  // Play audio chime on successful QR scan
+  const playScanBeep = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const audioCtx = new AudioCtx();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime); // 880Hz A5
+      osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.12); // chime up
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.16);
+    } catch {
+      // safe audio fallback
+    }
+  };
+
+  // Callback when QR code is detected
+  const handleQrDetected = (rawCode) => {
+    if (!rawCode || isScanningCooldownRef.current) return;
+    const cleanCode = rawCode.trim();
+    if (!cleanCode) return;
+
+    isScanningCooldownRef.current = true;
+    setQrDetectedHighlight(true);
+    setLastScannedCode(cleanCode);
+    playScanBeep();
+
+    let parsed = null;
+    if (cleanCode.startsWith('{') && cleanCode.endsWith('}')) {
+      try {
+        parsed = JSON.parse(cleanCode);
+      } catch {}
+    }
+
+    const displayName = parsed?.customerId || parsed?.name || parsed?.id || parsed?.entryOtp || cleanCode;
+    message.success(`QR Detected: ${displayName}`);
+
+    handleVerify({
+      code: cleanCode,
+      raw: cleanCode,
+      id: parsed?.id || parsed?.membershipId || undefined,
+      membershipId: parsed?.id || parsed?.membershipId || undefined,
+      entryOtp: parsed?.entryOtp || parsed?.otp || undefined,
+    });
+
+    setTimeout(() => {
+      setQrDetectedHighlight(false);
+    }, 1500);
+
+    setTimeout(() => {
+      isScanningCooldownRef.current = false;
+    }, 3000);
+  };
+
+  // Continuous frame analysis loop
+  const scanVideoFrame = () => {
+    if (
+      videoRef.current &&
+      videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA &&
+      cameraStateRef.current === 'active'
+    ) {
+      const video = videoRef.current;
+      if (!canvasRef.current) {
+        canvasRef.current = document.createElement('canvas');
+      }
+      const canvas = canvasRef.current;
+
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        }
+
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Hardware-accelerated BarcodeDetector (Chrome, Edge, Android Chrome)
+        if ('BarcodeDetector' in window) {
+          try {
+            if (!barcodeDetectorRef.current) {
+              barcodeDetectorRef.current = new window.BarcodeDetector({ formats: ['qr_code'] });
+            }
+            barcodeDetectorRef.current
+              .detect(video)
+              .then((barcodes) => {
+                if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                  handleQrDetected(barcodes[0].rawValue);
+                } else {
+                  // Fallback to jsQR
+                  decodeFrameWithJsQr(ctx, canvas);
+                }
+              })
+              .catch(() => {
+                decodeFrameWithJsQr(ctx, canvas);
+              });
+          } catch {
+            decodeFrameWithJsQr(ctx, canvas);
+          }
+        } else {
+          decodeFrameWithJsQr(ctx, canvas);
+        }
+      }
+    }
+
+    if (cameraStateRef.current === 'active') {
+      animFrameIdRef.current = requestAnimationFrame(scanVideoFrame);
+    }
+  };
+
+  const decodeFrameWithJsQr = (ctx, canvas) => {
+    if (isScanningCooldownRef.current) return;
+    try {
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'dontInvert',
+      });
+      if (code && code.data) {
+        handleQrDetected(code.data);
+      }
+    } catch {
+      // ignore frame decode error
     }
   };
 
@@ -118,14 +260,26 @@ export const QrCheckIn = () => {
         videoRef.current.srcObject = stream;
       }
       setCameraState('active');
+      cameraStateRef.current = 'active';
+
+      // Start frame scanning loop
+      if (animFrameIdRef.current) {
+        cancelAnimationFrame(animFrameIdRef.current);
+      }
+      animFrameIdRef.current = requestAnimationFrame(scanVideoFrame);
     } catch (err) {
       setCameraState('denied');
+      cameraStateRef.current = 'denied';
       message.warning('Camera permission was not granted.');
     }
   };
 
   // Stop Camera
   const stopCamera = () => {
+    if (animFrameIdRef.current) {
+      cancelAnimationFrame(animFrameIdRef.current);
+      animFrameIdRef.current = null;
+    }
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((t) => t.stop());
       mediaStreamRef.current = null;
@@ -134,10 +288,14 @@ export const QrCheckIn = () => {
       videoRef.current.srcObject = null;
     }
     setCameraState('idle');
+    cameraStateRef.current = 'idle';
   };
 
   useEffect(() => {
     return () => {
+      if (animFrameIdRef.current) {
+        cancelAnimationFrame(animFrameIdRef.current);
+      }
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach((t) => t.stop());
       }
@@ -147,6 +305,9 @@ export const QrCheckIn = () => {
   useEffect(() => {
     if (cameraState === 'active' && videoRef.current && mediaStreamRef.current) {
       videoRef.current.srcObject = mediaStreamRef.current;
+      if (!animFrameIdRef.current) {
+        animFrameIdRef.current = requestAnimationFrame(scanVideoFrame);
+      }
     }
   }, [cameraState]);
 
@@ -200,11 +361,33 @@ export const QrCheckIn = () => {
 
   // Member verification
   const handleVerify = async (customData = null) => {
+    let rawString = '';
+    let parsedJson = null;
+
+    if (typeof customData === 'string') {
+      rawString = customData.trim();
+    } else if (typeof customData?.code === 'string') {
+      rawString = customData.code.trim();
+    } else if (typeof customData?.raw === 'string') {
+      rawString = customData.raw.trim();
+    }
+
+    if (rawString.startsWith('{') && rawString.endsWith('}')) {
+      try {
+        parsedJson = JSON.parse(rawString);
+      } catch {}
+    }
+
     const rawLookup =
-      customData?.entryOtp ||
-      customData?.membershipId ||
-      customData?.membershipDbId ||
+      parsedJson?.id ||
+      parsedJson?.membershipId ||
+      parsedJson?.entryOtp ||
       customData?.id ||
+      customData?.membershipId ||
+      customData?.entryOtp ||
+      customData?.code ||
+      customData?.raw ||
+      customData?.membershipDbId ||
       customData?.userId ||
       (activeOption === 'otp' ? otpInput : manualInput);
 
@@ -222,11 +405,16 @@ export const QrCheckIn = () => {
       checkInMethod = 'Manual';
     }
 
+    const otpVal =
+      parsedJson?.entryOtp ||
+      parsedJson?.otp ||
+      (activeOption === 'otp' ? otpInput : (customData?.entryOtp || customData?.otp || undefined));
+
     try {
       const payload = {
         gymId,
-        code: lookupCode,
-        otp: activeOption === 'otp' ? otpInput : (customData?.entryOtp || customData?.otp || undefined),
+        code: rawString || lookupCode,
+        otp: otpVal,
         method: checkInMethod,
         area: 'General Workout',
         verifiedBy: 'Turnstile Fast Check-In',
@@ -641,23 +829,40 @@ export const QrCheckIn = () => {
                   </div>
                 </div>
 
-                {/* Primary Action Button */}
-                {cameraState !== 'active' && (
-                  <Button
-                    type="primary"
-                    icon={<VideoCameraOutlined />}
-                    loading={cameraState === 'requesting'}
-                    onClick={startCamera}
-                    style={{
-                      height: 40,
-                      borderRadius: 'var(--radius-base)',
-                      fontWeight: 600,
-                      backgroundColor: 'var(--color-primary)',
-                    }}
-                  >
-                    Start Camera Scanner
-                  </Button>
-                )}
+                {/* Action Buttons: Start Camera & Upload Image */}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {cameraState !== 'active' ? (
+                    <Button
+                      type="primary"
+                      icon={<VideoCameraOutlined />}
+                      loading={cameraState === 'requesting'}
+                      onClick={startCamera}
+                      style={{
+                        flex: 1,
+                        height: 40,
+                        borderRadius: 'var(--radius-base)',
+                        fontWeight: 600,
+                        backgroundColor: 'var(--color-primary)',
+                      }}
+                    >
+                      Start Camera Scanner
+                    </Button>
+                  ) : (
+                    <Button
+                      danger
+                      icon={<StopOutlined />}
+                      onClick={stopCamera}
+                      style={{
+                        flex: 1,
+                        height: 40,
+                        borderRadius: 'var(--radius-base)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Stop Camera
+                    </Button>
+                  )}
+                </div>
 
                 {/* Manual Fast Input */}
                 <div style={{ display: 'flex', gap: 8 }}>

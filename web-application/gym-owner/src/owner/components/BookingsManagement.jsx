@@ -771,12 +771,13 @@ export const BookingsManagement = ({
           }}
         >
           <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>
-            Showing 1 to {filteredBookings.length} of {bookings.length * 35} bookings
+            Showing {filteredBookings.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to{' '}
+            {Math.min(currentPage * pageSize, filteredBookings.length)} of {filteredBookings.length} bookings
           </div>
           <Pagination
             current={currentPage}
             onChange={setCurrentPage}
-            total={248}
+            total={filteredBookings.length}
             pageSize={pageSize}
             showSizeChanger={false}
           />

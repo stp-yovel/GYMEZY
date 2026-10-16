@@ -234,6 +234,7 @@ export const onboardGym = asyncHandler(async (req, res) => {
     halfYearlyPrice,
     annualPrice,
     pricingPlans,
+    customPricingPlans = [],
     rules,
     safetyMeasures,
     freeCancellationHours,
@@ -2052,3 +2053,58 @@ export const getGymTrainers = asyncHandler(async (req, res) => {
     ApiResponse.success(trainers, 'Gym trainers retrieved successfully.')
   );
 });
+
+/**
+ * GET /api/v1/gyms/options or /api/v1/admin/gyms/options
+ * Separate, lightweight lookup API for gym dropdowns with search and pagination support
+ */
+export const getGymOptions = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20, search = '', status } = req.query;
+
+  const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 20));
+  const skip = (pageNum - 1) * limitNum;
+
+  const query = {};
+
+  if (status && status !== 'All') {
+    query.status = status;
+  }
+
+  if (search && search.trim()) {
+    const s = search.trim();
+    const searchRegex = new RegExp(s, 'i');
+    query.$or = [
+      { name: searchRegex },
+      { partnerId: searchRegex },
+      { city: searchRegex },
+      { area: searchRegex },
+    ];
+  }
+
+  const [total, gyms] = await Promise.all([
+    Gym.countDocuments(query),
+    Gym.find(query)
+      .select('_id partnerId name city area address status approvalStatus')
+      .sort({ name: 1 })
+      .skip(skip)
+      .limit(limitNum)
+      .lean(),
+  ]);
+
+  const hasMore = skip + gyms.length < total;
+
+  return res.status(200).json(
+    ApiResponse.success(
+      {
+        gyms,
+        page: pageNum,
+        limit: limitNum,
+        total,
+        hasMore,
+      },
+      'Gym options retrieved successfully.'
+    )
+  );
+});
+

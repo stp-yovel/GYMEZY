@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../../services/apiClient';
 import {
   Card,
@@ -134,55 +135,49 @@ export const MembersManagement = ({
   const [extendForm] = Form.useForm();
 
   const [membersList, setMembersList] = useState(initialData);
+  const [membershipSummary, setMembershipSummary] = useState(null);
+  const [isMembersLoading, setIsMembersLoading] = useState(false);
+  const [totalMembersCount, setTotalMembersCount] = useState(0);
+
+  // Pagination & Filter States
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 8;
+  const [activeTab, setActiveTab] = useState(
+    urlTab && ['members', 'switches', 'cancellations'].includes(urlTab) ? urlTab : 'members'
+  );
 
   useEffect(() => {
-    if (!gymId) return;
-    const fetchGymMemberships = async () => {
-      try {
-        const res = await apiClient.get(`/memberships/gym/${gymId}`);
-        const data = res.data?.data?.memberships;
-        if (Array.isArray(data) && data.length > 0) {
-          const mapped = data.map((m) => {
-            const startStr = m.startDate
-              ? new Date(m.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-              : '';
-            const endStr = m.endDate
-              ? new Date(m.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-              : '';
-            const daysRemaining = Math.max(0, Math.ceil((new Date(m.endDate) - new Date()) / (1000 * 60 * 60 * 24)));
-            return {
-              key: m._id,
-              memberId: m.membershipId,
-              name: m.userId?.fullName || 'Member',
-              phone: m.userId?.phone || '',
-              email: m.userId?.email || '',
-              avatar:
-                m.userId?.profilePicture ||
-                'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop',
-              plan: `${m.membershipTier} (${m.durationDays || 30} Days)`,
-              startDate: startStr,
-              expiryDate: endStr,
-              daysLeft: `${daysRemaining} days left`,
-              status: m.status,
-              paymentType: m.payment?.method || 'Online',
-              amount: `₹${m.pricing?.totalAmount || 0}`,
-              trainerName: m.trainerId?.name || (m.hasTrainer ? 'Assigned' : 'None'),
-            };
-          });
-          setMembersList(mapped);
-        }
-      } catch (err) {
-        console.warn('Failed to fetch gym memberships:', err);
-      }
-    };
-    void fetchGymMemberships();
-  }, [gymId]);
-  const [activeTab, setActiveTab] = useState('members'); // 'members' | 'cancellations'
-  const [namePhoneSearch, setNamePhoneSearch] = useState('');
-  const [memberIdSearch, setMemberIdSearch] = useState('');
+    if (urlTab && ['members', 'switches', 'cancellations'].includes(urlTab)) {
+      setActiveTab(urlTab);
+    }
+  }, [urlTab]);
+
+  const handleTabChange = (nextTab) => {
+    setActiveTab(nextTab);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', nextTab);
+      return next;
+    });
+  };
+
+  const [searchQuery, setSearchQuery] = useState('');
   const [planFilter, setPlanFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [selectedDateRange, setSelectedDateRange] = useState('21 Jul 2025 - 21 Jul 2025');
+  const [selectedDateRange, setSelectedDateRange] = useState('All Dates');
+
+  // Plan Switch Requests State & Fetcher
+  const [switchRequests, setSwitchRequests] = useState([]);
+  const [isSwitchLoading, setIsSwitchLoading] = useState(false);
+  const [selectedSwitchReq, setSelectedSwitchReq] = useState(null);
+  const [isSwitchModalOpen, setIsSwitchModalOpen] = useState(false);
+  const [switchRejectionModalOpen, setSwitchRejectionModalOpen] = useState(false);
+  const [switchRejectionReason, setSwitchRejectionReason] = useState('');
+  const [switchReqToReject, setSwitchReqToReject] = useState(null);
+  const [switchSearch, setSwitchSearch] = useState('');
+  const [switchStatusFilter, setSwitchStatusFilter] = useState('ALL');
 
   // Cancellation Requests State
   const [cancellationRequests, setCancellationRequests] = useState(INITIAL_CANCELLATION_REQUESTS);
@@ -207,33 +202,125 @@ export const MembersManagement = ({
   const [selectedPlanType, setSelectedPlanType] = useState('Platinum (6 Months)');
   const [selectedPaymentType, setSelectedPaymentType] = useState('Online');
 
-  // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 7;
+  const fetchGymMemberships = async (
+    page = currentPage,
+    limit = pageSize,
+    search = searchQuery,
+    status = statusFilter,
+    tier = planFilter
+  ) => {
+    if (!gymId) return;
+    setIsMembersLoading(true);
+    try {
+      const params = {
+        page,
+        limit,
+      };
+      if (search?.trim()) params.search = search.trim();
+      if (status && status !== 'ALL' && status !== 'All') params.status = status;
+      if (tier && tier !== 'ALL' && tier !== 'All') params.tier = tier;
 
-  // Filter Logic
-  const filteredMembers = membersList.filter((item) => {
-    const matchNamePhone =
-      !namePhoneSearch ||
-      item.name.toLowerCase().includes(namePhoneSearch.toLowerCase()) ||
-      item.phone.includes(namePhoneSearch);
+      const res = await apiClient.get(`/memberships/gym/${gymId}`, { params });
+      const data = res.data?.data?.memberships;
+      const total = res.data?.data?.total;
+      const summary = res.data?.data?.summary;
 
-    const matchMemberId =
-      !memberIdSearch ||
-      item.memberId.toLowerCase().includes(memberIdSearch.toLowerCase());
+      if (typeof total === 'number') {
+        setTotalMembersCount(total);
+      }
+      if (summary) {
+        setMembershipSummary(summary);
+      }
+      if (Array.isArray(data)) {
+        const mapped = data.map((m) => {
+          const startStr = m.startDate
+            ? new Date(m.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+            : '';
+          const endStr = m.endDate
+            ? new Date(m.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+            : '';
+          const daysRemaining = Math.max(0, Math.ceil((new Date(m.endDate) - new Date()) / (1000 * 60 * 60 * 24)));
+          return {
+            key: m._id,
+            memberId: m.membershipId,
+            name: m.userId?.fullName || 'Member',
+            phone: m.userId?.phone || '',
+            email: m.userId?.email || '',
+            avatar:
+              m.userId?.avatar ||
+              m.userId?.profilePicture ||
+              m.avatar ||
+              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop',
+            plan: m.membershipTier || 'Standard',
+            startDate: startStr,
+            expiryDate: endStr,
+            daysLeft: `${daysRemaining} days left`,
+            status: m.status,
+            paymentType: m.payment?.method || 'Online',
+            amount: `₹${m.pricing?.totalAmount || 0}`,
+            trainerName: m.trainerId?.name || (m.hasTrainer ? 'Assigned' : 'None'),
+          };
+        });
+        setMembersList(mapped);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch gym memberships:', err);
+    } finally {
+      setIsMembersLoading(false);
+    }
+  };
 
-    const matchPlan = planFilter === 'ALL' || item.plan.includes(planFilter);
-    const matchStatus = statusFilter === 'ALL' || item.status === statusFilter;
+  useEffect(() => {
+    void fetchGymMemberships(currentPage, pageSize, searchQuery, statusFilter, planFilter);
+  }, [gymId, currentPage, pageSize, searchQuery, statusFilter, planFilter]);
 
-    return matchNamePhone && matchMemberId && matchPlan && matchStatus;
-  });
+  const fetchGymSwitchRequests = async () => {
+    if (!gymId) return;
+    setIsSwitchLoading(true);
+    try {
+      const res = await apiClient.get(`/memberships/gym/${gymId}/switch-requests`);
+      const data = res.data?.data?.requests;
+      if (Array.isArray(data)) {
+        setSwitchRequests(data);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch switch requests:', err);
+    } finally {
+      setIsSwitchLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchGymSwitchRequests();
+  }, [gymId]);
+
+  // Real Dynamic Metrics from DB & Current List
+  const dynamicTotal = membershipSummary?.total ?? totalMembersCount;
+  const dynamicActive =
+    membershipSummary?.active ??
+    membersList.filter((m) => (m.status || '').toLowerCase() === 'active').length;
+  const dynamicExpiringSoon =
+    membershipSummary?.expiringSoon ??
+    membersList.filter((m) => {
+      const st = (m.status || '').toLowerCase();
+      if (st === 'expiring soon') return true;
+      if (st === 'active') {
+        const days = Number.parseInt(m.daysLeft, 10);
+        return !Number.isNaN(days) && days <= 30 && days >= 0;
+      }
+      return false;
+    }).length;
+  const dynamicExpired =
+    membershipSummary?.expired ??
+    membersList.filter((m) => (m.status || '').toLowerCase() === 'expired').length;
 
   const clearFilters = () => {
-    setNamePhoneSearch('');
-    setMemberIdSearch('');
+    setSearchQuery('');
     setPlanFilter('ALL');
     setStatusFilter('ALL');
-    setSelectedDateRange('21 Jul 2025 - 21 Jul 2025');
+    setSelectedDateRange('All Dates');
+    setCurrentPage(1);
+    void fetchGymMemberships(1, pageSize, '', 'ALL', 'ALL');
     message.info('Filters cleared');
   };
 
@@ -529,20 +616,23 @@ export const MembersManagement = ({
       title: 'Member ID',
       dataIndex: 'memberId',
       key: 'memberId',
+      width: 130,
+      ellipsis: true,
       render: (text, record) => (
-        <Tooltip title="Click to view member details">
+        <Tooltip title={text || 'N/A'}>
           <span
             onClick={() => handleView(record)}
             style={{
-              fontWeight: 700,
+              fontWeight: 750,
               color: '#1677ff',
               fontSize: 13,
               cursor: 'pointer',
-              textDecoration: 'none',
-              transition: 'all 0.2s',
+              fontFamily: 'monospace',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'block',
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
           >
             {text}
           </span>
@@ -552,12 +642,28 @@ export const MembersManagement = ({
     {
       title: 'Member Name',
       key: 'memberName',
+      width: 170,
+      ellipsis: true,
       render: (_, record) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Avatar src={record.avatar} size={38} style={{ flexShrink: 0 }} />
-          <div style={{ fontWeight: 650, color: isDarkMode ? '#ffffff' : '#0f172a', fontSize: 13 }}>
-            {record.name}
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <Avatar src={record.avatar} size={32} style={{ flexShrink: 0 }} />
+          <Tooltip title={record.name}>
+            <span
+              style={{
+                fontWeight: 650,
+                color: isDarkMode ? '#ffffff' : '#0f172a',
+                fontSize: 13,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: 'block',
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              {record.name}
+            </span>
+          </Tooltip>
         </div>
       ),
     },
@@ -565,145 +671,253 @@ export const MembersManagement = ({
       title: 'Phone Number',
       dataIndex: 'phone',
       key: 'phone',
+      width: 140,
+      ellipsis: true,
       render: (text) => (
-        <span style={{ color: isDarkMode ? '#cccccc' : '#334155', fontSize: 13, fontWeight: 500 }}>
-          {text}
-        </span>
+        <Tooltip title={text || 'N/A'}>
+          <span
+            style={{
+              color: isDarkMode ? '#cbd5e1' : '#334155',
+              fontSize: 13,
+              fontWeight: 500,
+              fontFamily: 'monospace',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'block',
+            }}
+          >
+            {text || 'N/A'}
+          </span>
+        </Tooltip>
       ),
     },
     {
       title: 'Membership Plan',
       dataIndex: 'plan',
       key: 'plan',
+      width: 155,
+      ellipsis: true,
       render: (plan) => (
-        <Tag
-          style={{
-            backgroundColor: isDarkMode ? 'rgba(114, 46, 209, 0.2)' : '#f3effe',
-            color: isDarkMode ? '#b37feb' : '#722ed1',
-            border: 'none',
-            borderRadius: 'var(--radius-base)',
-            fontWeight: 600,
-            fontSize: 11,
-            padding: '2px 10px',
-          }}
-        >
-          {plan}
-        </Tag>
+        <Tooltip title={plan || 'N/A'}>
+          <span
+            style={{
+              color: '#722ed1',
+              fontWeight: 650,
+              fontSize: 13,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'block',
+            }}
+          >
+            {plan || 'N/A'}
+          </span>
+        </Tooltip>
       ),
     },
     {
       title: 'Start Date',
       dataIndex: 'startDate',
       key: 'startDate',
+      width: 120,
+      ellipsis: true,
       render: (text) => (
-        <span style={{ fontSize: 13, color: isDarkMode ? '#ffffff' : '#0f172a', fontWeight: 500 }}>
-          {text}
-        </span>
+        <Tooltip title={text || 'N/A'}>
+          <span
+            style={{
+              fontSize: 12.5,
+              color: isDarkMode ? '#cbd5e1' : '#334155',
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'block',
+            }}
+          >
+            {text || 'N/A'}
+          </span>
+        </Tooltip>
       ),
     },
     {
       title: 'Expiry Date',
       key: 'expiryDate',
-      render: (_, record) => {
-        const isExpired = record.status === 'Expired' || record.daysLeft === 'Expired';
-        return (
-          <div>
-            <div style={{ fontSize: 13, color: isDarkMode ? '#ffffff' : '#0f172a', fontWeight: 500 }}>
-              {record.expiryDate}
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                color: isExpired ? '#e11d48' : '#fa8c16',
-                fontWeight: 600,
-                marginTop: 1,
-              }}
-            >
-              ({record.daysLeft})
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => {
-        const isActive = status === 'Active';
-        const isCancelPending = status === 'Cancellation Requested';
-        return (
-          <Tag
+      width: 120,
+      ellipsis: true,
+      render: (_, record) => (
+        <Tooltip title={record.expiryDate || 'N/A'}>
+          <span
             style={{
-              backgroundColor: isActive
-                ? isDarkMode
-                  ? 'rgba(0, 191, 98, 0.15)'
-                  : '#eaf8ef'
-                : isCancelPending
-                ? isDarkMode
-                  ? 'rgba(250, 140, 22, 0.15)'
-                  : '#fff7e6'
-                : isDarkMode
-                ? 'rgba(225, 29, 72, 0.15)'
-                : '#fdeeed',
-              color: isActive ? '#00bf62' : isCancelPending ? '#fa8c16' : '#e11d48',
-              border: 'none',
-              borderRadius: 'var(--radius-base)',
-              fontWeight: 600,
-              fontSize: 11,
-              padding: '2px 10px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              fontSize: 12.5,
+              color: isDarkMode ? '#cbd5e1' : '#334155',
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'block',
             }}
           >
-            {status}
-          </Tag>
-        );
-      },
+            {record.expiryDate || 'N/A'}
+          </span>
+        </Tooltip>
+      ),
     },
     {
-      title: 'Payment Type',
-      dataIndex: 'paymentType',
-      key: 'paymentType',
-      render: (text) => (
-        <span style={{ fontSize: 13, color: isDarkMode ? '#cccccc' : '#334155', fontWeight: 500 }}>
-          {text}
-        </span>
-      ),
+      title: 'Days Left',
+      key: 'daysLeft',
+      width: 120,
+      ellipsis: true,
+      render: (_, record) => {
+        const isExpired = record.status === 'Expired' || record.daysLeft === 'Expired';
+        const label = isExpired
+          ? 'Expired'
+          : record.daysLeft
+          ? typeof record.daysLeft === 'number'
+            ? `${record.daysLeft} days left`
+            : String(record.daysLeft).includes('left')
+            ? record.daysLeft
+            : `${record.daysLeft} left`
+          : 'N/A';
+        return (
+          <Tooltip title={label}>
+            <span
+              style={{
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: isExpired ? '#ef4444' : '#10b981',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: 'block',
+              }}
+            >
+              {label}
+            </span>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Amount',
       dataIndex: 'amount',
       key: 'amount',
+      width: 110,
+      ellipsis: true,
       render: (amount) => (
-        <span style={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', fontSize: 13 }}>
-          {amount}
-        </span>
+        <Tooltip title={amount || 'N/A'}>
+          <span
+            style={{
+              fontWeight: 750,
+              color: isDarkMode ? '#ffffff' : '#0f172a',
+              fontSize: 13,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'block',
+            }}
+          >
+            {amount || 'N/A'}
+          </span>
+        </Tooltip>
       ),
+    },
+    {
+      title: 'Payment Type',
+      dataIndex: 'paymentType',
+      key: 'paymentType',
+      width: 130,
+      ellipsis: true,
+      render: (text) => (
+        <Tooltip title={text || 'Online'}>
+          <span
+            style={{
+              fontSize: 12.5,
+              color: isDarkMode ? '#cbd5e1' : '#475569',
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'block',
+            }}
+          >
+            {text || 'Online'}
+          </span>
+        </Tooltip>
+      ),
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      width: 130,
+      ellipsis: true,
+      render: (status) => {
+        let color = '#64748b';
+        let icon = null;
+        if (status === 'Active') {
+          color = '#10b981';
+          icon = <CheckCircleOutlined />;
+        } else if (status === 'Cancellation Requested') {
+          color = '#fa8c16';
+          icon = <ClockCircleOutlined />;
+        } else if (status === 'Expired') {
+          color = '#ef4444';
+          icon = <CloseCircleOutlined />;
+        } else {
+          color = '#64748b';
+          icon = <StopOutlined />;
+        }
+        const label = status || 'Active';
+        return (
+          <Tooltip title={label}>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                color: color,
+                fontWeight: 650,
+                fontSize: 12.5,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100%',
+              }}
+            >
+              <span style={{ flexShrink: 0 }}>{icon}</span>
+              <span
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {label}
+              </span>
+            </div>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Action',
       key: 'action',
-      width: 140,
+      width: 120,
+      fixed: 'right',
       render: (_, record) => (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, width: 124 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           <Button
             size="small"
             onClick={() => handleView(record)}
             style={{
               borderRadius: 'var(--radius-base)',
               fontSize: 12,
-              fontWeight: 600,
+              fontWeight: 650,
               borderColor: isDarkMode ? '#333333' : '#d0d7de',
               color: isDarkMode ? '#ffffff' : '#0f172a',
-              width: 82,
-              textAlign: 'center',
-              height: 30,
-              padding: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              height: 28,
+              padding: '0 10px',
             }}
           >
             View
@@ -712,7 +926,7 @@ export const MembersManagement = ({
             <Button
               type="text"
               size="small"
-              style={{ width: 28, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+              style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
               icon={<MoreOutlined style={{ fontSize: 16, color: isDarkMode ? '#888888' : '#64748b' }} />}
             />
           </Dropdown>
@@ -750,37 +964,69 @@ export const MembersManagement = ({
       dataIndex: 'requestId',
       key: 'requestId',
       width: 140,
+      ellipsis: true,
       render: (text, record) => (
-        <span
-          onClick={() => {
-            setSelectedCancelRequest(record);
-            setIsCancelDetailsModalOpen(true);
-          }}
-          style={{
-            fontWeight: 700,
-            color: '#1677ff',
-            fontSize: 13,
-            cursor: 'pointer',
-            fontFamily: 'monospace',
-          }}
-        >
-          {text}
-        </span>
+        <Tooltip title={text || 'N/A'}>
+          <span
+            onClick={() => {
+              setSelectedCancelRequest(record);
+              setIsCancelDetailsModalOpen(true);
+            }}
+            style={{
+              fontWeight: 750,
+              color: '#1677ff',
+              fontSize: 13,
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'block',
+            }}
+          >
+            {text}
+          </span>
+        </Tooltip>
       ),
     },
     {
       title: 'Member',
       key: 'member',
+      width: 180,
+      ellipsis: true,
       render: (_, record) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Avatar src={record.avatar} size={36} style={{ flexShrink: 0 }} />
-          <div>
-            <div style={{ fontWeight: 650, color: isDarkMode ? '#ffffff' : '#0f172a', fontSize: 13 }}>
-              {record.memberName}
-            </div>
-            <div style={{ fontSize: 11, color: '#722ed1', fontFamily: 'monospace', marginTop: 1 }}>
-              {record.memberId}
-            </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <Avatar src={record.avatar} size={32} style={{ flexShrink: 0 }} />
+          <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
+            <Tooltip title={record.memberName}>
+              <div
+                style={{
+                  fontWeight: 650,
+                  color: isDarkMode ? '#ffffff' : '#0f172a',
+                  fontSize: 13,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {record.memberName}
+              </div>
+            </Tooltip>
+            <Tooltip title={record.memberId}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: '#722ed1',
+                  fontFamily: 'monospace',
+                  marginTop: 1,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {record.memberId}
+              </div>
+            </Tooltip>
           </div>
         </div>
       ),
@@ -789,94 +1035,162 @@ export const MembersManagement = ({
       title: 'Phone Number',
       dataIndex: 'phone',
       key: 'phone',
+      width: 140,
+      ellipsis: true,
       render: (phone) => (
-        <span style={{ color: isDarkMode ? '#cccccc' : '#334155', fontSize: 13, fontWeight: 500 }}>
-          {phone}
-        </span>
+        <Tooltip title={phone || 'N/A'}>
+          <span
+            style={{
+              color: isDarkMode ? '#cbd5e1' : '#334155',
+              fontSize: 13,
+              fontWeight: 500,
+              fontFamily: 'monospace',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'block',
+            }}
+          >
+            {phone || 'N/A'}
+          </span>
+        </Tooltip>
       ),
     },
     {
       title: 'Plan & Fee Paid',
       key: 'planFee',
+      width: 170,
+      ellipsis: true,
       render: (_, record) => (
-        <div>
-          <Tag
-            style={{
-              backgroundColor: isDarkMode ? 'rgba(114, 46, 209, 0.2)' : '#f3effe',
-              color: isDarkMode ? '#b37feb' : '#722ed1',
-              border: 'none',
-              borderRadius: 'var(--radius-base)',
-              fontWeight: 600,
-              fontSize: 11,
-              padding: '1px 8px',
-              margin: 0,
-            }}
-          >
-            {record.plan}
-          </Tag>
-          <div style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginTop: 4 }}>
-            Paid: {record.amount} <span style={{ fontSize: 11, fontWeight: 500, color: isDarkMode ? '#888888' : '#64748b' }}>(Refund est: <strong style={{ color: '#52c41a' }}>{record.refundableAmount}</strong>)</span>
+        <Tooltip title={`${record.plan || ''} - Paid: ${record.amount || 0}`}>
+          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span
+              style={{
+                color: '#722ed1',
+                fontWeight: 650,
+                fontSize: 12.5,
+              }}
+            >
+              {record.plan}
+            </span>
+            <div style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginTop: 2 }}>
+              Paid: {record.amount}{' '}
+              <span style={{ fontSize: 11, fontWeight: 500, color: '#52c41a' }}>
+                (Est: {record.refundableAmount})
+              </span>
+            </div>
           </div>
-        </div>
+        </Tooltip>
       ),
     },
     {
       title: 'Reason for Cancellation',
       dataIndex: 'reason',
       key: 'reason',
+      width: 220,
+      ellipsis: true,
       render: (reason, record) => (
-        <div style={{ maxWidth: 220 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 600, color: isDarkMode ? '#ffffff' : '#0f172a', lineHeight: 1.3 }}>
-            {reason}
+        <Tooltip title={`${reason || ''}${record.notes ? ` - "${record.notes}"` : ''}`}>
+          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+              {reason}
+            </span>
+            {record.notes && (
+              <div
+                style={{
+                  fontSize: 11,
+                  color: isDarkMode ? '#888888' : '#64748b',
+                  marginTop: 2,
+                  fontStyle: 'italic',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                "{record.notes}"
+              </div>
+            )}
           </div>
-          {record.notes && (
-            <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 3, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              "{record.notes}"
-            </div>
-          )}
-        </div>
+        </Tooltip>
       ),
     },
     {
       title: 'Requested Date',
       dataIndex: 'requestDate',
       key: 'requestDate',
+      width: 130,
+      ellipsis: true,
       render: (date) => (
-        <span style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
-          {date}
-        </span>
+        <Tooltip title={date || 'N/A'}>
+          <span
+            style={{
+              fontSize: 12,
+              color: isDarkMode ? '#888888' : '#64748b',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'block',
+            }}
+          >
+            {date || 'N/A'}
+          </span>
+        </Tooltip>
       ),
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
+      width: 160,
+      ellipsis: true,
       render: (status) => {
+        let color = '#64748b';
+        let icon = null;
+
         if (status === 'Pending Gym Approval') {
-          return (
-            <Tag color="orange" icon={<ClockCircleOutlined />} style={{ borderRadius: 4, fontWeight: 650, fontSize: 11.5, padding: '2px 8px' }}>
-              Pending Gym Approval
-            </Tag>
-          );
+          color = '#fa8c16';
+          icon = <ClockCircleOutlined />;
+        } else if (status === 'Sent to Admin') {
+          color = '#1677ff';
+          icon = <SyncOutlined spin />;
+        } else if (status === 'Approved by Admin') {
+          color = '#10b981';
+          icon = <CheckCircleFilled />;
+        } else {
+          color = '#ef4444';
+          icon = <CloseCircleOutlined />;
         }
-        if (status === 'Sent to Admin') {
-          return (
-            <Tag color="processing" icon={<SyncOutlined spin />} style={{ borderRadius: 4, fontWeight: 650, fontSize: 11.5, padding: '2px 8px' }}>
-              Sent to Admin
-            </Tag>
-          );
-        }
-        if (status === 'Approved by Admin') {
-          return (
-            <Tag color="success" icon={<CheckCircleFilled />} style={{ borderRadius: 4, fontWeight: 650, fontSize: 11.5, padding: '2px 8px' }}>
-              Approved by Admin
-            </Tag>
-          );
-        }
+
+        const label = status || 'Pending';
+
         return (
-          <Tag color="error" icon={<CloseCircleOutlined />} style={{ borderRadius: 4, fontWeight: 650, fontSize: 11.5, padding: '2px 8px' }}>
-            Rejected
-          </Tag>
+          <Tooltip title={label}>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                color: color,
+                fontWeight: 650,
+                fontSize: 12.5,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100%',
+              }}
+            >
+              <span style={{ flexShrink: 0 }}>{icon}</span>
+              <span
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {label}
+              </span>
+            </div>
+          </Tooltip>
         );
       },
     },
@@ -884,6 +1198,8 @@ export const MembersManagement = ({
       title: 'Action',
       key: 'action',
       align: 'right',
+      width: 180,
+      fixed: 'right',
       render: (_, record) => {
         if (record.status === 'Pending Gym Approval') {
           return (
@@ -899,11 +1215,11 @@ export const MembersManagement = ({
                   borderRadius: 'var(--radius-base)',
                   fontSize: 12,
                   fontWeight: 600,
-                  height: 30,
-                  padding: '0 12px',
+                  height: 28,
+                  padding: '0 10px',
                 }}
               >
-                Accept & Send to Admin
+                Accept
               </Button>
               <Button
                 danger
@@ -912,7 +1228,7 @@ export const MembersManagement = ({
                 style={{
                   borderRadius: 'var(--radius-base)',
                   fontSize: 12,
-                  height: 30,
+                  height: 28,
                 }}
               >
                 Reject
@@ -927,7 +1243,7 @@ export const MembersManagement = ({
                 style={{
                   borderRadius: 'var(--radius-base)',
                   fontSize: 12,
-                  height: 30,
+                  height: 28,
                 }}
               />
             </Space>
@@ -945,8 +1261,394 @@ export const MembersManagement = ({
               borderRadius: 'var(--radius-base)',
               fontSize: 12,
               fontWeight: 500,
-              height: 30,
-              padding: '0 14px',
+              height: 28,
+              padding: '0 12px',
+            }}
+          >
+            View Details
+          </Button>
+        );
+      },
+    },
+  ];
+
+  // Plan Switch Handlers & Columns
+  const handleGymAcceptSwitch = (req) => {
+    if (!req) return;
+    Modal.confirm({
+      title: 'Accept & Forward Plan Switch Request',
+      icon: <SendOutlined style={{ color: 'var(--color-primary)' }} />,
+      content: (
+        <div>
+          <p style={{ margin: '8px 0 6px 0', fontSize: 13.5 }}>
+            Accept switch request for <strong>{req.userId?.fullName || req.memberName || 'Member'}</strong> to <strong>{req.targetTier} Plan</strong>?
+          </p>
+          <div style={{ padding: '10px 12px', background: isDarkMode ? '#141414' : '#f8fafc', borderRadius: 8, fontSize: 12, marginBottom: 8 }}>
+            <div>Prorated Credit Applied: <strong style={{ color: '#52c41a' }}>₹{((req.quoteSnapshot?.proRatedCreditPaise || 0) / 100).toFixed(2)}</strong></div>
+            <div>Net Payable / Settlement: <strong>₹{((req.quoteSnapshot?.netAmountToPayPaise || 0) / 100).toFixed(2)}</strong></div>
+          </div>
+          <p style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b', margin: 0 }}>
+            Once forwarded, Super Admin will perform final verification and execute the membership transition atomically.
+          </p>
+        </div>
+      ),
+      okText: 'Accept & Send to Admin',
+      cancelText: 'Cancel',
+      centered: true,
+      onOk: async () => {
+        try {
+          const reqId = req._id || req.requestId;
+          await apiClient.patch(`/memberships/switch-requests/${reqId}/gym-action`, {
+            action: 'ACCEPT',
+          });
+          setSwitchRequests((prev) =>
+            prev.map((r) =>
+              (r._id === reqId || r.requestId === req.requestId)
+                ? { ...r, status: 'PENDING_SUPER_ADMIN_APPROVAL' }
+                : r
+            )
+          );
+          if (selectedSwitchReq && (selectedSwitchReq._id === reqId || selectedSwitchReq.requestId === req.requestId)) {
+            setSelectedSwitchReq((prev) => ({ ...prev, status: 'PENDING_SUPER_ADMIN_APPROVAL' }));
+          }
+          setIsSwitchModalOpen(false);
+          triggerConfettiPopper();
+          message.success('Plan switch request accepted & sent to Super Admin for execution');
+        } catch (err) {
+          message.error(err.response?.data?.message || err.message || 'Failed to accept switch request');
+        }
+      },
+    });
+  };
+
+  const handleOpenRejectSwitch = (req) => {
+    setSwitchReqToReject(req);
+    setSwitchRejectionReason('');
+    setSwitchRejectionModalOpen(true);
+  };
+
+  const handleConfirmRejectSwitch = async () => {
+    if (!switchReqToReject) return;
+    try {
+      const reqId = switchReqToReject._id || switchReqToReject.requestId;
+      await apiClient.patch(`/memberships/switch-requests/${reqId}/gym-action`, {
+        action: 'REJECT',
+        rejectionReason: switchRejectionReason || 'Rejected by Gym Management',
+      });
+      setSwitchRequests((prev) =>
+        prev.map((r) =>
+          (r._id === reqId || r.requestId === switchReqToReject.requestId)
+            ? { ...r, status: 'REJECTED_BY_GYM', rejectionReason: switchRejectionReason }
+            : r
+        )
+      );
+      if (selectedSwitchReq && (selectedSwitchReq._id === reqId || selectedSwitchReq.requestId === switchReqToReject.requestId)) {
+        setSelectedSwitchReq((prev) => ({ ...prev, status: 'REJECTED_BY_GYM' }));
+      }
+      setSwitchRejectionModalOpen(false);
+      setIsSwitchModalOpen(false);
+      message.info(`Switch request for ${switchReqToReject.userId?.fullName || 'Member'} was rejected.`);
+    } catch (err) {
+      message.error(err.response?.data?.message || err.message || 'Failed to reject switch request');
+    }
+  };
+
+  const switchColumns = [
+    {
+      title: 'Request ID',
+      dataIndex: 'requestId',
+      key: 'requestId',
+      width: 140,
+      ellipsis: true,
+      render: (text, record) => (
+        <Tooltip title={text || 'Click to view details'}>
+          <span
+            onClick={() => {
+              setSelectedSwitchReq(record);
+              setIsSwitchModalOpen(true);
+            }}
+            style={{
+              fontWeight: 750,
+              color: '#1677ff',
+              fontSize: 13,
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'block',
+            }}
+          >
+            {text}
+          </span>
+        </Tooltip>
+      ),
+    },
+    {
+      title: 'Member',
+      key: 'member',
+      width: 180,
+      ellipsis: true,
+      render: (_, record) => {
+        const userObj = record.userId || {};
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <Avatar
+              src={userObj.profilePicture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop'}
+              size={32}
+              style={{ flexShrink: 0 }}
+            />
+            <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
+              <Tooltip title={userObj.fullName || 'Member'}>
+                <div
+                  style={{
+                    fontWeight: 650,
+                    color: isDarkMode ? '#ffffff' : '#0f172a',
+                    fontSize: 13,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {userObj.fullName || 'Member'}
+                </div>
+              </Tooltip>
+              <Tooltip title={userObj.phone || ''}>
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    color: isDarkMode ? '#888888' : '#64748b',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  {userObj.phone || ''}
+                </div>
+              </Tooltip>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      title: 'Current Plan',
+      key: 'currentPlan',
+      width: 150,
+      ellipsis: true,
+      render: (_, record) => {
+        const tier = record.membershipId?.membershipTier || 'Current';
+        const rem = record.quoteSnapshot?.daysRemaining != null ? `${record.quoteSnapshot.daysRemaining} days left` : '';
+        return (
+          <Tooltip title={`${tier} ${rem ? `(${rem})` : ''}`}>
+            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ color: '#722ed1', fontWeight: 650, fontSize: 13 }}>
+                {tier}
+              </span>
+              {rem && (
+                <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
+                  {rem}
+                </div>
+              )}
+            </div>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: 'Requested Plan',
+      key: 'requestedPlan',
+      width: 150,
+      ellipsis: true,
+      render: (_, record) => {
+        const switchType = record.quoteSnapshot?.switchType || 'SWITCH';
+        return (
+          <Tooltip title={`${record.targetTier} Plan (${switchType})`}>
+            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span
+                style={{
+                  color: switchType === 'UPGRADE' ? '#1677ff' : '#d97706',
+                  fontWeight: 700,
+                  fontSize: 13,
+                }}
+              >
+                {record.targetTier} Plan
+              </span>
+              <div style={{ fontSize: 11, fontWeight: 600, color: isDarkMode ? '#aaaaaa' : '#64748b', marginTop: 2 }}>
+                {switchType}
+              </div>
+            </div>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: 'Proration & Settlement',
+      key: 'settlement',
+      width: 180,
+      ellipsis: true,
+      render: (_, record) => {
+        const quote = record.quoteSnapshot || {};
+        const credit = ((quote.proRatedCreditPaise || 0) / 100).toFixed(2);
+        const net = ((quote.netAmountToPayPaise || 0) / 100).toFixed(2);
+        const policy = quote.downgradePolicy || 'WALLET';
+        const leftover = ((quote.leftoverCreditPaise || 0) / 100).toFixed(2);
+        const extraDays = quote.extraDaysAwarded || 0;
+        const isUpgrade = quote.switchType === 'UPGRADE';
+
+        return (
+          <Tooltip title={`Net: ₹${net} | Credit: -₹${credit}`}>
+            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                Net: ₹{net}
+              </div>
+              <div style={{ fontSize: 11, color: '#52c41a', fontWeight: 600, marginTop: 1 }}>
+                Credit: -₹{credit}
+              </div>
+              <div style={{ fontSize: 10.5, color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 2, fontWeight: 600 }}>
+                {isUpgrade
+                  ? record.paymentDetails?.method || 'UPI Payment'
+                  : policy === 'REFUND'
+                  ? `Refund: ₹${leftover}`
+                  : policy === 'EXTEND'
+                  ? `+${extraDays} Days Ext.`
+                  : `Wallet: ₹${leftover}`}
+              </div>
+            </div>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      width: 160,
+      ellipsis: true,
+      render: (status) => {
+        let color = '#64748b';
+        let icon = null;
+        let label = 'Pending';
+
+        if (status === 'PENDING_GYM_APPROVAL') {
+          color = '#fa8c16';
+          icon = <ClockCircleOutlined />;
+          label = 'Pending Gym Review';
+        } else if (status === 'PENDING_SUPER_ADMIN_APPROVAL') {
+          color = '#1677ff';
+          icon = <SyncOutlined spin />;
+          label = 'Sent to Super Admin';
+        } else if (status === 'APPROVED_AND_EXECUTED') {
+          color = '#10b981';
+          icon = <CheckCircleFilled />;
+          label = 'Approved & Executed';
+        } else {
+          color = '#ef4444';
+          icon = <CloseCircleOutlined />;
+          label = status === 'REJECTED_BY_GYM' ? 'Rejected by Gym' : 'Rejected by Admin';
+        }
+
+        return (
+          <Tooltip title={label}>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                color: color,
+                fontWeight: 650,
+                fontSize: 12.5,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100%',
+              }}
+            >
+              <span style={{ flexShrink: 0 }}>{icon}</span>
+              <span
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {label}
+              </span>
+            </div>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: 'Action',
+      key: 'action',
+      align: 'right',
+      width: 180,
+      fixed: 'right',
+      render: (_, record) => {
+        if (record.status === 'PENDING_GYM_APPROVAL') {
+          return (
+            <Space size={6}>
+              <Button
+                type="primary"
+                size="small"
+                icon={<SendOutlined />}
+                onClick={() => handleGymAcceptSwitch(record)}
+                style={{
+                  backgroundColor: 'var(--color-primary)',
+                  borderColor: 'var(--color-primary)',
+                  borderRadius: 'var(--radius-base)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  height: 28,
+                  padding: '0 10px',
+                }}
+              >
+                Accept
+              </Button>
+              <Button
+                danger
+                size="small"
+                onClick={() => handleOpenRejectSwitch(record)}
+                style={{
+                  borderRadius: 'var(--radius-base)',
+                  fontSize: 12,
+                  height: 28,
+                }}
+              >
+                Reject
+              </Button>
+              <Button
+                size="small"
+                icon={<EyeOutlined />}
+                onClick={() => {
+                  setSelectedSwitchReq(record);
+                  setIsSwitchModalOpen(true);
+                }}
+                style={{
+                  borderRadius: 'var(--radius-base)',
+                  fontSize: 12,
+                  height: 28,
+                }}
+              />
+            </Space>
+          );
+        }
+        return (
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => {
+              setSelectedSwitchReq(record);
+              setIsSwitchModalOpen(true);
+            }}
+            style={{
+              borderRadius: 'var(--radius-base)',
+              fontSize: 12,
+              fontWeight: 500,
+              height: 28,
+              padding: '0 12px',
             }}
           >
             View Details
@@ -958,7 +1660,7 @@ export const MembersManagement = ({
 
   return (
     <div>
-      {/* Top Header */}
+      {/* Top Header with Title on Left and Universal Search + Filters on Right */}
       <div
         style={{
           display: 'flex',
@@ -973,81 +1675,99 @@ export const MembersManagement = ({
           <Title level={2} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a', fontWeight: 700 }}>
             Membership Management
           </Title>
-          <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 14 }}>
+          <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13.5 }}>
             Manage all gym member subscriptions and details.
           </Text>
         </div>
 
-        {/* Add New Member Button */}
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => setIsAddModalOpen(true)}
-          style={{
-            backgroundColor: 'var(--color-primary)',
-            borderColor: 'var(--color-primary)',
-            borderRadius: 'var(--radius-base)',
-            fontWeight: 600,
-            height: 42,
-            padding: '0 20px',
-            boxShadow: isDarkMode ? 'none' : '0 2px 6px rgba(0, 56, 130, 0.2)',
-          }}
-        >
-          Add New Member
-        </Button>
-      </div>
+        {/* Universal Search & Filters Aligned to Right */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <Input
+            prefix={<SearchOutlined style={{ color: isDarkMode ? '#888888' : '#94a3b8' }} />}
+            placeholder="Search by name, phone, member ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onPressEnter={() => {
+              setCurrentPage(1);
+              void fetchGymMemberships(1, pageSize, searchQuery, statusFilter, planFilter);
+            }}
+            allowClear
+            style={{ width: 250, height: 40, borderRadius: 'var(--radius-base)' }}
+          />
 
-      {/* View Switcher: All Members vs Cancellation Requests */}
-      <div style={{ marginBottom: 22 }}>
-        <Segmented
-          size="large"
-          value={activeTab}
-          onChange={setActiveTab}
-          options={[
-            {
-              label: (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 14px', fontWeight: 600, fontSize: 13.5 }}>
-                  <TeamOutlined style={{ fontSize: 15 }} />
-                  <span>All Members</span>
-                  <Tag
-                    color="blue"
-                    style={{
-                      borderRadius: 10,
-                      margin: 0,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      padding: '0 8px',
-                    }}
-                  >
-                    {membersList.length}
-                  </Tag>
-                </div>
-              ),
-              value: 'members',
-            },
-            {
-              label: (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 14px', fontWeight: 600, fontSize: 13.5 }}>
-                  <StopOutlined style={{ fontSize: 15, color: '#ef4444' }} />
-                  <span>Cancellation Requests</span>
-                  <Tag
-                    color={cancellationRequests.filter((r) => r.status === 'Pending Gym Approval').length > 0 ? 'error' : 'default'}
-                    style={{
-                      borderRadius: 10,
-                      margin: 0,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      padding: '0 8px',
-                    }}
-                  >
-                    {cancellationRequests.length}
-                  </Tag>
-                </div>
-              ),
-              value: 'cancellations',
-            },
-          ]}
-        />
+          <Select
+            value={planFilter}
+            onChange={(val) => {
+              setPlanFilter(val);
+              setCurrentPage(1);
+              void fetchGymMemberships(1, pageSize, searchQuery, statusFilter, val);
+            }}
+            style={{ width: 140, height: 40 }}
+          >
+            <Option value="ALL">All Plans</Option>
+            <Option value="Monthly">Monthly</Option>
+            <Option value="Quarterly">Quarterly</Option>
+            <Option value="Half-Yearly">Half-Yearly</Option>
+            <Option value="Annual">Annual</Option>
+          </Select>
+
+          <Select
+            value={statusFilter}
+            onChange={(val) => {
+              setStatusFilter(val);
+              setCurrentPage(1);
+              void fetchGymMemberships(1, pageSize, searchQuery, val, planFilter);
+            }}
+            style={{ width: 140, height: 40 }}
+          >
+            <Option value="ALL">All Status</Option>
+            <Option value="Active">Active</Option>
+            <Option value="Expiring Soon">Expiring Soon</Option>
+            <Option value="Switched">Switched</Option>
+            <Option value="Expired">Expired</Option>
+            <Option value="Cancelled">Cancelled</Option>
+          </Select>
+
+          <Dropdown menu={dateRangeMenu} trigger={['click']}>
+            <div
+              style={{
+                height: 40,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 12px',
+                backgroundColor: isDarkMode ? '#141414' : '#ffffff',
+                border: `1px solid ${isDarkMode ? '#262626' : '#d9d9d9'}`,
+                borderRadius: 'var(--radius-base)',
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: 500,
+                color: isDarkMode ? '#ffffff' : '#0f172a',
+                gap: 8,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <CalendarOutlined style={{ color: isDarkMode ? '#888888' : '#64748b' }} />
+                <span>{selectedDateRange === '21 Jul 2025 - 21 Jul 2025' ? 'Date Range' : selectedDateRange}</span>
+              </div>
+              <DownOutlined style={{ fontSize: 9, color: isDarkMode ? '#888888' : '#64748b' }} />
+            </div>
+          </Dropdown>
+
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={clearFilters}
+            style={{
+              height: 40,
+              borderRadius: 'var(--radius-base)',
+              fontWeight: 600,
+              color: isDarkMode ? '#aaaaaa' : '#64748b',
+              borderColor: isDarkMode ? '#333333' : '#d0d7de',
+            }}
+          >
+            Clear
+          </Button>
+        </div>
       </div>
 
       {/* VIEW 1: ALL MEMBERS TAB */}
@@ -1055,7 +1775,7 @@ export const MembersManagement = ({
         <>
           {/* 4 SUMMARY STAT CARDS */}
           <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-            {/* Card 1: Total Members */}
+            {/* Total Members */}
             <Col xs={24} sm={12} lg={6}>
               <Card
                 style={{
@@ -1067,38 +1787,23 @@ export const MembersManagement = ({
                 styles={{ body: { padding: '20px' } }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: '50%',
-                      backgroundColor: isDarkMode ? 'rgba(114, 46, 209, 0.2)' : '#f3effe',
-                      color: isDarkMode ? '#b37feb' : '#722ed1',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 20,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <TeamOutlined />
-                  </div>
+                  <TeamOutlined style={{ fontSize: 22, color: 'var(--color-primary)', opacity: 0.75, flexShrink: 0 }} />
                   <div>
                     <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', fontWeight: 500 }}>
                       Total Members
                     </div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', lineHeight: 1.2, marginTop: 2 }}>
-                      248
+                      {dynamicTotal}
                     </div>
-                    <div style={{ fontSize: 12, color: '#00bf62', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                      <RiseOutlined /> 12% vs last month
+                    <div style={{ fontSize: 12, color: '#1677ff', fontWeight: 600, marginTop: 4 }}>
+                      Registered members
                     </div>
                   </div>
                 </div>
               </Card>
             </Col>
 
-            {/* Card 2: Active Members */}
+            {/* Active Members */}
             <Col xs={24} sm={12} lg={6}>
               <Card
                 style={{
@@ -1110,38 +1815,23 @@ export const MembersManagement = ({
                 styles={{ body: { padding: '20px' } }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: '50%',
-                      backgroundColor: isDarkMode ? 'rgba(0, 191, 98, 0.2)' : '#eaf8ef',
-                      color: '#00bf62',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 20,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <CheckCircleOutlined />
-                  </div>
+                  <CheckCircleOutlined style={{ fontSize: 22, color: '#16a34a', opacity: 0.75, flexShrink: 0 }} />
                   <div>
                     <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', fontWeight: 500 }}>
                       Active Members
                     </div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', lineHeight: 1.2, marginTop: 2 }}>
-                      186
+                      {dynamicActive}
                     </div>
-                    <div style={{ fontSize: 12, color: '#00bf62', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                      <RiseOutlined /> 8% vs last month
+                    <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 600, marginTop: 4 }}>
+                      Current active plans
                     </div>
                   </div>
                 </div>
               </Card>
             </Col>
 
-            {/* Card 3: Expiring This Month */}
+            {/* Expiring This Month */}
             <Col xs={24} sm={12} lg={6}>
               <Card
                 style={{
@@ -1153,38 +1843,23 @@ export const MembersManagement = ({
                 styles={{ body: { padding: '20px' } }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: '50%',
-                      backgroundColor: isDarkMode ? 'rgba(250, 140, 22, 0.2)' : '#fef4e8',
-                      color: '#fa8c16',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 20,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <ClockCircleOutlined />
-                  </div>
+                  <ClockCircleOutlined style={{ fontSize: 22, color: '#d97706', opacity: 0.75, flexShrink: 0 }} />
                   <div>
                     <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', fontWeight: 500 }}>
-                      Expiring This Month
+                      Expiring Soon
                     </div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', lineHeight: 1.2, marginTop: 2 }}>
-                      18
+                      {dynamicExpiringSoon}
                     </div>
-                    <div style={{ fontSize: 12, color: '#00bf62', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                      <RiseOutlined /> 5% vs last month
+                    <div style={{ fontSize: 12, color: '#d97706', fontWeight: 600, marginTop: 4 }}>
+                      Requires renewal
                     </div>
                   </div>
                 </div>
               </Card>
             </Col>
 
-            {/* Card 4: Expired Members */}
+            {/* Expired Members */}
             <Col xs={24} sm={12} lg={6}>
               <Card
                 style={{
@@ -1196,185 +1871,22 @@ export const MembersManagement = ({
                 styles={{ body: { padding: '20px' } }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: '50%',
-                      backgroundColor: isDarkMode ? 'rgba(225, 29, 72, 0.2)' : '#fdeeed',
-                      color: '#e11d48',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 20,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <TeamOutlined />
-                  </div>
+                  <CloseCircleOutlined style={{ fontSize: 22, color: '#dc2626', opacity: 0.75, flexShrink: 0 }} />
                   <div>
                     <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', fontWeight: 500 }}>
                       Expired Members
                     </div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', lineHeight: 1.2, marginTop: 2 }}>
-                      24
+                      {dynamicExpired}
                     </div>
-                    <div style={{ fontSize: 12, color: '#00bf62', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                      <RiseOutlined /> 3% vs last month
+                    <div style={{ fontSize: 12, color: '#dc2626', fontWeight: 600, marginTop: 4 }}>
+                      Past validity date
                     </div>
                   </div>
                 </div>
               </Card>
             </Col>
           </Row>
-
-          {/* FILTER & SEARCH CARD */}
-          <Card
-            style={{
-              backgroundColor: 'var(--bg-surface-elevated)',
-              borderColor: 'var(--border-color)',
-              borderRadius: 'var(--radius-base)',
-              marginBottom: 24,
-              boxShadow: isDarkMode ? 'none' : '0 1px 3px rgba(0,0,0,0.03)',
-            }}
-            styles={{ body: { padding: '20px 24px' } }}
-          >
-            {/* Row 1: All 5 Filter Selectors & Inputs */}
-            <Row gutter={[16, 16]} align="bottom">
-              {/* Search by Name / Phone */}
-              <Col xs={24} sm={12} md={8} lg={6}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#475569', marginBottom: 6 }}>
-                  Search by Name / Phone
-                </div>
-                <Input
-                  prefix={<SearchOutlined style={{ color: isDarkMode ? '#888888' : '#94a3b8' }} />}
-                  placeholder="Enter name or phone number"
-                  value={namePhoneSearch}
-                  onChange={(e) => setNamePhoneSearch(e.target.value)}
-                  allowClear
-                  style={{ height: 42, borderRadius: 'var(--radius-base)' }}
-                />
-              </Col>
-
-              {/* Member ID */}
-              <Col xs={24} sm={12} md={8} lg={4}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#475569', marginBottom: 6 }}>
-                  Member ID
-                </div>
-                <Input
-                  prefix={<SearchOutlined style={{ color: isDarkMode ? '#888888' : '#94a3b8' }} />}
-                  placeholder="Enter member ID"
-                  value={memberIdSearch}
-                  onChange={(e) => setMemberIdSearch(e.target.value)}
-                  allowClear
-                  style={{ height: 42, borderRadius: 'var(--radius-base)' }}
-                />
-              </Col>
-
-              {/* Membership Plan */}
-              <Col xs={24} sm={12} md={8} lg={5}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#475569', marginBottom: 6 }}>
-                  Membership Plan
-                </div>
-                <Select
-                  value={planFilter}
-                  onChange={setPlanFilter}
-                  style={{ width: '100%', height: 42 }}
-                >
-                  <Option value="ALL">All Plans</Option>
-                  <Option value="Gold">Gold (3 Months)</Option>
-                  <Option value="Platinum">Platinum (6 Months)</Option>
-                  <Option value="Silver">Silver (1 Month)</Option>
-                </Select>
-              </Col>
-
-              {/* Status */}
-              <Col xs={24} sm={12} md={8} lg={4}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#475569', marginBottom: 6 }}>
-                  Status
-                </div>
-                <Select
-                  value={statusFilter}
-                  onChange={setStatusFilter}
-                  style={{ width: '100%', height: 42 }}
-                >
-                  <Option value="ALL">All Status</Option>
-                  <Option value="Active">Active</Option>
-                  <Option value="Cancellation Requested">Cancellation Requested</Option>
-                  <Option value="Expired">Expired</Option>
-                </Select>
-              </Col>
-
-              {/* Date Range */}
-              <Col xs={24} sm={12} md={8} lg={5}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#475569', marginBottom: 6 }}>
-                  Date Range
-                </div>
-                <Dropdown menu={dateRangeMenu} trigger={['click']}>
-                  <div
-                    style={{
-                      height: 42,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '0 14px',
-                      backgroundColor: isDarkMode ? '#141414' : '#ffffff',
-                      border: `1px solid ${isDarkMode ? '#262626' : '#d9d9d9'}`,
-                      borderRadius: 'var(--radius-base)',
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      fontWeight: 500,
-                      color: isDarkMode ? '#ffffff' : '#0f172a',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      <CalendarOutlined style={{ color: isDarkMode ? '#888888' : '#64748b', flexShrink: 0 }} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedDateRange}</span>
-                    </div>
-                    <DownOutlined style={{ fontSize: 10, color: isDarkMode ? '#888888' : '#64748b', flexShrink: 0 }} />
-                  </div>
-                </Dropdown>
-              </Col>
-            </Row>
-
-            {/* Row 2: Right-Aligned Filter and Clear Filters Action Buttons */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 18 }}>
-              <Button
-                icon={<FilterOutlined />}
-                onClick={() => message.info(`Applied filters: ${filteredMembers.length} matches.`)}
-                style={{
-                  height: 40,
-                  padding: '0 22px',
-                  borderRadius: 'var(--radius-base)',
-                  fontWeight: 600,
-                  color: 'var(--color-primary)',
-                  borderColor: isDarkMode ? '#333333' : '#d0d7de',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                Filter
-              </Button>
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={clearFilters}
-                style={{
-                  height: 40,
-                  padding: '0 22px',
-                  borderRadius: 'var(--radius-base)',
-                  fontWeight: 600,
-                  color: isDarkMode ? '#aaaaaa' : '#64748b',
-                  borderColor: isDarkMode ? '#333333' : '#d0d7de',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                Clear Filters
-              </Button>
-            </div>
-          </Card>
 
           {/* MEMBERS TABLE CARD */}
           <Card
@@ -1387,11 +1899,13 @@ export const MembersManagement = ({
             styles={{ body: { padding: '16px 20px' } }}
           >
             <Table
+              loading={isMembersLoading}
               pagination={false}
               size="middle"
-              scroll={{ x: 'max-content' }}
-              dataSource={filteredMembers}
+              scroll={{ x: 1400 }}
+              dataSource={membersList}
               columns={columns}
+              rowKey={(r) => r.key || r.memberId}
             />
 
             {/* Custom Table Footer with Pagination */}
@@ -1408,12 +1922,13 @@ export const MembersManagement = ({
               }}
             >
               <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>
-                Showing 1 to {filteredMembers.length} of 248 members
+                Showing {totalMembersCount > 0 ? (currentPage - 1) * pageSize + 1 : 0} to{' '}
+                {Math.min(currentPage * pageSize, totalMembersCount)} of {totalMembersCount} members
               </div>
               <Pagination
                 current={currentPage}
-                onChange={setCurrentPage}
-                total={248}
+                onChange={(page) => setCurrentPage(page)}
+                total={totalMembersCount}
                 pageSize={pageSize}
                 showSizeChanger={false}
               />
@@ -1422,7 +1937,210 @@ export const MembersManagement = ({
         </>
       )}
 
-      {/* VIEW 2: CANCELLATION REQUESTS TAB */}
+      {/* VIEW 2: PLAN SWITCH REQUESTS TAB */}
+      {activeTab === 'switches' && (
+        <>
+          {/* 4 SUMMARY STAT CARDS FOR PLAN SWITCH REQUESTS */}
+          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+            {/* Total Switches */}
+            <Col xs={24} sm={12} lg={6}>
+              <Card
+                style={{
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  borderColor: 'var(--border-color)',
+                  borderRadius: 'var(--radius-base)',
+                  boxShadow: isDarkMode ? 'none' : '0 1px 3px rgba(0,0,0,0.03)',
+                }}
+                styles={{ body: { padding: '20px' } }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <SyncOutlined style={{ fontSize: 22, color: 'var(--color-primary)', opacity: 0.75, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', fontWeight: 500 }}>
+                      Total Switch Requests
+                    </div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', lineHeight: 1.2, marginTop: 2 }}>
+                      {switchRequests.length}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#1677ff', fontWeight: 600, marginTop: 4 }}>
+                      Member initiated
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </Col>
+
+            {/* Pending Gym Review */}
+            <Col xs={24} sm={12} lg={6}>
+              <Card
+                style={{
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  borderColor: 'var(--border-color)',
+                  borderRadius: 'var(--radius-base)',
+                  boxShadow: isDarkMode ? 'none' : '0 1px 3px rgba(0,0,0,0.03)',
+                }}
+                styles={{ body: { padding: '20px' } }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <ClockCircleOutlined style={{ fontSize: 22, color: '#fa8c16', opacity: 0.75, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', fontWeight: 500 }}>
+                      Pending Gym Review
+                    </div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: '#fa8c16', lineHeight: 1.2, marginTop: 2 }}>
+                      {switchRequests.filter((r) => r.status === 'PENDING_GYM_APPROVAL').length}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#fa8c16', fontWeight: 600, marginTop: 4 }}>
+                      Action required
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </Col>
+
+            {/* Sent to Super Admin */}
+            <Col xs={24} sm={12} lg={6}>
+              <Card
+                style={{
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  borderColor: 'var(--border-color)',
+                  borderRadius: 'var(--radius-base)',
+                  boxShadow: isDarkMode ? 'none' : '0 1px 3px rgba(0,0,0,0.03)',
+                }}
+                styles={{ body: { padding: '20px' } }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <SendOutlined style={{ fontSize: 22, color: '#1677ff', opacity: 0.75, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', fontWeight: 500 }}>
+                      Forwarded to Admin
+                    </div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: '#1677ff', lineHeight: 1.2, marginTop: 2 }}>
+                      {switchRequests.filter((r) => r.status === 'PENDING_SUPER_ADMIN_APPROVAL').length}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#1677ff', fontWeight: 600, marginTop: 4 }}>
+                      In Admin Review
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </Col>
+
+            {/* Approved & Executed */}
+            <Col xs={24} sm={12} lg={6}>
+              <Card
+                style={{
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  borderColor: 'var(--border-color)',
+                  borderRadius: 'var(--radius-base)',
+                  boxShadow: isDarkMode ? 'none' : '0 1px 3px rgba(0,0,0,0.03)',
+                }}
+                styles={{ body: { padding: '20px' } }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <CheckCircleFilled style={{ fontSize: 22, color: '#00bf62', opacity: 0.75, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', fontWeight: 500 }}>
+                      Completed Switches
+                    </div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: '#00bf62', lineHeight: 1.2, marginTop: 2 }}>
+                      {switchRequests.filter((r) => r.status === 'APPROVED_AND_EXECUTED').length}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#00bf62', fontWeight: 600, marginTop: 4 }}>
+                      Active in system
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </Col>
+          </Row>
+
+          {/* SEARCH & FILTER BAR */}
+          <Card
+            style={{
+              backgroundColor: 'var(--bg-surface-elevated)',
+              borderColor: 'var(--border-color)',
+              borderRadius: 'var(--radius-base)',
+              marginBottom: 16,
+              boxShadow: isDarkMode ? 'none' : '0 1px 3px rgba(0,0,0,0.03)',
+            }}
+            styles={{ body: { padding: '16px 20px' } }}
+          >
+            <Row gutter={[16, 16]} align="middle">
+              <Col xs={24} sm={12} md={10}>
+                <Input
+                  prefix={<SearchOutlined style={{ color: isDarkMode ? '#888888' : '#94a3b8' }} />}
+                  placeholder="Search by Member name, phone or Request ID..."
+                  value={switchSearch}
+                  onChange={(e) => setSwitchSearch(e.target.value)}
+                  allowClear
+                  style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                />
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Select
+                  value={switchStatusFilter}
+                  onChange={setSwitchStatusFilter}
+                  style={{ width: '100%', height: 40 }}
+                >
+                  <Option value="ALL">All Switch Statuses</Option>
+                  <Option value="PENDING_GYM_APPROVAL">Pending Gym Review</Option>
+                  <Option value="PENDING_SUPER_ADMIN_APPROVAL">Forwarded to Super Admin</Option>
+                  <Option value="APPROVED_AND_EXECUTED">Approved & Executed</Option>
+                  <Option value="REJECTED_BY_GYM">Rejected by Gym</Option>
+                  <Option value="REJECTED_BY_SUPER_ADMIN">Rejected by Super Admin</Option>
+                </Select>
+              </Col>
+              <Col xs={24} sm={12} md={6} style={{ textAlign: 'right' }}>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={() => {
+                    setSwitchSearch('');
+                    setSwitchStatusFilter('ALL');
+                    void fetchGymSwitchRequests();
+                  }}
+                  style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                >
+                  Refresh
+                </Button>
+              </Col>
+            </Row>
+          </Card>
+
+          {/* PLAN SWITCH REQUESTS TABLE */}
+          <Card
+            style={{
+              backgroundColor: 'var(--bg-surface-elevated)',
+              borderColor: 'var(--border-color)',
+              borderRadius: 'var(--radius-base)',
+              boxShadow: isDarkMode ? 'none' : '0 1px 3px rgba(0,0,0,0.03)',
+            }}
+            styles={{ body: { padding: '16px 20px' } }}
+          >
+            <Table
+              loading={isSwitchLoading}
+              pagination={{ pageSize: 8, showSizeChanger: false }}
+              size="middle"
+              scroll={{ x: 1300 }}
+              dataSource={switchRequests.filter((item) => {
+                const userObj = item.userId || {};
+                const matchSearch =
+                  !switchSearch ||
+                  (userObj.fullName || '').toLowerCase().includes(switchSearch.toLowerCase()) ||
+                  (userObj.phone || '').includes(switchSearch) ||
+                  (item.requestId || '').toLowerCase().includes(switchSearch.toLowerCase());
+                const matchStatus =
+                  switchStatusFilter === 'ALL' || item.status === switchStatusFilter;
+                return matchSearch && matchStatus;
+              })}
+              columns={switchColumns}
+              rowKey={(r) => r._id || r.requestId}
+            />
+          </Card>
+        </>
+      )}
+
+      {/* VIEW 3: CANCELLATION REQUESTS TAB */}
       {activeTab === 'cancellations' && (
         <>
           {/* 4 SUMMARY STAT CARDS FOR CANCELLATION REQUESTS */}
@@ -1700,7 +2418,7 @@ export const MembersManagement = ({
             <Table
               pagination={false}
               size="middle"
-              scroll={{ x: 'max-content' }}
+              scroll={{ x: 1300 }}
               dataSource={filteredCancelRequests}
               columns={cancellationColumns}
               locale={{
@@ -1953,6 +2671,235 @@ export const MembersManagement = ({
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* PLAN SWITCH REQUEST DETAILS MODAL */}
+      <Modal
+        title={
+          <div style={{ fontSize: 18, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+            Plan Switch Request Details
+          </div>
+        }
+        open={isSwitchModalOpen}
+        onCancel={() => setIsSwitchModalOpen(false)}
+        footer={null}
+        width={540}
+        centered
+        destroyOnClose
+        styles={{ body: { padding: '8px 4px 12px 4px' } }}
+      >
+        {selectedSwitchReq && (
+          <div>
+            {/* User Profile Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, marginTop: 6 }}>
+              <Avatar
+                src={selectedSwitchReq.userId?.avatar || selectedSwitchReq.userId?.profilePicture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop'}
+                size={64}
+                style={{
+                  border: `2px solid ${isDarkMode ? '#222222' : '#e2e8f0'}`,
+                  flexShrink: 0,
+                }}
+              />
+              <div>
+                <div style={{ fontSize: 19, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                  {selectedSwitchReq.userId?.fullName || 'Gym Member'}
+                </div>
+                <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <PhoneOutlined /> {selectedSwitchReq.userId?.phone || 'No phone recorded'}
+                </div>
+                <div style={{ marginTop: 6, display: 'flex', gap: 8 }}>
+                  <Tag color="blue" style={{ borderRadius: 4, fontWeight: 700, fontFamily: 'monospace', fontSize: 11.5, margin: 0 }}>
+                    {selectedSwitchReq.requestId}
+                  </Tag>
+                </div>
+              </div>
+            </div>
+
+            {/* Workflow Stage Banner */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '12px 14px',
+                borderRadius: 'var(--radius-base)',
+                backgroundColor:
+                  selectedSwitchReq.status === 'PENDING_GYM_APPROVAL'
+                    ? isDarkMode ? 'rgba(250, 140, 22, 0.15)' : '#fff7e6'
+                    : selectedSwitchReq.status === 'PENDING_SUPER_ADMIN_APPROVAL'
+                    ? isDarkMode ? 'rgba(22, 119, 255, 0.15)' : '#e6f4ff'
+                    : isDarkMode ? 'rgba(0, 191, 98, 0.15)' : '#eaf8ef',
+                marginBottom: 20,
+              }}
+            >
+              <InfoCircleOutlined
+                style={{
+                  color:
+                    selectedSwitchReq.status === 'PENDING_GYM_APPROVAL'
+                      ? '#fa8c16'
+                      : selectedSwitchReq.status === 'PENDING_SUPER_ADMIN_APPROVAL'
+                      ? '#1677ff'
+                      : '#00bf62',
+                  fontSize: 16,
+                  flexShrink: 0,
+                }}
+              />
+              <div style={{ fontSize: 12.5, color: isDarkMode ? '#ffffff' : '#0f172a', lineHeight: 1.4 }}>
+                {selectedSwitchReq.status === 'PENDING_GYM_APPROVAL' && (
+                  <span><strong>Stage 1 of 2:</strong> Awaiting Gym Owner review before dispatching to Super Admin.</span>
+                )}
+                {selectedSwitchReq.status === 'PENDING_SUPER_ADMIN_APPROVAL' && (
+                  <span><strong>Stage 2 of 2:</strong> Forwarded to Super Admin for final verification and atomic execution.</span>
+                )}
+                {selectedSwitchReq.status === 'APPROVED_AND_EXECUTED' && (
+                  <span><strong>Completed:</strong> Plan switch verified and executed. Member pass is updated.</span>
+                )}
+                {selectedSwitchReq.status.includes('REJECTED') && (
+                  <span><strong>Rejected:</strong> {selectedSwitchReq.rejectionReason || 'Switch request was declined.'}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Proration Breakdown Summary */}
+            <div
+              style={{
+                padding: '14px 16px',
+                borderRadius: 'var(--radius-base)',
+                backgroundColor: isDarkMode ? '#141414' : '#f8fafc',
+                border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}`,
+                marginBottom: 20,
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? '#aaaaaa' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
+                Proration & Calculation Breakdown
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: isDarkMode ? '#888888' : '#64748b' }}>Current Plan:</span>
+                  <span style={{ fontWeight: 600, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    {selectedSwitchReq.membershipId?.membershipTier || 'Current'} ({selectedSwitchReq.quoteSnapshot?.daysRemaining} days left)
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: isDarkMode ? '#888888' : '#64748b' }}>Target Plan:</span>
+                  <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
+                    {selectedSwitchReq.targetTier} Plan
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: isDarkMode ? '#888888' : '#64748b' }}>Unused Credit Deducted:</span>
+                  <span style={{ fontWeight: 800, color: '#52c41a' }}>
+                    - ₹{((selectedSwitchReq.quoteSnapshot?.proRatedCreditPaise || 0) / 100).toFixed(2)}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: isDarkMode ? '#888888' : '#64748b' }}>Target Plan Price:</span>
+                  <span style={{ fontWeight: 600, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    ₹{((selectedSwitchReq.quoteSnapshot?.newPricePaise || 0) / 100).toFixed(2)}
+                  </span>
+                </div>
+
+                <div style={{ height: 1, backgroundColor: isDarkMode ? '#222222' : '#e2e8f0', margin: '4px 0' }} />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    Net Amount Payable:
+                  </span>
+                  <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--color-primary)' }}>
+                    ₹{((selectedSwitchReq.quoteSnapshot?.netAmountToPayPaise || 0) / 100).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <Button
+                onClick={() => setIsSwitchModalOpen(false)}
+                style={{
+                  flex: 1,
+                  minWidth: 80,
+                  height: 44,
+                  borderRadius: 'var(--radius-base)',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  borderColor: isDarkMode ? '#333333' : '#d0d7de',
+                  color: isDarkMode ? '#ffffff' : '#0f172a',
+                  backgroundColor: isDarkMode ? '#141414' : '#ffffff',
+                }}
+              >
+                Close
+              </Button>
+              {selectedSwitchReq.status === 'PENDING_GYM_APPROVAL' && (
+                <>
+                  <Button
+                    danger
+                    onClick={() => handleOpenRejectSwitch(selectedSwitchReq)}
+                    style={{
+                      flex: 1,
+                      minWidth: 100,
+                      height: 44,
+                      borderRadius: 'var(--radius-base)',
+                      fontWeight: 600,
+                      fontSize: 13.5,
+                    }}
+                  >
+                    Reject
+                  </Button>
+                  <Button
+                    type="primary"
+                    icon={<SendOutlined />}
+                    onClick={() => handleGymAcceptSwitch(selectedSwitchReq)}
+                    style={{
+                      flex: 1.4,
+                      minWidth: 190,
+                      height: 44,
+                      borderRadius: 'var(--radius-base)',
+                      fontWeight: 600,
+                      fontSize: 13.5,
+                      backgroundColor: 'var(--color-primary)',
+                      borderColor: 'var(--color-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    Accept & Send to Admin
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* REJECTION REASON MODAL */}
+      <Modal
+        title="Decline Plan Switch Request"
+        open={switchRejectionModalOpen}
+        onCancel={() => setSwitchRejectionModalOpen(false)}
+        onOk={handleConfirmRejectSwitch}
+        okText="Confirm Reject"
+        okType="danger"
+        destroyOnClose
+      >
+        <div style={{ padding: '12px 0' }}>
+          <Paragraph style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13, marginBottom: 12 }}>
+            Please state the reason for declining this switch request. This note will be recorded for member reference.
+          </Paragraph>
+          <Input.TextArea
+            rows={3}
+            value={switchRejectionReason}
+            onChange={(e) => setSwitchRejectionReason(e.target.value)}
+            placeholder="e.g. Plan switch criteria not met or slot fully occupied..."
+            style={{ borderRadius: 'var(--radius-base)' }}
+          />
+        </div>
       </Modal>
 
       {/* VIEW MEMBER DETAILS MODAL */}

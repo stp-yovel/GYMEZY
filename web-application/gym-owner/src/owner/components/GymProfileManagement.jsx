@@ -98,23 +98,48 @@ const formatAmountWithCommas = (val) => {
 const parseAmountWithoutCommas = (val) => (val ? String(val).replace(/[^0-9.]/g, '') : '');
 
 const FACILITY_OPTIONS = [
-  'AC Gym', 'Locker Facility', 'Shower Available', 'Changing Room',
-  'Free Wi-Fi', 'Music System', 'Steam & Sauna', 'Ice Bath & Recovery',
-  'Parking Available', 'Dedicated Parking (2W/4W)', 'Turnstile Access Control', 'First Aid Kit',
-  'CCTV 24/7', 'Biometric Entry', 'Personal Trainers', 'Cardio Deck', 'Cardio Theater',
-  'Olympic Barbells Area', 'Heavy Dumbbells Zone', 'Olympic Lifting Platform',
+  'AC Gym',
+  'Locker Facility',
+  'Shower Available',
+  'Changing Room',
+  'Free Wi-Fi',
+  'Music System',
+  'Steam & Sauna',
+  'Ice Bath & Recovery',
+  'Dedicated Parking (2W/4W)',
+  'Turnstile Access Control',
+  'First Aid Kit',
+  'CCTV 24/7',
+  'Biometric Entry',
+  'Personal Trainers',
+  'Cardio Theater',
+  'Olympic Barbells Area',
 ];
 
 const AMENITY_OPTIONS = [
-  'RO Drinking Water', 'Towel Service', 'Protein Shake Bar', 'Juice & Smoothie Bar',
-  'Personal Locker Rental', 'InBody BMI Scanner', 'Nutritionist Desk',
-  'Lounge / Rest Area', 'Free Sanitizer Stations', 'Locker Key Padlocks',
+  'RO Drinking Water',
+  'Towel Service',
+  'Protein Shake Bar',
+  'Juice & Smoothie Bar',
+  'Personal Locker Rental',
+  'InBody BMI Scanner',
+  'Nutritionist Desk',
+  'Lounge / Rest Area',
+  'Free Sanitizer Stations',
+  'Locker Key Padlocks',
 ];
 
 const WORKOUT_OPTIONS = [
-  'GYM / Strength', 'Cardio Fitness', 'HIIT (High Intensity)', 'CrossFit',
-  'Yoga & Mobility', 'Zumba & Dance', 'Boxing & Kickboxing', 'Pilates',
-  'Calisthenics', 'MMA & Martial Arts', 'Powerlifting', 'Bodybuilding', 'Aerobics',
+  'GYM / Strength',
+  'Cardio Fitness',
+  'HIIT (High Intensity)',
+  'CrossFit',
+  'Yoga & Mobility',
+  'Zumba & Dance',
+  'Boxing & Kickboxing',
+  'Pilates',
+  'Calisthenics',
+  'MMA & Martial Arts',
 ];
 
 const DEFAULT_RULES = [
@@ -2035,7 +2060,7 @@ export const GymProfileManagement = () => {
                           { label: 'ESTABLISHED ON', val: activeGym?.yearEstablished ? `Est. ${activeGym.yearEstablished}` : 'Not Specified' },
                           { label: 'FLOOR AREA', val: activeGym?.floorSpaceSqFt ? `${activeGym.floorSpaceSqFt} Sq.Ft` : 'Not Specified' },
                           { label: 'MAX FLOOR CAPACITY', val: activeGym?.maxFloorCapacity ? `${activeGym.maxFloorCapacity} Persons` : '50 Persons' },
-                          { label: 'GENDER ALLOWED', val: activeGym?.genderAllowed || 'Unisex' },
+                          { label: 'GENDER POLICY', val: activeGym?.genderAllowed || 'Unisex' },
                           { label: 'ACTIVE FACILITIES', val: `${facilities.length} Categories` },
                         ].map((item, idx) => (
                           <Col xs={12} sm={6} key={idx}>
@@ -3591,7 +3616,7 @@ export const GymProfileManagement = () => {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="genderAllowed" label="Gender Allowed">
+              <Form.Item name="genderAllowed" label="Gender Policy">
                 <Select>
                   <Option value="Unisex">Unisex</Option>
                   <Option value="Men Only">Men Only</Option>

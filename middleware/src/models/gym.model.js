@@ -105,6 +105,29 @@ const systemSettingsSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const prorationSettingsSchema = new mongoose.Schema(
+  {
+    downgradePolicy: {
+      type: String,
+      enum: ['WALLET', 'REFUND', 'EXTEND', 'SCHEDULED_END_OF_CYCLE'],
+      default: 'WALLET',
+    },
+    allowMidCycleDowngrade: {
+      type: Boolean,
+      default: true,
+    },
+    requireGymApprovalForUpgrades: {
+      type: Boolean,
+      default: true,
+    },
+    requireGymApprovalForDowngrades: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  { _id: false }
+);
+
 const gymAuditLogSchema = new mongoose.Schema(
   {
     changeType: { type: String, required: true },
@@ -342,6 +365,10 @@ const gymSchema = new mongoose.Schema(
     },
     systemSettings: {
       type: systemSettingsSchema,
+      default: () => ({}),
+    },
+    prorationSettings: {
+      type: prorationSettingsSchema,
       default: () => ({}),
     },
 

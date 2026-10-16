@@ -68,7 +68,7 @@ const { Title, Text, Paragraph } = Typography;
 
 const ONBOARDING_STEPS = [
   { id: 1, key: 'business', title: 'Business Info', icon: <ShopOutlined /> },
-  { id: 2, key: 'location', title: 'Location & Hours', icon: <EnvironmentOutlined /> },
+  { id: 2, key: 'location', title: 'Location & Geolocation', icon: <EnvironmentOutlined /> },
   { id: 3, key: 'facilities', title: 'Facilities & Photos', icon: <PictureOutlined /> },
   { id: 4, key: 'workouts', title: 'Workouts & Disciplines', icon: <ThunderboltFilled /> },
   { id: 5, key: 'payment', title: 'Payout & Tier', icon: <CreditCardOutlined /> },
@@ -84,11 +84,11 @@ const STEP_REQUIRED_FIELDS = {
     { field: 'password', label: 'Owner Login Password' },
   ],
   2: [
-    { field: 'address', label: 'Street Address' },
+    { field: 'address', label: 'Street Address / Door No.' },
     { field: 'area', label: 'Area / Locality' },
     { field: 'city', label: 'City' },
     { field: 'state', label: 'State' },
-    { field: 'pincode', label: '6-digit Pincode' },
+    { field: 'pincode', label: 'Pincode' },
   ],
   3: [
     { field: 'floorSpaceSqFt', label: 'Floor Space (sq. ft.)' },
@@ -340,6 +340,7 @@ export const GymOnboarding = () => {
     amenities: [],
     tags: [],
     badgeText: 'Verified',
+    genderAllowed: 'Unisex',
     aboutText: '',
 
     // Step 4: Workouts & Trainers
@@ -451,9 +452,9 @@ export const GymOnboarding = () => {
         }
         break;
 
-      // Step 2: Location & Hours
+      // Step 2: Location & Geolocation
       case 'address':
-        if (!strVal) error = 'Full Street Address is required';
+        if (!strVal) error = 'Street Address is required';
         else if (strVal.length < 5) error = 'Address must be at least 5 characters';
         break;
       case 'area':
@@ -703,7 +704,7 @@ export const GymOnboarding = () => {
         googleMapsUrl: formData.googleMapsUrl,
         floorSpaceSqFt: Number(formData.floorSpaceSqFt) || 0,
         maxFloorCapacity: Number(formData.maxFloorCapacity) || 0,
-        yearEstablished: formData.yearEstablished,
+        genderAllowed: formData.genderAllowed || 'Unisex',
         gstNumber: formData.gstNumber,
         panNumber: formData.panNumber,
         branches: formData.branches,
@@ -1165,7 +1166,6 @@ export const GymOnboarding = () => {
                       Gym / Studio Name * {renderFieldSuccess('gymName')}
                     </div>
                     <Input
-                      placeholder="e.g. FitZone Premium Fitness"
                       value={formData.gymName}
                       status={touched.gymName && errors.gymName ? 'error' : ''}
                       onChange={(e) => handleFieldChange('gymName', e.target.value)}
@@ -1177,19 +1177,18 @@ export const GymOnboarding = () => {
 
                   <Col xs={24} md={12}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Tagline / Brand Slogan
+                      Tagline / Motto
                     </div>
                     <Input
-                      placeholder="e.g. Sculpt Your Best Self"
                       value={formData.tagline}
                       onChange={(e) => handleFieldChange('tagline', e.target.value)}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                     />
                   </Col>
 
-                  <Col xs={24} md={8}>
+                  <Col xs={24} md={12}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
-                      Business Entity Type * {renderFieldSuccess('businessType')}
+                      Business Structure * {renderFieldSuccess('businessType')}
                     </div>
                     <Select
                       value={formData.businessType}
@@ -1204,12 +1203,11 @@ export const GymOnboarding = () => {
                     </Select>
                   </Col>
 
-                  <Col xs={24} md={8}>
+                  <Col xs={24} md={12}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
-                      Primary Owner / MD Name * {renderFieldSuccess('ownerName')}
+                      Owner / MD Full Name * {renderFieldSuccess('ownerName')}
                     </div>
                     <Input
-                      placeholder="e.g. Ramesh Kumar"
                       value={formData.ownerName}
                       status={touched.ownerName && errors.ownerName ? 'error' : ''}
                       onChange={(e) => handleFieldChange('ownerName', e.target.value)}
@@ -1219,28 +1217,12 @@ export const GymOnboarding = () => {
                     {renderFieldError('ownerName')}
                   </Col>
 
-                  <Col xs={24} md={8}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Established Year
-                    </div>
-                    <Select
-                      value={formData.yearEstablished}
-                      onChange={(v) => handleFieldChange('yearEstablished', v)}
-                      style={{ width: '100%', height: 40 }}
-                    >
-                      {Array.from({ length: 25 }, (_, i) => 2026 - i).map((y) => (
-                        <Option key={y} value={String(y)}>{y}</Option>
-                      ))}
-                    </Select>
-                  </Col>
-
                   <Col xs={24} md={12}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
-                      Contact Mobile Number * {renderFieldSuccess('phone')}
+                      Owner Mobile Number * {renderFieldSuccess('phone')}
                     </div>
                     <Input
                       addonBefore="+91"
-                      placeholder="9876543210"
                       value={formData.phone}
                       status={touched.phone && errors.phone ? 'error' : ''}
                       onChange={(e) => handleFieldChange('phone', e.target.value)}
@@ -1255,7 +1237,6 @@ export const GymOnboarding = () => {
                       Official Email Address * {renderFieldSuccess('email')}
                     </div>
                     <Input
-                      placeholder="owner@gymezy.com"
                       value={formData.email}
                       status={touched.email && errors.email ? 'error' : ''}
                       onChange={(e) => handleFieldChange('email', e.target.value)}
@@ -1267,10 +1248,9 @@ export const GymOnboarding = () => {
 
                   <Col xs={24} md={12}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
-                      Account Password * {renderFieldSuccess('password')}
+                      Create Password * {renderFieldSuccess('password')}
                     </div>
                     <Input.Password
-                      placeholder="8-16 chars (1 caps, 1 number, 1 symbol, no emojis)"
                       value={formData.password}
                       maxLength={16}
                       status={touched.password && errors.password ? 'error' : ''}
@@ -1286,10 +1266,9 @@ export const GymOnboarding = () => {
 
                   <Col xs={24} md={8}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
-                      GSTIN (Optional) {renderFieldSuccess('gstNumber')}
+                      GST Number (Optional) {renderFieldSuccess('gstNumber')}
                     </div>
                     <Input
-                      placeholder="33AAAAA0000A1Z5"
                       value={formData.gstNumber}
                       status={touched.gstNumber && errors.gstNumber ? 'error' : ''}
                       onChange={(e) => handleFieldChange('gstNumber', e.target.value)}
@@ -1304,7 +1283,6 @@ export const GymOnboarding = () => {
                       PAN Number (Optional) {renderFieldSuccess('panNumber')}
                     </div>
                     <Input
-                      placeholder="AAAAA0000A"
                       value={formData.panNumber}
                       status={touched.panNumber && errors.panNumber ? 'error' : ''}
                       onChange={(e) => handleFieldChange('panNumber', e.target.value)}
@@ -1316,10 +1294,9 @@ export const GymOnboarding = () => {
 
                   <Col xs={24} md={8}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Branch Count
+                      Number of Branches
                     </div>
                     <Input
-                      placeholder="e.g. 1"
                       value={formData.branches}
                       onChange={(e) => handleFieldChange('branches', e.target.value)}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
@@ -1451,7 +1428,8 @@ export const GymOnboarding = () => {
             )}
 
             {/* ========================================================================= */}
-            {/* STEP 2: LOCATION & OPERATING HOURS */}
+            {/* ========================================================================= */}
+            {/* STEP 2: LOCATION, GEOLOCATION & OPERATING HOURS */}
             {/* ========================================================================= */}
             {currentStep === 2 && (
               <div>
@@ -1460,15 +1438,19 @@ export const GymOnboarding = () => {
                     2. Location, Geolocation & Operating Hours
                   </div>
                   <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
-                    Provide address details, Google Maps location link, and operating schedules
+                    Pinpoint your exact facility address with live geolocation and define regular operating hours.
                   </div>
+                </div>
+
+                <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 16 }}>
+                  Facility Address & Geolocation
                 </div>
 
                 <Row gutter={[16, 16]}>
                   <Col xs={24}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <CompassOutlined style={{ color: '#4338ca' }} /> Google Maps Link (Auto-detects GPS Coordinates)
+                        <CompassOutlined style={{ color: '#4338ca' }} /> Google Maps Share Link (Auto-extracts GPS)
                       </span>
                       {formData.lat && formData.lng && (
                         <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
@@ -1477,7 +1459,6 @@ export const GymOnboarding = () => {
                       )}
                     </div>
                     <Input
-                      placeholder="Paste Google Maps URL e.g. https://maps.app.goo.gl/... or https://maps.google.com/?q=13.0827,80.2707"
                       value={formData.googleMapsUrl}
                       onChange={async (e) => {
                         const url = e.target.value;
@@ -1531,7 +1512,7 @@ export const GymOnboarding = () => {
                         justifyContent: 'space-between',
                       }}
                     >
-                      <span>Full Street Address / Building Name * {renderFieldSuccess('address')}</span>
+                      <span>Street Address / Door No. * {renderFieldSuccess('address')}</span>
                       <Button
                         type="link"
                         size="small"
@@ -1553,7 +1534,6 @@ export const GymOnboarding = () => {
                       </Button>
                     </div>
                     <Input
-                      placeholder="e.g. Plot 42, 2nd Avenue, Anna Nagar West"
                       value={formData.address}
                       status={touched.address && errors.address ? 'error' : ''}
                       onChange={(e) => handleFieldChange('address', e.target.value)}
@@ -1568,7 +1548,6 @@ export const GymOnboarding = () => {
                       Area / Locality * {renderFieldSuccess('area')}
                     </div>
                     <Input
-                      placeholder="e.g. Anna Nagar"
                       value={formData.area}
                       status={touched.area && errors.area ? 'error' : ''}
                       onChange={(e) => handleFieldChange('area', e.target.value)}
@@ -1583,7 +1562,6 @@ export const GymOnboarding = () => {
                       City * {renderFieldSuccess('city')}
                     </div>
                     <Input
-                      placeholder="e.g. Chennai"
                       value={formData.city}
                       status={touched.city && errors.city ? 'error' : ''}
                       onChange={(e) => handleFieldChange('city', e.target.value)}
@@ -1598,7 +1576,6 @@ export const GymOnboarding = () => {
                       State * {renderFieldSuccess('state')}
                     </div>
                     <Input
-                      placeholder="e.g. Tamil Nadu"
                       value={formData.state}
                       status={touched.state && errors.state ? 'error' : ''}
                       onChange={(e) => handleFieldChange('state', e.target.value)}
@@ -1613,7 +1590,6 @@ export const GymOnboarding = () => {
                       Pincode * {renderFieldSuccess('pincode')}
                     </div>
                     <Input
-                      placeholder="e.g. 600040"
                       value={formData.pincode}
                       status={touched.pincode && errors.pincode ? 'error' : ''}
                       onChange={(e) => handleFieldChange('pincode', e.target.value)}
@@ -1628,7 +1604,6 @@ export const GymOnboarding = () => {
                       Landmark (Optional)
                     </div>
                     <Input
-                      placeholder="e.g. Opposite Metro Station"
                       value={formData.landmark}
                       onChange={(e) => handleFieldChange('landmark', e.target.value)}
                       style={{ height: 40, borderRadius: 'var(--radius-base)' }}
@@ -1637,10 +1612,9 @@ export const GymOnboarding = () => {
 
                   <Col xs={24} md={6}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Latitude (GPS)
+                      GPS Latitude
                     </div>
                     <InputNumber
-                      placeholder="13.0850"
                       value={formData.lat}
                       onChange={(v) => handleFieldChange('lat', v)}
                       style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
@@ -1649,10 +1623,9 @@ export const GymOnboarding = () => {
 
                   <Col xs={24} md={6}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Longitude (GPS)
+                      GPS Longitude
                     </div>
                     <InputNumber
-                      placeholder="80.2101"
                       value={formData.lng}
                       onChange={(v) => handleFieldChange('lng', v)}
                       style={{ width: '100%', height: 40, borderRadius: 'var(--radius-base)' }}
@@ -1663,50 +1636,52 @@ export const GymOnboarding = () => {
                 <Divider style={{ margin: '24px 0 20px 0' }} />
 
                 <div style={{ fontSize: 15, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 14 }}>
-                  Operating Hours & Schedules
+                  Regular Operating Hours
                 </div>
 
                 <Row gutter={[16, 16]}>
-                  <Col xs={24} md={12}>
+                  <Col xs={24} sm={12} md={6}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Weekday Timings (Mon - Fri)
+                      Weekday Open (Mon – Fri)
                     </div>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                      <Input
-                        value={formData.weekdayOpen}
-                        onChange={(e) => handleFieldChange('weekdayOpen', e.target.value)}
-                        placeholder="05:30 AM"
-                        style={{ height: 40 }}
-                      />
-                      <span>to</span>
-                      <Input
-                        value={formData.weekdayClose}
-                        onChange={(e) => handleFieldChange('weekdayClose', e.target.value)}
-                        placeholder="10:30 PM"
-                        style={{ height: 40 }}
-                      />
-                    </div>
+                    <Input
+                      value={formData.weekdayOpen}
+                      onChange={(e) => handleFieldChange('weekdayOpen', e.target.value)}
+                      style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                    />
                   </Col>
 
-                  <Col xs={24} md={12}>
+                  <Col xs={24} sm={12} md={6}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Weekend Timings (Sat - Sun)
+                      Weekday Close (Mon – Fri)
                     </div>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                      <Input
-                        value={formData.weekendOpen}
-                        onChange={(e) => handleFieldChange('weekendOpen', e.target.value)}
-                        placeholder="06:00 AM"
-                        style={{ height: 40 }}
-                      />
-                      <span>to</span>
-                      <Input
-                        value={formData.weekendClose}
-                        onChange={(e) => handleFieldChange('weekendClose', e.target.value)}
-                        placeholder="09:00 PM"
-                        style={{ height: 40 }}
-                      />
+                    <Input
+                      value={formData.weekdayClose}
+                      onChange={(e) => handleFieldChange('weekdayClose', e.target.value)}
+                      style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                    />
+                  </Col>
+
+                  <Col xs={24} sm={12} md={6}>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                      Weekend Open (Sat – Sun)
                     </div>
+                    <Input
+                      value={formData.weekendOpen}
+                      onChange={(e) => handleFieldChange('weekendOpen', e.target.value)}
+                      style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                    />
+                  </Col>
+
+                  <Col xs={24} sm={12} md={6}>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                      Weekend Close (Sat – Sun)
+                    </div>
+                    <Input
+                      value={formData.weekendClose}
+                      onChange={(e) => handleFieldChange('weekendClose', e.target.value)}
+                      style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                    />
                   </Col>
 
                   <Col xs={24} md={8}>
@@ -1716,7 +1691,7 @@ export const GymOnboarding = () => {
                         onChange={(chk) => handleFieldChange('is24Hours', chk)}
                       />
                       <span style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                        24x7 Open Facility
+                        24/7 Facility Access
                       </span>
                     </div>
                   </Col>
@@ -1751,7 +1726,7 @@ export const GymOnboarding = () => {
                 </div>
 
                 <Row gutter={[16, 16]}>
-                  <Col xs={24} md={8}>
+                  <Col xs={24} md={6}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
                       Floor Space (sq. ft.) * {renderFieldSuccess('floorSpaceSqFt')}
                     </div>
@@ -1761,12 +1736,11 @@ export const GymOnboarding = () => {
                       onChange={(v) => handleFieldChange('floorSpaceSqFt', v)}
                       onBlur={() => handleFieldBlur('floorSpaceSqFt')}
                       style={{ width: '100%', height: 40 }}
-                      placeholder="5000"
                     />
                     {renderFieldError('floorSpaceSqFt')}
                   </Col>
 
-                  <Col xs={24} md={8}>
+                  <Col xs={24} md={6}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center' }}>
                       Max Safe Floor Capacity (Athletes) * {renderFieldSuccess('maxFloorCapacity')}
                     </div>
@@ -1776,12 +1750,26 @@ export const GymOnboarding = () => {
                       onChange={(v) => handleFieldChange('maxFloorCapacity', v)}
                       onBlur={() => handleFieldBlur('maxFloorCapacity')}
                       style={{ width: '100%', height: 40 }}
-                      placeholder="85"
                     />
                     {renderFieldError('maxFloorCapacity')}
                   </Col>
 
-                  <Col xs={24} md={8}>
+                  <Col xs={24} md={6}>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                      Gender Policy
+                    </div>
+                    <Select
+                      value={formData.genderAllowed}
+                      onChange={(v) => handleFieldChange('genderAllowed', v)}
+                      style={{ width: '100%', height: 40 }}
+                    >
+                      <Option value="Unisex">Unisex (All Welcome)</Option>
+                      <Option value="Men Only">Men Only</Option>
+                      <Option value="Women Only">Women Only</Option>
+                    </Select>
+                  </Col>
+
+                  <Col xs={24} md={6}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
                       Highlight Badge Text
                     </div>
@@ -1905,6 +1893,112 @@ export const GymOnboarding = () => {
                         </div>
                       </div>
                     )}
+                  </Col>
+
+                  <Col xs={24}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                        Facility & Equipment Photos
+                      </div>
+                      <span style={{ fontSize: 11, color: '#64748b' }}>
+                        {(formData.galleryPhotos || []).length} photos uploaded
+                      </span>
+                    </div>
+                    <p style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', margin: '0 0 10px 0' }}>
+                      Upload clear photos of your workout floor, strength machines, cardio zones, and locker rooms.
+                    </p>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+                      <Upload
+                        accept="image/*"
+                        showUploadList={false}
+                        beforeUpload={async (file) => {
+                          try {
+                            const b64 = await fileToBase64(file);
+                            handleFieldChange('galleryPhotos', [...(formData.galleryPhotos || []), b64]);
+                            message.success(`Facility photo "${file.name}" attached!`);
+                          } catch {
+                            message.error('Failed to read image file');
+                          }
+                          return false;
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 120,
+                            height: 100,
+                            border: `1.5px dashed ${isDarkMode ? '#333333' : '#d9d9d9'}`,
+                            borderRadius: 8,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            backgroundColor: isDarkMode ? '#141414' : '#fafafa',
+                            gap: 6,
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#4338ca';
+                            e.currentTarget.style.backgroundColor = isDarkMode ? '#1e1e1e' : '#f5f3ff';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = isDarkMode ? '#333333' : '#d9d9d9';
+                            e.currentTarget.style.backgroundColor = isDarkMode ? '#141414' : '#fafafa';
+                          }}
+                        >
+                          <PlusOutlined style={{ fontSize: 20, color: '#4338ca' }} />
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#4338ca' }}>Add Photo</span>
+                        </div>
+                      </Upload>
+
+                      {(formData.galleryPhotos || []).map((photoSrc, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            position: 'relative',
+                            width: 120,
+                            height: 100,
+                            borderRadius: 8,
+                            overflow: 'hidden',
+                            border: isDarkMode ? '1px solid #333333' : '1px solid #e2e8f0',
+                          }}
+                        >
+                          <img
+                            src={photoSrc}
+                            alt={`Facility ${idx + 1}`}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleFieldChange(
+                                'galleryPhotos',
+                                (formData.galleryPhotos || []).filter((_, i) => i !== idx)
+                              );
+                            }}
+                            style={{
+                              position: 'absolute',
+                              top: 4,
+                              right: 4,
+                              width: 24,
+                              height: 24,
+                              borderRadius: '50%',
+                              backgroundColor: 'rgba(0,0,0,0.6)',
+                              color: '#ffffff',
+                              border: 'none',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 11,
+                            }}
+                          >
+                            <DeleteOutlined />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </Col>
 
                   <Col xs={24}>
@@ -2433,8 +2527,10 @@ export const GymOnboarding = () => {
                           <div><span style={{ color: '#64748b' }}>Owner:</span> <strong>{formData.ownerName || '—'}</strong></div>
                           <div><span style={{ color: '#64748b' }}>Phone:</span> <strong>{formData.phone ? `+91 ${formData.phone}` : '—'}</strong></div>
                           <div><span style={{ color: '#64748b' }}>City:</span> <strong>{formData.city || '—'}</strong></div>
+                          <div><span style={{ color: '#64748b' }}>Gender Policy:</span> <strong>{formData.genderAllowed || 'Unisex'}</strong></div>
+                          <div><span style={{ color: '#64748b' }}>Facility Photos:</span> <strong>{(formData.galleryPhotos || []).length} uploaded</strong></div>
                           <div style={{ gridColumn: 'span 2' }}><span style={{ color: '#64748b' }}>Address:</span> {formData.address || '—'}</div>
-                          <div style={{ gridColumn: 'span 2' }}><span style={{ color: '#64748b' }}>Timings:</span> {formData.is24Hours ? '24x7 Open' : `${formData.weekdayOpen} - ${formData.weekdayClose}`}</div>
+                          <div style={{ gridColumn: 'span 2' }}><span style={{ color: '#64748b' }}>Timings:</span> {formData.is24Hours ? '24/7 Facility Access' : `${formData.weekdayOpen} - ${formData.weekdayClose}`}</div>
                         </div>
                       </Card>
 

@@ -2247,17 +2247,24 @@ export const GymsManagement = () => {
                 dataIndex: 'name',
                 key: 'name',
                 width: 200,
-                render: (name) => (
-                  <span
-                    style={{
-                      fontWeight: 700,
-                      color: isDarkMode ? '#f8fafc' : '#0f172a',
-                      fontSize: 13.5,
-                      lineHeight: '1.4',
-                    }}
-                  >
-                    {name}
-                  </span>
+                render: (name, record) => (
+                  <div>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        color: isDarkMode ? '#f8fafc' : '#0f172a',
+                        fontSize: 13.5,
+                        lineHeight: '1.4',
+                      }}
+                    >
+                      {name}
+                    </span>
+                    <div style={{ marginTop: 3 }}>
+                      <Tag color="cyan" style={{ fontSize: 10, padding: '0 5px', borderRadius: 4, margin: 0, fontWeight: 600 }}>
+                        {record.genderAllowed || 'Unisex'}
+                      </Tag>
+                    </div>
+                  </div>
                 ),
               },
               {
@@ -2437,17 +2444,24 @@ export const GymsManagement = () => {
                 dataIndex: 'name',
                 key: 'name',
                 width: 200,
-                render: (name) => (
-                  <span
-                    style={{
-                      fontWeight: 700,
-                      color: isDarkMode ? '#f8fafc' : '#0f172a',
-                      fontSize: 13.5,
-                      lineHeight: '1.4',
-                    }}
-                  >
-                    {name}
-                  </span>
+                render: (name, record) => (
+                  <div>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        color: isDarkMode ? '#f8fafc' : '#0f172a',
+                        fontSize: 13.5,
+                        lineHeight: '1.4',
+                      }}
+                    >
+                      {name}
+                    </span>
+                    <div style={{ marginTop: 3 }}>
+                      <Tag color="cyan" style={{ fontSize: 10, padding: '0 5px', borderRadius: 4, margin: 0, fontWeight: 600 }}>
+                        {record.genderAllowed || 'Unisex'}
+                      </Tag>
+                    </div>
+                  </div>
                 ),
               },
               {

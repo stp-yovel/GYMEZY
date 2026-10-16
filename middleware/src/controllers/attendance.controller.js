@@ -1,8 +1,11 @@
 import mongoose from 'mongoose';
+import crypto from 'node:crypto';
 import Attendance from '../models/attendance.model.js';
 import Membership from '../models/membership.model.js';
+import MembershipSwitchRequest from '../models/membershipSwitchRequest.model.js';
 import Gym from '../models/gym.model.js';
 import User from '../models/user.model.js';
+import { autoCheckoutStaleRecords } from '../services/attendanceCron.service.js';
 import { ApiError } from '../utils/apiError.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 
@@ -65,7 +68,7 @@ const findMembershipForEntry = async (gymDbId, parsedInfo) => {
   // 1. If OTP is provided, query by gymId and entryOtp
   if (otp) {
     const mem = await Membership.findOne({ gymId: gymDbId, entryOtp: otp })
-      .populate('userId', 'fullName phone email profilePicture customerProfile customerId')
+      .populate('userId', 'fullName phone email avatar profilePicture customerProfile customerId')
       .populate('gymId', 'name partnerId address');
     if (mem) return mem;
   }
@@ -73,7 +76,7 @@ const findMembershipForEntry = async (gymDbId, parsedInfo) => {
   // 2. Query by MongoDB _id if valid
   if (id && mongoose.Types.ObjectId.isValid(id)) {
     const mem = await Membership.findOne({ _id: id, gymId: gymDbId })
-      .populate('userId', 'fullName phone email profilePicture customerProfile customerId')
+      .populate('userId', 'fullName phone email avatar profilePicture customerProfile customerId')
       .populate('gymId', 'name partnerId address');
     if (mem) return mem;
   }
@@ -82,7 +85,7 @@ const findMembershipForEntry = async (gymDbId, parsedInfo) => {
   if (id || raw) {
     const memId = id || raw;
     const mem = await Membership.findOne({ membershipId: memId, gymId: gymDbId })
-      .populate('userId', 'fullName phone email profilePicture customerProfile customerId')
+      .populate('userId', 'fullName phone email avatar profilePicture customerProfile customerId')
       .populate('gymId', 'name partnerId address');
     if (mem) return mem;
   }
@@ -117,23 +120,41 @@ export const checkInMember = async (req, res, next) => {
     // Validate Membership Status & Date Window
     const now = new Date();
 
-    if (membership.status === 'Upcoming' || (membership.startDate && new Date(membership.startDate) > now)) {
-      const startStr = membership.startDate
-        ? new Date(membership.startDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
-        : 'a future date';
-      throw ApiError.badRequest(`Membership pass is not active yet (Starts on ${startStr}). Entry is not permitted before the start date.`);
-    }
-
-    if (membership.status === 'Expired' || (membership.endDate && new Date(membership.endDate) < now)) {
-      throw ApiError.badRequest('Membership has expired. Renewal required before entry.');
-    }
-
     if (membership.status === 'Cancelled') {
       throw ApiError.badRequest('This membership pass has been cancelled. Entry is not permitted.');
     }
 
+    // Check if membership is currently under review for plan switch
+    const pendingReview = await MembershipSwitchRequest.findOne({
+      membershipId: membership._id,
+      status: { $in: ['PENDING_GYM_APPROVAL', 'PENDING_SUPER_ADMIN_APPROVAL'] },
+    }).lean();
+
+    if (pendingReview) {
+      throw ApiError.badRequest(
+        'Your membership plan switch request is currently under review. Gym entry is paused until review completion.'
+      );
+    }
+
+    if (membership.startDate && new Date(membership.startDate) > now) {
+      const startStr = new Date(membership.startDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+      throw ApiError.badRequest(`Membership pass is not active yet (Starts on ${startStr}). Entry is not permitted before the start date.`);
+    }
+
+    if (membership.endDate && new Date(membership.endDate) < now) {
+      throw ApiError.badRequest('Membership has expired. Renewal required before entry.');
+    }
+
+    // Auto-activate if status was previously 'Upcoming' and start date has arrived
     if (membership.status !== 'Active') {
-      throw ApiError.badRequest(`Membership status is ${membership.status}. Only Active memberships can enter.`);
+      membership.status = 'Active';
+      if (!membership.entryOtp) {
+        membership.entryOtp = crypto.randomInt(100000, 1000000).toString();
+      }
+      await Membership.updateOne(
+        { _id: membership._id },
+        { status: 'Active', entryOtp: membership.entryOtp }
+      );
     }
 
     // Check for double entry (already checked in and not checked out)
@@ -173,7 +194,7 @@ export const checkInMember = async (req, res, next) => {
         id: user?._id,
         name: user?.fullName || 'Gym Member',
         phone: user?.phone || 'N/A',
-        avatar: user?.profilePicture || null,
+        avatar: user?.avatar || user?.profilePicture || null,
         membershipId: membership.membershipId,
         tier: membership.membershipTier,
         endDate: membership.endDate,
@@ -228,7 +249,7 @@ export const checkOutMember = async (req, res, next) => {
     attendanceRecord.status = 'Completed';
     await attendanceRecord.save();
 
-    await attendanceRecord.populate('userId', 'fullName phone email profilePicture');
+    await attendanceRecord.populate('userId', 'fullName phone email avatar profilePicture');
     await attendanceRecord.populate('membershipId', 'membershipId membershipTier');
 
     return res.status(200).json(ApiResponse.success(attendanceRecord, 'Check-out completed successfully.'));
@@ -261,7 +282,7 @@ export const getTodayAttendance = async (req, res, next) => {
       gymId: gym._id,
       checkInTime: { $gte: startOfDay, $lte: endOfDay },
     })
-      .populate('userId', 'fullName phone email profilePicture customerProfile customerId')
+      .populate('userId', 'fullName phone email avatar profilePicture customerProfile customerId')
       .populate('membershipId', 'membershipId membershipTier startDate endDate status entryOtp')
       .sort({ checkInTime: -1 })
       .lean();
@@ -290,7 +311,7 @@ export const getTodayAttendance = async (req, res, next) => {
         userId: user?._id?.toString() || 'N/A',
         customerId: user?.customerId || user?._id?.toString().slice(-8) || 'N/A',
         memberName: user?.fullName || 'Gym Member',
-        avatar: user?.profilePicture || null,
+        avatar: user?.avatar || user?.profilePicture || null,
         phone: user?.phone || 'N/A',
         plan: mem?.membershipTier || 'General Pass',
         time: timeStr,
@@ -348,7 +369,7 @@ export const searchGymMembersForCheckIn = async (req, res, next) => {
       gymId: gym._id,
       status: { $in: ['Active', 'Upcoming', 'Expiring Soon'] },
     })
-      .populate('userId', 'fullName phone email profilePicture customerId')
+      .populate('userId', 'fullName phone email avatar profilePicture customerId')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -376,12 +397,30 @@ export const searchGymMembersForCheckIn = async (req, res, next) => {
         startDate: m.startDate,
         endDate: m.endDate,
         planExpiry: m.endDate ? new Date(m.endDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A',
-        avatar: m.userId?.profilePicture || null,
+        avatar: m.userId?.avatar || m.userId?.profilePicture || null,
         gymBranch: gym.name,
         entryOtp: m.entryOtp || null,
       }));
 
     return res.status(200).json(ApiResponse.success(filtered, 'Gym members retrieved successfully.'));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Manually trigger attendance auto-checkout cron job
+ * POST /api/v1/attendance/trigger-cron
+ */
+export const triggerAttendanceCron = async (req, res, next) => {
+  try {
+    const updatedCount = await autoCheckoutStaleRecords();
+    return res.status(200).json(
+      ApiResponse.success(
+        { updatedCount },
+        `Attendance auto-checkout completed. Processed ${updatedCount} stale check-in records.`
+      )
+    );
   } catch (error) {
     next(error);
   }

@@ -105,6 +105,89 @@ class MembershipService {
       throw error;
     }
   }
+
+  /**
+   * Preview Plan Switch (Prorated Quote Dry-Run)
+   * @param {string} membershipId
+   * @param {Object} payload - { targetTier, targetPlanId, useWalletBalance }
+   */
+  async previewSwitchPlan(membershipId, payload) {
+    try {
+      const response = await apiService.executeFetch(
+        `/memberships/${encodeURIComponent(membershipId)}/preview-switch`,
+        {
+          method: 'POST',
+          headers: apiService.getHeaders(),
+          body: JSON.stringify(payload),
+        },
+        8000
+      );
+
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        throw new Error(json.message || 'Failed to calculate switch quote.');
+      }
+      return json.data;
+    } catch (error) {
+      console.warn('[MEMBERSHIP SERVICE] previewSwitchPlan error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Submit Plan Switch Request (User Action -> PENDING_GYM_APPROVAL)
+   * @param {string} membershipId
+   * @param {Object} payload - { targetTier, targetPlanId, paymentMethod, transactionId, useWalletBalance }
+   */
+  async requestSwitchPlan(membershipId, payload) {
+    try {
+      const response = await apiService.executeFetch(
+        `/memberships/${encodeURIComponent(membershipId)}/request-switch`,
+        {
+          method: 'POST',
+          headers: apiService.getHeaders(),
+          body: JSON.stringify(payload),
+        },
+        10000
+      );
+
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        throw new Error(json.message || 'Failed to submit plan switch request.');
+      }
+      return json.data;
+    } catch (error) {
+      console.error('[MEMBERSHIP SERVICE] requestSwitchPlan error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch User's Plan Switch Requests History
+   * @param {string} [userId]
+   */
+  async fetchMySwitchRequests(userId) {
+    try {
+      const query = userId ? `?userId=${encodeURIComponent(userId)}` : '';
+      const response = await apiService.executeFetch(
+        `/memberships/my/switch-requests${query}`,
+        {
+          method: 'GET',
+          headers: apiService.getHeaders(),
+        },
+        8000
+      );
+
+      const json = await response.json();
+      if (response.ok && json.success && Array.isArray(json.data)) {
+        return json.data;
+      }
+      return [];
+    } catch (error) {
+      console.warn('[MEMBERSHIP SERVICE] fetchMySwitchRequests error:', error.message);
+      return [];
+    }
+  }
 }
 
 export const membershipService = new MembershipService();

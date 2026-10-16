@@ -4,6 +4,7 @@ import {
   checkOutMember,
   getTodayAttendance,
   searchGymMembersForCheckIn,
+  triggerAttendanceCron,
 } from '../controllers/attendance.controller.js';
 
 const router = Router();
@@ -19,5 +20,8 @@ router.get('/today', getTodayAttendance);
 
 // Search members for quick manual check-in
 router.get('/members', searchGymMembersForCheckIn);
+
+// Manually trigger auto-checkout cron
+router.post('/trigger-cron', triggerAttendanceCron);
 
 export default router;

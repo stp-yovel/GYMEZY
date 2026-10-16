@@ -289,4 +289,42 @@ export const registerCustomer = asyncHandler(async (req, res) => {
   );
 });
 
+/**
+ * PATCH /api/v1/auth/profile
+ * Update user profile details (avatar, name, phone, emergency contact, etc.)
+ */
+export const updateProfile = asyncHandler(async (req, res) => {
+  const userId = req.user?.userId;
+
+  if (!userId) {
+    throw ApiError.unauthorized('Authentication session is invalid.');
+  }
+
+  const { fullName, email, phone, avatar, profilePicture, gender, emergencyContact, address } = req.body;
+  const updates = {};
+  if (fullName !== undefined) updates.fullName = String(fullName).trim();
+  if (email !== undefined) updates.email = String(email).trim().toLowerCase();
+  if (phone !== undefined) updates.phone = String(phone).trim();
+  if (avatar !== undefined) {
+    updates.avatar = String(avatar).trim();
+    updates.profilePicture = String(avatar).trim();
+  } else if (profilePicture !== undefined) {
+    updates.avatar = String(profilePicture).trim();
+    updates.profilePicture = String(profilePicture).trim();
+  }
+  if (gender !== undefined) updates.gender = gender;
+  if (emergencyContact !== undefined) updates.emergencyContact = String(emergencyContact).trim();
+  if (address !== undefined) updates.address = String(address).trim();
+
+  const user = await User.findByIdAndUpdate(userId, { $set: updates }, { new: true, runValidators: true });
+  if (!user) {
+    throw ApiError.notFound('User account not found.');
+  }
+
+  const sanitizedUser = sanitizeDocument(user.toJSON());
+  return res.status(200).json(
+    ApiResponse.success(sanitizedUser, 'Profile updated successfully.')
+  );
+});
+
 

@@ -28,37 +28,35 @@ import { pickImageFromDevice, capturePhotoFromCamera } from '../../utils/filePic
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const ALL_FACILITIES = [
-  'Air Conditioned',
+  'AC Gym',
   'Locker Facility',
   'Shower Available',
-  'Changing Rooms',
+  'Changing Room',
   'Free Wi-Fi',
-  'Sound & Music System',
+  'Music System',
   'Steam & Sauna',
-  'Ice Bath Recovery',
-  'Dedicated Parking',
-  'Turnstile Gate Access',
+  'Ice Bath & Recovery',
+  'Dedicated Parking (2W/4W)',
+  'Turnstile Access Control',
   'First Aid Kit',
-  '24/7 CCTV Security',
+  'CCTV 24/7',
   'Biometric Entry',
-  'Personal Trainers Available',
+  'Personal Trainers',
   'Cardio Theater',
   'Olympic Barbells Area',
 ];
 
 const ALL_WORKOUTS = [
-  'Strength & Weights',
-  'Cardio & Endurance',
-  'CrossFit Studio',
-  'HIIT Functional Training',
-  'Powerlifting',
-  'Bodybuilding',
-  'Yoga & Flexibility',
-  'Zumba / Dance Fitness',
-  'Boxing / MMA / Kickboxing',
-  'Calisthenics Floor',
-  'Pilates & Core',
-  'Aerobics',
+  'GYM / Strength',
+  'Cardio Fitness',
+  'HIIT (High Intensity)',
+  'CrossFit',
+  'Yoga & Mobility',
+  'Zumba & Dance',
+  'Boxing & Kickboxing',
+  'Pilates',
+  'Calisthenics',
+  'MMA & Martial Arts',
 ];
 
 const ALL_AMENITIES = [
@@ -1340,8 +1338,18 @@ export const SettingsTab = ({ topInset, navigation }) => {
               text: 'Sign Out',
               style: 'destructive',
               onPress: async () => {
-                await logout();
-                navigation.replace('Login');
+                try {
+                  await logout();
+                } catch {
+                  // ignore
+                }
+                if (typeof navigation?.replace === 'function') {
+                  navigation.replace('Login');
+                } else if (typeof navigation?.reset === 'function') {
+                  navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+                } else if (typeof navigation?.navigate === 'function') {
+                  navigation.navigate('Login');
+                }
               },
             },
           ]);

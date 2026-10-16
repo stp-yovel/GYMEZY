@@ -432,20 +432,13 @@ export const LoginScreen = ({ navigation }) => {
               )}
             </TouchableOpacity>
 
-            {/* Support Footer */}
+            {/* Partner Onboarding Footer */}
             <View style={styles.footerRow}>
               <Text style={[styles.footerText, { color: subtitleColor }]}>
-                Need gym partner onboarding assistance?{' '}
+                New gym partner?{' '}
               </Text>
-              <TouchableOpacity
-                onPress={() =>
-                  Alert.alert(
-                    'Partner Support',
-                    'Contact GYMEZY Partner Support at partner@gymezy.com or call +91 91509 55071'
-                  )
-                }
-              >
-                <Text style={styles.signUpLink}>Contact Support</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+                <Text style={styles.signUpLink}>Register Your Gym</Text>
               </TouchableOpacity>
             </View>
           </View>

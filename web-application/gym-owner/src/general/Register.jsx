@@ -34,6 +34,9 @@ import {
   EnvironmentOutlined,
   CompassOutlined,
   LoadingOutlined,
+  FilePdfOutlined,
+  FileTextOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
@@ -127,44 +130,68 @@ const reverseGeocodeCoordinates = async (lat, lng) => {
 
 const STEPS = [
   { id: 1, title: 'Basic Info', key: 'basic' },
-  { id: 2, title: 'Location & GPS', key: 'location' },
+  { id: 2, title: 'Location & Geolocation', key: 'location' },
   { id: 3, title: 'Facilities & Photos', key: 'facilities' },
   { id: 4, title: 'Pricing & Plans', key: 'pricing' },
   { id: 5, title: 'Bank & Submit', key: 'bank' },
 ];
 
 const FACILITY_OPTIONS = [
-  'Air Conditioned',
+  'AC Gym',
   'Locker Facility',
   'Shower Available',
-  'Changing Rooms',
+  'Changing Room',
   'Free Wi-Fi',
-  'Sound & Music System',
+  'Music System',
   'Steam & Sauna',
-  'Ice Bath Recovery',
-  'Dedicated Parking',
-  'Turnstile Gate Access',
+  'Ice Bath & Recovery',
+  'Dedicated Parking (2W/4W)',
+  'Turnstile Access Control',
   'First Aid Kit',
-  '24/7 CCTV Security',
+  'CCTV 24/7',
   'Biometric Entry',
-  'Personal Trainers Available',
+  'Personal Trainers',
   'Cardio Theater',
   'Olympic Barbells Area',
 ];
 
+const AMENITY_OPTIONS = [
+  'RO Drinking Water',
+  'Towel Service',
+  'Protein Shake Bar',
+  'Juice & Smoothie Bar',
+  'Personal Locker Rental',
+  'InBody BMI Scanner',
+  'Nutritionist Desk',
+  'Lounge / Rest Area',
+  'Free Sanitizer Stations',
+  'Locker Key Padlocks',
+];
+
 const WORKOUT_OPTIONS = [
-  'Strength & Weights',
-  'Cardio & Endurance',
-  'CrossFit Studio',
-  'HIIT Functional Training',
-  'Powerlifting',
-  'Bodybuilding',
-  'Yoga & Flexibility',
-  'Zumba / Dance Fitness',
-  'Boxing / MMA / Kickboxing',
-  'Calisthenics Floor',
-  'Pilates & Core',
-  'Aerobics',
+  'GYM / Strength',
+  'Cardio Fitness',
+  'HIIT (High Intensity)',
+  'CrossFit',
+  'Yoga & Mobility',
+  'Zumba & Dance',
+  'Boxing & Kickboxing',
+  'Pilates',
+  'Calisthenics',
+  'MMA & Martial Arts',
+];
+
+const DEFAULT_RULES = [
+  'Carry clean indoor training shoes',
+  'Mandatory personal gym towel on workout benches',
+  'Re-rack dumbbells and plates after set completion',
+  'No outside food or beverages allowed on gym floor',
+];
+
+const DEFAULT_SAFETY = [
+  'Daily multi-session equipment sanitization',
+  'Certified First Aid & CPR staff available on floor',
+  '24/7 CCTV surveillance coverage',
 ];
 
 const STEP_FIELDS = {
@@ -309,6 +336,10 @@ export const Register = () => {
     gstNumber: '',
     panNumber: '',
     branches: '1',
+    businessCertificate: '',
+    businessCertificateName: '',
+    businessCertificateSize: '',
+    businessCertificateType: '',
 
     // Step 2: Location & GPS
     address: '',
@@ -334,11 +365,21 @@ export const Register = () => {
     logo: '',
     coverPhoto: '',
     galleryPhotos: [],
-    facilities: ['Air Conditioned', 'Locker Facility', 'Shower Available', 'Free Wi-Fi', '24/7 CCTV Security'],
-    amenities: ['RO Drinking Water', 'Fresh Towel Service', 'First Aid Kit'],
+    facilities: ['AC Gym', 'Locker Facility', 'Shower Available', 'Free Wi-Fi', 'CCTV 24/7'],
+    amenities: ['RO Drinking Water', 'Towel Service', 'Locker Key Padlocks'],
     aboutText: '',
 
-    workouts: ['Strength & Weights', 'Cardio & Endurance', 'HIIT Functional Training'],
+    workouts: ['GYM / Strength', 'Cardio Fitness', 'HIIT (High Intensity)'],
+    rules: [
+      'Carry clean indoor training shoes',
+      'Mandatory personal gym towel on workout benches',
+      'Re-rack dumbbells and plates after set completion',
+    ],
+    safetyMeasures: [
+      'Daily multi-session equipment sanitization',
+      'Certified First Aid & CPR staff available on floor',
+      '24/7 CCTV surveillance coverage',
+    ],
     singleSessionPrice: 199,
     weeklyPassPrice: 799,
     fiveSessionPrice: 899,
@@ -576,6 +617,31 @@ export const Register = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleBusinessDocUpload = async (file) => {
+    try {
+      const isLt10M = file.size / 1024 / 1024 < 10;
+      if (!isLt10M) {
+        message.error('Document size must be less than 10MB');
+        return false;
+      }
+      const b64 = await fileToBase64(file);
+      const sizeStr = file.size > 1024 * 1024
+        ? (file.size / (1024 * 1024)).toFixed(1) + ' MB'
+        : Math.round(file.size / 1024) + ' KB';
+      setFormData((prev) => ({
+        ...prev,
+        businessCertificate: b64,
+        businessCertificateName: file.name,
+        businessCertificateSize: sizeStr,
+        businessCertificateType: file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+      }));
+      message.success(`Attached ${file.name}`);
+    } catch {
+      message.error('Failed to read document');
+    }
+    return false;
+  };
+
   const handleLogoUpload = async (file) => {
     try {
       const b64 = await fileToBase64(file);
@@ -650,6 +716,7 @@ export const Register = () => {
         gstNumber: formData.gstNumber.trim(),
         panNumber: formData.panNumber.trim(),
         branches: formData.branches,
+        gstCertificate: formData.businessCertificate || '',
 
         address: formData.address.trim(),
         area: formData.area.trim(),
@@ -679,6 +746,8 @@ export const Register = () => {
         facilities: formData.facilities,
         amenities: formData.amenities,
         workouts: formData.workouts,
+        rules: formData.rules || [],
+        safetyMeasures: formData.safetyMeasures || [],
         aboutText: formData.aboutText,
 
         singleSessionPrice: Number(formData.singleSessionPrice),
@@ -941,21 +1010,11 @@ export const Register = () => {
               filter: isDarkMode ? 'brightness(0) invert(1)' : 'none',
             }}
           />
-          <span style={{ fontSize: 16, fontWeight: 900, letterSpacing: '1px' }}>GYMEZY</span>
-          <Tag
-            color="blue"
-            style={{
-              margin: 0,
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 700,
-              backgroundColor: isDarkMode ? '#1e293b' : '#eff6ff',
-              borderColor: '#93c5fd',
-              color: '#1d4ed8',
-            }}
-          >
+          <span style={{ fontSize: 16, fontWeight: 900, letterSpacing: '0.5px', color: isDarkMode ? '#ffffff' : '#0f172a' }}>GYMEZY</span>
+          <span style={{ color: isDarkMode ? '#52525b' : '#94a3b8', fontSize: 14, fontWeight: 400 }}>/</span>
+          <span style={{ fontSize: 12, fontWeight: 500, color: isDarkMode ? '#94a3b8' : '#64748b' }}>
             Partner Onboarding
-          </Tag>
+          </span>
         </div>
 
         {/* Right: Actions */}
@@ -1051,14 +1110,14 @@ export const Register = () => {
             }}
           >
             {currentStep === 1 && "Let's start with your gym details"}
-            {currentStep === 2 && 'Location, GPS & Operating Hours'}
+            {currentStep === 2 && 'Location, Geolocation & Operating Hours'}
             {currentStep === 3 && 'Facilities, Amenities & Photos'}
             {currentStep === 4 && 'Workout Disciplines & Membership Pricing'}
             {currentStep === 5 && 'Bank Account & Review'}
           </h1>
           <p style={{ fontSize: 14, color: '#64748b', margin: 0 }}>
             {currentStep === 1 && 'Provide basic business information and create your administrator login credentials.'}
-            {currentStep === 2 && 'Pinpoint your exact facility address with live GPS and define regular operating hours.'}
+            {currentStep === 2 && 'Pinpoint your exact facility address with live geolocation and define regular operating hours.'}
             {currentStep === 3 && 'Upload brand logo, cover photo, and high quality facility & equipment photos.'}
             {currentStep === 4 && 'Set your walk-in single session pass price and optional recurring membership tiers.'}
             {currentStep === 5 && 'Provide your settlement bank account. Your application will be submitted for Super Admin review.'}
@@ -1161,12 +1220,11 @@ export const Register = () => {
               </div>
 
               <Row gutter={[16, 16]}>
-                <Col xs={24} sm={16}>
+                <Col xs={24}>
                   <label style={labelStyle}>
                     Gym / Studio Name <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <Input
-                    placeholder="e.g. Apex Fitness Arena"
                     value={formData.gymName}
                     onChange={(e) => updateField('gymName', e.target.value)}
                     onBlur={() => markFieldTouched('gymName')}
@@ -1175,21 +1233,9 @@ export const Register = () => {
                   {renderFieldError('gymName')}
                 </Col>
 
-                <Col xs={24} sm={8}>
-                  <label style={labelStyle}>Year Established</label>
-                  <Input
-                    placeholder="2024"
-                    value={formData.yearEstablished}
-                    onChange={(e) => updateField('yearEstablished', e.target.value)}
-                    onBlur={() => markFieldTouched('yearEstablished')}
-                    style={getInputStyle('yearEstablished')}
-                  />
-                </Col>
-
                 <Col xs={24}>
                   <label style={labelStyle}>Tagline / Motto</label>
                   <Input
-                    placeholder="e.g. Forge Your Ultimate Self"
                     value={formData.tagline}
                     onChange={(e) => updateField('tagline', e.target.value)}
                     style={getInputStyle('tagline')}
@@ -1228,7 +1274,6 @@ export const Register = () => {
                 <Col xs={24} sm={12}>
                   <label style={labelStyle}>GST Number (Optional)</label>
                   <Input
-                    placeholder="e.g. 33AAAAA0000A1Z5"
                     value={formData.gstNumber}
                     onChange={(e) => updateField('gstNumber', e.target.value.toUpperCase())}
                     onBlur={() => markFieldTouched('gstNumber')}
@@ -1240,13 +1285,120 @@ export const Register = () => {
                 <Col xs={24} sm={12}>
                   <label style={labelStyle}>PAN Number (Optional)</label>
                   <Input
-                    placeholder="e.g. ABCDE1234F"
                     value={formData.panNumber}
                     onChange={(e) => updateField('panNumber', e.target.value.toUpperCase())}
                     onBlur={() => markFieldTouched('panNumber')}
                     style={getInputStyle('panNumber')}
                   />
                   {renderFieldError('panNumber')}
+                </Col>
+
+                <Col xs={24}>
+                  <div style={{ marginTop: 6 }}>
+                    <label style={labelStyle}>
+                      Business License / Registration Document (Optional)
+                    </label>
+
+                    {!formData.businessCertificate ? (
+                      <Upload.Dragger
+                        accept=".pdf,image/*"
+                        showUploadList={false}
+                        beforeUpload={handleBusinessDocUpload}
+                        style={{
+                          padding: '20px',
+                          background: isDarkMode ? '#18181b' : '#fafafa',
+                          borderColor: isDarkMode ? '#27272a' : '#cbd5e1',
+                          borderRadius: 8,
+                        }}
+                      >
+                        <p style={{ margin: 0 }}>
+                          <FilePdfOutlined style={{ color: '#003882', fontSize: 28 }} />
+                        </p>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: isDarkMode ? '#ffffff' : '#0f172a', margin: '6px 0 0 0' }}>
+                          Click or drag document to upload
+                        </p>
+                        <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>
+                          PDF, PNG, or JPG up to 10MB (GST, Trade License, or Shop Act)
+                        </p>
+                      </Upload.Dragger>
+                    ) : (
+                      <div
+                        style={{
+                          padding: '12px 16px',
+                          borderRadius: 8,
+                          backgroundColor: isDarkMode ? '#18181b' : '#f8fafc',
+                          border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 12,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
+                          <div
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 6,
+                              backgroundColor: formData.businessCertificateType?.includes('pdf') || formData.businessCertificateName?.toLowerCase().endsWith('.pdf')
+                                ? 'rgba(239, 68, 68, 0.1)'
+                                : 'rgba(0, 56, 130, 0.1)',
+                              color: formData.businessCertificateType?.includes('pdf') || formData.businessCertificateName?.toLowerCase().endsWith('.pdf')
+                                ? '#ef4444'
+                                : '#003882',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 18,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {formData.businessCertificateType?.includes('pdf') || formData.businessCertificateName?.toLowerCase().endsWith('.pdf') ? (
+                              <FilePdfOutlined />
+                            ) : (
+                              <PictureOutlined />
+                            )}
+                          </div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: isDarkMode ? '#ffffff' : '#0f172a',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                              title={formData.businessCertificateName}
+                            >
+                              {formData.businessCertificateName}
+                            </div>
+                            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 1 }}>
+                              {formData.businessCertificateSize}
+                            </div>
+                          </div>
+                        </div>
+
+                        <Button
+                          type="text"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              businessCertificate: '',
+                              businessCertificateName: '',
+                              businessCertificateSize: '',
+                              businessCertificateType: '',
+                            }));
+                          }}
+                          style={{ fontWeight: 600 }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </Col>
               </Row>
 
@@ -1263,7 +1415,6 @@ export const Register = () => {
                   </label>
                   <Input
                     prefix={<UserOutlined style={{ color: '#94a3b8' }} />}
-                    placeholder="e.g. Varun Kumar"
                     value={formData.ownerName}
                     onChange={(e) => updateField('ownerName', e.target.value)}
                     onBlur={() => markFieldTouched('ownerName')}
@@ -1278,7 +1429,6 @@ export const Register = () => {
                   </label>
                   <Input
                     prefix={<PhoneOutlined style={{ color: '#94a3b8' }} />}
-                    placeholder="9876543210"
                     maxLength={10}
                     value={formData.phone}
                     onChange={(e) => updateField('phone', e.target.value.replace(/\D/g, ''))}
@@ -1320,7 +1470,6 @@ export const Register = () => {
                         <CloseCircleFilled style={{ color: '#ef4444' }} />
                       ) : null
                     }
-                    placeholder="e.g. owner@apexfitness.com"
                     value={formData.email}
                     onChange={(e) => updateField('email', e.target.value)}
                     onBlur={() => {
@@ -1340,7 +1489,6 @@ export const Register = () => {
                   </label>
                   <Input.Password
                     prefix={<LockOutlined style={{ color: '#94a3b8' }} />}
-                    placeholder="••••••••"
                     value={formData.password}
                     onChange={(e) => updateField('password', e.target.value)}
                     onBlur={() => markFieldTouched('password')}
@@ -1355,7 +1503,6 @@ export const Register = () => {
                   </label>
                   <Input.Password
                     prefix={<LockOutlined style={{ color: '#94a3b8' }} />}
-                    placeholder="••••••••"
                     value={formData.confirmPassword}
                     onChange={(e) => updateField('confirmPassword', e.target.value)}
                     onBlur={() => markFieldTouched('confirmPassword')}
@@ -1424,7 +1571,7 @@ export const Register = () => {
                 }}
               >
                 <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                  Facility Address & GPS Pin
+                  Facility Address & Geolocation
                 </div>
 
                 <Button
@@ -1487,7 +1634,6 @@ export const Register = () => {
                     Street Address / Door No. <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <Input
-                    placeholder="e.g. 45/2, 2nd Floor, Gandhi Road"
                     value={formData.address}
                     onChange={(e) => updateField('address', e.target.value)}
                     onBlur={() => markFieldTouched('address')}
@@ -1501,7 +1647,6 @@ export const Register = () => {
                     Area / Locality <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <Input
-                    placeholder="e.g. Anna Nagar West"
                     value={formData.area}
                     onChange={(e) => updateField('area', e.target.value)}
                     onBlur={() => markFieldTouched('area')}
@@ -1511,9 +1656,8 @@ export const Register = () => {
                 </Col>
 
                 <Col xs={24} sm={12}>
-                  <label style={labelStyle}>Nearby Landmark</label>
+                  <label style={labelStyle}>Landmark (Optional)</label>
                   <Input
-                    placeholder="e.g. Opposite Metro Station"
                     value={formData.landmark}
                     onChange={(e) => updateField('landmark', e.target.value)}
                     style={getInputStyle('landmark')}
@@ -1525,7 +1669,6 @@ export const Register = () => {
                     City <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <Input
-                    placeholder="Chennai"
                     value={formData.city}
                     onChange={(e) => updateField('city', e.target.value)}
                     onBlur={() => markFieldTouched('city')}
@@ -1539,7 +1682,6 @@ export const Register = () => {
                     State <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <Input
-                    placeholder="Tamil Nadu"
                     value={formData.state}
                     onChange={(e) => updateField('state', e.target.value)}
                     onBlur={() => markFieldTouched('state')}
@@ -1553,7 +1695,6 @@ export const Register = () => {
                     Pincode <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <Input
-                    placeholder="600040"
                     maxLength={6}
                     value={formData.pincode}
                     onChange={(e) => updateField('pincode', e.target.value.replace(/\D/g, ''))}
@@ -1567,7 +1708,6 @@ export const Register = () => {
                   <label style={labelStyle}>Google Maps Share Link (Auto-extracts GPS)</label>
                   <Input
                     prefix={<CompassOutlined style={{ color: '#94a3b8' }} />}
-                    placeholder="Paste Google Maps URL e.g. https://maps.google.com/?q=13.0827,80.2707"
                     value={formData.googleMapsUrl}
                     onChange={(e) => handleGoogleMapsUrlChange(e.target.value)}
                     style={getInputStyle('googleMapsUrl')}
@@ -1584,7 +1724,6 @@ export const Register = () => {
                       if (formData.lng) updateField('googleMapsUrl', `https://maps.google.com/?q=${val},${formData.lng}`);
                     }}
                     style={{ width: '100%', height: 44, borderRadius: 8 }}
-                    placeholder="13.0827"
                   />
                 </Col>
 
@@ -1598,7 +1737,6 @@ export const Register = () => {
                       if (formData.lat) updateField('googleMapsUrl', `https://maps.google.com/?q=${formData.lat},${val}`);
                     }}
                     style={{ width: '100%', height: 44, borderRadius: 8 }}
-                    placeholder="80.2707"
                   />
                 </Col>
               </Row>
@@ -1611,7 +1749,7 @@ export const Register = () => {
 
               <Row gutter={[16, 16]}>
                 <Col xs={24} sm={12}>
-                  <label style={labelStyle}>Monday – Friday Open</label>
+                  <label style={labelStyle}>Weekday Open (Mon – Fri)</label>
                   <Select
                     value={formData.weekdayOpen}
                     onChange={(val) => updateField('weekdayOpen', val)}
@@ -1624,7 +1762,7 @@ export const Register = () => {
                 </Col>
 
                 <Col xs={24} sm={12}>
-                  <label style={labelStyle}>Monday – Friday Close</label>
+                  <label style={labelStyle}>Weekday Close (Mon – Fri)</label>
                   <Select
                     value={formData.weekdayClose}
                     onChange={(val) => updateField('weekdayClose', val)}
@@ -1637,7 +1775,7 @@ export const Register = () => {
                 </Col>
 
                 <Col xs={24} sm={12}>
-                  <label style={labelStyle}>Saturday – Sunday Open</label>
+                  <label style={labelStyle}>Weekend Open (Sat – Sun)</label>
                   <Select
                     value={formData.weekendOpen}
                     onChange={(val) => updateField('weekendOpen', val)}
@@ -1650,7 +1788,7 @@ export const Register = () => {
                 </Col>
 
                 <Col xs={24} sm={12}>
-                  <label style={labelStyle}>Saturday – Sunday Close</label>
+                  <label style={labelStyle}>Weekend Close (Sat – Sun)</label>
                   <Select
                     value={formData.weekendClose}
                     onChange={(val) => updateField('weekendClose', val)}
@@ -1665,31 +1803,28 @@ export const Register = () => {
 
               <div
                 style={{
-                  marginTop: 16,
+                  marginTop: 18,
                   display: 'flex',
                   gap: 24,
                   flexWrap: 'wrap',
-                  padding: '12px 14px',
-                  borderRadius: 8,
-                  backgroundColor: isDarkMode ? '#18181b' : '#f8fafc',
-                  border: `1px solid ${isDarkMode ? '#27272a' : '#f1f5f9'}`,
+                  alignItems: 'center',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>Open on Public Holidays</span>
                   <Switch
                     size="small"
                     checked={formData.isOpenHolidays}
                     onChange={(checked) => updateField('isOpenHolidays', checked)}
                   />
-                  <span style={{ fontSize: 13, fontWeight: 500 }}>Open on Public Holidays</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>24/7 Facility Access</span>
                   <Switch
                     size="small"
                     checked={formData.is24Hours}
                     onChange={(checked) => updateField('is24Hours', checked)}
                   />
-                  <span style={{ fontSize: 13, fontWeight: 500 }}>24/7 Access Active</span>
                 </div>
               </div>
             </div>
@@ -1760,7 +1895,7 @@ export const Register = () => {
                     <div
                       style={{
                         position: 'relative',
-                        height: 120,
+                        height: 135,
                         borderRadius: 8,
                         border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`,
                         display: 'flex',
@@ -1772,7 +1907,7 @@ export const Register = () => {
                       <img
                         src={formData.logo}
                         alt="Logo"
-                        style={{ maxHeight: 90, maxWidth: '80%', objectFit: 'contain' }}
+                        style={{ maxHeight: 100, maxWidth: '80%', objectFit: 'contain' }}
                       />
                       <Button
                         type="text"
@@ -1783,30 +1918,28 @@ export const Register = () => {
                       />
                     </div>
                   ) : (
-                    <Upload
+                    <Upload.Dragger
                       accept="image/*"
                       showUploadList={false}
                       beforeUpload={handleLogoUpload}
+                      style={{
+                        padding: '16px 12px',
+                        background: isDarkMode ? '#18181b' : '#fafafa',
+                        borderColor: touched.logo && errors.logo ? '#ef4444' : isDarkMode ? '#27272a' : '#cbd5e1',
+                        borderRadius: 8,
+                        height: 135,
+                      }}
                     >
-                      <div
-                        style={{
-                          height: 120,
-                          border: `1.5px dashed ${touched.logo && errors.logo ? '#ef4444' : isDarkMode ? '#3f3f46' : '#cbd5e1'}`,
-                          borderRadius: 8,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          backgroundColor: isDarkMode ? '#18181b' : '#fafafa',
-                          gap: 6,
-                        }}
-                      >
-                        <PictureOutlined style={{ fontSize: 22, color: '#94a3b8' }} />
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#003882' }}>Upload Logo</span>
-                        <span style={{ fontSize: 11, color: '#94a3b8' }}>PNG or JPG (Square recommended)</span>
-                      </div>
-                    </Upload>
+                      <p style={{ margin: 0 }}>
+                        <PictureOutlined style={{ fontSize: 24, color: '#003882' }} />
+                      </p>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: '#003882', margin: '6px 0 2px 0' }}>
+                        Upload Logo
+                      </p>
+                      <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>
+                        PNG or JPG (Square recommended)
+                      </p>
+                    </Upload.Dragger>
                   )}
                   {renderFieldError('logo')}
                 </Col>
@@ -1817,7 +1950,7 @@ export const Register = () => {
                     <div
                       style={{
                         position: 'relative',
-                        height: 120,
+                        height: 135,
                         borderRadius: 8,
                         border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`,
                         display: 'flex',
@@ -1841,30 +1974,28 @@ export const Register = () => {
                       />
                     </div>
                   ) : (
-                    <Upload
+                    <Upload.Dragger
                       accept="image/*"
                       showUploadList={false}
                       beforeUpload={handleCoverUpload}
+                      style={{
+                        padding: '16px 12px',
+                        background: isDarkMode ? '#18181b' : '#fafafa',
+                        borderColor: isDarkMode ? '#27272a' : '#cbd5e1',
+                        borderRadius: 8,
+                        height: 135,
+                      }}
                     >
-                      <div
-                        style={{
-                          height: 120,
-                          border: `1.5px dashed ${isDarkMode ? '#3f3f46' : '#cbd5e1'}`,
-                          borderRadius: 8,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          backgroundColor: isDarkMode ? '#18181b' : '#fafafa',
-                          gap: 6,
-                        }}
-                      >
-                        <PictureOutlined style={{ fontSize: 22, color: '#94a3b8' }} />
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#003882' }}>Upload Cover Banner</span>
-                        <span style={{ fontSize: 11, color: '#94a3b8' }}>16:9 Wide Landscape</span>
-                      </div>
-                    </Upload>
+                      <p style={{ margin: 0 }}>
+                        <PictureOutlined style={{ fontSize: 24, color: '#003882' }} />
+                      </p>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: '#003882', margin: '6px 0 2px 0' }}>
+                        Upload Cover Banner
+                      </p>
+                      <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>
+                        16:9 Wide Landscape
+                      </p>
+                    </Upload.Dragger>
                   )}
                 </Col>
               </Row>
@@ -1888,9 +2019,10 @@ export const Register = () => {
                 {/* Upload Button + Gallery Grid */}
                 <div
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+                    display: 'flex',
+                    flexWrap: 'wrap',
                     gap: 12,
+                    alignItems: 'center',
                   }}
                 >
                   <Upload
@@ -1900,6 +2032,7 @@ export const Register = () => {
                   >
                     <div
                       style={{
+                        width: 120,
                         height: 100,
                         border: `1.5px dashed ${isDarkMode ? '#3f3f46' : '#cbd5e1'}`,
                         borderRadius: 8,
@@ -1909,11 +2042,20 @@ export const Register = () => {
                         justifyContent: 'center',
                         cursor: 'pointer',
                         backgroundColor: isDarkMode ? '#18181b' : '#fafafa',
-                        gap: 4,
+                        gap: 6,
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#003882';
+                        e.currentTarget.style.backgroundColor = isDarkMode ? '#27272a' : '#f0f7ff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = isDarkMode ? '#3f3f46' : '#cbd5e1';
+                        e.currentTarget.style.backgroundColor = isDarkMode ? '#18181b' : '#fafafa';
                       }}
                     >
-                      <PlusOutlined style={{ fontSize: 18, color: '#003882' }} />
-                      <span style={{ fontSize: 11, fontWeight: 600, color: '#003882' }}>Add Photo</span>
+                      <PlusOutlined style={{ fontSize: 20, color: '#003882' }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#003882' }}>Add Photo</span>
                     </div>
                   </Upload>
 
@@ -1922,6 +2064,7 @@ export const Register = () => {
                       key={idx}
                       style={{
                         position: 'relative',
+                        width: 120,
                         height: 100,
                         borderRadius: 8,
                         overflow: 'hidden',
@@ -1962,11 +2105,16 @@ export const Register = () => {
 
               <Divider style={{ margin: '24px 0 20px 0', borderColor: isDarkMode ? '#27272a' : '#f1f5f9' }} />
 
-              {/* AMENITIES PILLS */}
+              {/* FACILITIES MULTI-SELECT */}
               <div style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>
-                  Available Amenities <span style={{ color: '#ef4444' }}>*</span>
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label style={{ ...labelStyle, margin: 0 }}>
+                    Facilities Multi-Select (Available at Facility) <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>
+                    {formData.facilities.length} selected
+                  </span>
+                </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                   {FACILITY_OPTIONS.map((item) => {
                     const isSelected = formData.facilities.includes(item);
@@ -2011,6 +2159,63 @@ export const Register = () => {
                   })}
                 </div>
                 {renderFieldError('facilities')}
+              </div>
+
+              <Divider style={{ margin: '20px 0 16px 0', borderColor: isDarkMode ? '#27272a' : '#f1f5f9' }} />
+
+              {/* AMENITIES & MEMBER PERKS */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label style={{ ...labelStyle, margin: 0 }}>
+                    Amenities & Member Perks
+                  </label>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>
+                    {(formData.amenities || []).length} selected
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                  {AMENITY_OPTIONS.map((item) => {
+                    const isSelected = (formData.amenities || []).includes(item);
+                    return (
+                      <div
+                        key={item}
+                        onClick={() => toggleArrayItem('amenities', item)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '6px 12px',
+                          borderRadius: 20,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          backgroundColor: isSelected
+                            ? '#F59E0B'
+                            : isDarkMode
+                            ? '#18181b'
+                            : '#fffbeb',
+                          color: isSelected
+                            ? '#ffffff'
+                            : isDarkMode
+                            ? '#cbd5e1'
+                            : '#92400e',
+                          border: `1px solid ${
+                            isSelected
+                              ? '#F59E0B'
+                              : isDarkMode
+                              ? '#27272a'
+                              : '#fcd34d'
+                          }`,
+                          userSelect: 'none',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        {isSelected && <CheckOutlined style={{ fontSize: 10 }} />}
+                        {item}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -2152,6 +2357,7 @@ export const Register = () => {
               <div
                 style={{
                   marginTop: 20,
+                  marginBottom: 20,
                   padding: '12px 16px',
                   borderRadius: 8,
                   backgroundColor: isDarkMode ? '#18181b' : '#f8fafc',
@@ -2168,6 +2374,103 @@ export const Register = () => {
                   Members can cancel bookings up to <strong>2 hours</strong> before the session for a <strong>100% refund</strong>.
                 </span>
               </div>
+
+              <Divider style={{ margin: '20px 0', borderColor: isDarkMode ? '#27272a' : '#f1f5f9' }} />
+
+              {/* RULES & SAFETY */}
+              <Row gutter={[16, 16]}>
+                <Col xs={24} md={12}>
+                  <div style={{ padding: '16px', borderRadius: 8, border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`, backgroundColor: isDarkMode ? '#18181b' : '#fafafa', height: '100%' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <FileTextOutlined style={{ color: '#6366F1' }} /> Gym Rules & Member Guidelines
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                      {(formData.rules || []).map((rule, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}` }}>
+                          <CheckOutlined style={{ color: '#6366F1', fontSize: 10, flexShrink: 0 }} />
+                          <span style={{ flex: 1, fontSize: 12, color: isDarkMode ? '#e2e8f0' : '#334155' }}>{rule}</span>
+                          <Button
+                            type="text" size="small" danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => updateField('rules', (formData.rules || []).filter((_, i) => i !== idx))}
+                            style={{ padding: '0 4px', height: 22 }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Input
+                        placeholder="Add gym rule..."
+                        id="web-new-rule-input"
+                        style={{ height: 34, borderRadius: 6 }}
+                        onPressEnter={(e) => {
+                          if (e.target.value.trim()) {
+                            updateField('rules', [...(formData.rules || []), e.target.value.trim()]);
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                      <Button
+                        icon={<PlusOutlined />}
+                        onClick={() => {
+                          const input = document.getElementById('web-new-rule-input');
+                          if (input?.value?.trim()) {
+                            updateField('rules', [...(formData.rules || []), input.value.trim()]);
+                            input.value = '';
+                          }
+                        }}
+                        style={{ flexShrink: 0, height: 34 }}
+                      />
+                    </div>
+                  </div>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <div style={{ padding: '16px', borderRadius: 8, border: `1px solid ${isDarkMode ? '#27272a' : '#e2e8f0'}`, backgroundColor: isDarkMode ? '#18181b' : '#fafafa', height: '100%' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, color: isDarkMode ? '#cccccc' : '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <SafetyCertificateOutlined style={{ color: '#10B981' }} /> Safety Measures & Protocols
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                      {(formData.safetyMeasures || []).map((measure, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, backgroundColor: isDarkMode ? '#1e293b' : '#f0fdf4', border: `1px solid ${isDarkMode ? '#334155' : '#bbf7d0'}` }}>
+                          <CheckCircleFilled style={{ color: '#10B981', fontSize: 10, flexShrink: 0 }} />
+                          <span style={{ flex: 1, fontSize: 12, color: isDarkMode ? '#e2e8f0' : '#166534' }}>{measure}</span>
+                          <Button
+                            type="text" size="small" danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => updateField('safetyMeasures', (formData.safetyMeasures || []).filter((_, i) => i !== idx))}
+                            style={{ padding: '0 4px', height: 22 }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Input
+                        placeholder="Add safety measure..."
+                        id="web-new-safety-input"
+                        style={{ height: 34, borderRadius: 6 }}
+                        onPressEnter={(e) => {
+                          if (e.target.value.trim()) {
+                            updateField('safetyMeasures', [...(formData.safetyMeasures || []), e.target.value.trim()]);
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                      <Button
+                        icon={<PlusOutlined />}
+                        onClick={() => {
+                          const input = document.getElementById('web-new-safety-input');
+                          if (input?.value?.trim()) {
+                            updateField('safetyMeasures', [...(formData.safetyMeasures || []), input.value.trim()]);
+                            input.value = '';
+                          }
+                        }}
+                        style={{ flexShrink: 0, height: 34 }}
+                      />
+                    </div>
+                  </div>
+                </Col>
+              </Row>
             </div>
           )}
 

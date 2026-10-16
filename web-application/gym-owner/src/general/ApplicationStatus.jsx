@@ -57,37 +57,48 @@ const fileToBase64 = (file) =>
   });
 
 const FACILITY_OPTIONS = [
-  'Air Conditioned',
+  'AC Gym',
   'Locker Facility',
   'Shower Available',
-  'Changing Rooms',
+  'Changing Room',
   'Free Wi-Fi',
-  'Sound & Music System',
+  'Music System',
   'Steam & Sauna',
-  'Ice Bath Recovery',
-  'Dedicated Parking',
-  'Turnstile Gate Access',
+  'Ice Bath & Recovery',
+  'Dedicated Parking (2W/4W)',
+  'Turnstile Access Control',
   'First Aid Kit',
-  '24/7 CCTV Security',
+  'CCTV 24/7',
   'Biometric Entry',
-  'Personal Trainers Available',
+  'Personal Trainers',
   'Cardio Theater',
   'Olympic Barbells Area',
 ];
 
+const AMENITY_OPTIONS = [
+  'RO Drinking Water',
+  'Towel Service',
+  'Protein Shake Bar',
+  'Juice & Smoothie Bar',
+  'Personal Locker Rental',
+  'InBody BMI Scanner',
+  'Nutritionist Desk',
+  'Lounge / Rest Area',
+  'Free Sanitizer Stations',
+  'Locker Key Padlocks',
+];
+
 const WORKOUT_OPTIONS = [
-  'Strength & Weights',
-  'Cardio & Endurance',
-  'CrossFit Studio',
-  'HIIT Functional Training',
-  'Powerlifting',
-  'Bodybuilding',
-  'Yoga & Flexibility',
-  'Zumba / Dance Fitness',
-  'Boxing / MMA / Kickboxing',
-  'Calisthenics Floor',
-  'Pilates & Core',
-  'Aerobics',
+  'GYM / Strength',
+  'Cardio Fitness',
+  'HIIT (High Intensity)',
+  'CrossFit',
+  'Yoga & Mobility',
+  'Zumba & Dance',
+  'Boxing & Kickboxing',
+  'Pilates',
+  'Calisthenics',
+  'MMA & Martial Arts',
 ];
 
 export const ApplicationStatus = () => {

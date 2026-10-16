@@ -11,13 +11,14 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors } from '../theme/appTheme';
 import { useBookingRepository } from '../data/BookingContext';
 import { useToast } from '../widgets/CustomScaffoldMessage';
 import { useAuth } from '../context/AuthContext';
 import { membershipService } from '../services/membershipService';
+import { calculateMembershipProgress } from '../utils/dateUtils';
 
 const TABS = ['Active', 'Completed', 'Cancelled'];
 
@@ -73,13 +74,19 @@ export const MyMembershipsScreen = ({ navigation }) => {
               _id: m._id || uniqueDocId,
               customerId: m.userId?.fullName || user?.fullName || user?.email || 'Member',
               gymName: m.gymId?.name || 'Gym Membership',
-              gymLocation: m.gymId?.location || m.gymId?.address || '',
+              gymLocation:
+                typeof m.gymId?.location === 'string'
+                  ? m.gymId.location
+                  : (m.gymId?.address || m.gymId?.city || m.gymId?.area || ''),
               gymImageUrl: resolvedGymLogo,
               planName: `${m.membershipTier} Membership`,
+              membershipTier: m.membershipTier,
               durationDays: m.durationDays,
               amountPaid: m.pricing?.totalAmount || 0,
               startDate: startDateStr,
               endDate: endDateStr,
+              rawStartDate: m.startDate,
+              rawEndDate: m.endDate,
               paymentMode: m.payment?.method || 'UPI',
               status: m.status,
               otp: m.entryOtp || null,
@@ -89,6 +96,8 @@ export const MyMembershipsScreen = ({ navigation }) => {
               trainerName: m.trainerId?.name || null,
               trainerSchedule: m.trainerSlot || null,
               trainerFee: m.pricing?.trainerFee || 0,
+              planDescription: m.planDescription || m.description || null,
+              gym: m.gymId,
             };
           });
           setAllMemberships(mapped);
@@ -110,7 +119,7 @@ export const MyMembershipsScreen = ({ navigation }) => {
     if (selectedTab === 'Active') {
       return m.status === 'Active' || m.status === 'Upcoming' || m.status === 'Expiring Soon';
     } else if (selectedTab === 'Completed') {
-      return m.status === 'Completed' || m.status === 'Expired';
+      return m.status === 'Completed' || m.status === 'Expired' || m.status === 'Switched';
     } else {
       return m.status === 'Cancelled';
     }
@@ -120,7 +129,7 @@ export const MyMembershipsScreen = ({ navigation }) => {
     (m) => m.status === 'Active' || m.status === 'Upcoming' || m.status === 'Expiring Soon'
   ).length;
   const completedCount = memberships.filter(
-    (m) => m.status === 'Completed' || m.status === 'Expired'
+    (m) => m.status === 'Completed' || m.status === 'Expired' || m.status === 'Switched'
   ).length;
   const cancelledCount = memberships.filter((m) => m.status === 'Cancelled').length;
 
@@ -143,9 +152,12 @@ export const MyMembershipsScreen = ({ navigation }) => {
       {/* Top App Bar */}
       <View style={styles.appBar}>
         <Text style={[styles.appBarTitle, { color: colors.text }]}>My Memberships</Text>
-        <TouchableOpacity style={styles.notifBtn} activeOpacity={0.7}>
-          <MaterialIcons name="notifications-none" size={24} color={colors.text} />
-          <View style={styles.notifRedDot} />
+        <TouchableOpacity
+          style={[styles.notifBtn, { backgroundColor: isDark ? '#1E1E1E' : '#F8FAFC', borderColor: colors.border }]}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('Wallet')}
+        >
+          <Ionicons name="wallet-outline" size={22} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -171,7 +183,6 @@ export const MyMembershipsScreen = ({ navigation }) => {
               activeOpacity={0.85}
             >
               <Text style={styles.promoBtnText}>View Plans</Text>
-              <MaterialIcons name="arrow-forward" size={16} color="#1E1B4B" style={{ marginLeft: 4 }} />
             </TouchableOpacity>
           </View>
 
@@ -258,6 +269,7 @@ export const MyMembershipsScreen = ({ navigation }) => {
         ) : (
           filteredMemberships.map((mbr, idx) => {
             const isActive = mbr.status === 'Active';
+            const { daysRemaining, progressPercent } = calculateMembershipProgress(mbr);
             const cardKey = mbr._id ? String(mbr._id) : `${mbr.id || 'mem'}_${idx}`;
             return (
               <TouchableOpacity
@@ -395,7 +407,7 @@ export const MyMembershipsScreen = ({ navigation }) => {
                       <Text style={[styles.progressLabel, { color: colors.subtitle }]}>
                         Days Remaining
                       </Text>
-                      <Text style={styles.progressVal}>{mbr.durationDays}</Text>
+                      <Text style={styles.progressVal}>{daysRemaining}</Text>
                     </View>
                     <View
                       style={[
@@ -408,7 +420,7 @@ export const MyMembershipsScreen = ({ navigation }) => {
                           styles.progressFill,
                           {
                             backgroundColor: AppColors.secondaryColor,
-                            width: '70%',
+                            width: progressPercent,
                           },
                         ]}
                       />
@@ -435,7 +447,6 @@ export const MyMembershipsScreen = ({ navigation }) => {
                   >
                     <MaterialIcons name="qr-code" size={16} color="#FFFFFF" />
                     <Text style={styles.viewPassBtnText}>View Pass & Details</Text>
-                    <MaterialIcons name="chevron-right" size={18} color="#FFFFFF" />
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>

@@ -1,7 +1,7 @@
 import { NativeModules } from 'react-native';
 
 const BACKEND_PORT = 5001;
-const LOCAL_WIFI_IP = '192.168.0.103';
+const LOCAL_WIFI_IP = '192.168.0.102';
 
 const getMetroHost = () => {
   try {
@@ -389,6 +389,27 @@ class ApiService {
       throw new Error(result.message || 'Failed to search members.');
     }
     return result.data;
+  }
+
+  async checkEmail(email) {
+    const response = await this.executeFetch(`/auth/check-email?email=${encodeURIComponent(email)}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    return await response.json();
+  }
+
+  async registerGym(payload) {
+    const response = await this.executeFetch('/gyms/register', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    }, 15000);
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Gym registration failed.');
+    }
+    return result;
   }
 }
 

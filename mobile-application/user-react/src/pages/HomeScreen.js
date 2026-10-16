@@ -401,8 +401,9 @@ export const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Notification Button with Red Dot */}
+          {/* Wallet Button */}
           <TouchableOpacity
+            onPress={() => navigation.navigate('Wallet')}
             style={[
               styles.notificationBtn,
               {
@@ -412,8 +413,7 @@ export const HomeScreen = ({ navigation }) => {
             ]}
             activeOpacity={0.7}
           >
-            <MaterialIcons name="notifications-none" size={24} color={colors.text} />
-            <View style={styles.notifRedDot} />
+            <Ionicons name="wallet-outline" size={22} color={colors.text} />
           </TouchableOpacity>
         </View>
 

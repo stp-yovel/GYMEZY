@@ -16,6 +16,7 @@ import {
   BarChartOutlined,
   CalendarOutlined,
   CreditCardOutlined,
+  IdcardOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../../theme/ThemeContext';
 import { employeeService } from '../../services/employeeService';
@@ -226,9 +227,27 @@ export const AppSidebar = ({
       label: 'Subscriptions',
     },
     {
-      key: '/admin/bookings',
-      icon: <CalendarOutlined />,
-      label: 'Bookings',
+      key: 'memberships-sub',
+      icon: <IdcardOutlined />,
+      label: 'Memberships',
+      children: [
+        {
+          key: '/admin/memberships?tab=all',
+          label: 'All Memberships',
+        },
+        {
+          key: '/admin/memberships?tab=active',
+          label: 'Active Members',
+        },
+        {
+          key: '/admin/memberships?tab=expiring',
+          label: 'Expiring Soon',
+        },
+        {
+          key: '/admin/memberships?tab=switched_cancelled',
+          label: 'Switched / Cancelled',
+        },
+      ],
     },
     {
       key: '/admin/payments',
@@ -247,6 +266,14 @@ export const AppSidebar = ({
     if (location.pathname === '/admin/gyms') {
       const search = location.search || '?tab=all';
       return `/admin/gyms${search}`;
+    }
+    if (
+      location.pathname === '/admin/memberships' ||
+      location.pathname === '/admin/membership' ||
+      location.pathname === '/admin/bookings'
+    ) {
+      const search = location.search || '?tab=all';
+      return `/admin/memberships${search}`;
     }
     return location.pathname;
   };

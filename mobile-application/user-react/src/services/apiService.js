@@ -1,7 +1,7 @@
 import { NativeModules } from 'react-native';
 
 const BACKEND_PORT = 5001;
-const LOCAL_WIFI_IP = '192.168.0.103';
+const LOCAL_WIFI_IP = '192.168.0.102';
 
 const getMetroHost = () => {
   try {
@@ -228,6 +228,24 @@ class ApiService {
     const json = await response.json();
     if (!response.ok || !json.success) {
       throw new Error(json.message || 'Failed to fetch user profile.');
+    }
+
+    return json.data;
+  }
+
+  /**
+   * Update Member Profile (Avatar, Full Name, Phone, etc.)
+   */
+  async updateProfile(profileData) {
+    const response = await this.executeFetch('/auth/profile', {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify(profileData),
+    });
+
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to update profile.');
     }
 
     return json.data;

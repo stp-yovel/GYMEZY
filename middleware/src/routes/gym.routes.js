@@ -3,6 +3,7 @@ import {
   onboardGym,
   getGymZones,
   getGyms,
+  getGymOptions,
   getAdminGymsFleet,
   getGymById,
   getGymTrainers,
@@ -25,6 +26,9 @@ import { USER_ROLES } from '../models/user.model.js';
 const router = Router();
 
 // ==================== PUBLIC / DISCOVERY ROUTES ====================
+// Lightweight Gym Options / Dropdown with Infinite Scroll & Search
+router.get('/options', optionalAuthenticate, getGymOptions);
+
 // Public Partner Self-Registration endpoint (No JWT required, created with Pending Approval)
 router.post('/register', onboardGym);
 

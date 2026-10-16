@@ -249,9 +249,7 @@ export const addGymReview = asyncHandler(async (req, res) => {
     throw ApiError.badRequest('Rating must be a number between 1 and 5.');
   }
 
-  if (!comment || typeof comment !== 'string' || comment.trim().length === 0) {
-    throw ApiError.badRequest('Review comment is required.');
-  }
+  const cleanComment = typeof comment === 'string' ? comment.trim() : '';
 
   const gym = await findGymByParam(id);
   if (!gym) {
@@ -266,7 +264,7 @@ export const addGymReview = asyncHandler(async (req, res) => {
     userName: req.user?.fullName || 'Verified Member',
     userImageUrl: req.user?.avatar || '',
     rating: numericRating,
-    comment: comment.trim(),
+    comment: cleanComment,
     bookingType: bookingType || 'Member',
     date: 'Just now',
     createdAt: new Date(),
@@ -316,9 +314,7 @@ export const addTrainerReview = asyncHandler(async (req, res) => {
     throw ApiError.badRequest('Rating must be a number between 1 and 5.');
   }
 
-  if (!comment || typeof comment !== 'string' || comment.trim().length === 0) {
-    throw ApiError.badRequest('Review comment is required.');
-  }
+  const cleanComment = typeof comment === 'string' ? comment.trim() : '';
 
   const gym = await findGymByParam(id);
   if (!gym) {
@@ -363,7 +359,7 @@ export const addTrainerReview = asyncHandler(async (req, res) => {
     userName: req.user?.fullName || 'Verified Member',
     userImageUrl: req.user?.avatar || '',
     rating: numericRating,
-    comment: comment.trim(),
+    comment: cleanComment,
     bookingType: bookingType || 'Personal Training',
     date: 'Just now',
     createdAt: new Date(),
