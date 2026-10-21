@@ -34,10 +34,12 @@
     "web": "expo start --web",
     "set-env:dev": "node scripts/set-env.js development",
     "set-env:prod": "node scripts/set-env.js production",
-    "build:dev:android": "node scripts/set-env.js development && npx eas build -p android --profile development",
-    "build:prod:android": "node scripts/set-env.js production && npx eas build -p android --profile production",
+    "build:dev:android": "node scripts/set-env.js development && cd android && ./gradlew assembleRelease",
+    "build:prod:android": "node scripts/set-env.js production && cd android && ./gradlew assembleRelease",
     "build:dev:apk": "node scripts/set-env.js development && cd android && ./gradlew assembleRelease",
-    "build:prod:apk": "node scripts/set-env.js production && cd android && ./gradlew assembleRelease"
+    "build:prod:apk": "node scripts/set-env.js production && cd android && ./gradlew assembleRelease",
+    "build:dev:eas": "node scripts/set-env.js development && npx eas build -p android --profile preview",
+    "build:prod:eas": "node scripts/set-env.js production && npx eas build -p android --profile production"
   },
   "private": true,
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
