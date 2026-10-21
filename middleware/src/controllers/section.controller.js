@@ -1,0 +1,304 @@
+import mongoose from 'mongoose';
+import { Section, SECTION_CATEGORIES, DAYS_OF_WEEK } from '../models/section.model.js';
+import { Employee } from '../models/employee.model.js';
+import { Gym } from '../models/gym.model.js';
+import { ApiError } from '../utils/apiError.js';
+import { ApiResponse } from '../utils/apiResponse.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+
+/**
+ * Helper to resolve gym context from req or inputs
+ */
+const resolveGymId = async (req, gymIdInput) => {
+  if (gymIdInput && mongoose.isValidObjectId(gymIdInput)) {
+    return new mongoose.Types.ObjectId(gymIdInput);
+  }
+
+  if (req.user?.gymId && mongoose.isValidObjectId(req.user.gymId)) {
+    return new mongoose.Types.ObjectId(req.user.gymId);
+  }
+
+  if (req.user?.userId) {
+    const gym = await Gym.findOne({
+      $or: [
+        { ownerId: req.user.userId },
+        { userId: req.user.userId },
+        { email: req.user.email },
+      ],
+    }).select('_id');
+    if (gym?._id) return gym._id;
+  }
+
+  return null;
+};
+
+/**
+ * @desc Create a new Workout/Class Section
+ * @route POST /api/v1/sections
+ * @access Gym Owner / Super Admin
+ */
+export const createSection = asyncHandler(async (req, res) => {
+  const {
+    gymId: inputGymId,
+    trainerId,
+    title,
+    category = 'yoga',
+    cost,
+    currency = 'INR',
+    startDate,
+    durationDays = 20,
+    startTime,
+    endTime,
+    activeDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    maxCapacity = 25,
+    description = '',
+    isActive = true,
+  } = req.body;
+
+  // 1. Resolve Gym ID (By ID only)
+  const resolvedGymId = await resolveGymId(req, inputGymId);
+  if (!resolvedGymId) {
+    throw new ApiError(400, 'A valid Gym ID is required to create a section.');
+  }
+
+  // 2. Validate Required Fields
+  if (!title || typeof title !== 'string' || !title.trim()) {
+    throw new ApiError(400, 'Section title/name is required (e.g. "Basic Yoga 20 Days").');
+  }
+
+  if (!trainerId || !mongoose.isValidObjectId(trainerId)) {
+    throw new ApiError(400, 'A valid Trainer ID is required.');
+  }
+
+  if (cost === undefined || cost === null || Number.isNaN(Number(cost)) || Number(cost) < 0) {
+    throw new ApiError(400, 'A valid section cost is required.');
+  }
+
+  if (!startDate) {
+    throw new ApiError(400, 'Start date is required.');
+  }
+
+  if (!startTime || !endTime) {
+    throw new ApiError(400, 'Both start time and end time are required.');
+  }
+
+  if (!Array.isArray(activeDays) || activeDays.length === 0) {
+    throw new ApiError(400, 'At least one active recurring day must be selected.');
+  }
+
+  const invalidDays = activeDays.filter((d) => !DAYS_OF_WEEK.includes(d));
+  if (invalidDays.length > 0) {
+    throw new ApiError(400, `Invalid days provided: ${invalidDays.join(', ')}.`);
+  }
+
+  if (category && !SECTION_CATEGORIES.includes(category)) {
+    throw new ApiError(400, `Invalid category. Must be one of: ${SECTION_CATEGORIES.join(', ')}.`);
+  }
+
+  // 3. Verify Trainer exists and belongs to Gym (By ID only)
+  const trainer = await Employee.findById(trainerId);
+  if (!trainer) {
+    throw new ApiError(404, 'Selected trainer was not found in gym staff records.');
+  }
+
+  // 4. Create Section Document (Strictly by IDs)
+  const parsedStartDate = new Date(startDate);
+  const parsedDuration = Math.max(1, Number(durationDays) || 20);
+  const calculatedEndDate = new Date(parsedStartDate);
+  calculatedEndDate.setDate(calculatedEndDate.getDate() + parsedDuration);
+
+  const section = await Section.create({
+    gymId: resolvedGymId,
+    trainerId: new mongoose.Types.ObjectId(trainerId),
+    title: title.trim(),
+    category,
+    cost: Number(cost),
+    currency,
+    startDate: parsedStartDate,
+    durationDays: parsedDuration,
+    endDate: calculatedEndDate,
+    startTime: startTime.trim(),
+    endTime: endTime.trim(),
+    activeDays,
+    maxCapacity: Math.max(1, Number(maxCapacity) || 25),
+    enrolledCount: 0,
+    description: description.trim(),
+    isActive: Boolean(isActive),
+  });
+
+  // Populate trainer details for response
+  const populatedSection = await Section.findById(section._id).populate(
+    'trainerId',
+    'name employeeId phone avatar specialization'
+  );
+
+  return res
+    .status(201)
+    .json(ApiResponse.created(populatedSection, 'Workout section created successfully.'));
+});
+
+/**
+ * @desc Get all sections for gym with optional filters
+ * @route GET /api/v1/sections
+ * @access Gym Owner / Super Admin / Authenticated User
+ */
+export const getSections = asyncHandler(async (req, res) => {
+  const { gymId: inputGymId, category, isActive, search } = req.query;
+
+  const resolvedGymId = await resolveGymId(req, inputGymId);
+  if (!resolvedGymId) {
+    throw new ApiError(400, 'Gym ID is required to fetch sections.');
+  }
+
+  const query = { gymId: resolvedGymId };
+
+  if (category && category !== 'all') {
+    query.category = category;
+  }
+
+  if (isActive !== undefined && isActive !== '') {
+    query.isActive = isActive === 'true' || isActive === true;
+  }
+
+  if (search && typeof search === 'string' && search.trim()) {
+    query.title = { $regex: search.trim(), $options: 'i' };
+  }
+
+  const sections = await Section.find(query)
+    .populate('trainerId', 'name employeeId phone avatar specialization')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return res
+    .status(200)
+    .json(ApiResponse.success(sections, 'Sections retrieved successfully.'));
+});
+
+/**
+ * @desc Get single section by ID
+ * @route GET /api/v1/sections/:id
+ * @access Authenticated User
+ */
+export const getSectionById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new ApiError(400, 'Invalid section ID format.');
+  }
+
+  const section = await Section.findById(id).populate(
+    'trainerId',
+    'name employeeId phone avatar specialization'
+  );
+
+  if (!section) {
+    throw new ApiError(404, 'Section not found.');
+  }
+
+  return res
+    .status(200)
+    .json(ApiResponse.success(section, 'Section details retrieved successfully.'));
+});
+
+/**
+ * @desc Update a section
+ * @route PUT /api/v1/sections/:id
+ * @access Gym Owner / Super Admin
+ */
+export const updateSection = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const updateData = { ...req.body };
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new ApiError(400, 'Invalid section ID format.');
+  }
+
+  // Prevent modifying gymId directly
+  delete updateData.gymId;
+
+  // If updating trainerId, verify validity
+  if (updateData.trainerId) {
+    if (!mongoose.isValidObjectId(updateData.trainerId)) {
+      throw new ApiError(400, 'Invalid trainer ID format.');
+    }
+    const trainerExists = await Employee.exists({ _id: updateData.trainerId });
+    if (!trainerExists) {
+      throw new ApiError(404, 'Assigned trainer not found in employee records.');
+    }
+    updateData.trainerId = new mongoose.Types.ObjectId(updateData.trainerId);
+  }
+
+  // Recalculate end date if start date or duration is updated
+  if (updateData.startDate || updateData.durationDays) {
+    const existing = await Section.findById(id);
+    if (!existing) {
+      throw new ApiError(404, 'Section not found.');
+    }
+    const start = updateData.startDate ? new Date(updateData.startDate) : existing.startDate;
+    const duration = updateData.durationDays ? Number(updateData.durationDays) : existing.durationDays;
+    const end = new Date(start);
+    end.setDate(end.getDate() + duration);
+    updateData.endDate = end;
+  }
+
+  const updatedSection = await Section.findByIdAndUpdate(id, updateData, {
+    new: true,
+    runValidators: true,
+  }).populate('trainerId', 'name employeeId phone avatar specialization');
+
+  if (!updatedSection) {
+    throw new ApiError(404, 'Section not found to update.');
+  }
+
+  return res
+    .status(200)
+    .json(ApiResponse.success(updatedSection, 'Section updated successfully.'));
+});
+
+/**
+ * @desc Toggle active status of a section
+ * @route PATCH /api/v1/sections/:id/status
+ * @access Gym Owner / Super Admin
+ */
+export const toggleSectionStatus = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { isActive } = req.body;
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new ApiError(400, 'Invalid section ID format.');
+  }
+
+  const section = await Section.findById(id);
+  if (!section) {
+    throw new ApiError(404, 'Section not found.');
+  }
+
+  section.isActive = isActive !== undefined ? Boolean(isActive) : !section.isActive;
+  await section.save();
+
+  return res
+    .status(200)
+    .json(ApiResponse.success(section, `Section ${section.isActive ? 'activated' : 'paused'} successfully.`));
+});
+
+/**
+ * @desc Delete a section
+ * @route DELETE /api/v1/sections/:id
+ * @access Gym Owner / Super Admin
+ */
+export const deleteSection = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new ApiError(400, 'Invalid section ID format.');
+  }
+
+  const deleted = await Section.findByIdAndDelete(id);
+  if (!deleted) {
+    throw new ApiError(404, 'Section not found to delete.');
+  }
+
+  return res
+    .status(200)
+    .json(ApiResponse.success(null, 'Section deleted successfully.'));
+});

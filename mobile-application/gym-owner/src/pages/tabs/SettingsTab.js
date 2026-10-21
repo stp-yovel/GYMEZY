@@ -25,6 +25,7 @@ import { apiService } from '../../services/apiService';
 import { getSafeImageUri, getGymLogoUri } from '../../utils/mediaUtils';
 import { pickImageFromDevice, capturePhotoFromCamera } from '../../utils/filePickerUtils';
 import { AddEmployeeModal } from '../../widgets/AddEmployeeModal';
+import { SectionsSubView } from './SectionsSubView';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -990,6 +991,28 @@ export const SettingsTab = ({ topInset, navigation }) => {
               </View>
               <Text style={[styles.menuSubText, { color: isDark ? 'rgba(255,255,255,0.55)' : '#64748B' }]}>
                 Receptionists, floor managers & staff verification
+              </Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={isDark ? 'rgba(255,255,255,0.4)' : '#94A3B8'} />
+          </TouchableOpacity>
+
+          <View style={[styles.menuDivider, { backgroundColor: isDark ? AppColors.darkBorder : '#F1F5F9' }]} />
+
+          {/* Workout Sections & Batches */}
+          <TouchableOpacity
+            style={styles.menuItemRow}
+            onPress={() => setActiveSection('SECTIONS')}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.menuIconBox, { backgroundColor: 'rgba(0, 56, 130, 0.1)' }]}>
+              <MaterialIcons name="event-available" size={20} color="#003882" />
+            </View>
+            <View style={styles.menuTextBox}>
+              <Text style={[styles.menuTitleText, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                Workout Sections & Batches
+              </Text>
+              <Text style={[styles.menuSubText, { color: isDark ? 'rgba(255,255,255,0.55)' : '#64748B' }]}>
+                Yoga, Gym & Zumba classes, trainer assignments & timings
               </Text>
             </View>
             <MaterialIcons name="chevron-right" size={20} color={isDark ? 'rgba(255,255,255,0.4)' : '#94A3B8'} />
@@ -2204,6 +2227,13 @@ export const SettingsTab = ({ topInset, navigation }) => {
       {activeSection === 'BASIC_PROFILE' && renderBasicProfileSubView()}
       {activeSection === 'TRAINER_PROFILE' && renderTrainerProfileSubView()}
       {activeSection === 'EMPLOYEES' && renderEmployeesSubView()}
+      {activeSection === 'SECTIONS' && (
+        <SectionsSubView
+          topInset={topInset}
+          onBack={() => setActiveSection('MAIN')}
+          gymId={targetGymId}
+        />
+      )}
 
       {/* ==================== REUSABLE ADD EMPLOYEE / TRAINER MODAL ==================== */}
       <AddEmployeeModal

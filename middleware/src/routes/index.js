@@ -7,6 +7,7 @@ import employeeRoutes from './employee.routes.js';
 import membershipRoutes from './membership.routes.js';
 import attendanceRoutes from './attendance.routes.js';
 import walletRoutes from './wallet.routes.js';
+import sectionRoutes from './section.routes.js';
 
 const apiRouter = Router();
 
@@ -18,5 +19,6 @@ apiRouter.use('/employees', employeeRoutes);
 apiRouter.use('/memberships', membershipRoutes);
 apiRouter.use('/attendance', attendanceRoutes);
 apiRouter.use('/wallet', walletRoutes);
+apiRouter.use('/sections', sectionRoutes);
 
 export default apiRouter;
