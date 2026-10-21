@@ -196,9 +196,14 @@ const reviewSchema = new mongoose.Schema(
 const trainerSchema = new mongoose.Schema(
   {
     employeeId: { type: String, trim: true, default: '' },
-    name: { type: String, required: true, trim: true },
     specialty: { type: String, trim: true, default: 'General Fitness' },
     experienceYears: { type: Number, default: 1, min: 0 },
+    experience: { type: String, trim: true, default: '' },
+    description: { type: String, trim: true, default: '' },
+    aboutMe: { type: String, trim: true, default: '' },
+    servicesOffered: [{ type: String, trim: true }],
+    certifications: [{ type: String, trim: true }],
+    languages: [{ type: String, trim: true }],
     rating: { type: Number, default: 4.9, min: 0, max: 5 },
     reviewsCount: { type: Number, default: 0, min: 0 },
     ratings: { type: [reviewSchema], default: [] },

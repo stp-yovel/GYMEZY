@@ -479,6 +479,15 @@ export const EmployeeManagement = ({
       emergencyRel: record.emergencyContact?.relationship || '',
       emergencyPhone: record.emergencyContact?.phone || '',
       notes: record.notes || '',
+      description: record.description || record.aboutMe || 'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.',
+      servicesOffered: Array.isArray(record.servicesOffered) && record.servicesOffered.length > 0
+        ? record.servicesOffered
+        : ['Weight Loss Program', 'Muscle Gain', 'Strength Training', 'Fat Loss', 'HIIT Workouts', 'Diet & Nutrition', 'Body Transformation'],
+      experience: record.experience || (record.experienceYears ? `${record.experienceYears}+ Years` : '8+ Years'),
+      certifications: Array.isArray(record.certifications) && record.certifications.length > 0
+        ? record.certifications
+        : ['ACE Certified Personal Trainer', 'Certified Strength & Conditioning Specialist (CSCS)', 'Nutrition & Weight Management Certification'],
+      languages: Array.isArray(record.languages) && record.languages.length > 0 ? record.languages : ['English', 'Hindi'],
     });
     setIsDetailsModalOpen(true);
   };
@@ -506,6 +515,12 @@ export const EmployeeManagement = ({
       status: values.status || selectedEmployee.status || 'Active',
       avatar: editPhoto !== null ? editPhoto : (selectedEmployee.avatar || ''),
       specialty: values.specialty !== undefined ? values.specialty.trim() : (selectedEmployee.specialty || ''),
+      description: values.description || values.aboutMe || selectedEmployee.description || '',
+      aboutMe: values.aboutMe || values.description || selectedEmployee.aboutMe || '',
+      servicesOffered: Array.isArray(values.servicesOffered) ? values.servicesOffered : (selectedEmployee.servicesOffered || []),
+      experience: values.experience || (values.experienceYears ? `${values.experienceYears}+ Years` : (selectedEmployee.experience || '8+ Years')),
+      certifications: Array.isArray(values.certifications) ? values.certifications : (selectedEmployee.certifications || []),
+      languages: Array.isArray(values.languages) ? values.languages : (selectedEmployee.languages || ['English', 'Hindi']),
       experienceYears: values.experienceYears !== undefined
         ? (Number(values.experienceYears) || 0)
         : (Number(selectedEmployee.experienceYears) || 1),
@@ -660,6 +675,18 @@ export const EmployeeManagement = ({
       previousCompany: allFormValues.prevCompany || '',
       previousDesignation: allFormValues.prevDesignation || '',
       previousExp: allFormValues.prevExp || '',
+      description: allFormValues.description || allFormValues.aboutMe || 'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.',
+      aboutMe: allFormValues.description || allFormValues.aboutMe || 'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.',
+      servicesOffered: Array.isArray(allFormValues.servicesOffered) && allFormValues.servicesOffered.length > 0
+        ? allFormValues.servicesOffered
+        : ['Weight Loss Program', 'Muscle Gain', 'Strength Training', 'Fat Loss', 'HIIT Workouts', 'Diet & Nutrition', 'Body Transformation'],
+      experience: allFormValues.experience || allFormValues.prevExp || '8+ Years',
+      certifications: Array.isArray(allFormValues.certifications) && allFormValues.certifications.length > 0
+        ? allFormValues.certifications
+        : ['ACE Certified Personal Trainer', 'Certified Strength & Conditioning Specialist (CSCS)', 'Nutrition & Weight Management Certification'],
+      languages: Array.isArray(allFormValues.languages) && allFormValues.languages.length > 0
+        ? allFormValues.languages
+        : ['English', 'Hindi'],
       emergencyContact: {
         name: allFormValues.emergencyName || '',
         relationship: allFormValues.emergencyRel || '',
@@ -1906,6 +1933,81 @@ export const EmployeeManagement = ({
                   ),
                 },
                 {
+                  key: 'trainer_profile',
+                  label: (
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>
+                      <CrownOutlined /> Trainer Profile & Showcase
+                    </span>
+                  ),
+                  children: (
+                    <div style={{ paddingTop: 8 }}>
+                      <Form.Item
+                        label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>About Me / Trainer Description</span>}
+                        name="description"
+                        style={{ marginBottom: 14 }}
+                      >
+                        <TextArea
+                          rows={3}
+                          placeholder="e.g. Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance."
+                          style={{ borderRadius: 'var(--radius-base)' }}
+                        />
+                      </Form.Item>
+
+                      <Row gutter={16}>
+                        <Col xs={24} sm={12}>
+                          <Form.Item
+                            label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Services Offered</span>}
+                            name="servicesOffered"
+                            style={{ marginBottom: 14 }}
+                          >
+                            <Select mode="multiple" placeholder="Select services" style={{ width: '100%' }}>
+                              <Option value="Weight Loss Program">Weight Loss Program</Option>
+                              <Option value="Muscle Gain">Muscle Gain</Option>
+                              <Option value="Strength Training">Strength Training</Option>
+                              <Option value="Fat Loss">Fat Loss</Option>
+                              <Option value="HIIT Workouts">HIIT Workouts</Option>
+                              <Option value="Diet & Nutrition">Diet & Nutrition</Option>
+                              <Option value="Body Transformation">Body Transformation</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={6}>
+                          <Form.Item
+                            label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Experience</span>}
+                            name="experience"
+                            style={{ marginBottom: 14 }}
+                          >
+                            <Input placeholder="e.g. 8+ Years" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={6}>
+                          <Form.Item
+                            label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Languages</span>}
+                            name="languages"
+                            style={{ marginBottom: 14 }}
+                          >
+                            <Select mode="tags" placeholder="Languages" style={{ width: '100%' }}>
+                              <Option value="English">English</Option>
+                              <Option value="Hindi">Hindi</Option>
+                              <Option value="Tamil">Tamil</Option>
+                              <Option value="Telugu">Telugu</Option>
+                              <Option value="Kannada">Kannada</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                      </Row>
+
+                      <Form.Item
+                        label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Certifications</span>}
+                        name="certifications"
+                        style={{ marginBottom: 14 }}
+                      >
+                        <Select mode="tags" placeholder="Add certifications" style={{ width: '100%' }} />
+                      </Form.Item>
+                    </div>
+                  ),
+                },
+                {
                   key: 'schedule_pay',
                   label: (
                     <span style={{ fontWeight: 600, fontSize: 13 }}>
@@ -2498,6 +2600,87 @@ export const EmployeeManagement = ({
                 </div>
               </Col>
             </Row>
+
+            {/* Trainer Profile & Showcase (Shown in User App) */}
+            <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 14, marginTop: 6, marginBottom: 14 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <CrownOutlined /> Trainer Profile & Showcase (Shown in User App)
+              </div>
+
+              <Form.Item
+                label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>About Me / Trainer Description</span>}
+                name="description"
+                initialValue="Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance."
+                style={{ marginBottom: 12 }}
+              >
+                <TextArea
+                  rows={3}
+                  placeholder="e.g. Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance."
+                  style={{ borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }}
+                />
+              </Form.Item>
+
+              <Row gutter={12}>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Services Offered</span>}
+                    name="servicesOffered"
+                    initialValue={['Weight Loss Program', 'Muscle Gain', 'Strength Training', 'Fat Loss', 'HIIT Workouts', 'Diet & Nutrition', 'Body Transformation']}
+                    style={{ marginBottom: 12 }}
+                  >
+                    <Select mode="multiple" placeholder="Select services offered" style={{ width: '100%' }}>
+                      <Option value="Weight Loss Program">Weight Loss Program</Option>
+                      <Option value="Muscle Gain">Muscle Gain</Option>
+                      <Option value="Strength Training">Strength Training</Option>
+                      <Option value="Fat Loss">Fat Loss</Option>
+                      <Option value="HIIT Workouts">HIIT Workouts</Option>
+                      <Option value="Diet & Nutrition">Diet & Nutrition</Option>
+                      <Option value="Body Transformation">Body Transformation</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} sm={6}>
+                  <Form.Item
+                    label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Experience</span>}
+                    name="experience"
+                    initialValue="8+ Years"
+                    style={{ marginBottom: 12 }}
+                  >
+                    <Input
+                      placeholder="e.g. 8+ Years"
+                      style={{ height: 40, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }}
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} sm={6}>
+                  <Form.Item
+                    label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Languages</span>}
+                    name="languages"
+                    initialValue={['English', 'Hindi']}
+                    style={{ marginBottom: 12 }}
+                  >
+                    <Select mode="tags" placeholder="Languages spoken" style={{ width: '100%' }}>
+                      <Option value="English">English</Option>
+                      <Option value="Hindi">Hindi</Option>
+                      <Option value="Tamil">Tamil</Option>
+                      <Option value="Telugu">Telugu</Option>
+                      <Option value="Kannada">Kannada</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Form.Item
+                label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Certifications</span>}
+                name="certifications"
+                initialValue={['ACE Certified Personal Trainer', 'Certified Strength & Conditioning Specialist (CSCS)', 'Nutrition & Weight Management Certification']}
+                style={{ marginBottom: 12 }}
+              >
+                <Select mode="tags" placeholder="Type certification and press enter" style={{ width: '100%' }} />
+              </Form.Item>
+            </div>
 
             {/* Previous Employment Details */}
             <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 14, marginTop: 6 }}>

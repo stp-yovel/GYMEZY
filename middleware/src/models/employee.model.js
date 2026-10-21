@@ -148,6 +148,12 @@ const employeeSchema = new mongoose.Schema(
     // Professional & Past Employment Details
     specialty: { type: String, trim: true, default: '' },
     experienceYears: { type: Number, default: 1, min: 0 },
+    experience: { type: String, trim: true, default: '' },
+    description: { type: String, trim: true, default: '' },
+    aboutMe: { type: String, trim: true, default: '' },
+    servicesOffered: [{ type: String, trim: true }],
+    certifications: [{ type: String, trim: true }],
+    languages: [{ type: String, trim: true }],
     previousCompany: { type: String, trim: true, default: '' },
     previousDesignation: { type: String, trim: true, default: '' },
     previousExp: { type: String, trim: true, default: '' },

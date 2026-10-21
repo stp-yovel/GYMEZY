@@ -43,6 +43,30 @@ const ACCESS_LEVELS = [
   { value: 'Manager', label: 'Floor Manager', desc: 'Staff & Facility Operations' },
 ];
 
+const AVAILABLE_SERVICES = [
+  'Weight Loss Program',
+  'Muscle Gain',
+  'Strength Training',
+  'Fat Loss',
+  'HIIT Workouts',
+  'Diet & Nutrition',
+  'Body Transformation',
+];
+
+const getServiceIconName = (service) => {
+  const s = (service || '').toLowerCase().trim();
+  if (s.includes('weight loss')) return 'local-mall';
+  if (s.includes('muscle')) return 'fitness-center';
+  if (s.includes('strength')) return 'ad-units';
+  if (s.includes('fat')) return 'local-fire-department';
+  if (s.includes('hiit') || s.includes('cardio') || s.includes('run')) return 'directions-run';
+  if (s.includes('diet') || s.includes('nutrition') || s.includes('meal')) return 'restaurant';
+  if (s.includes('transformation') || s.includes('body')) return 'accessibility-new';
+  if (s.includes('yoga')) return 'self-improvement';
+  if (s.includes('crossfit')) return 'flash-on';
+  return 'fitness-center';
+};
+
 export const EmployeesTab = ({ topInset, navigation }) => {
   const { isDark } = useTheme();
   const { showToast } = useToast();
@@ -77,6 +101,25 @@ export const EmployeesTab = ({ topInset, navigation }) => {
   const [addEmergencyPhone, setAddEmergencyPhone] = useState('');
   const [addEmergencyRelation, setAddEmergencyRelation] = useState('Parent');
   const [addAvatar, setAddAvatar] = useState(null);
+
+  // Trainer Profile & Showcase State
+  const [addAboutMe, setAddAboutMe] = useState(
+    'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.'
+  );
+  const [addExperience, setAddExperience] = useState('8+ Years');
+  const [addServicesOffered, setAddServicesOffered] = useState([
+    'Weight Loss Program',
+    'Muscle Gain',
+    'Strength Training',
+    'Fat Loss',
+    'HIIT Workouts',
+    'Diet & Nutrition',
+    'Body Transformation',
+  ]);
+  const [addCertifications, setAddCertifications] = useState(
+    'ACE Certified Personal Trainer\nCertified Strength & Conditioning Specialist (CSCS)\nNutrition & Weight Management Certification'
+  );
+  const [addLanguages, setAddLanguages] = useState('English, Hindi');
 
   // Fetch Employees
   const fetchEmployees = useCallback(async () => {
@@ -199,6 +242,23 @@ export const EmployeesTab = ({ topInset, navigation }) => {
     setAddEmergencyPhone('');
     setAddEmergencyRelation('Parent');
     setAddAvatar(null);
+    setAddAboutMe(
+      'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.'
+    );
+    setAddExperience('8+ Years');
+    setAddServicesOffered([
+      'Weight Loss Program',
+      'Muscle Gain',
+      'Strength Training',
+      'Fat Loss',
+      'HIIT Workouts',
+      'Diet & Nutrition',
+      'Body Transformation',
+    ]);
+    setAddCertifications(
+      'ACE Certified Personal Trainer\nCertified Strength & Conditioning Specialist (CSCS)\nNutrition & Weight Management Certification'
+    );
+    setAddLanguages('English, Hindi');
   };
 
   // Submit Add Employee
@@ -240,6 +300,18 @@ export const EmployeesTab = ({ topInset, navigation }) => {
               phone: addEmergencyPhone.trim() || cleanPhone,
             }
           : undefined,
+        aboutMe: addAboutMe.trim() || undefined,
+        description: addAboutMe.trim() || undefined,
+        experience: addExperience.trim() || undefined,
+        servicesOffered: addServicesOffered,
+        certifications: addCertifications
+          .split('\n')
+          .map((c) => c.trim().replace(/^[•\-*]\s*/, ''))
+          .filter(Boolean),
+        languages: addLanguages
+          .split(',')
+          .map((l) => l.trim())
+          .filter(Boolean),
         gymId: gym?._id || gym?.partnerId,
         gymPartnerId: gym?.partnerId || gym?._id,
       };
@@ -975,6 +1047,91 @@ export const EmployeesTab = ({ topInset, navigation }) => {
                   </View>
                 )}
 
+                {/* Trainer Profile & Showcase (Shown in User App) */}
+                <View style={styles.sectionBlock}>
+                  <Text style={[styles.sectionTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                    Trainer Profile & Showcase (User App)
+                  </Text>
+                  <Text style={[styles.detailKey, { color: isDark ? '#94A3B8' : '#64748B', marginBottom: 4 }]}>
+                    About Me
+                  </Text>
+                  <Text style={[styles.detailVal, { color: isDark ? '#FFFFFF' : '#0F172A', marginBottom: 12, lineHeight: 20 }]}>
+                    {selectedEmployee.aboutMe || selectedEmployee.description || 'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.'}
+                  </Text>
+
+                  <Text style={[styles.detailKey, { color: isDark ? '#94A3B8' : '#64748B', marginBottom: 6 }]}>
+                    Services Offered
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                    {(Array.isArray(selectedEmployee.servicesOffered) && selectedEmployee.servicesOffered.length > 0
+                      ? selectedEmployee.servicesOffered
+                      : AVAILABLE_SERVICES
+                    ).map((s, idx) => (
+                      <View
+                        key={idx}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <MaterialIcons
+                          name={getServiceIconName(s)}
+                          size={13}
+                          color={AppColors.primaryColor}
+                          style={{ marginRight: 4 }}
+                        />
+                        <Text style={{ fontSize: 11, color: isDark ? '#FFFFFF' : '#0F172A', fontWeight: '600' }}>
+                          {s}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailKey, { color: isDark ? '#94A3B8' : '#64748B' }]}>Experience</Text>
+                    <Text style={[styles.detailVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                      {selectedEmployee.experience || '8+ Years'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailKey, { color: isDark ? '#94A3B8' : '#64748B' }]}>Languages</Text>
+                    <Text style={[styles.detailVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                      {Array.isArray(selectedEmployee.languages)
+                        ? selectedEmployee.languages.join(', ')
+                        : selectedEmployee.languages || 'English, Hindi'}
+                    </Text>
+                  </View>
+
+                  <Text style={[styles.detailKey, { color: isDark ? '#94A3B8' : '#64748B', marginTop: 8, marginBottom: 4 }]}>
+                    Certifications
+                  </Text>
+                  {(Array.isArray(selectedEmployee.certifications) && selectedEmployee.certifications.length > 0
+                    ? selectedEmployee.certifications
+                    : [
+                        'ACE Certified Personal Trainer',
+                        'Certified Strength & Conditioning Specialist (CSCS)',
+                        'Nutrition & Weight Management Certification',
+                      ]
+                  ).map((c, idx) => (
+                    <Text
+                      key={idx}
+                      style={{
+                        fontSize: 12,
+                        color: isDark ? '#94A3B8' : '#64748B',
+                        marginBottom: 3,
+                        lineHeight: 18,
+                      }}
+                    >
+                      • {c}
+                    </Text>
+                  ))}
+                </View>
+
                 {/* Action Buttons in Modal */}
                 <View style={{ flexDirection: 'row', gap: 12, marginTop: 20, marginBottom: 24 }}>
                   <TouchableOpacity
@@ -1364,6 +1521,170 @@ export const EmployeesTab = ({ topInset, navigation }) => {
                 value={addEmergencyPhone}
                 onChangeText={setAddEmergencyPhone}
               />
+
+              {/* Trainer Profile & Showcase (Shown in User App) */}
+              <View
+                style={[
+                  styles.trainerShowcaseBox,
+                  {
+                    backgroundColor: isDark ? 'rgba(0,102,204,0.06)' : '#F0F7FF',
+                    borderColor: isDark ? 'rgba(0,102,204,0.25)' : '#BAE6FD',
+                  },
+                ]}
+              >
+                <View style={styles.showcaseHeaderRow}>
+                  <MaterialIcons name="stars" size={18} color={AppColors.primaryColor} />
+                  <Text style={[styles.showcaseHeaderTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                    Trainer Profile & Showcase (Shown in User App)
+                  </Text>
+                </View>
+                <Text style={[styles.showcaseHeaderSub, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                  This info appears directly in the user mobile app when members view your trainer.
+                </Text>
+
+                {/* About Me / Trainer Description */}
+                <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 12 }]}>
+                  About Me / Trainer Description
+                </Text>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    styles.textAreaInput,
+                    {
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF',
+                      borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                      color: isDark ? '#FFFFFF' : '#0F172A',
+                    },
+                  ]}
+                  multiline
+                  numberOfLines={3}
+                  value={addAboutMe}
+                  onChangeText={setAddAboutMe}
+                  placeholder="e.g. Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance."
+                  placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
+                />
+
+                {/* Services Offered Chips */}
+                <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 12 }]}>
+                  Services Offered
+                </Text>
+                <View style={styles.servicesChipContainer}>
+                  {AVAILABLE_SERVICES.map((srv) => {
+                    const isSelected = addServicesOffered.includes(srv);
+                    return (
+                      <TouchableOpacity
+                        key={srv}
+                        style={[
+                          styles.serviceChipBtn,
+                          isSelected && {
+                            backgroundColor: AppColors.primaryColor,
+                            borderColor: AppColors.primaryColor,
+                          },
+                          {
+                            backgroundColor: isSelected
+                              ? AppColors.primaryColor
+                              : isDark
+                              ? 'rgba(255,255,255,0.06)'
+                              : '#FFFFFF',
+                            borderColor: isSelected
+                              ? AppColors.primaryColor
+                              : isDark
+                              ? AppColors.darkBorder
+                              : '#E2E8F0',
+                          },
+                        ]}
+                        onPress={() => {
+                          if (isSelected) {
+                            setAddServicesOffered(addServicesOffered.filter((s) => s !== srv));
+                          } else {
+                            setAddServicesOffered([...addServicesOffered, srv]);
+                          }
+                        }}
+                      >
+                        <MaterialIcons
+                          name={getServiceIconName(srv)}
+                          size={15}
+                          color={isSelected ? '#FFFFFF' : isDark ? '#CBD5E1' : '#475569'}
+                          style={{ marginRight: 6 }}
+                        />
+                        <Text
+                          style={[
+                            styles.serviceChipText,
+                            { color: isSelected ? '#FFFFFF' : isDark ? '#FFFFFF' : '#0F172A' },
+                          ]}
+                        >
+                          {srv}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Experience & Languages */}
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                      Experience
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.formInput,
+                        {
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF',
+                          borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                          color: isDark ? '#FFFFFF' : '#0F172A',
+                        },
+                      ]}
+                      value={addExperience}
+                      onChangeText={setAddExperience}
+                      placeholder="e.g. 8+ Years"
+                      placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
+                    />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                      Languages
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.formInput,
+                        {
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF',
+                          borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                          color: isDark ? '#FFFFFF' : '#0F172A',
+                        },
+                      ]}
+                      value={addLanguages}
+                      onChangeText={setAddLanguages}
+                      placeholder="e.g. English, Hindi"
+                      placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
+                    />
+                  </View>
+                </View>
+
+                {/* Certifications */}
+                <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 12 }]}>
+                  Certifications (one per line)
+                </Text>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    styles.textAreaInput,
+                    {
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF',
+                      borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                      color: isDark ? '#FFFFFF' : '#0F172A',
+                    },
+                  ]}
+                  multiline
+                  numberOfLines={3}
+                  value={addCertifications}
+                  onChangeText={setAddCertifications}
+                  placeholder="ACE Certified Personal Trainer&#10;Certified Strength & Conditioning Specialist (CSCS)&#10;Nutrition & Weight Management Certification"
+                  placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
+                />
+              </View>
 
               {/* Submit Button */}
               <TouchableOpacity
@@ -1878,5 +2199,49 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 13.5,
+  },
+  trainerShowcaseBox: {
+    marginTop: 18,
+    marginBottom: 8,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  showcaseHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  showcaseHeaderTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  showcaseHeaderSub: {
+    fontSize: 11,
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  textAreaInput: {
+    minHeight: 70,
+    textAlignVertical: 'top',
+    paddingTop: 10,
+  },
+  servicesChipContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  serviceChipBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  serviceChipText: {
+    fontSize: 11.5,
+    fontWeight: '600',
   },
 });
