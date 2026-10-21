@@ -1194,6 +1194,7 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                 const enrolled = sec.enrolledCount || 0;
                 const capacity = sec.maxCapacity || 25;
                 const remaining = Math.max(0, capacity - enrolled);
+                const isFilled = remaining <= 0;
 
                 return (
                   <TouchableOpacity
@@ -1209,6 +1210,7 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                         backgroundColor: cardColor,
                         borderColor: borderColor,
                       },
+                      isFilled && styles.sectionListCardFilled,
                     ]}
                   >
                     {/* Top: Category Pill & Capacity */}
@@ -1221,18 +1223,19 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                       </View>
                       <View style={styles.sectionCapacityPill}>
                         <MaterialIcons
-                          name="person"
+                          name={isFilled ? 'block' : 'person'}
                           size={13}
-                          color={remaining <= 3 ? '#EF4444' : '#00BF62'}
+                          color={isFilled ? '#EF4444' : remaining <= 3 ? '#EF4444' : '#00BF62'}
                           style={{ marginRight: 3 }}
                         />
                         <Text
                           style={[
                             styles.sectionCapacityText,
-                            { color: remaining <= 3 ? '#EF4444' : '#00BF62' },
+                            { color: isFilled ? '#EF4444' : remaining <= 3 ? '#EF4444' : '#00BF62' },
+                            isFilled && { fontWeight: '700' },
                           ]}
                         >
-                          {remaining <= 3 ? `Only ${remaining} left` : `${enrolled}/${capacity} Enrolled`}
+                          {isFilled ? 'Slot Full' : remaining <= 3 ? `Only ${remaining} left` : `${enrolled}/${capacity} Enrolled`}
                         </Text>
                       </View>
                     </View>
@@ -1290,11 +1293,31 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                           ₹{Math.round(Number(sec.cost) || 0)}
                         </Text>
                       </View>
-                      <View style={[styles.viewDetailsBtn, { backgroundColor: isDark ? 'rgba(96,165,250,0.15)' : 'rgba(0,56,130,0.08)' }]}>
-                        <Text style={[styles.viewDetailsBtnText, { color: isDark ? '#93C5FD' : '#003882' }]}>
-                          View Details
+                      <View
+                        style={[
+                          styles.viewDetailsBtn,
+                          isFilled
+                            ? { backgroundColor: isDark ? 'rgba(239,68,68,0.18)' : 'rgba(239,68,68,0.1)' }
+                            : { backgroundColor: isDark ? 'rgba(96,165,250,0.15)' : 'rgba(0,56,130,0.08)' },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.viewDetailsBtnText,
+                            {
+                              color: isFilled ? '#EF4444' : (isDark ? '#93C5FD' : '#003882'),
+                              fontWeight: isFilled ? '700' : '600',
+                            },
+                          ]}
+                        >
+                          {isFilled ? 'Slot Full' : 'View Details'}
                         </Text>
-                        <MaterialIcons name="arrow-forward" size={14} color={isDark ? '#93C5FD' : '#003882'} style={{ marginLeft: 4 }} />
+                        <MaterialIcons
+                          name={isFilled ? 'block' : 'arrow-forward'}
+                          size={14}
+                          color={isFilled ? '#EF4444' : (isDark ? '#93C5FD' : '#003882')}
+                          style={{ marginLeft: 4 }}
+                        />
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -1354,15 +1377,29 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.detailSectionHeading, { color: textColor }]}>Batch Capacity</Text>
                   <Text style={[styles.detailSubtext, { color: subtitleColor }]}>
-                    {(selectedSection.maxCapacity || 25) - (selectedSection.enrolledCount || 0) <= 3
+                    {(selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25)
+                      ? 'All slots filled! Admissions are currently closed.'
+                      : (selectedSection.maxCapacity || 25) - (selectedSection.enrolledCount || 0) <= 3
                       ? 'Filling fast! Limited seats remaining.'
                       : 'Open for admissions'}
                   </Text>
                 </View>
                 <View style={styles.detailCapacityBadge}>
-                  <MaterialIcons name="groups" size={16} color="#00BF62" style={{ marginRight: 6 }} />
-                  <Text style={styles.detailCapacityBadgeText}>
-                    {selectedSection.enrolledCount || 0} / {selectedSection.maxCapacity || 25} Enrolled
+                  <MaterialIcons
+                    name={(selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25) ? 'block' : 'groups'}
+                    size={16}
+                    color={(selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25) ? '#EF4444' : '#00BF62'}
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text
+                    style={[
+                      styles.detailCapacityBadgeText,
+                      (selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25) && { color: '#EF4444' },
+                    ]}
+                  >
+                    {(selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25)
+                      ? 'Slot Full'
+                      : `${selectedSection.enrolledCount || 0} / ${selectedSection.maxCapacity || 25} Enrolled`}
                   </Text>
                 </View>
               </View>
@@ -1577,10 +1614,27 @@ export const BookingSessionScreen = ({ route, navigation }) => {
             </View>
             <TouchableOpacity
               activeOpacity={0.85}
+              disabled={(selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25)}
               onPress={() => goToCheckout(selectedSection)}
-              style={styles.continueBtn}
+              style={[
+                styles.continueBtn,
+                (selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25) && {
+                  backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.12)',
+                },
+              ]}
             >
-              <Text style={styles.continueBtnText}>Continue to Payment</Text>
+              <Text
+                style={[
+                  styles.continueBtnText,
+                  (selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25) && {
+                    color: '#EF4444',
+                  },
+                ]}
+              >
+                {(selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25)
+                  ? 'Slot Full'
+                  : 'Continue to Payment'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2059,6 +2113,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     marginBottom: 14,
+  },
+  sectionListCardFilled: {
+    opacity: 0.52,
   },
   sectionCardHeader: {
     flexDirection: 'row',
