@@ -704,46 +704,42 @@ export const EmployeesTab = ({ topInset, navigation }) => {
                     </View>
                   </View>
 
-                  {/* Status Pill */}
-                  <View
-                    style={[
-                      styles.statusPill,
-                      {
-                        backgroundColor: isApproved
-                          ? 'rgba(16, 185, 129, 0.12)'
-                          : isPending
-                          ? 'rgba(245, 158, 11, 0.14)'
-                          : 'rgba(239, 68, 68, 0.12)',
-                      },
-                    ]}
-                  >
+                  {/* Status Pill - Only shown when not approved (e.g. Pending Approval or Rejected) */}
+                  {!isApproved && emp.approvalStatus && emp.approvalStatus !== 'Approved' && (
                     <View
                       style={[
-                        styles.statusDot,
+                        styles.statusPill,
                         {
-                          backgroundColor: isApproved
-                            ? AppColors.successGreen
-                            : isPending
-                            ? AppColors.warningAmber
-                            : AppColors.dangerRed,
-                        },
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.statusPillText,
-                        {
-                          color: isApproved
-                            ? AppColors.successGreen
-                            : isPending
-                            ? AppColors.warningAmber
-                            : AppColors.dangerRed,
+                          backgroundColor: isPending
+                            ? 'rgba(245, 158, 11, 0.14)'
+                            : 'rgba(239, 68, 68, 0.12)',
                         },
                       ]}
                     >
-                      {emp.approvalStatus || 'Approved'}
-                    </Text>
-                  </View>
+                      <View
+                        style={[
+                          styles.statusDot,
+                          {
+                            backgroundColor: isPending
+                              ? AppColors.warningAmber
+                              : AppColors.dangerRed,
+                          },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.statusPillText,
+                          {
+                            color: isPending
+                              ? AppColors.warningAmber
+                              : AppColors.dangerRed,
+                          },
+                        ]}
+                      >
+                        {emp.approvalStatus}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* Info row */}
