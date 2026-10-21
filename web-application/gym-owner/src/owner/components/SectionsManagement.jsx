@@ -127,55 +127,83 @@ export const SectionsManagement = () => {
             emp.status !== 'Deactivated' &&
             (!emp.role || emp.role.toLowerCase().includes('trainer') || emp.role.toLowerCase().includes('coach'))
         );
-        // Fallback to all employees if none specifically marked trainer
-        setTrainers(gymTrainers.length > 0 ? gymTrainers : allEmployees);
+        const resolved = gymTrainers.length > 0 ? gymTrainers : allEmployees;
+        setTrainers(resolved);
+
+        // Auto-select first trainer if not set
+        if (!form.getFieldValue('trainerId') && resolved.length > 0) {
+          form.setFieldsValue({ trainerId: String(resolved[0]._id || resolved[0].id) });
+        }
       }
     } catch (err) {
       console.warn('Could not load gym trainers:', err.message);
     }
-  }, []);
+  }, [form]);
 
   useEffect(() => {
     fetchSections();
     fetchTrainers();
   }, [fetchSections, fetchTrainers]);
 
+  // Trainer Select Options
+  const trainerOptions = React.useMemo(() => {
+    return trainers.map((t) => ({
+      value: String(t._id || t.id),
+      label: (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Avatar size="small" src={t.avatar} icon={<UserOutlined />} />
+          <span style={{ fontWeight: 600 }}>{t.name}</span>
+          {t.employeeId ? (
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>({t.employeeId})</span>
+          ) : null}
+        </div>
+      ),
+    }));
+  }, [trainers]);
+
   // Open Create/Edit Modal
   const handleOpenModal = (section = null) => {
     setEditingSection(section);
-    if (section) {
-      form.setFieldsValue({
-        title: section.title,
-        category: section.category || 'yoga',
-        trainerId: section.trainerId?._id || section.trainerId,
-        cost: section.cost,
-        startDate: section.startDate ? section.startDate.split('T')[0] : '',
-        durationDays: section.durationDays || 20,
-        startTime: section.startTime || '06:00 AM',
-        endTime: section.endTime || '07:00 AM',
-        activeDays: section.activeDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-        maxCapacity: section.maxCapacity || 25,
-        description: section.description || '',
-        isActive: section.isActive !== undefined ? section.isActive : true,
-      });
-    } else {
-      form.resetFields();
-      form.setFieldsValue({
-        title: '',
-        category: 'yoga',
-        trainerId: trainers[0]?._id || undefined,
-        cost: 1500,
-        startDate: new Date().toISOString().split('T')[0],
-        durationDays: 20,
-        startTime: '06:00 AM',
-        endTime: '07:00 AM',
-        activeDays: ['Mon', 'Wed', 'Fri'],
-        maxCapacity: 20,
-        description: '',
-        isActive: true,
-      });
-    }
     setIsModalOpen(true);
+
+    setTimeout(() => {
+      if (section) {
+        const tid = section.trainerId?._id ? String(section.trainerId._id) : String(section.trainerId || '');
+        form.setFieldsValue({
+          title: section.title,
+          category: section.category || 'yoga',
+          trainerId: tid || undefined,
+          cost: section.cost,
+          startDate: section.startDate ? section.startDate.split('T')[0] : '',
+          durationDays: section.durationDays || 20,
+          startTime: section.startTime || '06:00 AM',
+          endTime: section.endTime || '07:00 AM',
+          activeDays: section.activeDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+          maxCapacity: section.maxCapacity || 25,
+          description: section.description || '',
+          isActive: section.isActive !== undefined ? section.isActive : true,
+        });
+      } else {
+        form.resetFields();
+        const defaultTrainerId = trainers[0]?._id
+          ? String(trainers[0]._id)
+          : (trainers[0]?.id ? String(trainers[0].id) : undefined);
+        form.setFieldsValue({
+          title: '',
+          category: 'yoga',
+          trainerId: defaultTrainerId,
+          cost: 1500,
+          startDate: new Date().toISOString().split('T')[0],
+          durationDays: 20,
+          startTime: '06:00 AM',
+          endTime: '07:00 AM',
+          activeDays: ['Mon', 'Wed', 'Fri'],
+          maxCapacity: 20,
+          description: '',
+          isActive: true,
+        });
+      }
+    }, 0);
   };
 
   // Save Section (Create / Update)
@@ -654,19 +682,8 @@ export const SectionsManagement = () => {
                   size="large"
                   placeholder="Select a gym trainer"
                   style={{ borderRadius: 'var(--radius-base)' }}
-                >
-                  {trainers.map((t) => (
-                    <Option key={t._id} value={t._id}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Avatar size="small" src={t.avatar} icon={<UserOutlined />} />
-                        <span>{t.name}</span>
-                        {t.employeeId ? (
-                          <span style={{ color: '#94a3b8', fontSize: 12 }}>({t.employeeId})</span>
-                        ) : null}
-                      </div>
-                    </Option>
-                  ))}
-                </Select>
+                  options={trainerOptions}
+                />
               </Form.Item>
             </Col>
 
