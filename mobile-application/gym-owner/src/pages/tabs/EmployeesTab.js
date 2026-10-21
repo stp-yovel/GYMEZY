@@ -102,25 +102,6 @@ export const EmployeesTab = ({ topInset, navigation }) => {
   const [addEmergencyRelation, setAddEmergencyRelation] = useState('Parent');
   const [addAvatar, setAddAvatar] = useState(null);
 
-  // Trainer Profile & Showcase State
-  const [addAboutMe, setAddAboutMe] = useState(
-    'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.'
-  );
-  const [addExperience, setAddExperience] = useState('8+ Years');
-  const [addServicesOffered, setAddServicesOffered] = useState([
-    'Weight Loss Program',
-    'Muscle Gain',
-    'Strength Training',
-    'Fat Loss',
-    'HIIT Workouts',
-    'Diet & Nutrition',
-    'Body Transformation',
-  ]);
-  const [addCertifications, setAddCertifications] = useState(
-    'ACE Certified Personal Trainer\nCertified Strength & Conditioning Specialist (CSCS)\nNutrition & Weight Management Certification'
-  );
-  const [addLanguages, setAddLanguages] = useState('English, Hindi');
-
   // Fetch Employees
   const fetchEmployees = useCallback(async () => {
     try {
@@ -191,6 +172,25 @@ export const EmployeesTab = ({ topInset, navigation }) => {
       return true;
     });
   }, [employees, activeTab, searchQuery]);
+
+  // Trainer Profile & Showcase State
+  const [addAboutMe, setAddAboutMe] = useState(
+    'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.'
+  );
+  const [addExperience, setAddExperience] = useState('8+ Years');
+  const [addServicesOffered, setAddServicesOffered] = useState([
+    'Weight Loss Program',
+    'Muscle Gain',
+    'Strength Training',
+    'Fat Loss',
+    'HIIT Workouts',
+    'Diet & Nutrition',
+    'Body Transformation',
+  ]);
+  const [addCertifications, setAddCertifications] = useState(
+    'ACE Certified Personal Trainer\nCertified Strength & Conditioning Specialist (CSCS)\nNutrition & Weight Management Certification'
+  );
+  const [addLanguages, setAddLanguages] = useState('English, Hindi');
 
   // Photo picker
   const handlePickPhoto = () => {
