@@ -108,28 +108,45 @@ const ROLE_OPTIONS_DETAILED = [
   { value: 'Customer Support', label: 'Customer Support', desc: 'Member Service & Enquiries' },
   { value: 'Housekeeping', label: 'Housekeeping', desc: 'Gym Floor Hygiene & Facility Care' },
   { value: 'Nutritionist', label: 'Nutritionist', desc: 'Diet & Meal Planning Specialist' },
-  { value: 'Floor Manager', label: 'Floor Manager', desc: 'Gym Floor Operations & Safety' },
-  { value: 'Cleaner', label: 'Cleaner', desc: 'Equipment & Washroom Sanitization' },
   { value: 'Maintenance', label: 'Maintenance', desc: 'Gym Machines & Electrical Service' },
   { value: 'Security', label: 'Security', desc: 'Turnstile & Entrance Security' },
-  { value: 'Admin', label: 'Admin / Manager', desc: 'Branch General Operations' },
 ];
 
 const ACCESS_LEVEL_OPTIONS_DETAILED = [
-  { value: 'Admin', label: 'Admin Access', desc: 'Full permissions: Profile, Staff, Plans & Reports' },
-  { value: 'Employee', label: 'Staff / Employee', desc: 'Operational: Member check-in, Attendance & Passes' },
-  { value: 'Trainer', label: 'Trainer Access', desc: 'Personal: View assigned members & workout logs' },
-  { value: 'None', label: 'View Only (No Edit)', desc: 'Restricted view-only mode without edit rights' },
+  { value: 'Admin', label: 'Admin', desc: 'Full branch access & operations' },
+  { value: 'Employee', label: 'Employee', desc: 'Member check-in & attendance operations' },
+  { value: 'None', label: 'None', desc: 'Define what this employee can access in the system.' },
 ];
 
 const EXP_OPTIONS_DETAILED = [
-  { value: 'Fresher (< 1 Year)', label: 'Fresher (< 1 Year)', desc: 'New to fitness coaching / Beginner' },
-  { value: '1-2 Years', label: '1 - 2 Years', desc: 'Junior Trainer / Staff' },
-  { value: '2-3 Years', label: '2 - 3 Years', desc: 'Mid-Level Professional' },
-  { value: '3-5 Years', label: '3 - 5 Years', desc: 'Experienced Fitness Coach' },
-  { value: '5-8 Years', label: '5 - 8 Years', desc: 'Senior Specialist Coach' },
-  { value: '8+ Years', label: '8+ Years (Master)', desc: 'Master Head Coach & Lead Instructor' },
+  { value: '1-2 Years', label: '1-2 Years', desc: '1 - 2 Years Experience' },
+  { value: '3-5 Years', label: '3-5 Years', desc: '3 - 5 Years Experience' },
+  { value: '5+ Years', label: '5+ Years', desc: '5+ Years Senior Experience' },
 ];
+
+const AVAILABLE_SERVICES = [
+  'Weight Loss Program',
+  'Muscle Gain',
+  'Strength Training',
+  'Fat Loss',
+  'HIIT Workouts',
+  'Diet & Nutrition',
+  'Body Transformation',
+];
+
+const getServiceIconName = (service) => {
+  const s = (service || '').toLowerCase().trim();
+  if (s.includes('weight loss')) return 'local-mall';
+  if (s.includes('muscle')) return 'fitness-center';
+  if (s.includes('strength')) return 'ad-units';
+  if (s.includes('fat')) return 'local-fire-department';
+  if (s.includes('hiit') || s.includes('cardio') || s.includes('run')) return 'directions-run';
+  if (s.includes('diet') || s.includes('nutrition') || s.includes('meal')) return 'restaurant';
+  if (s.includes('transformation') || s.includes('body')) return 'accessibility-new';
+  if (s.includes('yoga')) return 'self-improvement';
+  if (s.includes('crossfit')) return 'flash-on';
+  return 'fitness-center';
+};
 
 const SHIFT_OPTIONS_DETAILED = [
   { value: '06:00 AM - 02:00 PM', label: 'Morning Shift', desc: '06:00 AM - 02:00 PM (8 Hours)' },
@@ -367,6 +384,23 @@ export const SettingsTab = ({ topInset, navigation }) => {
   const [addEmpSalary, setAddEmpSalary] = useState('');
   const [addEmpSpecialty, setAddEmpSpecialty] = useState('');
   const [addEmpNotes, setAddEmpNotes] = useState('');
+  const [addEmpAboutMe, setAddEmpAboutMe] = useState(
+    'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.'
+  );
+  const [addEmpExperience, setAddEmpExperience] = useState('8+ Years');
+  const [addEmpServicesOffered, setAddEmpServicesOffered] = useState([
+    'Weight Loss Program',
+    'Muscle Gain',
+    'Strength Training',
+    'Fat Loss',
+    'HIIT Workouts',
+    'Diet & Nutrition',
+    'Body Transformation',
+  ]);
+  const [addEmpCertifications, setAddEmpCertifications] = useState(
+    'ACE Certified Personal Trainer\nCertified Strength & Conditioning Specialist (CSCS)\nNutrition & Weight Management Certification'
+  );
+  const [addEmpLanguages, setAddEmpLanguages] = useState('English, Hindi');
   const [isSubmittingEmp, setIsSubmittingEmp] = useState(false);
 
   // Attach Document Modal State
@@ -819,12 +853,13 @@ export const SettingsTab = ({ topInset, navigation }) => {
   };
 
   // -------------------------------------------------------------------------
-  // ADD TRAINER / EMPLOYEE (MULTI-STEP WIZARD)
+  // ADD TRAINER / EMPLOYEE (UNIFIED SINGLE PAGE FLOW)
   // -------------------------------------------------------------------------
   const openAddTrainerFlow = () => {
     setAddEmpStep(1);
     setAddEmpPhoto(null);
     setAddEmpName('');
+    setAddEmpCountryCode('+91');
     setAddEmpPhone('');
     setAddEmpEmail('');
     setAddEmpRole('Trainer');
@@ -843,6 +878,19 @@ export const SettingsTab = ({ topInset, navigation }) => {
     setAddEmpSalary('');
     setAddEmpSpecialty('');
     setAddEmpNotes('');
+    setAddEmpAboutMe('Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.');
+    setAddEmpExperience('8+ Years');
+    setAddEmpServicesOffered([
+      'Weight Loss Program',
+      'Muscle Gain',
+      'Strength Training',
+      'Fat Loss',
+      'HIIT Workouts',
+      'Diet & Nutrition',
+      'Body Transformation',
+    ]);
+    setAddEmpCertifications('ACE Certified Personal Trainer\nCertified Strength & Conditioning Specialist (CSCS)\nNutrition & Weight Management Certification');
+    setAddEmpLanguages('English, Hindi');
     setActiveSection('ADD_TRAINER');
   };
 
@@ -850,6 +898,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
     setAddEmpStep(1);
     setAddEmpPhoto(null);
     setAddEmpName('');
+    setAddEmpCountryCode('+91');
     setAddEmpPhone('');
     setAddEmpEmail('');
     setAddEmpRole('Front Desk Manager');
@@ -868,6 +917,11 @@ export const SettingsTab = ({ topInset, navigation }) => {
     setAddEmpSalary('');
     setAddEmpSpecialty('');
     setAddEmpNotes('');
+    setAddEmpAboutMe('');
+    setAddEmpExperience('1-2 Years');
+    setAddEmpServicesOffered([]);
+    setAddEmpCertifications('');
+    setAddEmpLanguages('English, Hindi');
     setActiveSection('ADD_EMPLOYEE');
   };
 
@@ -942,24 +996,23 @@ export const SettingsTab = ({ topInset, navigation }) => {
     showToast({ message: `${attachDocType} attached successfully!`, isSuccess: true });
   };
 
-  // Step 1 -> Step 2 validation
+  // Step navigation helper (retained for backward compatibility)
   const handleNextStep2 = () => {
     if (!addEmpName.trim()) {
-      showToast({ message: 'Please enter employee name', isError: true });
+      showToast({ message: 'Employee name is required', isError: true });
       return;
     }
     if (!addEmpPhone.trim()) {
-      showToast({ message: 'Please enter phone number', isError: true });
+      showToast({ message: 'Phone number is required', isError: true });
       return;
     }
     if (!addEmpEmail.trim()) {
-      showToast({ message: 'Please enter email address', isError: true });
+      showToast({ message: 'Email ID is required', isError: true });
       return;
     }
     setAddEmpStep(2);
   };
 
-  // Step 2 -> Step 3 validation
   const handleNextStep3 = () => {
     if (!addEmpEmergencyName.trim() || !addEmpEmergencyPhone.trim()) {
       showToast({ message: 'Emergency contact name & phone are required', isError: true });
@@ -968,11 +1021,28 @@ export const SettingsTab = ({ topInset, navigation }) => {
     setAddEmpStep(3);
   };
 
-  // Complete submission
+  // Complete unified submission
   const handleCompleteAddEmployee = async (isTrainer = false) => {
+    if (!addEmpName.trim()) {
+      showToast({ message: 'Employee name is required', isError: true });
+      return;
+    }
+    if (!addEmpPhone.trim()) {
+      showToast({ message: 'Phone number is required', isError: true });
+      return;
+    }
+    if (!addEmpEmail.trim()) {
+      showToast({ message: 'Email ID is required', isError: true });
+      return;
+    }
+    if (!addEmpEmergencyName.trim() || !addEmpEmergencyPhone.trim()) {
+      showToast({ message: 'Emergency contact name & phone are required', isError: true });
+      return;
+    }
+
     setIsSubmittingEmp(true);
     try {
-      const fullPhone = `${addEmpCountryCode} ${addEmpPhone.trim()}`.trim();
+      const fullPhone = `${addEmpCountryCode || '+91'} ${addEmpPhone.trim()}`.trim();
       const payload = {
         gymId: targetGymId,
         gymPartnerId: gymData?.partnerId || (typeof targetGymId === 'string' && !targetGymId.match(/^[0-9a-fA-F]{24}$/) ? targetGymId : 'GYM-001'),
@@ -981,40 +1051,38 @@ export const SettingsTab = ({ topInset, navigation }) => {
         role: isTrainer ? 'Trainer' : addEmpRole,
         phone: fullPhone,
         email: addEmpEmail.trim(),
-        avatar: addEmpPhoto || '',
+        avatar: addEmpPhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop',
+        joinDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        status: 'Active',
+        attendance: 'Present',
         accessType: addEmpAccessLevel,
-        type: addEmpType,
-        specialty: isTrainer ? addEmpSpecialty.trim() || 'Fitness Trainer' : addEmpRole,
-        experienceYears: addEmpPrevExp.includes('5+') ? 5 : addEmpPrevExp.includes('3-5') ? 3 : 1,
+        approvalStatus: 'Pending Approval',
         previousCompany: addEmpPrevCompany.trim(),
         previousDesignation: addEmpPrevDesignation.trim(),
         previousExp: addEmpPrevExp,
+        description: addEmpAboutMe.trim() || 'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.',
+        aboutMe: addEmpAboutMe.trim() || 'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.',
+        servicesOffered: addEmpServicesOffered.length > 0 ? addEmpServicesOffered : AVAILABLE_SERVICES,
+        experience: addEmpExperience.trim() || addEmpPrevExp || '8+ Years',
+        certifications: addEmpCertifications
+          ? addEmpCertifications.split('\n').map((c) => c.trim().replace(/^[•\-*]\s*/, '')).filter(Boolean)
+          : ['ACE Certified Personal Trainer', 'Certified Strength & Conditioning Specialist (CSCS)', 'Nutrition & Weight Management Certification'],
+        languages: addEmpLanguages
+          ? addEmpLanguages.split(',').map((l) => l.trim()).filter(Boolean)
+          : ['English', 'Hindi'],
         emergencyContact: {
           name: addEmpEmergencyName.trim(),
-          relationship: addEmpEmergencyRel.trim(),
+          relationship: addEmpEmergencyRel.trim() || 'Spouse',
           phone: addEmpEmergencyPhone.trim(),
-        },
-        schedule: {
-          shiftHours: addEmpShift,
-          workingTimeStart: addEmpShift.split('-')[0]?.trim() || '06:00 AM',
-          workingTimeEnd: addEmpShift.split('-')[1]?.trim() || '02:00 PM',
-          workingDays: addEmpWorkDays.includes('Everyday')
-            ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-            : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-        },
-        compensation: {
-          payAmount: Number(addEmpSalary) || 0,
-          payType: 'Monthly',
-          payFreq: 'Monthly',
         },
         documents: [...addEmpDocsList, ...addPersonalDocsList],
         trainerCerts: addTrainerCertsList,
-        notes: addEmpNotes.trim(),
+        specialty: isTrainer ? addEmpSpecialty.trim() || 'Fitness Trainer' : addEmpRole,
       };
 
       const res = await apiService.createEmployee(payload);
       showToast({
-        message: res.message || `${payload.name} submitted successfully! Pending Super Admin approval.`,
+        message: res.message || `Employee "${payload.name}" submitted for Super Admin approval!`,
         isSuccess: true,
       });
 
@@ -2523,10 +2591,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
   };
 
   // -------------------------------------------------------------------------
-  // 6. MULTI-STEP ADD TRAINER / STAFF FORM (MATCHING WEB LOGIC)
-  // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // 6. MULTI-STEP ADD TRAINER / STAFF FORM (MATCHING WEB LOGIC)
+  // 6. UNIFIED SINGLE-PAGE ADD TRAINER / STAFF FORM (MATCHING WEB LOGIC)
   // -------------------------------------------------------------------------
   const renderAddTrainerOrEmpSubView = (isTrainer = false) => (
     <ScrollView
@@ -2546,177 +2611,287 @@ export const SettingsTab = ({ topInset, navigation }) => {
         >
           <MaterialIcons name="arrow-back" size={22} color={isDark ? '#FFFFFF' : '#0F172A'} />
         </TouchableOpacity>
-        <Text style={[styles.subHeaderTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-          {isTrainer ? 'Add Trainer' : 'Add Staff Member'}
-        </Text>
-        <View style={{ width: 42 }} />
-      </View>
-
-      {/* Step Wizard Progress Header */}
-      <View style={styles.wizardProgressRow}>
-        <View style={[styles.stepPill, addEmpStep >= 1 && styles.stepPillActive]}>
-          <Text style={[styles.stepPillText, addEmpStep >= 1 && styles.stepPillTextActive]}>1. Personal Info</Text>
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <Text style={[styles.subHeaderTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+            {isTrainer ? 'Add Trainer' : 'Add New Employee'}
+          </Text>
+          <Text style={{ fontSize: 11.5, color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B', marginTop: 2 }}>
+            Add trainer, coach, or operational gym employee
+          </Text>
         </View>
-        <View style={styles.stepConnector} />
-        <View style={[styles.stepPill, addEmpStep >= 2 && styles.stepPillActive]}>
-          <Text style={[styles.stepPillText, addEmpStep >= 2 && styles.stepPillTextActive]}>2. Docs & Certs</Text>
-        </View>
-        <View style={styles.stepConnector} />
-        <View style={[styles.stepPill, addEmpStep >= 3 && styles.stepPillActive]}>
-          <Text style={[styles.stepPillText, addEmpStep >= 3 && styles.stepPillTextActive]}>3. Schedule & Pay</Text>
-        </View>
+        <View style={{ width: 10 }} />
       </View>
 
       <View
         style={[
           styles.card,
-          { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', marginTop: 14 },
+          { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', marginTop: 10 },
         ]}
       >
-        {/* ==================== STEP 1: PERSONAL & BASIC INFO ==================== */}
-        {addEmpStep === 1 && (
-          <View>
-            <Text style={[styles.stepHeaderTitle, { color: '#722ED1' }]}>
-              Personal Details & Previous Employment
+        {/* ==================== 1. BASIC INFORMATION ==================== */}
+        {/* Photo Avatar Picker */}
+        <View style={{ alignItems: 'center', marginVertical: 12 }}>
+          <TouchableOpacity
+            style={[styles.empPhotoPickerBox, { borderColor: addEmpPhoto ? '#722ED1' : isDark ? AppColors.darkBorder : '#CBD5E1' }]}
+            onPress={handlePickEmpPhoto}
+          >
+            {addEmpPhoto ? (
+              <Image source={{ uri: addEmpPhoto }} style={styles.empPhotoPreview} />
+            ) : (
+              <View style={{ alignItems: 'center' }}>
+                <MaterialIcons name="photo-camera" size={28} color="#722ED1" />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#722ED1', marginTop: 4 }}>Upload Photo</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <Text style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B', marginTop: 6 }}>
+            {addEmpPhoto ? 'Photo attached. Tap to change.' : 'Employee Photo • JPG, PNG (Max 2MB)'}
+          </Text>
+        </View>
+
+        {/* Employee Name */}
+        <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+          Employee Name <Text style={{ color: '#EF4444' }}>*</Text>
+        </Text>
+        <TextInput
+          value={addEmpName}
+          onChangeText={setAddEmpName}
+          placeholder="Enter employee name"
+          placeholderTextColor="#94A3B8"
+          style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
+        />
+
+        {/* Phone Number with Country Code */}
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+          <View style={{ width: 85 }}>
+            <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Code</Text>
+            <TextInput
+              value={addEmpCountryCode}
+              onChangeText={setAddEmpCountryCode}
+              placeholder="+91"
+              placeholderTextColor="#94A3B8"
+              style={[styles.formInput, { textAlign: 'center', color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+              Phone Number <Text style={{ color: '#EF4444' }}>*</Text>
             </Text>
+            <TextInput
+              value={addEmpPhone}
+              onChangeText={setAddEmpPhone}
+              placeholder="9876543210"
+              keyboardType="phone-pad"
+              placeholderTextColor="#94A3B8"
+              style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
+            />
+          </View>
+        </View>
 
-            {/* Photo Avatar Picker */}
-            <View style={{ alignItems: 'center', marginVertical: 14 }}>
-              <TouchableOpacity
-                style={[styles.empPhotoPickerBox, { borderColor: addEmpPhoto ? '#722ED1' : isDark ? AppColors.darkBorder : '#CBD5E1' }]}
-                onPress={handlePickEmpPhoto}
+        {/* Email ID */}
+        <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 12 }]}>
+          Email ID <Text style={{ color: '#EF4444' }}>*</Text>
+        </Text>
+        <TextInput
+          value={addEmpEmail}
+          onChangeText={setAddEmpEmail}
+          placeholder="staff@gymezy.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          placeholderTextColor="#94A3B8"
+          style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
+        />
+
+        {/* Role & Access Level Side-by-Side */}
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+              Role <Text style={{ color: '#EF4444' }}>*</Text>
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.dropdownField,
+                {
+                  backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC',
+                  borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                },
+              ]}
+              onPress={() =>
+                openOptionPicker(
+                  'Select Role',
+                  ROLE_OPTIONS_DETAILED,
+                  addEmpRole,
+                  (val) => setAddEmpRole(val)
+                )
+              }
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.dropdownValueText,
+                  { color: isDark ? '#FFFFFF' : '#0F172A' },
+                ]}
+                numberOfLines={1}
               >
-                {addEmpPhoto ? (
-                  <Image source={{ uri: addEmpPhoto }} style={styles.empPhotoPreview} />
-                ) : (
-                  <View style={{ alignItems: 'center' }}>
-                    <MaterialIcons name="photo-camera" size={28} color="#722ED1" />
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#722ED1', marginTop: 4 }}>Upload Photo</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              <Text style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B', marginTop: 6 }}>
-                Tap to upload employee headshot photo
+                {addEmpRole || 'Select Role'}
               </Text>
-            </View>
+              <MaterialIcons name="keyboard-arrow-down" size={22} color={isDark ? '#94A3B8' : '#64748B'} />
+            </TouchableOpacity>
+          </View>
 
-            <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Full Name *</Text>
-            <TextInput
-              value={addEmpName}
-              onChangeText={setAddEmpName}
-              placeholder="e.g. Arun Kumar"
-              placeholderTextColor="#94A3B8"
-              style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
-            />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+              Access Level <Text style={{ color: '#EF4444' }}>*</Text>
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.dropdownField,
+                {
+                  backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC',
+                  borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                },
+              ]}
+              onPress={() =>
+                openOptionPicker(
+                  'Select Access Level',
+                  ACCESS_LEVEL_OPTIONS_DETAILED,
+                  addEmpAccessLevel,
+                  (val) => setAddEmpAccessLevel(val)
+                )
+              }
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.dropdownValueText,
+                  { color: isDark ? '#FFFFFF' : '#0F172A' },
+                ]}
+                numberOfLines={1}
+              >
+                {addEmpAccessLevel || 'Select Level'}
+              </Text>
+              <MaterialIcons name="keyboard-arrow-down" size={22} color={isDark ? '#94A3B8' : '#64748B'} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B', marginTop: 4, marginBottom: 12 }}>
+          Define what this employee can access in the system.
+        </Text>
 
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-              <View style={{ width: 85 }}>
-                <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Code</Text>
-                <TextInput
-                  value={addEmpCountryCode}
-                  onChangeText={setAddEmpCountryCode}
-                  placeholder="+91"
-                  placeholderTextColor="#94A3B8"
-                  style={[styles.formInput, { textAlign: 'center', color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Phone Number *</Text>
-                <TextInput
-                  value={addEmpPhone}
-                  onChangeText={setAddEmpPhone}
-                  placeholder="9876543210"
-                  keyboardType="phone-pad"
-                  placeholderTextColor="#94A3B8"
-                  style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
-                />
-              </View>
-            </View>
+        {/* ==================== 2. TRAINER PROFILE & SHOWCASE ==================== */}
+        <View style={[styles.subSectionBox, { borderColor: isDark ? AppColors.darkBorder : '#F1F5F9', marginTop: 8 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <MaterialIcons name="stars" size={18} color="#722ED1" />
+            <Text style={[styles.subSectionTitle, { color: '#722ED1', marginBottom: 0 }]}>
+              Trainer Profile & Showcase (Shown in User App)
+            </Text>
+          </View>
+          <Text style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B', marginBottom: 10 }}>
+            This info appears directly in the user mobile app when members view your trainer.
+          </Text>
 
-            <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 12 }]}>Email Address *</Text>
-            <TextInput
-              value={addEmpEmail}
-              onChangeText={setAddEmpEmail}
-              placeholder="staff@gymezy.com"
-              keyboardType="email-address"
-              placeholderTextColor="#94A3B8"
-              style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
-            />
+          <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+            About Me / Trainer Description
+          </Text>
+          <TextInput
+            value={addEmpAboutMe}
+            onChangeText={setAddEmpAboutMe}
+            placeholder="e.g. Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance."
+            placeholderTextColor="#94A3B8"
+            multiline
+            numberOfLines={3}
+            style={[styles.formInput, { height: 75, textAlignVertical: 'top', color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
+          />
 
-            {/* Role & Access Level Side-by-Side Dropdowns */}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Role *</Text>
+          <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 10 }]}>
+            Services Offered
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: 6 }}>
+            {AVAILABLE_SERVICES.map((srv) => {
+              const isSelected = addEmpServicesOffered.includes(srv);
+              return (
                 <TouchableOpacity
+                  key={srv}
                   style={[
-                    styles.dropdownField,
+                    styles.selectionChipSmall,
                     {
-                      backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC',
-                      borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      backgroundColor: isSelected ? '#722ED1' : isDark ? AppColors.darkSurface : '#F8FAFC',
+                      borderColor: isSelected ? '#722ED1' : isDark ? AppColors.darkBorder : '#E2E8F0',
                     },
                   ]}
-                  onPress={() =>
-                    openOptionPicker(
-                      'Select Role',
-                      isTrainer ? [{ value: 'Trainer', label: 'Trainer', desc: 'Fitness & Personal Coach' }] : ROLE_OPTIONS_DETAILED,
-                      addEmpRole,
-                      (val) => setAddEmpRole(val)
-                    )
-                  }
-                  activeOpacity={0.8}
+                  onPress={() => {
+                    if (isSelected) {
+                      setAddEmpServicesOffered(addEmpServicesOffered.filter((s) => s !== srv));
+                    } else {
+                      setAddEmpServicesOffered([...addEmpServicesOffered, srv]);
+                    }
+                  }}
                 >
-                  <Text
-                    style={[
-                      styles.dropdownValueText,
-                      { color: isDark ? '#FFFFFF' : '#0F172A' },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {addEmpRole || 'Select Role'}
+                  <MaterialIcons
+                    name={getServiceIconName(srv)}
+                    size={14}
+                    color={isSelected ? '#FFFFFF' : isDark ? '#CBD5E1' : '#475569'}
+                  />
+                  <Text style={[styles.selectionChipTextSmall, { color: isSelected ? '#FFFFFF' : isDark ? '#FFFFFF' : '#0F172A' }]}>
+                    {srv}
                   </Text>
-                  <MaterialIcons name="keyboard-arrow-down" size={22} color={isDark ? '#94A3B8' : '#64748B'} />
                 </TouchableOpacity>
-              </View>
+              );
+            })}
+          </View>
 
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Access Level</Text>
-                <TouchableOpacity
-                  style={[
-                    styles.dropdownField,
-                    {
-                      backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC',
-                      borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                    },
-                  ]}
-                  onPress={() =>
-                    openOptionPicker(
-                      'Select Access Level',
-                      ACCESS_LEVEL_OPTIONS_DETAILED,
-                      addEmpAccessLevel,
-                      (val) => setAddEmpAccessLevel(val)
-                    )
-                  }
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownValueText,
-                      { color: isDark ? '#FFFFFF' : '#0F172A' },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {addEmpAccessLevel || 'Select Level'}
-                  </Text>
-                  <MaterialIcons name="keyboard-arrow-down" size={22} color={isDark ? '#94A3B8' : '#64748B'} />
-                </TouchableOpacity>
-              </View>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Experience</Text>
+              <TextInput
+                value={addEmpExperience}
+                onChangeText={setAddEmpExperience}
+                placeholder="e.g. 8+ Years"
+                placeholderTextColor="#94A3B8"
+                style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
+              />
             </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Languages</Text>
+              <TextInput
+                value={addEmpLanguages}
+                onChangeText={setAddEmpLanguages}
+                placeholder="e.g. English, Hindi"
+                placeholderTextColor="#94A3B8"
+                style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
+              />
+            </View>
+          </View>
 
-            {/* Previous Employment Section */}
-            <View style={[styles.subSectionBox, { borderColor: isDark ? AppColors.darkBorder : '#F1F5F9', marginTop: 16 }]}>
-              <Text style={[styles.subSectionTitle, { color: '#722ED1' }]}>Previous Employment Details</Text>
-              
-              <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 8 }]}>Previous Gym / Company</Text>
+          <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 10 }]}>
+            Certifications
+          </Text>
+          <TextInput
+            value={addEmpCertifications}
+            onChangeText={setAddEmpCertifications}
+            placeholder="Type certification (e.g. ACE Certified Personal Trainer)"
+            placeholderTextColor="#94A3B8"
+            multiline
+            numberOfLines={2}
+            style={[styles.formInput, { height: 60, textAlignVertical: 'top', color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
+          />
+        </View>
+
+        {/* ==================== 3. PREVIOUS EMPLOYMENT DETAILS ==================== */}
+        <View style={[styles.subSectionBox, { borderColor: isDark ? AppColors.darkBorder : '#F1F5F9', marginTop: 14 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <MaterialIcons name="business-center" size={18} color="#722ED1" />
+            <Text style={[styles.subSectionTitle, { color: '#722ED1', marginBottom: 0 }]}>
+              Previous Employment Details
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Company Name</Text>
               <TextInput
                 value={addEmpPrevCompany}
                 onChangeText={setAddEmpPrevCompany}
@@ -2724,391 +2899,253 @@ export const SettingsTab = ({ topInset, navigation }) => {
                 placeholderTextColor="#94A3B8"
                 style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
               />
-
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Designation</Text>
-                  <TextInput
-                    value={addEmpPrevDesignation}
-                    onChangeText={setAddEmpPrevDesignation}
-                    placeholder="e.g. Senior Trainer"
-                    placeholderTextColor="#94A3B8"
-                    style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Experience</Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.dropdownField,
-                      {
-                        backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC',
-                        borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                      },
-                    ]}
-                    onPress={() =>
-                      openOptionPicker(
-                        'Select Experience',
-                        EXP_OPTIONS_DETAILED,
-                        addEmpPrevExp,
-                        (val) => setAddEmpPrevExp(val)
-                      )
-                    }
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownValueText,
-                        { color: isDark ? '#FFFFFF' : '#0F172A' },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {addEmpPrevExp || 'Select Exp'}
-                    </Text>
-                    <MaterialIcons name="keyboard-arrow-down" size={22} color={isDark ? '#94A3B8' : '#64748B'} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Employment Documents Table */}
-              <View style={{ marginTop: 14 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                    Employment Documents ({addEmpDocsList.length})
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.attachBtn}
-                    onPress={() => openAttachDocModal('employment')}
-                  >
-                    <MaterialIcons name="attach-file" size={14} color="#722ED1" />
-                    <Text style={styles.attachBtnText}>Attach Document</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {addEmpDocsList.map((doc, idx) => (
-                  <View key={doc.key || idx} style={[styles.docListItem, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC' }]}>
-                    <MaterialIcons name="description" size={18} color="#722ED1" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.docListTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>{doc.docType}</Text>
-                      <Text style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }}>
-                        {doc.fileName} • {doc.addedOn}
-                      </Text>
-                    </View>
-                    <TouchableOpacity onPress={() => setAddEmpDocsList(addEmpDocsList.filter((_, i) => i !== idx))}>
-                      <MaterialIcons name="delete" size={18} color="#EF4444" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                {addEmpDocsList.length === 0 && (
-                  <Text style={{ fontSize: 11, color: '#94A3B8' }}>No employment documents attached yet.</Text>
-                )}
-              </View>
             </View>
-
-            {/* Next Button */}
-            <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: AppColors.primaryColor, marginTop: 20 }]}
-              onPress={handleNextStep2}
-            >
-              <Text style={styles.submitBtnText}>Next: Documents & Certifications</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* ==================== STEP 2: FAMILY & VERIFICATION DOCS ==================== */}
-        {addEmpStep === 2 && (
-          <View>
-            <Text style={[styles.stepHeaderTitle, { color: '#722ED1' }]}>
-              Family & Government ID Verification
-            </Text>
-
-            <View style={[styles.subSectionBox, { borderColor: isDark ? AppColors.darkBorder : '#F1F5F9', marginTop: 10 }]}>
-              <Text style={[styles.subSectionTitle, { color: '#722ED1' }]}>Emergency Contact Details</Text>
-              
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Contact Name *</Text>
-                  <TextInput
-                    value={addEmpEmergencyName}
-                    onChangeText={setAddEmpEmergencyName}
-                    placeholder="e.g. Priya Kumar"
-                    placeholderTextColor="#94A3B8"
-                    style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Relationship *</Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.dropdownField,
-                      {
-                        backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC',
-                        borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                      },
-                    ]}
-                    onPress={() =>
-                      openOptionPicker(
-                        'Select Relationship',
-                        REL_OPTIONS_DETAILED,
-                        addEmpEmergencyRel,
-                        (val) => setAddEmpEmergencyRel(val)
-                      )
-                    }
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownValueText,
-                        { color: isDark ? '#FFFFFF' : '#0F172A' },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {addEmpEmergencyRel || 'Select'}
-                    </Text>
-                    <MaterialIcons name="keyboard-arrow-down" size={22} color={isDark ? '#94A3B8' : '#64748B'} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 10 }]}>Emergency Phone Number *</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Designation</Text>
               <TextInput
-                value={addEmpEmergencyPhone}
-                onChangeText={setAddEmpEmergencyPhone}
-                placeholder="+91 98400 00000"
-                keyboardType="phone-pad"
+                value={addEmpPrevDesignation}
+                onChangeText={setAddEmpPrevDesignation}
+                placeholder="e.g. Senior Trainer"
                 placeholderTextColor="#94A3B8"
                 style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
               />
             </View>
+          </View>
 
-            {/* Government ID Documents */}
-            <View style={[styles.subSectionBox, { borderColor: isDark ? AppColors.darkBorder : '#F1F5F9', marginTop: 14 }]}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={[styles.subSectionTitle, { color: '#722ED1' }]}>
-                  Government ID Proofs ({addPersonalDocsList.length})
-                </Text>
-                <TouchableOpacity
-                  style={styles.attachBtn}
-                  onPress={() => openAttachDocModal('personal')}
-                >
-                  <MaterialIcons name="add" size={14} color="#722ED1" />
-                  <Text style={styles.attachBtnText}>Attach ID Proof</Text>
-                </TouchableOpacity>
-              </View>
+          <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 10 }]}>Years of Experience</Text>
+          <TouchableOpacity
+            style={[
+              styles.dropdownField,
+              {
+                backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC',
+                borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+              },
+            ]}
+            onPress={() =>
+              openOptionPicker(
+                'Select Experience',
+                EXP_OPTIONS_DETAILED,
+                addEmpPrevExp,
+                (val) => setAddEmpPrevExp(val)
+              )
+            }
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                styles.dropdownValueText,
+                { color: isDark ? '#FFFFFF' : '#0F172A' },
+              ]}
+              numberOfLines={1}
+            >
+              {addEmpPrevExp || 'Select Experience'}
+            </Text>
+            <MaterialIcons name="keyboard-arrow-down" size={22} color={isDark ? '#94A3B8' : '#64748B'} />
+          </TouchableOpacity>
 
-              {addPersonalDocsList.map((doc, idx) => (
-                <View key={doc.key || idx} style={[styles.docListItem, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC' }]}>
-                  <MaterialIcons name="badge" size={18} color="#10B981" />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.docListTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>{doc.docType}</Text>
-                    <Text style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }}>
-                      No: {doc.docNum} • {doc.fileName}
-                    </Text>
-                  </View>
-                  <TouchableOpacity onPress={() => setAddPersonalDocsList(addPersonalDocsList.filter((_, i) => i !== idx))}>
-                    <MaterialIcons name="delete" size={18} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              {addPersonalDocsList.length === 0 && (
-                <Text style={{ fontSize: 11, color: '#94A3B8' }}>No government ID proofs attached yet.</Text>
-              )}
+          {/* Added Employment Documents Table */}
+          <View style={{ marginTop: 12 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                Added Employment Documents ({addEmpDocsList.length})
+              </Text>
+              <TouchableOpacity
+                style={styles.attachBtn}
+                onPress={() => openAttachDocModal('employment')}
+              >
+                <MaterialIcons name="attach-file" size={14} color="#722ED1" />
+                <Text style={styles.attachBtnText}>Attach Document</Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Trainer Certifications (If Trainer) */}
-            {isTrainer && (
-              <View style={[styles.subSectionBox, { borderColor: isDark ? AppColors.darkBorder : '#F1F5F9', marginTop: 14 }]}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <Text style={[styles.subSectionTitle, { color: '#722ED1' }]}>
-                    Trainer Certifications & Proofs ({addTrainerCertsList.length})
+            {addEmpDocsList.map((doc, idx) => (
+              <View key={doc.key || idx} style={[styles.docListItem, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC' }]}>
+                <MaterialIcons name="description" size={18} color="#722ED1" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.docListTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>{doc.docType}</Text>
+                  <Text style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }}>
+                    {doc.fileName} • {doc.addedOn}
                   </Text>
-                  <TouchableOpacity
-                    style={styles.attachBtn}
-                    onPress={() => openAttachDocModal('trainer')}
-                  >
-                    <MaterialIcons name="card-membership" size={14} color="#722ED1" />
-                    <Text style={styles.attachBtnText}>Attach Certificate</Text>
-                  </TouchableOpacity>
                 </View>
+                <TouchableOpacity onPress={() => setAddEmpDocsList(addEmpDocsList.filter((_, i) => i !== idx))}>
+                  <MaterialIcons name="delete" size={18} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {addEmpDocsList.length === 0 && (
+              <Text style={{ fontSize: 11, color: '#94A3B8' }}>No employment documents attached yet.</Text>
+            )}
+          </View>
+        </View>
 
-                {addTrainerCertsList.map((cert, idx) => (
-                  <View key={cert.key || idx} style={[styles.docListItem, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC' }]}>
-                    <MaterialIcons name="verified" size={18} color="#F59E0B" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.docListTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>{cert.certType}</Text>
-                      <Text style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }}>
-                        ID: {cert.certNum} • {cert.fileName}
-                      </Text>
-                    </View>
-                    <TouchableOpacity onPress={() => setAddTrainerCertsList(addTrainerCertsList.filter((_, i) => i !== idx))}>
-                      <MaterialIcons name="delete" size={18} color="#EF4444" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                {addTrainerCertsList.length === 0 && (
-                  <Text style={{ fontSize: 11, color: '#94A3B8' }}>No trainer certifications attached yet.</Text>
-                )}
+        {/* ==================== 4. FAMILY DETAILS ==================== */}
+        <View style={[styles.subSectionBox, { borderColor: isDark ? AppColors.darkBorder : '#F1F5F9', marginTop: 14 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <MaterialIcons name="group" size={18} color="#722ED1" />
+            <Text style={[styles.subSectionTitle, { color: '#722ED1', marginBottom: 0 }]}>
+              Family Details
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                Emergency Contact Name <Text style={{ color: '#EF4444' }}>*</Text>
+              </Text>
+              <TextInput
+                value={addEmpEmergencyName}
+                onChangeText={setAddEmpEmergencyName}
+                placeholder="Contact full name"
+                placeholderTextColor="#94A3B8"
+                style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                Relationship <Text style={{ color: '#EF4444' }}>*</Text>
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.dropdownField,
+                  {
+                    backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC',
+                    borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                  },
+                ]}
+                onPress={() =>
+                  openOptionPicker(
+                    'Select Relationship',
+                    REL_OPTIONS_DETAILED,
+                    addEmpEmergencyRel,
+                    (val) => setAddEmpEmergencyRel(val)
+                  )
+                }
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.dropdownValueText,
+                    { color: isDark ? '#FFFFFF' : '#0F172A' },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {addEmpEmergencyRel || 'e.g. Spouse / Brother'}
+                </Text>
+                <MaterialIcons name="keyboard-arrow-down" size={22} color={isDark ? '#94A3B8' : '#64748B'} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 10 }]}>
+            Phone Number <Text style={{ color: '#EF4444' }}>*</Text>
+          </Text>
+          <TextInput
+            value={addEmpEmergencyPhone}
+            onChangeText={setAddEmpEmergencyPhone}
+            placeholder="+91 98765 43210"
+            keyboardType="phone-pad"
+            placeholderTextColor="#94A3B8"
+            style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
+          />
+        </View>
+
+        {/* ==================== 5. DOCUMENTS ==================== */}
+        <View style={[styles.subSectionBox, { borderColor: isDark ? AppColors.darkBorder : '#F1F5F9', marginTop: 14 }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <MaterialIcons name="badge" size={18} color="#722ED1" />
+              <Text style={[styles.subSectionTitle, { color: '#722ED1', marginBottom: 0 }]}>
+                Documents ({addPersonalDocsList.length})
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.attachBtn}
+              onPress={() => openAttachDocModal('personal')}
+            >
+              <MaterialIcons name="attach-file" size={14} color="#722ED1" />
+              <Text style={styles.attachBtnText}>Attach Document</Text>
+            </TouchableOpacity>
+          </View>
+
+          {addPersonalDocsList.map((doc, idx) => (
+            <View key={doc.key || idx} style={[styles.docListItem, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC' }]}>
+              <MaterialIcons name="badge" size={18} color="#10B981" />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.docListTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>{doc.docType}</Text>
+                <Text style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }}>
+                  No: {doc.docNum || '—'} • {doc.fileName}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setAddPersonalDocsList(addPersonalDocsList.filter((_, i) => i !== idx))}>
+                <MaterialIcons name="delete" size={18} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {addPersonalDocsList.length === 0 && (
+            <Text style={{ fontSize: 11, color: '#94A3B8' }}>No personal verification documents attached yet.</Text>
+          )}
+        </View>
+
+        {/* ==================== 6. TRAINER CERTIFICATE ==================== */}
+        <View style={[styles.subSectionBox, { borderColor: isDark ? AppColors.darkBorder : '#F1F5F9', marginTop: 14 }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <MaterialIcons name="card-membership" size={18} color="#722ED1" />
+              <Text style={[styles.subSectionTitle, { color: '#722ED1', marginBottom: 0 }]}>
+                Trainer Certificate ({addTrainerCertsList.length})
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.attachBtn}
+              onPress={() => openAttachDocModal('trainer')}
+            >
+              <MaterialIcons name="attach-file" size={14} color="#722ED1" />
+              <Text style={styles.attachBtnText}>Attach Certificate</Text>
+            </TouchableOpacity>
+          </View>
+
+          {addTrainerCertsList.map((cert, idx) => (
+            <View key={cert.key || idx} style={[styles.docListItem, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC' }]}>
+              <MaterialIcons name="verified" size={18} color="#F59E0B" />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.docListTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>{cert.certType}</Text>
+                <Text style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }}>
+                  ID: {cert.certNum || '—'} • {cert.fileName}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setAddTrainerCertsList(addTrainerCertsList.filter((_, i) => i !== idx))}>
+                <MaterialIcons name="delete" size={18} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {addTrainerCertsList.length === 0 && (
+            <Text style={{ fontSize: 11, color: '#94A3B8' }}>No trainer certificates attached yet.</Text>
+          )}
+        </View>
+
+        {/* ==================== BOTTOM ACTIONS ==================== */}
+        <View style={{ flexDirection: 'row', gap: 12, marginTop: 24, paddingTop: 14, borderTopWidth: 1, borderTopColor: isDark ? AppColors.darkBorder : '#F1F5F9' }}>
+          <TouchableOpacity
+            style={[styles.backStepBtn, { borderColor: isDark ? AppColors.darkBorder : '#CBD5E1' }]}
+            onPress={() => setActiveSection(isTrainer ? 'TRAINER_PROFILE' : 'EMPLOYEES')}
+          >
+            <Text style={{ color: isDark ? '#FFFFFF' : '#0F172A', fontWeight: '700' }}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.submitBtn, { flex: 1, backgroundColor: AppColors.primaryColor }]}
+            onPress={() => handleCompleteAddEmployee(isTrainer)}
+            disabled={isSubmittingEmp}
+          >
+            {isSubmittingEmp ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <MaterialIcons name="person-add" size={18} color="#FFFFFF" />
+                <Text style={styles.submitBtnText}>Add Employee</Text>
               </View>
             )}
-
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-              <TouchableOpacity
-                style={[styles.backStepBtn, { borderColor: isDark ? AppColors.darkBorder : '#CBD5E1' }]}
-                onPress={() => setAddEmpStep(1)}
-              >
-                <Text style={{ color: isDark ? '#FFFFFF' : '#0F172A', fontWeight: '700' }}>Back</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.submitBtn, { flex: 1, backgroundColor: AppColors.primaryColor }]}
-                onPress={handleNextStep3}
-              >
-                <Text style={styles.submitBtnText}>Next: Schedule & Pay</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* ==================== STEP 3: SCHEDULE, SPECIALTY & PAY ==================== */}
-        {addEmpStep === 3 && (
-          <View>
-            <Text style={[styles.stepHeaderTitle, { color: '#722ED1' }]}>
-              Shift Schedule & Compensation
-            </Text>
-
-            <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 10 }]}>
-              {isTrainer ? 'Trainer Specialty / Focus Area' : 'Designation / Area'}
-            </Text>
-            <TextInput
-              value={addEmpSpecialty}
-              onChangeText={setAddEmpSpecialty}
-              placeholder={isTrainer ? 'e.g. Strength & Conditioning Coach' : 'e.g. Front Desk Specialist'}
-              placeholderTextColor="#94A3B8"
-              style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
-            />
-
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Monthly Pay (₹)</Text>
-                <TextInput
-                  value={addEmpSalary}
-                  onChangeText={setAddEmpSalary}
-                  placeholder="e.g. 25000"
-                  keyboardType="number-pad"
-                  placeholderTextColor="#94A3B8"
-                  style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Shift Schedule</Text>
-                <TouchableOpacity
-                  style={[
-                    styles.dropdownField,
-                    {
-                      backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC',
-                      borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                    },
-                  ]}
-                  onPress={() =>
-                    openOptionPicker(
-                      'Select Shift Schedule',
-                      SHIFT_OPTIONS_DETAILED,
-                      addEmpShift,
-                      (val) => setAddEmpShift(val)
-                    )
-                  }
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownValueText,
-                      { color: isDark ? '#FFFFFF' : '#0F172A' },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {addEmpShift || 'Select Shift'}
-                  </Text>
-                  <MaterialIcons name="keyboard-arrow-down" size={22} color={isDark ? '#94A3B8' : '#64748B'} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Work Days</Text>
-                <TextInput
-                  value={addEmpWorkDays}
-                  onChangeText={setAddEmpWorkDays}
-                  placeholder="Mon - Sat"
-                  placeholderTextColor="#94A3B8"
-                  style={[styles.formInput, { color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Employment Type</Text>
-                <TouchableOpacity
-                  style={[
-                    styles.dropdownField,
-                    {
-                      backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC',
-                      borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                    },
-                  ]}
-                  onPress={() =>
-                    openOptionPicker(
-                      'Select Employment Type',
-                      EMP_TYPE_OPTIONS_DETAILED,
-                      addEmpType,
-                      (val) => setAddEmpType(val)
-                    )
-                  }
-                  activeOpacity={0.8}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownValueText,
-                      { color: isDark ? '#FFFFFF' : '#0F172A' },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {addEmpType || 'Full-Time'}
-                  </Text>
-                  <MaterialIcons name="keyboard-arrow-down" size={22} color={isDark ? '#94A3B8' : '#64748B'} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <Text style={[styles.inputLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 12 }]}>Bio & Trainer Description</Text>
-            <TextInput
-              value={addEmpNotes}
-              onChangeText={setAddEmpNotes}
-              placeholder="Specialist in powerlifting, body transformation and nutrition planning..."
-              multiline
-              numberOfLines={3}
-              placeholderTextColor="#94A3B8"
-              style={[styles.formInput, { height: 75, textAlignVertical: 'top', color: isDark ? '#FFFFFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0', backgroundColor: isDark ? AppColors.darkSurface : '#F8FAFC' }]}
-            />
-
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-              <TouchableOpacity
-                style={[styles.backStepBtn, { borderColor: isDark ? AppColors.darkBorder : '#CBD5E1' }]}
-                onPress={() => setAddEmpStep(2)}
-              >
-                <Text style={{ color: isDark ? '#FFFFFF' : '#0F172A', fontWeight: '700' }}>Back</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.submitBtn, { flex: 1, backgroundColor: AppColors.primaryColor }]}
-                onPress={() => handleCompleteAddEmployee(isTrainer)}
-                disabled={isSubmittingEmp}
-              >
-                {isSubmittingEmp ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.submitBtnText}>Submit for Super Admin Approval</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );

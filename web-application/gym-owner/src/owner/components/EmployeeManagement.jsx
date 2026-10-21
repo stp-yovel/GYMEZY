@@ -2417,47 +2417,8 @@ export const EmployeeManagement = ({
       {/* 2. ADD NEW EMPLOYEE 2-STEP MULTI-STEP MODAL (SCREENSHOT 3) */}
       <Modal
         title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: 24 }}>
-            <span style={{ fontSize: 18, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-              Add New Employee
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
-              <span>Page {addStep} of 2</span>
-              <div style={{ display: 'flex', gap: 4 }}>
-                <span
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: '50%',
-                    backgroundColor: addStep === 1 ? 'var(--color-primary)' : isDarkMode ? '#222222' : '#e2e8f0',
-                    color: addStep === 1 ? '#ffffff' : isDarkMode ? '#888888' : '#64748b',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 11,
-                    fontWeight: 700,
-                  }}
-                >
-                  1
-                </span>
-                <span
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: '50%',
-                    backgroundColor: addStep === 2 ? 'var(--color-primary)' : isDarkMode ? '#222222' : '#e2e8f0',
-                    color: addStep === 2 ? '#ffffff' : isDarkMode ? '#888888' : '#64748b',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 11,
-                    fontWeight: 700,
-                  }}
-                >
-                  2
-                </span>
-              </div>
-            </div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+            Add New Employee
           </div>
         }
         open={isAddModalOpen}
@@ -2471,9 +2432,9 @@ export const EmployeeManagement = ({
           setTrainerCerts([]);
         }}
         footer={null}
-        width={740}
+        width={760}
         centered
-        styles={{ body: { padding: '16px 24px 24px 24px' } }}
+        styles={{ body: { padding: '16px 24px 24px 24px', maxHeight: '85vh', overflowY: 'auto' } }}
       >
         <Form
           form={addEmployeeForm}
@@ -2481,8 +2442,8 @@ export const EmployeeManagement = ({
           preserve={true}
           onFinish={handleCompleteAddEmployee}
         >
-          {/* STEP 1: Personal & Basic Info */}
-          <div style={{ display: addStep === 1 ? 'block' : 'none' }}>
+          {/* Unified Single Page Form */}
+          <div>
             {/* Photo + Basic Details */}
             <Row gutter={16} align="top" style={{ marginBottom: 16 }}>
               <Col xs={24} sm={8}>
@@ -2683,7 +2644,7 @@ export const EmployeeManagement = ({
             </div>
 
             {/* Previous Employment Details */}
-            <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 14, marginTop: 6 }}>
+            <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 14, marginTop: 6, marginBottom: 14 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
                 <CalendarOutlined /> Previous Employment Details
               </div>
@@ -2808,53 +2769,30 @@ export const EmployeeManagement = ({
               </div>
             </div>
 
-            {/* Step 1 Actions */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 24 }}>
-              <Button onClick={() => setIsAddModalOpen(false)} style={{ borderRadius: 'var(--radius-base)', height: 42, padding: '0 24px' }}>
-                Cancel
-              </Button>
-              <Button
-                type="primary"
-                onClick={handleNextToAddStep2}
-                style={{
-                  borderRadius: 'var(--radius-base)',
-                  height: 42,
-                  padding: '0 28px',
-                  backgroundColor: 'var(--color-primary)',
-                  borderColor: 'var(--color-primary)',
-                  color: '#ffffff',
-                  fontWeight: 600,
-                }}
-              >
-                Next <ArrowRightOutlined />
-              </Button>
-            </div>
-          </div>
-
-          {/* STEP 2: Family & Verification Documents */}
-          <div style={{ display: addStep === 2 ? 'block' : 'none' }}>
             {/* Family Details */}
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-              <TeamOutlined /> Family Details
-            </div>
+            <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 14, marginTop: 14, marginBottom: 14 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                <TeamOutlined /> Family Details
+              </div>
 
-            <Row gutter={12}>
-              <Col xs={24} sm={8}>
-                <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Emergency Contact Name <span style={{ color: '#ef4444' }}>*</span></span>} name="emergencyName" style={{ marginBottom: 12 }}>
-                  <Input placeholder="Contact full name" style={{ height: 38, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={8}>
-                <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Relationship <span style={{ color: '#ef4444' }}>*</span></span>} name="emergencyRel" style={{ marginBottom: 12 }}>
-                  <Input placeholder="e.g. Spouse / Brother" style={{ height: 38, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={8}>
-                <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Phone Number <span style={{ color: '#ef4444' }}>*</span></span>} name="emergencyPhone" style={{ marginBottom: 12 }}>
-                  <Input placeholder="+91 98765 43210" style={{ height: 38, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
-                </Form.Item>
-              </Col>
-            </Row>
+              <Row gutter={12}>
+                <Col xs={24} sm={8}>
+                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Emergency Contact Name <span style={{ color: '#ef4444' }}>*</span></span>} name="emergencyName" rules={[{ required: true, message: 'Enter emergency contact' }]} style={{ marginBottom: 12 }}>
+                    <Input placeholder="Contact full name" style={{ height: 38, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Relationship <span style={{ color: '#ef4444' }}>*</span></span>} name="emergencyRel" rules={[{ required: true, message: 'Enter relationship' }]} style={{ marginBottom: 12 }}>
+                    <Input placeholder="e.g. Spouse / Brother" style={{ height: 38, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={8}>
+                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Phone Number <span style={{ color: '#ef4444' }}>*</span></span>} name="emergencyPhone" rules={[{ required: true, message: 'Enter emergency phone' }]} style={{ marginBottom: 12 }}>
+                    <Input placeholder="+91 98765 43210" style={{ height: 38, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
 
             {/* Documents Section */}
             <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 14, marginTop: 8 }}>
@@ -3054,14 +2992,10 @@ export const EmployeeManagement = ({
               </div>
             </div>
 
-            {/* Step 2 Actions */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 24 }}>
-              <Button
-                onClick={() => setAddStep(1)}
-                icon={<ArrowLeftOutlined />}
-                style={{ borderRadius: 'var(--radius-base)', height: 42, padding: '0 24px' }}
-              >
-                Back
+            {/* Bottom Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, alignItems: 'center', marginTop: 24, borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 16 }}>
+              <Button onClick={() => setIsAddModalOpen(false)} style={{ borderRadius: 'var(--radius-base)', height: 42, padding: '0 24px' }}>
+                Cancel
               </Button>
               <Button
                 type="primary"
