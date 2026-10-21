@@ -182,7 +182,7 @@ export const SectionsSubView = ({ topInset, onBack, gymId }) => {
             <MaterialIcons name="event-busy" size={44} color={subTextCol} />
             <Text style={[styles.emptyTitle, { color: textCol }]}>No Sections Found</Text>
             <Text style={[styles.emptySub, { color: subTextCol }]}>
-              Create your first workout section like "Basic Yoga 20 Days" to assign trainers and schedule timings.
+              Create your first workout section to assign trainers and schedule timings.
             </Text>
             <TouchableOpacity
               onPress={() => {

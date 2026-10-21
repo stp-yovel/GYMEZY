@@ -227,7 +227,7 @@ export const CreateSectionModal = ({
   // Submit Handler
   const handleSubmit = async () => {
     if (!title.trim()) {
-      Alert.alert('Validation Error', 'Please enter section name (e.g. Basic Yoga 20 Days).');
+      Alert.alert('Validation Error', 'Please enter section name.');
       return;
     }
 
@@ -331,7 +331,7 @@ export const CreateSectionModal = ({
               </Text>
               <TextInput
                 style={[styles.textInput, { backgroundColor: inputBg, borderColor: borderCol, color: textCol }]}
-                placeholder="e.g. Basic Yoga 20 Days"
+                placeholder="Enter section title"
                 placeholderTextColor={subTextCol}
                 value={title}
                 onChangeText={setTitle}

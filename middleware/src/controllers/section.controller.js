@@ -63,7 +63,7 @@ export const createSection = asyncHandler(async (req, res) => {
 
   // 2. Validate Required Fields
   if (!title || typeof title !== 'string' || !title.trim()) {
-    throw new ApiError(400, 'Section title/name is required (e.g. "Basic Yoga 20 Days").');
+    throw new ApiError(400, 'Section title/name is required.');
   }
 
   if (!trainerId || !mongoose.isValidObjectId(trainerId)) {

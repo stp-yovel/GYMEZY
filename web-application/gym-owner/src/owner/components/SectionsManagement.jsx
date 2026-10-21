@@ -688,7 +688,7 @@ export const SectionsManagement = () => {
               {editingSection ? <EditOutlined /> : <PlusOutlined />}
             </div>
             <span style={{ fontSize: 16, fontWeight: 700 }}>
-              {editingSection ? 'Edit Section / Class' : 'Create New Section (e.g. Basic Yoga 20 Days)'}
+              {editingSection ? 'Edit Section / Class' : 'Create New Section'}
             </span>
           </div>
         }
@@ -708,7 +708,7 @@ export const SectionsManagement = () => {
               >
                 <Input
                   size="large"
-                  placeholder="e.g. Basic Yoga 20 Days"
+                  placeholder="Enter section name"
                   style={{ borderRadius: 'var(--radius-base)' }}
                 />
               </Form.Item>
