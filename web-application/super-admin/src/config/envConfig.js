@@ -8,7 +8,7 @@ export const ENV_MODES = {
 export const API_BASE_URLS = {
   [ENV_MODES.LOCAL]: 'http://localhost:5001/api/v1',
   [ENV_MODES.DEV]: 'http://localhost:5001/api/v1',
-  [ENV_MODES.STAGING]: 'https://dev-api.gymezy.com/api/v1',
+  [ENV_MODES.STAGING]: 'https://dev.api.gymezy.com/api/v1',
   [ENV_MODES.PROD]: 'https://api.gymezy.com/api/v1',
 };
 
