@@ -129,7 +129,7 @@ export const MembersTab = ({ topInset, navigation }) => {
           return {
             id: m._id,
             key: m._id,
-            memberId: m.membershipId || (m._id ? m._id.substring(m._id.length - 8).toUpperCase() : 'MEM'),
+            memberId: m.membershipId || (m._id ? `MEM-${m._id.toString().substring(m._id.toString().length - 6).toUpperCase()}` : 'MEM'),
             name: m.userId?.fullName || 'Member',
             phone: m.userId?.phone || '',
             email: m.userId?.email || '',
@@ -246,7 +246,7 @@ export const MembersTab = ({ topInset, navigation }) => {
 
     Alert.alert(
       'Request Membership Cancellation',
-      `Are you sure you want to request cancellation for ${member.name} (${member.id})?\n\nA formal cancellation request will be dispatched to Super Admin for verification and refund processing.`,
+      `Are you sure you want to request cancellation for ${member.name} (${member.memberId || member.id})?\n\nA formal cancellation request will be dispatched to Super Admin for verification and refund processing.`,
       [
         { text: 'Keep Membership', style: 'cancel' },
         {
@@ -274,7 +274,7 @@ export const MembersTab = ({ topInset, navigation }) => {
             const newReq = {
               key: `can-${Date.now()}`,
               requestId: `CAN-2025-${String(cancellations.length + 1).padStart(3, '0')}`,
-              memberId: member.id,
+              memberId: member.memberId || member.id,
               memberName: member.name,
               phone: member.phone,
               avatar: member.avatar,
@@ -402,7 +402,8 @@ export const MembersTab = ({ topInset, navigation }) => {
         q === '' ||
         m.name.toLowerCase().includes(q) ||
         m.phone.includes(q) ||
-        m.id.toLowerCase().includes(q) ||
+        (m.memberId && m.memberId.toLowerCase().includes(q)) ||
+        (m.id && m.id.toLowerCase().includes(q)) ||
         m.plan.toLowerCase().includes(q);
 
       return matchesFilter && matchesSearch;
@@ -935,7 +936,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                             >
                               {member.name}
                             </Text>
-                            <Text style={styles.memberIdText}>{member.id}</Text>
+                            <Text style={styles.memberIdText}>{member.memberId || member.id}</Text>
                           </View>
                           <Text
                             style={[
@@ -1161,7 +1162,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                               { color: isDark ? '#94A3B8' : '#64748B' },
                             ]}
                           >
-                            {userObj.phone || userObj.email || 'Member ID: ' + (req.membershipId?._id?.substring(0, 8) || '--')}
+                            {userObj.phone || userObj.email || 'Member ID: ' + (req.membershipId?.membershipId || (req.membershipId?._id ? `MEM-${req.membershipId._id.toString().slice(-6).toUpperCase()}` : '--'))}
                             {reqDate ? ` • ${reqDate}` : ''}
                           </Text>
                         </View>
@@ -1702,7 +1703,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                           { color: isDark ? 'rgba(255,255,255,0.5)' : '#94A3B8' },
                         ]}
                       >
-                        ID: {selectedMember.id} • Joined {selectedMember.joinDate || '21 Jul 2025'}
+                        ID: {selectedMember.memberId || selectedMember.id} • Joined {selectedMember.joinDate || '21 Jul 2025'}
                       </Text>
                     </View>
                   </View>
@@ -2434,6 +2435,15 @@ export const MembersTab = ({ topInset, navigation }) => {
                     </Text>
                     <Text style={[styles.detailVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
                       {selectedSwitchRequest.userId?.phone || selectedSwitchRequest.userId?.email || '--'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                      Membership ID
+                    </Text>
+                    <Text style={[styles.detailVal, { color: AppColors.primaryColor, fontWeight: '700' }]}>
+                      {selectedSwitchRequest.membershipId?.membershipId || (selectedSwitchRequest.membershipId?._id ? `MEM-${selectedSwitchRequest.membershipId._id.toString().slice(-6).toUpperCase()}` : '--')}
                     </Text>
                   </View>
 
