@@ -2676,7 +2676,7 @@ export const MembersTab = ({ topInset, navigation }) => {
       <Modal
         visible={showModeFilterModal}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setShowModeFilterModal(false)}
       >
         <TouchableOpacity
@@ -2694,6 +2694,15 @@ export const MembersTab = ({ topInset, navigation }) => {
               },
             ]}
           >
+            <View style={styles.sheetHandleBar}>
+              <View
+                style={[
+                  styles.sheetHandle,
+                  { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : '#CBD5E1' },
+                ]}
+              />
+            </View>
+
             <View style={styles.filterModalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <MaterialIcons name="tune" size={20} color={AppColors.primaryColor} />
@@ -2909,11 +2918,28 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   filterModalContent: {
-    width: '92%',
-    maxHeight: '82%',
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 20,
+    width: '100%',
+    maxHeight: '85%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderTopWidth: 1,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 32,
+  },
+  sheetHandleBar: {
+    alignItems: 'center',
+    paddingBottom: 12,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
   },
   filterModalHeader: {
     flexDirection: 'row',
