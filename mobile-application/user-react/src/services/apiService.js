@@ -433,6 +433,28 @@ class ApiService {
     }
     return json.data;
   }
+
+  /**
+   * Fetch Active Workout Sections / Group Classes for a Gym
+   */
+  async getGymSections(gymId, params = {}) {
+    let url = `/sections?gymId=${gymId}&isActive=true`;
+    if (params.category && params.category !== 'all') {
+      url += `&category=${encodeURIComponent(params.category)}`;
+    }
+    if (params.search) {
+      url += `&search=${encodeURIComponent(params.search)}`;
+    }
+    const response = await this.executeFetch(url, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to fetch gym sections.');
+    }
+    return json.data || [];
+  }
 }
 
 export const apiService = new ApiService();

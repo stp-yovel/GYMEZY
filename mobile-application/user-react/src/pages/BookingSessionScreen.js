@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,11 +17,71 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors, AppTheme } from '../theme/appTheme';
 import { MonthlyGridCalendar } from '../widgets/CustomCalendar';
+import apiService from '../services/apiService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const MORNING_SLOTS = ['6:00 AM', '7:00 AM', '8:00 AM'];
 const EVENING_SLOTS = ['6:00 PM', '7:00 PM', '8:00 PM'];
+const ALL_WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const formatToDDMMYYYY = (val) => {
+  if (!val) return '';
+  const dt = new Date(val);
+  if (Number.isNaN(dt.getTime())) return String(val);
+  const day = String(dt.getDate()).padStart(2, '0');
+  const month = String(dt.getMonth() + 1).padStart(2, '0');
+  const year = dt.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
+const getCategoryBadgeStyle = (category, isDark) => {
+  const cat = (category || '').toLowerCase();
+  switch (cat) {
+    case 'yoga':
+      return {
+        bg: isDark ? 'rgba(167,139,250,0.2)' : 'rgba(124,58,237,0.12)',
+        text: isDark ? '#C4B5FD' : '#7C3AED',
+        icon: 'self-improvement',
+      };
+    case 'zumba':
+      return {
+        bg: isDark ? 'rgba(244,114,182,0.2)' : 'rgba(219,39,119,0.12)',
+        text: isDark ? '#F472B6' : '#DB2777',
+        icon: 'music-note',
+      };
+    case 'crossfit':
+      return {
+        bg: isDark ? 'rgba(239,68,68,0.2)' : 'rgba(220,38,38,0.12)',
+        text: isDark ? '#FCA5A5' : '#DC2626',
+        icon: 'fitness-center',
+      };
+    case 'hiit':
+      return {
+        bg: isDark ? 'rgba(245,158,11,0.2)' : 'rgba(217,119,6,0.12)',
+        text: isDark ? '#FCD34D' : '#D97706',
+        icon: 'bolt',
+      };
+    case 'pilates':
+      return {
+        bg: isDark ? 'rgba(16,185,129,0.2)' : 'rgba(5,150,105,0.12)',
+        text: isDark ? '#6EE7B7' : '#059669',
+        icon: 'spa',
+      };
+    case 'boxing':
+      return {
+        bg: isDark ? 'rgba(244,63,94,0.2)' : 'rgba(225,29,72,0.12)',
+        text: isDark ? '#FDA4AF' : '#E11D48',
+        icon: 'sports-mma',
+      };
+    default:
+      return {
+        bg: isDark ? 'rgba(99,102,241,0.2)' : 'rgba(79,70,229,0.12)',
+        text: isDark ? '#A5B4FC' : '#4F46E5',
+        icon: 'groups',
+      };
+  }
+};
 
 const OTHER_CLASSES = [
   {
@@ -69,11 +130,26 @@ export const BookingSessionScreen = ({ route, navigation }) => {
   const { gym, initialCategory } = route.params;
   const { isDark, colors } = useTheme();
 
-  // Navigation views: 'categories', 'gym_booking', 'weekly_plan', 'custom_dates', 'class_booking', 'other_classes'
+  const gymId = gym?._id || gym?.id;
+
+  // Navigation views: 'categories', 'gym_booking', 'weekly_plan', 'custom_dates', 'class_booking', 'other_classes', 'group_classes'
   const [currentView, setCurrentView] = useState(
-    initialCategory ? (initialCategory === 'Gym' ? 'gym_booking' : 'class_booking') : 'categories'
+    initialCategory
+      ? initialCategory === 'Gym'
+        ? 'gym_booking'
+        : initialCategory === 'Group Classes'
+        ? 'group_classes'
+        : 'class_booking'
+      : 'categories'
   );
   const [selectedCategory, setSelectedCategory] = useState(initialCategory || null);
+
+  // Group Classes State (Owner-created sections/batches)
+  const [sections, setSections] = useState([]);
+  const [isLoadingSections, setIsLoadingSections] = useState(false);
+  const [sectionsError, setSectionsError] = useState(null);
+  const [selectedSection, setSelectedSection] = useState(null);
+  const [selectedGroupCategory, setSelectedGroupCategory] = useState('all');
 
   // Gym Booking State
   const [gymBookingType, setGymBookingType] = useState('Per Session'); // 'Per Session', 'Weekly Plan', 'Custom Dates'
@@ -97,10 +173,38 @@ export const BookingSessionScreen = ({ route, navigation }) => {
   const subtitleColor = isDark ? 'rgba(255, 255, 255, 0.7)' : '#64748B';
   const borderColor = isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0';
 
+  const loadSections = async () => {
+    if (!gymId) return;
+    try {
+      setIsLoadingSections(true);
+      setSectionsError(null);
+      const data = await apiService.getGymSections(gymId);
+      const list = Array.isArray(data) ? data : [];
+      setSections(list);
+      if (list.length > 0 && !selectedSection) {
+        setSelectedSection(list[0]);
+      }
+    } catch (err) {
+      console.warn('Failed to load gym sections:', err?.message);
+      setSectionsError(err?.message || 'Failed to load group classes');
+    } finally {
+      setIsLoadingSections(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSections();
+  }, [gymId]);
+
   const selectCategory = (cat) => {
     setSelectedCategory(cat);
     if (cat === 'Gym') {
       setCurrentView('gym_booking');
+    } else if (cat === 'Group Classes') {
+      setCurrentView('group_classes');
+      if (sections.length === 0) {
+        loadSections();
+      }
     } else if (cat === 'Yoga') {
       setSelectedClassName('Yoga Classes');
       setSelectedClassType('Hatha Yoga');
@@ -135,14 +239,24 @@ export const BookingSessionScreen = ({ route, navigation }) => {
     return months[m];
   };
 
-  const goToCheckout = () => {
+  const goToCheckout = (sectionOverride = null) => {
     let title = '';
     let datesSummary = '';
     let timeSlot = null;
     let sessions = 1;
     let subtotal = 0;
 
-    if (currentView === 'gym_booking' && gymBookingType === 'Per Session') {
+    const activeSection = sectionOverride || selectedSection;
+
+    if (currentView === 'group_classes' && activeSection) {
+      title = `Group Class: ${activeSection.title}`;
+      const startStr = formatToDDMMYYYY(activeSection.startDate);
+      const endStr = formatToDDMMYYYY(activeSection.endDate);
+      datesSummary = `${startStr} to ${endStr} (${activeSection.durationDays || 20} Days Batch)`;
+      timeSlot = `${activeSection.startTime} - ${activeSection.endTime}`;
+      sessions = activeSection.durationDays || 20;
+      subtotal = Number(activeSection.cost) || 0;
+    } else if (currentView === 'gym_booking' && gymBookingType === 'Per Session') {
       title = 'Gym Access (Single Session)';
       datesSummary = 'Valid for today / next 24 hrs';
       sessions = 1;
@@ -177,6 +291,7 @@ export const BookingSessionScreen = ({ route, navigation }) => {
       subtotal,
       discount: 0.0,
       amount: subtotal,
+      sectionId: activeSection?._id || null,
     });
   };
 
@@ -184,6 +299,8 @@ export const BookingSessionScreen = ({ route, navigation }) => {
     switch (currentView) {
       case 'gym_booking':
         return 'Book Gym Session';
+      case 'group_classes':
+        return 'Group Classes & Batches';
       case 'weekly_plan':
         return 'Weekly Plan';
       case 'custom_dates':
@@ -206,6 +323,13 @@ export const BookingSessionScreen = ({ route, navigation }) => {
       navigation.goBack();
     }
   };
+
+  const filteredSections =
+    selectedGroupCategory === 'all'
+      ? sections
+      : sections.filter(
+          (s) => (s.category || '').toLowerCase() === selectedGroupCategory.toLowerCase()
+        );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -247,7 +371,34 @@ export const BookingSessionScreen = ({ route, navigation }) => {
             <MaterialIcons name="chevron-right" size={22} color={subtitleColor} />
           </TouchableOpacity>
 
-          {/* 2. Yoga Classes */}
+          {/* 2. Group Classes (Owner Created Sections/Batches) */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => selectCategory('Group Classes')}
+            style={[styles.categoryCard, { backgroundColor: cardColor, borderColor: borderColor }]}
+          >
+            <View style={[styles.categoryIconBox, { backgroundColor: isDark ? 'rgba(99,102,241,0.2)' : 'rgba(79,70,229,0.12)' }]}>
+              <MaterialIcons name="groups" size={26} color={isDark ? '#818CF8' : '#4F46E5'} />
+            </View>
+            <View style={styles.categoryContent}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={[styles.categoryTitle, { color: textColor }]}>Group Classes</Text>
+                {sections.length > 0 && (
+                  <View style={[styles.batchCountBadge, { backgroundColor: isDark ? 'rgba(99,102,241,0.25)' : 'rgba(79,70,229,0.12)' }]}>
+                    <Text style={[styles.batchCountBadgeText, { color: isDark ? '#A5B4FC' : '#4F46E5' }]}>
+                      {sections.length} {sections.length === 1 ? 'Batch' : 'Batches'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.categoryDesc, { color: subtitleColor }]}>
+                Book trainer-led batches & scheduled workout sections
+              </Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={22} color={subtitleColor} />
+          </TouchableOpacity>
+
+          {/* 3. Yoga Classes */}
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => selectCategory('Yoga')}
@@ -862,6 +1013,382 @@ export const BookingSessionScreen = ({ route, navigation }) => {
         </View>
       )}
 
+      {/* VIEW: GROUP CLASSES / OWNER CREATED SECTIONS */}
+      {currentView === 'group_classes' && (
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* Hero Banner */}
+            <ImageBackground
+              source={{
+                uri: 'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?q=80&w=800&auto=format&fit=crop',
+              }}
+              style={styles.heroBanner}
+              imageStyle={{ borderRadius: 20 }}
+              resizeMode="cover"
+            >
+              <LinearGradient
+                colors={['rgba(15,23,42,0.88)', 'rgba(30,27,75,0.72)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.heroBannerGradient}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={styles.groupHeroBadge}>
+                    <MaterialIcons name="groups" size={16} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.heroBannerTitle}>Group Classes & Batches</Text>
+                </View>
+                <Text style={styles.heroBannerSubtitle}>
+                  Structured training cohorts scheduled & led by gym trainers
+                </Text>
+              </LinearGradient>
+            </ImageBackground>
+
+            {/* Category Filter Chips */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.groupFilterScroll}
+            >
+              {[
+                { key: 'all', label: 'All Batches' },
+                { key: 'yoga', label: 'Yoga' },
+                { key: 'zumba', label: 'Zumba' },
+                { key: 'crossfit', label: 'CrossFit' },
+                { key: 'hiit', label: 'HIIT' },
+                { key: 'pilates', label: 'Pilates' },
+                { key: 'boxing', label: 'Boxing' },
+                { key: 'other', label: 'Other' },
+              ].map((tab) => {
+                const isActive = selectedGroupCategory === tab.key;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    activeOpacity={0.8}
+                    onPress={() => setSelectedGroupCategory(tab.key)}
+                    style={[
+                      styles.groupFilterChip,
+                      {
+                        backgroundColor: isActive
+                          ? '#003882'
+                          : isDark
+                          ? 'rgba(255,255,255,0.06)'
+                          : '#F1F5F9',
+                        borderColor: isActive ? '#003882' : borderColor,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.groupFilterChipText,
+                        {
+                          color: isActive ? '#FFFFFF' : textColor,
+                          fontWeight: isActive ? 'bold' : '500',
+                        },
+                      ]}
+                    >
+                      {tab.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Loading Indicator */}
+            {isLoadingSections && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#003882" />
+                <Text style={[styles.loadingText, { color: subtitleColor }]}>
+                  Loading available batches from {gym.name || 'gym'}...
+                </Text>
+              </View>
+            )}
+
+            {/* Error Banner */}
+            {!isLoadingSections && sectionsError && (
+              <View style={styles.errorNoticeBox}>
+                <MaterialIcons name="error-outline" size={20} color="#EF4444" style={{ marginRight: 8 }} />
+                <Text style={styles.errorNoticeText}>{sectionsError}</Text>
+                <TouchableOpacity onPress={loadSections} style={styles.retryPill}>
+                  <Text style={styles.retryPillText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Empty State */}
+            {!isLoadingSections && !sectionsError && filteredSections.length === 0 && (
+              <View style={[styles.emptyBatchCard, { backgroundColor: cardColor, borderColor: borderColor }]}>
+                <View style={[styles.emptyIconBox, { backgroundColor: isDark ? 'rgba(99,102,241,0.15)' : 'rgba(79,70,229,0.08)' }]}>
+                  <MaterialIcons name="event-busy" size={36} color={isDark ? '#A5B4FC' : '#4F46E5'} />
+                </View>
+                <Text style={[styles.emptyBatchTitle, { color: textColor }]}>
+                  No Batches Available
+                </Text>
+                <Text style={[styles.emptyBatchDesc, { color: subtitleColor }]}>
+                  {selectedGroupCategory === 'all'
+                    ? 'The gym owner has not scheduled any active batches yet.'
+                    : `No active batches found for category "${selectedGroupCategory}". Try selecting another category.`}
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={loadSections}
+                  style={styles.refreshBatchesBtn}
+                >
+                  <MaterialIcons name="refresh" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.refreshBatchesBtnText}>Refresh Batches</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Batch Cards */}
+            {!isLoadingSections &&
+              filteredSections.map((sec) => {
+                const isSelected = selectedSection?._id === sec._id;
+                const catStyle = getCategoryBadgeStyle(sec.category, isDark);
+                const trainerName = sec.trainerId?.name || 'Assigned Coach';
+                const trainerAvatar = sec.trainerId?.avatar;
+                const trainerSpec = sec.trainerId?.specialization;
+                const enrolled = sec.enrolledCount || 0;
+                const capacity = sec.maxCapacity || 25;
+                const remaining = Math.max(0, capacity - enrolled);
+
+                return (
+                  <TouchableOpacity
+                    key={sec._id}
+                    activeOpacity={0.9}
+                    onPress={() => setSelectedSection(sec)}
+                    style={[
+                      styles.sectionCard,
+                      {
+                        backgroundColor: cardColor,
+                        borderColor: isSelected ? '#003882' : borderColor,
+                        borderWidth: isSelected ? 2 : 1,
+                      },
+                    ]}
+                  >
+                    {/* Top: Category Pill & Capacity */}
+                    <View style={styles.sectionCardHeader}>
+                      <View style={[styles.sectionCatBadge, { backgroundColor: catStyle.bg }]}>
+                        <MaterialIcons name={catStyle.icon} size={14} color={catStyle.text} style={{ marginRight: 4 }} />
+                        <Text style={[styles.sectionCatBadgeText, { color: catStyle.text }]}>
+                          {(sec.category || 'workout').toUpperCase()}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.sectionCapacityPill,
+                          {
+                            backgroundColor:
+                              remaining <= 3
+                                ? 'rgba(239,68,68,0.1)'
+                                : 'rgba(0,191,98,0.1)',
+                          },
+                        ]}
+                      >
+                        <MaterialIcons
+                          name="person"
+                          size={12}
+                          color={remaining <= 3 ? '#EF4444' : '#00BF62'}
+                          style={{ marginRight: 3 }}
+                        />
+                        <Text
+                          style={[
+                            styles.sectionCapacityText,
+                            { color: remaining <= 3 ? '#EF4444' : '#00BF62' },
+                          ]}
+                        >
+                          {remaining <= 3 ? `Only ${remaining} left` : `${enrolled}/${capacity} Enrolled`}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Section Title */}
+                    <Text style={[styles.sectionTitleText, { color: textColor }]}>
+                      {sec.title}
+                    </Text>
+
+                    {/* Trainer Row */}
+                    <View style={styles.sectionTrainerRow}>
+                      {trainerAvatar ? (
+                        <Image source={{ uri: trainerAvatar }} style={styles.trainerAvatarImg} />
+                      ) : (
+                        <View style={[styles.trainerAvatarFallback, { backgroundColor: isDark ? '#334155' : '#E2E8F0' }]}>
+                          <Text style={[styles.trainerInitials, { color: textColor }]}>
+                            {trainerName.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={[styles.trainerLabel, { color: subtitleColor }]}>Trainer</Text>
+                        <Text style={[styles.trainerName, { color: textColor }]}>{trainerName}</Text>
+                      </View>
+                      {trainerSpec ? (
+                        <View style={[styles.trainerSpecBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F8FAFC' }]}>
+                          <Text style={[styles.trainerSpecText, { color: subtitleColor }]}>
+                            {trainerSpec}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+
+                    {/* Schedule Block */}
+                    <View style={[styles.sectionScheduleBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC', borderColor: borderColor }]}>
+                      {/* Dates */}
+                      <View style={styles.scheduleRow}>
+                        <MaterialIcons name="date-range" size={16} color={isDark ? '#93C5FD' : '#003882'} style={{ marginRight: 8 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.scheduleLabel, { color: subtitleColor }]}>Batch Dates</Text>
+                          <Text style={[styles.scheduleValue, { color: textColor }]}>
+                            {formatToDDMMYYYY(sec.startDate)} to {formatToDDMMYYYY(sec.endDate)}
+                          </Text>
+                        </View>
+                        <View style={[styles.durationBadge, { backgroundColor: isDark ? 'rgba(96,165,250,0.18)' : 'rgba(0,56,130,0.08)' }]}>
+                          <Text style={[styles.durationBadgeText, { color: isDark ? '#93C5FD' : '#003882' }]}>
+                            {sec.durationDays || 20} Days
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Timings */}
+                      <View style={[styles.scheduleRow, { marginTop: 8 }]}>
+                        <MaterialIcons name="schedule" size={16} color={isDark ? '#93C5FD' : '#003882'} style={{ marginRight: 8 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.scheduleLabel, { color: subtitleColor }]}>Daily Timing</Text>
+                          <Text style={[styles.scheduleValue, { color: textColor }]}>
+                            {sec.startTime} - {sec.endTime}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Active Days */}
+                      <View style={[styles.scheduleRow, { marginTop: 8, alignItems: 'flex-start' }]}>
+                        <MaterialIcons name="repeat" size={16} color={isDark ? '#93C5FD' : '#003882'} style={{ marginRight: 8, marginTop: 2 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.scheduleLabel, { color: subtitleColor, marginBottom: 4 }]}>Weekly Schedule</Text>
+                          <View style={styles.daysPillRow}>
+                            {ALL_WEEK_DAYS.map((d) => {
+                              const isDayActive = Array.isArray(sec.activeDays) && sec.activeDays.includes(d);
+                              return (
+                                <View
+                                  key={d}
+                                  style={[
+                                    styles.smallDayPill,
+                                    {
+                                      backgroundColor: isDayActive
+                                        ? (isDark ? 'rgba(96,165,250,0.25)' : 'rgba(0,56,130,0.12)')
+                                        : (isDark ? 'rgba(255,255,255,0.04)' : '#E2E8F0'),
+                                      borderColor: isDayActive ? (isDark ? '#60A5FA' : '#003882') : 'transparent',
+                                    },
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.smallDayPillText,
+                                      {
+                                        color: isDayActive
+                                          ? (isDark ? '#93C5FD' : '#003882')
+                                          : subtitleColor,
+                                        fontWeight: isDayActive ? 'bold' : 'normal',
+                                      },
+                                    ]}
+                                  >
+                                    {d}
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Description if present */}
+                    {sec.description ? (
+                      <Text style={[styles.sectionDescText, { color: subtitleColor }]} numberOfLines={2}>
+                        {sec.description}
+                      </Text>
+                    ) : null}
+
+                    {/* Footer Row: Fee & Select Radio */}
+                    <View style={styles.sectionCardFooter}>
+                      <View>
+                        <Text style={[styles.sectionFeeLabel, { color: subtitleColor }]}>Full Batch Fee</Text>
+                        <Text style={[styles.sectionFeeValue, { color: textColor }]}>
+                          ₹{Math.round(Number(sec.cost) || 0)}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.selectBatchBtn,
+                          {
+                            backgroundColor: isSelected
+                              ? '#003882'
+                              : isDark
+                              ? 'rgba(255,255,255,0.08)'
+                              : '#F1F5F9',
+                            borderColor: isSelected ? '#003882' : borderColor,
+                          },
+                        ]}
+                      >
+                        <MaterialIcons
+                          name={isSelected ? 'check-circle' : 'radio-button-unchecked'}
+                          size={16}
+                          color={isSelected ? '#FFFFFF' : subtitleColor}
+                          style={{ marginRight: 6 }}
+                        />
+                        <Text
+                          style={[
+                            styles.selectBatchBtnText,
+                            { color: isSelected ? '#FFFFFF' : textColor },
+                          ]}
+                        >
+                          {isSelected ? 'Selected' : 'Select'}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+          </ScrollView>
+
+          {/* Bottom Bar for Group Classes */}
+          {selectedSection && (
+            <View
+              style={[
+                styles.bottomBar,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(18, 18, 18, 0.88)'
+                    : 'rgba(255, 255, 255, 0.88)',
+                  borderTopColor: isDark
+                    ? 'rgba(255, 255, 255, 0.08)'
+                    : 'rgba(226, 232, 240, 0.8)',
+                },
+              ]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.bottomPriceLabel, { color: subtitleColor }]} numberOfLines={1}>
+                  {selectedSection.title}
+                </Text>
+                <Text style={[styles.bottomPriceValue, { color: textColor }]}>
+                  ₹{Math.round(Number(selectedSection.cost) || 0)}
+                </Text>
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => goToCheckout(selectedSection)}
+                style={styles.continueBtn}
+              >
+                <Text style={styles.continueBtnText}>Continue to Payment</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
+
       {/* VIEW 6: OTHER CLASSES DIRECTORY */}
       {currentView === 'other_classes' && (
         <ScrollView
@@ -1210,6 +1737,270 @@ const styles = StyleSheet.create({
   continueBtnText: {
     color: '#FFFFFF',
     fontSize: 14,
+    fontWeight: 'bold',
+  },
+
+  /* Group Classes View */
+  batchCountBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  batchCountBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  groupHeroBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  groupFilterScroll: {
+    paddingVertical: 12,
+    gap: 8,
+  },
+  groupFilterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  groupFilterChipText: {
+    fontSize: 12,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 13,
+    marginTop: 12,
+  },
+  errorNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    padding: 12,
+    borderRadius: 14,
+    marginVertical: 12,
+  },
+  errorNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#EF4444',
+  },
+  retryPill: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  retryPillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  emptyBatchCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 28,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginVertical: 16,
+  },
+  emptyIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  emptyBatchTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  emptyBatchDesc: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  refreshBatchesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#003882',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  refreshBatchesBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  sectionCard: {
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: 14,
+  },
+  sectionCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  sectionCatBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  sectionCatBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  sectionCapacityPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  sectionCapacityText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  sectionTitleText: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    lineHeight: 22,
+  },
+  sectionTrainerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  trainerAvatarImg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  trainerAvatarFallback: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trainerInitials: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  trainerLabel: {
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  trainerName: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  trainerSpecBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  trainerSpecText: {
+    fontSize: 11,
+  },
+  sectionScheduleBox: {
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  scheduleLabel: {
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  scheduleValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  durationBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  durationBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  daysPillRow: {
+    flexDirection: 'row',
+    gap: 4,
+    flexWrap: 'wrap',
+  },
+  smallDayPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  smallDayPillText: {
+    fontSize: 10,
+  },
+  sectionDescText: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginBottom: 12,
+  },
+  sectionCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  sectionFeeLabel: {
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sectionFeeValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#00BF62',
+  },
+  selectBatchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  selectBatchBtnText: {
+    fontSize: 12,
     fontWeight: 'bold',
   },
 });
