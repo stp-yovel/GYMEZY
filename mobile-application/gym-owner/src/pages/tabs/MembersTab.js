@@ -98,7 +98,8 @@ export const MembersTab = ({ topInset, navigation }) => {
   const [memberPage, setMemberPage] = useState(1);
   const [hasMoreMembers, setHasMoreMembers] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [isInitialMembersLoading, setIsInitialMembersLoading] = useState(false);
+  const [isInitialMembersLoading, setIsInitialMembersLoading] = useState(true);
+  const [isSupportLoading, setIsSupportLoading] = useState(true);
   const [totalMembersCount, setTotalMembersCount] = useState(0);
 
   const isFetchingMoreRef = useRef(false);
@@ -192,6 +193,7 @@ export const MembersTab = ({ topInset, navigation }) => {
 
   // Fetch Support Data (Employees, Switch Requests, etc.)
   const fetchSupportData = useCallback(async () => {
+    setIsSupportLoading(true);
     try {
       if (refreshGymProfile) {
         await refreshGymProfile();
@@ -216,6 +218,8 @@ export const MembersTab = ({ topInset, navigation }) => {
       }
     } catch (err) {
       console.warn('Error fetching gym support data:', err.message);
+    } finally {
+      setIsSupportLoading(false);
     }
   }, [gym?._id, gym?.id, gym?.partnerId, refreshGymProfile]);
 
@@ -794,11 +798,17 @@ export const MembersTab = ({ topInset, navigation }) => {
               onChangeText={setSearchQuery}
               style={[styles.searchInput, { color: isDark ? '#FFFFFF' : '#0F172A' }]}
             />
-            {searchQuery.length > 0 && (
+            {isInitialMembersLoading ? (
+              <ActivityIndicator
+                size="small"
+                color={AppColors.primaryColor}
+                style={{ marginRight: 8 }}
+              />
+            ) : searchQuery.length > 0 ? (
               <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtn}>
                 <MaterialIcons name="close" size={16} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
-            )}
+            ) : null}
           </View>
 
           {/* Filter Icon Button (Opens Mode & Section Picker) */}
@@ -936,17 +946,114 @@ export const MembersTab = ({ topInset, navigation }) => {
         {/* --- 5A. MEMBERS ROSTER VIEW --- */}
         {activeMode === 'MEMBERS' && (
           <>
-            {isInitialMembersLoading && members.length === 0 ? (
+            {isInitialMembersLoading ? (
               <View style={styles.initialLoadingBox}>
-                <ActivityIndicator size="large" color={AppColors.primaryColor} />
-                <Text
-                  style={[
-                    styles.initialLoadingText,
-                    { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' },
-                  ]}
-                >
-                  Loading members roster...
-                </Text>
+                <View style={styles.loadingSpinnerHeader}>
+                  <ActivityIndicator size="large" color={AppColors.primaryColor} />
+                  <Text
+                    style={[
+                      styles.initialLoadingText,
+                      { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' },
+                    ]}
+                  >
+                    Loading members roster...
+                  </Text>
+                </View>
+
+                {[1, 2, 3].map((itemKey) => (
+                  <View
+                    key={`skeleton-member-${itemKey}`}
+                    style={[
+                      styles.memberCard,
+                      {
+                        backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
+                        borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                        opacity: 0.7,
+                      },
+                    ]}
+                  >
+                    <View style={styles.cardTopRow}>
+                      <View style={styles.memberMain}>
+                        <View
+                          style={[
+                            styles.avatarCircle,
+                            { backgroundColor: isDark ? '#334155' : '#E2E8F0' },
+                          ]}
+                        />
+                        <View style={{ flex: 1, marginLeft: 12, gap: 6 }}>
+                          <View
+                            style={{
+                              height: 14,
+                              width: '55%',
+                              borderRadius: 4,
+                              backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                            }}
+                          />
+                          <View
+                            style={{
+                              height: 12,
+                              width: '38%',
+                              borderRadius: 4,
+                              backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                            }}
+                          />
+                        </View>
+                      </View>
+                      <View
+                        style={{
+                          height: 22,
+                          width: 58,
+                          borderRadius: 12,
+                          backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                        }}
+                      />
+                    </View>
+                    <View
+                      style={[
+                        styles.cardDivider,
+                        { backgroundColor: isDark ? AppColors.darkBorder : '#F1F5F9' },
+                      ]}
+                    />
+                    <View style={styles.cardBottomRow}>
+                      <View style={{ gap: 4 }}>
+                        <View
+                          style={{
+                            height: 10,
+                            width: 60,
+                            borderRadius: 3,
+                            backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                          }}
+                        />
+                        <View
+                          style={{
+                            height: 12,
+                            width: 140,
+                            borderRadius: 4,
+                            backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                          }}
+                        />
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <View
+                          style={{
+                            height: 34,
+                            width: 34,
+                            borderRadius: 8,
+                            backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                          }}
+                        />
+                        <View
+                          style={{
+                            height: 34,
+                            width: 34,
+                            borderRadius: 8,
+                            backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                          }}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                ))}
               </View>
             ) : filteredMembers.length === 0 ? (
               <View
@@ -1166,7 +1273,21 @@ export const MembersTab = ({ topInset, navigation }) => {
         {/* --- 5B. PLAN SWITCH REQUESTS VIEW --- */}
         {activeMode === 'SWITCHES' && (
           <>
-            {filteredSwitches.length === 0 ? (
+            {isSupportLoading ? (
+              <View style={styles.initialLoadingBox}>
+                <View style={styles.loadingSpinnerHeader}>
+                  <ActivityIndicator size="large" color={AppColors.primaryColor} />
+                  <Text
+                    style={[
+                      styles.initialLoadingText,
+                      { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' },
+                    ]}
+                  >
+                    Loading switch requests...
+                  </Text>
+                </View>
+              </View>
+            ) : filteredSwitches.length === 0 ? (
               <View
                 style={[
                   styles.emptyState,
@@ -3802,10 +3923,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   initialLoadingBox: {
+    width: '100%',
+    paddingVertical: 12,
+  },
+  loadingSpinnerHeader: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
-    gap: 12,
+    paddingVertical: 18,
+    gap: 10,
   },
   initialLoadingText: {
     fontSize: 13,
