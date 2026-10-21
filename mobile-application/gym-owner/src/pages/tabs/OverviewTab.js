@@ -28,21 +28,29 @@ export const OverviewTab = ({
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [employees, setEmployees] = useState([]);
+  const [membershipSummary, setMembershipSummary] = useState(null);
 
-  // Fetch live employees and refresh gym profile
+  // Fetch live employees, memberships summary, and refresh gym profile
   const fetchOverviewData = useCallback(async () => {
     try {
       if (refreshGymProfile) {
         await refreshGymProfile();
       }
-      const employeeData = await apiService.getEmployees();
+      const targetGymId = gym?.id || gym?._id || user?.gymId;
+      const [employeeData, memRes] = await Promise.all([
+        apiService.getEmployees().catch(() => []),
+        targetGymId ? apiService.getMemberships(targetGymId, { limit: 10 }).catch(() => null) : null,
+      ]);
       if (Array.isArray(employeeData)) {
         setEmployees(employeeData);
+      }
+      if (memRes?.summary) {
+        setMembershipSummary(memRes.summary);
       }
     } catch (err) {
       console.warn('Overview data fetch error:', err.message);
     }
-  }, [refreshGymProfile]);
+  }, [gym?.id, gym?._id, user?.gymId, refreshGymProfile]);
 
   useEffect(() => {
     fetchOverviewData();
@@ -71,7 +79,9 @@ export const OverviewTab = ({
 
   // Dynamic Live Key Metrics matching Web Dashboard
   const activeMembersCount = Number(
-    gym?.activeMembersCount !== undefined
+    membershipSummary?.active !== undefined
+      ? membershipSummary.active
+      : gym?.activeMembersCount !== undefined
       ? gym.activeMembersCount
       : Array.isArray(gym?.members)
       ? gym.members.length
@@ -100,14 +110,21 @@ export const OverviewTab = ({
     return 0;
   }, [gym?.appBookingRevenue, gym?.bookingRevenue, gym?.recentCheckins]);
 
-  const totalActiveUsers = Number(gym?.membersCount || (gym?.members || []).length || activeMembersCount || 0);
+  const totalActiveUsers = Number(
+    membershipSummary?.total !== undefined
+      ? membershipSummary.total
+      : gym?.membersCount || (gym?.members || []).length || activeMembersCount || 0
+  );
 
   const activePassesCount = useMemo(() => {
+    if (membershipSummary?.active !== undefined) {
+      return Number(membershipSummary.active);
+    }
     if (Array.isArray(gym?.members)) {
       return gym.members.filter((m) => m.status === 'Active' || !m.status).length;
     }
     return totalActiveUsers;
-  }, [gym?.members, totalActiveUsers]);
+  }, [membershipSummary?.active, gym?.members, totalActiveUsers]);
 
   const appBookingsCount = Number(gym?.appBookingsCount || gym?.completedBookingsCount || todayCheckinsCount || 0);
 

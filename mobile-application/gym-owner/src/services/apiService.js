@@ -419,6 +419,68 @@ class ApiService {
     }
     return result;
   }
+
+  // --- MEMBERSHIP & SWITCH REQUEST METHODS ---
+  async getMemberships(gymId, params = {}) {
+    if (!gymId) throw new Error('Gym ID is required.');
+    const queryParts = [];
+    Object.entries(params).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && val !== '') {
+        queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(val)}`);
+      }
+    });
+    const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+    const response = await this.executeFetch(`/memberships/gym/${gymId}${queryString}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to fetch gym memberships.');
+    }
+    return result.data;
+  }
+
+  async getSwitchRequests(gymId) {
+    if (!gymId) throw new Error('Gym ID is required.');
+    const response = await this.executeFetch(`/memberships/gym/${gymId}/switch-requests`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to fetch switch requests.');
+    }
+    return result.data;
+  }
+
+  async respondToSwitchRequest(requestId, payload) {
+    if (!requestId) throw new Error('Request ID is required.');
+    const response = await this.executeFetch(`/memberships/switch-requests/${requestId}/gym-action`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to update switch request.');
+    }
+    return result.data;
+  }
+
+  async updateTrainerPricing(gymId, payload) {
+    if (!gymId) throw new Error('Gym ID is required.');
+    const response = await this.executeFetch(`/gyms/${gymId}/trainer-pricing`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to update trainer pricing.');
+    }
+    return result.data;
+  }
 }
 
 export const apiService = new ApiService();

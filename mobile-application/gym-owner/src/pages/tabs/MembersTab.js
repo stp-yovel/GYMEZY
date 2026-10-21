@@ -26,7 +26,8 @@ import { getSafeImageUri, getGymLogoUri } from '../../utils/mediaUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const MEMBER_FILTER_TABS = ['All', 'Active', 'Expiring Soon', 'Inactive', 'Cancellation Requested'];
+const MEMBER_FILTER_TABS = ['All', 'Active', 'Expiring Soon', 'Expired', 'Cancelled'];
+const SWITCH_FILTER_TABS = ['All', 'Pending Review', 'Sent to Admin', 'Approved', 'Rejected'];
 const BOOKING_FILTER_TABS = ['All', 'Upcoming', 'Checked-in', 'Completed'];
 const CANCEL_FILTER_TABS = ['All', 'Sent to Admin', 'In Review', 'Approved', 'Rejected'];
 
@@ -56,18 +57,22 @@ export const MembersTab = ({ topInset, navigation }) => {
   const { showToast } = useToast();
   const { gym, refreshGymProfile } = useAuth();
 
-  // Mode: 'MEMBERS' | 'BOOKINGS' | 'CANCELLATIONS'
+  // Mode: 'MEMBERS' | 'SWITCHES' | 'CANCELLATIONS' | 'BOOKINGS'
   const [activeMode, setActiveMode] = useState('MEMBERS');
 
   // Search & Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [memberFilter, setMemberFilter] = useState('All');
+  const [switchFilter, setSwitchFilter] = useState('All');
   const [bookingFilter, setBookingFilter] = useState('All');
   const [cancelFilter, setCancelFilter] = useState('All');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isMembersLoading, setIsMembersLoading] = useState(false);
 
   // Live Data States
   const [members, setMembers] = useState([]);
+  const [switchRequests, setSwitchRequests] = useState([]);
+  const [membershipSummary, setMembershipSummary] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [cancellations, setCancellations] = useState([]);
   const [trainersList, setTrainersList] = useState([]);
@@ -77,6 +82,7 @@ export const MembersTab = ({ topInset, navigation }) => {
   const [memberDetailsTab, setMemberDetailsTab] = useState('plan'); // 'plan' | 'trainer' | 'emergency' | 'attendance'
   const [showExtendModal, setShowExtendModal] = useState(false);
   const [selectedCancelRequest, setSelectedCancelRequest] = useState(null);
+  const [selectedSwitchRequest, setSelectedSwitchRequest] = useState(null);
 
   // Extend Membership Form State
   const [extendPlan, setExtendPlan] = useState(DEFAULT_PLANS[1]);
@@ -84,23 +90,83 @@ export const MembersTab = ({ topInset, navigation }) => {
   const [extendPaymentMethod, setExtendPaymentMethod] = useState('UPI');
   const [extendFromOption, setExtendFromOption] = useState('EXPIRY'); // 'EXPIRY' | 'TODAY'
 
-  // Fetch Live Data
+  // Fetch Live Data from Backend API
   const fetchAllData = useCallback(async () => {
     try {
       if (refreshGymProfile) {
         await refreshGymProfile();
       }
-      const employees = await apiService.getEmployees();
+
+      const targetGymId = gym?._id || gym?.id || gym?.partnerId;
+
+      const [employees, membershipsRes, switchRes] = await Promise.all([
+        apiService.getEmployees().catch(() => []),
+        targetGymId ? apiService.getMemberships(targetGymId, { limit: 100 }).catch(() => null) : null,
+        targetGymId ? apiService.getSwitchRequests(targetGymId).catch(() => null) : null,
+      ]);
+
       if (Array.isArray(employees)) {
         const trainers = employees.filter(
           (e) => (e.role || '').toLowerCase().includes('trainer') || (e.role || '').toLowerCase().includes('coach')
         );
         setTrainersList(trainers.length > 0 ? trainers : employees);
       }
+
+      if (membershipsRes?.summary) {
+        setMembershipSummary(membershipsRes.summary);
+      }
+
+      if (Array.isArray(membershipsRes?.memberships)) {
+        const mapped = membershipsRes.memberships.map((m) => {
+          const startStr = m.startDate
+            ? new Date(m.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+            : '';
+          const endStr = m.endDate
+            ? new Date(m.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+            : '';
+          const daysRemaining = Math.max(0, Math.ceil((new Date(m.endDate) - new Date()) / (1000 * 60 * 60 * 24)));
+          return {
+            id: m._id,
+            key: m._id,
+            memberId: m.membershipId || (m._id ? m._id.substring(m._id.length - 8).toUpperCase() : 'MEM'),
+            name: m.userId?.fullName || 'Member',
+            phone: m.userId?.phone || '',
+            email: m.userId?.email || '',
+            avatar:
+              m.userId?.avatar ||
+              m.userId?.profilePicture ||
+              m.avatar ||
+              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop',
+            avatarInitials: (m.userId?.fullName || 'M')
+              .split(' ')
+              .map((n) => n[0])
+              .join('')
+              .substring(0, 2)
+              .toUpperCase(),
+            plan: m.membershipTier || 'Standard',
+            startDate: startStr,
+            expiryDate: endStr,
+            daysLeft: `${daysRemaining} days left`,
+            status: m.status || 'Active',
+            paymentType: m.payment?.method || 'Online',
+            amount: `₹${Number(m.pricing?.totalAmount || 0).toLocaleString('en-IN')}`,
+            trainerName: m.trainerId?.name || (m.hasTrainer ? 'Assigned' : 'None'),
+            emergencyContact: m.userId?.emergencyContact || m.emergencyContact || 'Not Specified',
+            gender: m.userId?.gender || 'Not Specified',
+            bloodGroup: m.userId?.bloodGroup || 'Not Specified',
+            fitnessGoals: m.userId?.fitnessGoals || ['General Fitness'],
+          };
+        });
+        setMembers(mapped);
+      }
+
+      if (Array.isArray(switchRes?.requests)) {
+        setSwitchRequests(switchRes.requests);
+      }
     } catch (err) {
-      console.warn('Error fetching trainers/gym data:', err.message);
+      console.warn('Error fetching gym live data:', err.message);
     }
-  }, [refreshGymProfile]);
+  }, [gym?._id, gym?.id, gym?.partnerId, refreshGymProfile]);
 
   useEffect(() => {
     fetchAllData();
@@ -378,6 +444,85 @@ export const MembersTab = ({ topInset, navigation }) => {
     });
   }, [cancellations, cancelFilter, searchQuery]);
 
+  const filteredSwitches = useMemo(() => {
+    return switchRequests.filter((s) => {
+      let matchesFilter = true;
+      if (switchFilter === 'Pending Review') {
+        matchesFilter = s.status === 'PENDING_GYM_APPROVAL';
+      } else if (switchFilter === 'Sent to Admin') {
+        matchesFilter = ['PENDING_SUPER_ADMIN_APPROVAL', 'FORWARDED_TO_ADMIN', 'IN_REVIEW_SUPER_ADMIN'].includes(s.status);
+      } else if (switchFilter === 'Approved') {
+        matchesFilter = ['APPROVED', 'COMPLETED'].includes(s.status);
+      } else if (switchFilter === 'Rejected') {
+        matchesFilter = ['REJECTED_BY_GYM', 'REJECTED_BY_SUPER_ADMIN', 'REJECTED'].includes(s.status);
+      }
+
+      const q = searchQuery.toLowerCase().trim();
+      const userName = (s.userId?.fullName || '').toLowerCase();
+      const userPhone = s.userId?.phone || '';
+      const reqId = (s.requestId || s._id || '').toLowerCase();
+      const matchesSearch = q === '' || userName.includes(q) || userPhone.includes(q) || reqId.includes(q);
+
+      return matchesFilter && matchesSearch;
+    });
+  }, [switchRequests, switchFilter, searchQuery]);
+
+  // Action on Plan Switch Request (ACCEPT or REJECT)
+  const handleSwitchAction = (req, action) => {
+    const isApprove = action === 'ACCEPT';
+    const memberName = req.userId?.fullName || 'member';
+    Alert.alert(
+      isApprove ? 'Approve Transfer' : 'Reject Transfer',
+      isApprove
+        ? `Approve switch request for ${memberName} and forward to Super Admin for processing?`
+        : `Are you sure you want to reject switch request for ${memberName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: isApprove ? 'Accept & Forward' : 'Reject',
+          style: isApprove ? 'default' : 'destructive',
+          onPress: async () => {
+            try {
+              await apiService.respondToSwitchRequest(req._id || req.requestId, {
+                action,
+                remarks: isApprove
+                  ? 'Approved by Gym Owner via mobile console'
+                  : 'Rejected by Gym Owner via mobile console',
+              });
+              showToast({
+                message: isApprove
+                  ? `Plan switch for ${memberName} approved and forwarded to Super Admin!`
+                  : `Plan switch for ${memberName} rejected.`,
+                isSuccess: isApprove,
+              });
+              fetchAllData();
+            } catch (err) {
+              Alert.alert('Action Failed', err.message || 'Unable to update switch request.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Dynamic Metrics matching Web Console exactly
+  const dynamicTotal = membershipSummary?.total ?? members.length;
+  const dynamicActive = membershipSummary?.active ?? members.filter((m) => (m.status || '').toLowerCase() === 'active').length;
+  const dynamicExpiringSoon =
+    membershipSummary?.expiringSoon ??
+    members.filter((m) => {
+      const st = (m.status || '').toLowerCase();
+      if (st === 'expiring soon') return true;
+      if (st === 'active') {
+        const days = parseInt(m.daysLeft, 10);
+        return !isNaN(days) && days <= 30 && days >= 0;
+      }
+      return false;
+    }).length;
+  const dynamicExpired =
+    membershipSummary?.expired ??
+    members.filter((m) => (m.status || '').toLowerCase() === 'expired').length;
+
   return (
     <View
       style={[
@@ -403,7 +548,7 @@ export const MembersTab = ({ topInset, navigation }) => {
           />
         }
       >
-        {/* 1. TOP SEGMENT SWITCHER (Members / Bookings / Cancellations) */}
+        {/* 1. TOP SEGMENT SWITCHER (Members / Switches / Cancellations / Bookings) */}
         <View
           style={[
             styles.modeSegmentContainer,
@@ -431,6 +576,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                 styles.modeSegmentText,
                 { color: activeMode === 'MEMBERS' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B' },
               ]}
+              numberOfLines={1}
             >
               Members ({members.length})
             </Text>
@@ -439,23 +585,24 @@ export const MembersTab = ({ topInset, navigation }) => {
           <TouchableOpacity
             style={[
               styles.modeSegmentBtn,
-              activeMode === 'BOOKINGS' && { backgroundColor: AppColors.primaryColor },
+              activeMode === 'SWITCHES' && { backgroundColor: AppColors.primaryColor },
             ]}
-            onPress={() => setActiveMode('BOOKINGS')}
+            onPress={() => setActiveMode('SWITCHES')}
             activeOpacity={0.8}
           >
             <MaterialIcons
-              name="confirmation-number"
+              name="sync"
               size={15}
-              color={activeMode === 'BOOKINGS' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B'}
+              color={activeMode === 'SWITCHES' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B'}
             />
             <Text
               style={[
                 styles.modeSegmentText,
-                { color: activeMode === 'BOOKINGS' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B' },
+                { color: activeMode === 'SWITCHES' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B' },
               ]}
+              numberOfLines={1}
             >
-              Bookings ({bookings.length})
+              Switches ({switchRequests.length})
             </Text>
           </TouchableOpacity>
 
@@ -480,18 +627,45 @@ export const MembersTab = ({ topInset, navigation }) => {
                     activeMode === 'CANCELLATIONS' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B',
                 },
               ]}
+              numberOfLines={1}
             >
               Cancel ({cancellations.length})
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.modeSegmentBtn,
+              activeMode === 'BOOKINGS' && { backgroundColor: AppColors.primaryColor },
+            ]}
+            onPress={() => setActiveMode('BOOKINGS')}
+            activeOpacity={0.8}
+          >
+            <MaterialIcons
+              name="confirmation-number"
+              size={15}
+              color={activeMode === 'BOOKINGS' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B'}
+            />
+            <Text
+              style={[
+                styles.modeSegmentText,
+                { color: activeMode === 'BOOKINGS' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B' },
+              ]}
+              numberOfLines={1}
+            >
+              Bookings ({bookings.length})
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* 2. HEADER BAR & QUICK ADD BUTTON */}
+        {/* 2. HEADER BAR */}
         <View style={styles.headerRow}>
           <View>
             <Text style={[styles.pageTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
               {activeMode === 'MEMBERS'
                 ? 'Members Management'
+                : activeMode === 'SWITCHES'
+                ? 'Plan Switch Requests'
                 : activeMode === 'BOOKINGS'
                 ? 'Day Pass Bookings'
                 : 'Cancellation Requests'}
@@ -504,16 +678,103 @@ export const MembersTab = ({ topInset, navigation }) => {
             >
               {activeMode === 'MEMBERS'
                 ? `${members.length} registered members in gym roster`
+                : activeMode === 'SWITCHES'
+                ? `${switchRequests.length} plan switch requests from members`
                 : activeMode === 'BOOKINGS'
                 ? `${bookings.length} passes and session bookings`
                 : `${cancellations.length} total cancellation requests`}
             </Text>
           </View>
-
-
         </View>
 
-        {/* 3. SEARCH BAR */}
+        {/* 3. DYNAMIC STAT CARDS (Matches Web Owner Console Exactly) */}
+        {activeMode === 'MEMBERS' && (
+          <View style={styles.statCardsGrid}>
+            <View style={[styles.statCard, { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}>
+              <View style={styles.statCardHeader}>
+                <MaterialIcons name="people" size={18} color="#2563EB" />
+                <Text style={[styles.statCardTitle, { color: isDark ? '#94A3B8' : '#64748B' }]}>Total Members</Text>
+              </View>
+              <Text style={[styles.statCardValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>{dynamicTotal}</Text>
+              <Text style={[styles.statCardSubtitle, { color: '#2563EB' }]}>Registered members</Text>
+            </View>
+
+            <View style={[styles.statCard, { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}>
+              <View style={styles.statCardHeader}>
+                <MaterialIcons name="check-circle" size={18} color="#16A34A" />
+                <Text style={[styles.statCardTitle, { color: isDark ? '#94A3B8' : '#64748B' }]}>Active Members</Text>
+              </View>
+              <Text style={[styles.statCardValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>{dynamicActive}</Text>
+              <Text style={[styles.statCardSubtitle, { color: '#16A34A' }]}>Current active plans</Text>
+            </View>
+
+            <View style={[styles.statCard, { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}>
+              <View style={styles.statCardHeader}>
+                <MaterialIcons name="schedule" size={18} color="#D97706" />
+                <Text style={[styles.statCardTitle, { color: isDark ? '#94A3B8' : '#64748B' }]}>Expiring Soon</Text>
+              </View>
+              <Text style={[styles.statCardValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>{dynamicExpiringSoon}</Text>
+              <Text style={[styles.statCardSubtitle, { color: '#D97706' }]}>Requires renewal</Text>
+            </View>
+
+            <View style={[styles.statCard, { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}>
+              <View style={styles.statCardHeader}>
+                <MaterialIcons name="cancel" size={18} color="#EF4444" />
+                <Text style={[styles.statCardTitle, { color: isDark ? '#94A3B8' : '#64748B' }]}>Expired</Text>
+              </View>
+              <Text style={[styles.statCardValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>{dynamicExpired}</Text>
+              <Text style={[styles.statCardSubtitle, { color: '#EF4444' }]}>Membership lapsed</Text>
+            </View>
+          </View>
+        )}
+
+        {activeMode === 'SWITCHES' && (
+          <View style={styles.statCardsGrid}>
+            <View style={[styles.statCard, { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}>
+              <View style={styles.statCardHeader}>
+                <MaterialIcons name="sync" size={18} color="#2563EB" />
+                <Text style={[styles.statCardTitle, { color: isDark ? '#94A3B8' : '#64748B' }]}>Total Switches</Text>
+              </View>
+              <Text style={[styles.statCardValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>{switchRequests.length}</Text>
+              <Text style={[styles.statCardSubtitle, { color: '#2563EB' }]}>Member initiated</Text>
+            </View>
+
+            <View style={[styles.statCard, { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}>
+              <View style={styles.statCardHeader}>
+                <MaterialIcons name="pending" size={18} color="#D97706" />
+                <Text style={[styles.statCardTitle, { color: isDark ? '#94A3B8' : '#64748B' }]}>Pending Review</Text>
+              </View>
+              <Text style={[styles.statCardValue, { color: '#D97706' }]}>
+                {switchRequests.filter((r) => r.status === 'PENDING_GYM_APPROVAL').length}
+              </Text>
+              <Text style={[styles.statCardSubtitle, { color: '#D97706' }]}>Action required</Text>
+            </View>
+
+            <View style={[styles.statCard, { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}>
+              <View style={styles.statCardHeader}>
+                <MaterialIcons name="admin-panel-settings" size={18} color="#6366F1" />
+                <Text style={[styles.statCardTitle, { color: isDark ? '#94A3B8' : '#64748B' }]}>Sent to Admin</Text>
+              </View>
+              <Text style={[styles.statCardValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                {switchRequests.filter((r) => ['PENDING_SUPER_ADMIN_APPROVAL', 'FORWARDED_TO_ADMIN', 'IN_REVIEW_SUPER_ADMIN'].includes(r.status)).length}
+              </Text>
+              <Text style={[styles.statCardSubtitle, { color: '#6366F1' }]}>In Admin review</Text>
+            </View>
+
+            <View style={[styles.statCard, { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}>
+              <View style={styles.statCardHeader}>
+                <MaterialIcons name="task-alt" size={18} color="#16A34A" />
+                <Text style={[styles.statCardTitle, { color: isDark ? '#94A3B8' : '#64748B' }]}>Resolved</Text>
+              </View>
+              <Text style={[styles.statCardValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                {switchRequests.filter((r) => ['APPROVED', 'COMPLETED', 'REJECTED_BY_GYM', 'REJECTED_BY_SUPER_ADMIN'].includes(r.status)).length}
+              </Text>
+              <Text style={[styles.statCardSubtitle, { color: '#16A34A' }]}>Finalized transfers</Text>
+            </View>
+          </View>
+        )}
+
+        {/* 4. SEARCH BAR */}
         <View
           style={[
             styles.searchContainer,
@@ -533,6 +794,8 @@ export const MembersTab = ({ topInset, navigation }) => {
             placeholder={
               activeMode === 'MEMBERS'
                 ? 'Search by name, phone, or Member ID...'
+                : activeMode === 'SWITCHES'
+                ? 'Search member name, phone, or Request ID...'
                 : activeMode === 'BOOKINGS'
                 ? 'Search customer name or booking ID...'
                 : 'Search member or Request ID...'
@@ -549,7 +812,7 @@ export const MembersTab = ({ topInset, navigation }) => {
           )}
         </View>
 
-        {/* 4. FILTER CHIPS */}
+        {/* 5. FILTER CHIPS */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -557,6 +820,8 @@ export const MembersTab = ({ topInset, navigation }) => {
         >
           {(activeMode === 'MEMBERS'
             ? MEMBER_FILTER_TABS
+            : activeMode === 'SWITCHES'
+            ? SWITCH_FILTER_TABS
             : activeMode === 'BOOKINGS'
             ? BOOKING_FILTER_TABS
             : CANCEL_FILTER_TABS
@@ -564,6 +829,8 @@ export const MembersTab = ({ topInset, navigation }) => {
             const isSelected =
               activeMode === 'MEMBERS'
                 ? memberFilter === tab
+                : activeMode === 'SWITCHES'
+                ? switchFilter === tab
                 : activeMode === 'BOOKINGS'
                 ? bookingFilter === tab
                 : cancelFilter === tab;
@@ -573,6 +840,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                 key={tab}
                 onPress={() => {
                   if (activeMode === 'MEMBERS') setMemberFilter(tab);
+                  else if (activeMode === 'SWITCHES') setSwitchFilter(tab);
                   else if (activeMode === 'BOOKINGS') setBookingFilter(tab);
                   else setCancelFilter(tab);
                 }}
@@ -797,6 +1065,307 @@ export const MembersTab = ({ topInset, navigation }) => {
                         </TouchableOpacity>
                       </View>
                     </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </>
+        )}
+
+        {/* --- 5B. PLAN SWITCH REQUESTS VIEW --- */}
+        {activeMode === 'SWITCHES' && (
+          <>
+            {filteredSwitches.length === 0 ? (
+              <View
+                style={[
+                  styles.emptyState,
+                  { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF' },
+                ]}
+              >
+                <MaterialIcons
+                  name="sync"
+                  size={48}
+                  color={isDark ? 'rgba(255,255,255,0.2)' : '#CBD5E1'}
+                />
+                <Text
+                  style={[
+                    styles.emptyTitle,
+                    { color: isDark ? 'rgba(255,255,255,0.7)' : '#334155' },
+                  ]}
+                >
+                  No Plan Switch Requests
+                </Text>
+                <Text
+                  style={[
+                    styles.emptySub,
+                    { color: isDark ? 'rgba(255,255,255,0.45)' : '#94A3B8' },
+                  ]}
+                >
+                  {searchQuery
+                    ? 'No switch requests match your search criteria'
+                    : 'Member-initiated plan switch requests will appear here.'}
+                </Text>
+              </View>
+            ) : (
+              filteredSwitches.map((req) => {
+                const userObj = req.userId || {};
+                const currentTier = req.membershipId?.membershipTier || 'Current';
+                const targetTier = req.targetTier || 'Target';
+                const quote = req.quoteSnapshot || {};
+                const switchType = quote.switchType || 'SWITCH';
+                const isUpgrade = switchType === 'UPGRADE';
+                const isPendingGym = req.status === 'PENDING_GYM_APPROVAL';
+                const isSentAdmin = ['PENDING_SUPER_ADMIN_APPROVAL', 'FORWARDED_TO_ADMIN', 'IN_REVIEW_SUPER_ADMIN'].includes(req.status);
+                const isApproved = ['APPROVED', 'APPROVED_AND_EXECUTED', 'COMPLETED'].includes(req.status);
+                const isRejected = ['REJECTED_BY_GYM', 'REJECTED_BY_SUPER_ADMIN', 'REJECTED'].includes(req.status);
+
+                let statusBadgeBg = isDark ? 'rgba(217, 119, 6, 0.15)' : '#FEF3C7';
+                let statusBadgeText = '#D97706';
+                let statusLabel = 'Pending Gym Review';
+
+                if (isSentAdmin) {
+                  statusBadgeBg = isDark ? 'rgba(99, 102, 241, 0.15)' : '#EEF2FF';
+                  statusBadgeText = '#6366F1';
+                  statusLabel = 'Sent to Super Admin';
+                } else if (isApproved) {
+                  statusBadgeBg = isDark ? 'rgba(22, 163, 74, 0.15)' : '#DCFCE7';
+                  statusBadgeText = '#16A34A';
+                  statusLabel = 'Approved & Executed';
+                } else if (isRejected) {
+                  statusBadgeBg = isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2';
+                  statusBadgeText = '#EF4444';
+                  statusLabel = req.status === 'REJECTED_BY_GYM' ? 'Rejected by Gym' : 'Rejected by Admin';
+                }
+
+                const netPaise = quote.netAmountToPayPaise || 0;
+                const creditPaise = quote.proRatedCreditPaise || 0;
+                const netAmountStr = (netPaise / 100).toFixed(2);
+                const creditAmountStr = (creditPaise / 100).toFixed(2);
+
+                const reqDate = req.createdAt
+                  ? new Date(req.createdAt).toLocaleDateString('en-GB', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : '';
+
+                return (
+                  <TouchableOpacity
+                    key={req._id || req.requestId}
+                    activeOpacity={0.88}
+                    onPress={() => setSelectedSwitchRequest(req)}
+                    style={[
+                      styles.switchCard,
+                      {
+                        backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
+                        borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                      },
+                    ]}
+                  >
+                    {/* Header: User Info & Request ID */}
+                    <View style={styles.switchCardHeader}>
+                      <View style={styles.switchHeaderLeft}>
+                        {userObj.profilePicture ? (
+                          <Image
+                            source={{ uri: userObj.profilePicture }}
+                            style={styles.switchAvatar}
+                          />
+                        ) : (
+                          <View
+                            style={[
+                              styles.switchAvatarFallback,
+                              { backgroundColor: AppColors.primaryColor },
+                            ]}
+                          >
+                            <Text style={styles.switchAvatarText}>
+                              {(userObj.fullName || 'U').substring(0, 2).toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                          <View style={styles.switchNameRow}>
+                            <Text
+                              style={[
+                                styles.switchUserName,
+                                { color: isDark ? '#FFFFFF' : '#0F172A' },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {userObj.fullName || 'Gym Member'}
+                            </Text>
+                            <View style={styles.switchReqBadge}>
+                              <Text style={styles.switchReqBadgeText}>
+                                {req.requestId || (req._id ? req._id.substring(req._id.length - 8).toUpperCase() : 'REQ')}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text
+                            style={[
+                              styles.switchUserPhone,
+                              { color: isDark ? '#94A3B8' : '#64748B' },
+                            ]}
+                          >
+                            {userObj.phone || userObj.email || 'Member ID: ' + (req.membershipId?._id?.substring(0, 8) || '--')}
+                            {reqDate ? ` • ${reqDate}` : ''}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Status Tag */}
+                      <View style={[styles.switchStatusTag, { backgroundColor: statusBadgeBg }]}>
+                        <Text style={[styles.switchStatusText, { color: statusBadgeText }]}>
+                          {statusLabel}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Plan Comparison Box (Current -> Requested) */}
+                    <View
+                      style={[
+                        styles.switchPlanBox,
+                        {
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
+                          borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                        },
+                      ]}
+                    >
+                      <View style={styles.switchPlanCol}>
+                        <Text style={styles.switchPlanColLabel}>CURRENT PLAN</Text>
+                        <Text
+                          style={[
+                            styles.switchPlanColValue,
+                            { color: '#722ED1' },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {currentTier} Plan
+                        </Text>
+                        {quote.daysRemaining != null && (
+                          <Text style={styles.switchPlanColSub}>
+                            {quote.daysRemaining} days left
+                          </Text>
+                        )}
+                      </View>
+
+                      <View style={styles.switchArrowContainer}>
+                        <MaterialIcons
+                          name="arrow-forward"
+                          size={18}
+                          color={isDark ? '#94A3B8' : '#64748B'}
+                        />
+                        <View
+                          style={[
+                            styles.switchTypePill,
+                            {
+                              backgroundColor: isUpgrade ? 'rgba(37, 99, 235, 0.1)' : 'rgba(217, 119, 6, 0.1)',
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.switchTypePillText,
+                              { color: isUpgrade ? '#2563EB' : '#D97706' },
+                            ]}
+                          >
+                            {switchType}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={[styles.switchPlanCol, { alignItems: 'flex-end' }]}>
+                        <Text style={styles.switchPlanColLabel}>REQUESTED PLAN</Text>
+                        <Text
+                          style={[
+                            styles.switchPlanColValue,
+                            { color: isUpgrade ? '#2563EB' : '#D97706' },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {targetTier} Plan
+                        </Text>
+                        <Text style={styles.switchPlanColSub}>
+                          Target tier
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Proration & Financial Settlement Row */}
+                    <View
+                      style={[
+                        styles.switchSettlementRow,
+                        { borderTopColor: isDark ? AppColors.darkBorder : '#F1F5F9' },
+                      ]}
+                    >
+                      <View style={styles.switchSettlementItem}>
+                        <Text style={styles.switchSettlementItemLabel}>Prorated Credit</Text>
+                        <Text style={[styles.switchSettlementItemValue, { color: '#16A34A' }]}>
+                          -₹{creditAmountStr}
+                        </Text>
+                      </View>
+
+                      <View style={styles.switchSettlementItem}>
+                        <Text style={styles.switchSettlementItemLabel}>Net Payable</Text>
+                        <Text
+                          style={[
+                            styles.switchSettlementItemValue,
+                            { color: isDark ? '#FFFFFF' : '#0F172A', fontWeight: '800' },
+                          ]}
+                        >
+                          ₹{netAmountStr}
+                        </Text>
+                      </View>
+
+                      <View style={[styles.switchSettlementItem, { alignItems: 'flex-end' }]}>
+                        <Text style={styles.switchSettlementItemLabel}>Settlement</Text>
+                        <Text
+                          style={[
+                            styles.switchSettlementItemValue,
+                            { color: isDark ? '#94A3B8' : '#64748B', fontSize: 11.5 },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {isUpgrade
+                            ? req.paymentDetails?.method || 'UPI Payment'
+                            : quote.downgradePolicy === 'REFUND'
+                            ? `Refund: ₹${((quote.leftoverCreditPaise || 0) / 100).toFixed(2)}`
+                            : quote.downgradePolicy === 'EXTEND'
+                            ? `+${quote.extraDaysAwarded || 0} Days Ext.`
+                            : `Wallet: ₹${((quote.leftoverCreditPaise || 0) / 100).toFixed(2)}`}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Action Buttons for Pending Gym Review */}
+                    {isPendingGym && (
+                      <View style={styles.switchActionRow}>
+                        <TouchableOpacity
+                          style={[styles.switchAcceptBtn, { backgroundColor: AppColors.primaryColor }]}
+                          onPress={() => handleSwitchAction(req, 'ACCEPT')}
+                          activeOpacity={0.8}
+                        >
+                          <MaterialIcons name="send" size={15} color="#FFFFFF" />
+                          <Text style={styles.switchAcceptBtnText}>Accept & Send to Admin</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[
+                            styles.switchRejectBtn,
+                            {
+                              borderColor: '#EF4444',
+                              backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#FEF2F2',
+                            },
+                          ]}
+                          onPress={() => handleSwitchAction(req, 'REJECT')}
+                          activeOpacity={0.8}
+                        >
+                          <MaterialIcons name="close" size={15} color="#EF4444" />
+                          <Text style={[styles.switchRejectBtnText, { color: '#EF4444' }]}>
+                            Reject
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               })
@@ -1860,6 +2429,148 @@ export const MembersTab = ({ topInset, navigation }) => {
         </View>
       </Modal>
 
+      {/* 4. PLAN SWITCH REQUEST DETAILS MODAL */}
+      <Modal
+        visible={!!selectedSwitchRequest}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedSwitchRequest(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', maxHeight: '84%' },
+            ]}
+          >
+            {selectedSwitchRequest && (
+              <>
+                <View style={styles.modalHeader}>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={[styles.modalTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                      Plan Switch Request Details
+                    </Text>
+                    <Text style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#64748B', marginTop: 2 }}>
+                      {selectedSwitchRequest.requestId || selectedSwitchRequest._id}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setSelectedSwitchRequest(null)}>
+                    <MaterialIcons
+                      name="close"
+                      size={24}
+                      color={isDark ? '#FFFFFF' : '#0F172A'}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                      Member Name
+                    </Text>
+                    <Text style={[styles.detailVal, { color: isDark ? '#FFFFFF' : '#0F172A', fontWeight: '700' }]}>
+                      {selectedSwitchRequest.userId?.fullName || 'Member'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                      Phone / Contact
+                    </Text>
+                    <Text style={[styles.detailVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                      {selectedSwitchRequest.userId?.phone || selectedSwitchRequest.userId?.email || '--'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                      Current Membership Tier
+                    </Text>
+                    <Text style={[styles.detailVal, { color: '#722ED1', fontWeight: '700' }]}>
+                      {selectedSwitchRequest.membershipId?.membershipTier || 'Current'} Plan
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                      Target Membership Tier
+                    </Text>
+                    <Text style={[styles.detailVal, { color: '#2563EB', fontWeight: '700' }]}>
+                      {selectedSwitchRequest.targetTier} Plan ({selectedSwitchRequest.quoteSnapshot?.switchType || 'SWITCH'})
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                      Prorated Credit Applied
+                    </Text>
+                    <Text style={[styles.detailVal, { color: '#16A34A', fontWeight: '700' }]}>
+                      -₹{(((selectedSwitchRequest.quoteSnapshot?.proRatedCreditPaise || 0) / 100).toFixed(2))}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                      Net Payable Amount
+                    </Text>
+                    <Text style={[styles.detailVal, { color: isDark ? '#FFFFFF' : '#0F172A', fontWeight: '800', fontSize: 16 }]}>
+                      ₹{(((selectedSwitchRequest.quoteSnapshot?.netAmountToPayPaise || 0) / 100).toFixed(2))}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                      Status
+                    </Text>
+                    <Text style={[styles.detailVal, { color: AppColors.primaryColor, fontWeight: '700' }]}>
+                      {selectedSwitchRequest.status === 'PENDING_GYM_APPROVAL'
+                        ? 'Pending Gym Review'
+                        : ['PENDING_SUPER_ADMIN_APPROVAL', 'FORWARDED_TO_ADMIN', 'IN_REVIEW_SUPER_ADMIN'].includes(selectedSwitchRequest.status)
+                        ? 'Sent to Super Admin'
+                        : ['APPROVED', 'APPROVED_AND_EXECUTED', 'COMPLETED'].includes(selectedSwitchRequest.status)
+                        ? 'Approved & Executed'
+                        : 'Rejected'}
+                    </Text>
+                  </View>
+
+                  {selectedSwitchRequest.status === 'PENDING_GYM_APPROVAL' && (
+                    <View style={styles.sheetBottomActionRow}>
+                      <TouchableOpacity
+                        style={[styles.sheetMainBtn, { backgroundColor: AppColors.primaryColor }]}
+                        onPress={() => {
+                          const req = selectedSwitchRequest;
+                          setSelectedSwitchRequest(null);
+                          handleSwitchAction(req, 'ACCEPT');
+                        }}
+                      >
+                        <MaterialIcons name="send" size={18} color="#FFFFFF" />
+                        <Text style={styles.sheetMainBtnText}>Accept & Send to Admin</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.sheetSecondaryBtn,
+                          { borderColor: AppColors.dangerRed, backgroundColor: 'rgba(239, 68, 68, 0.08)' },
+                        ]}
+                        onPress={() => {
+                          const req = selectedSwitchRequest;
+                          setSelectedSwitchRequest(null);
+                          handleSwitchAction(req, 'REJECT');
+                        }}
+                      >
+                        <MaterialIcons name="close" size={18} color={AppColors.dangerRed} />
+                        <Text style={[styles.sheetSecondaryBtnText, { color: AppColors.dangerRed }]}>
+                          Reject Request
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </ScrollView>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
 
     </View>
   );
@@ -2495,5 +3206,210 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 14,
+  },
+
+  // Dynamic Stat Cards Grid (Matching Web App)
+  statCardsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  statCard: {
+    width: '48.5%',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+  },
+  statCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  statCardTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  statCardValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  statCardSubtitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+
+  // Plan Switch Requests Card Styles
+  switchCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 12,
+  },
+  switchCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  switchHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  switchAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  switchAvatarFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  switchAvatarText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  switchNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  switchUserName: {
+    fontSize: 14,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  switchReqBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+  },
+  switchReqBadgeText: {
+    fontSize: 10.5,
+    fontFamily: 'monospace',
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  switchUserPhone: {
+    fontSize: 11.5,
+    marginTop: 2,
+  },
+  switchStatusTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  switchStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  switchPlanBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  switchPlanCol: {
+    flex: 1,
+  },
+  switchPlanColLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  switchPlanColValue: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  switchPlanColSub: {
+    fontSize: 10.5,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  switchArrowContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  switchTypePill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 2,
+  },
+  switchTypePillText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+  switchSettlementRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    paddingTop: 10,
+    marginBottom: 10,
+  },
+  switchSettlementItem: {
+    flex: 1,
+  },
+  switchSettlementItemLabel: {
+    fontSize: 10.5,
+    color: '#94A3B8',
+    marginBottom: 2,
+  },
+  switchSettlementItemValue: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  switchActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  switchAcceptBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  switchAcceptBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  switchRejectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+  },
+  switchRejectBtnText: {
+    fontWeight: '700',
+    fontSize: 12,
   },
 });

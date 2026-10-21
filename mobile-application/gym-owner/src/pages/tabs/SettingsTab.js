@@ -254,6 +254,10 @@ export const SettingsTab = ({ topInset, navigation }) => {
   const [trainerTabType, setTrainerTabType] = useState('All');
   const [staffTabRole, setStaffTabRole] = useState('All');
 
+  // Trainer Membership Tier Pricing Mapping (Matches Web App)
+  const [gymTrainersPricing, setGymTrainersPricing] = useState([]);
+  const [isSavingTrainerPricing, setIsSavingTrainerPricing] = useState(false);
+
   // Operational Toggles
   const [audioBeep, setAudioBeep] = useState(true);
   const [smsReminders, setSmsReminders] = useState(true);
@@ -448,6 +452,24 @@ export const SettingsTab = ({ topInset, navigation }) => {
           setIfscCode(data.bankDetails.ifscCode || '');
           setUpiId(data.bankDetails.upiId || '');
         }
+
+        if (Array.isArray(data.trainers) && data.trainers.length > 0) {
+          setGymTrainersPricing(
+            data.trainers.map((t) => ({
+              employeeId: t.employeeId || t.id || t._id,
+              name: t.name || t.fullName,
+              specialty: t.specialty,
+              imageUrl: t.imageUrl || t.image?.fileData,
+              trainerPricing: {
+                monthly: String(t.trainerPricing?.monthly || t.monthlyFee || 0),
+                quarterly: String(t.trainerPricing?.quarterly || 0),
+                halfYearly: String(t.trainerPricing?.halfYearly || 0),
+                annual: String(t.trainerPricing?.annual || 0),
+                singleSession: String(t.trainerPricing?.singleSession || 0),
+              },
+            }))
+          );
+        }
       }
     } catch (err) {
       console.warn('Gym profile fetch error:', err.message);
@@ -484,6 +506,72 @@ export const SettingsTab = ({ topInset, navigation }) => {
         e.specialty
     );
   }, [employeesList]);
+
+  // Sync trainers pricing with trainers from employees if not populated
+  useEffect(() => {
+    if (gymTrainersPricing.length === 0 && trainers.length > 0) {
+      setGymTrainersPricing(
+        trainers.map((t) => ({
+          employeeId: t.employeeId || t.id || t._id,
+          name: t.name || t.fullName,
+          specialty: t.specialty || 'Personal Trainer',
+          imageUrl: t.imageUrl || t.profilePicture || t.image?.fileData,
+          trainerPricing: {
+            monthly: String(t.trainerPricing?.monthly || t.monthlyFee || 0),
+            quarterly: String(t.trainerPricing?.quarterly || 0),
+            halfYearly: String(t.trainerPricing?.halfYearly || 0),
+            annual: String(t.trainerPricing?.annual || 0),
+            singleSession: String(t.trainerPricing?.singleSession || 0),
+          },
+        }))
+      );
+    }
+  }, [trainers, gymTrainersPricing.length]);
+
+  const handleUpdateTrainerTierRate = (index, tierKey, val) => {
+    const clean = val.replace(/[^0-9]/g, '');
+    setGymTrainersPricing((prev) => {
+      const copy = [...prev];
+      copy[index] = {
+        ...copy[index],
+        trainerPricing: {
+          ...copy[index].trainerPricing,
+          [tierKey]: clean,
+        },
+      };
+      return copy;
+    });
+  };
+
+  const handleSaveTrainerPricing = async () => {
+    if (!targetGymId) {
+      Alert.alert('Error', 'Gym ID not found');
+      return;
+    }
+    setIsSavingTrainerPricing(true);
+    try {
+      const payload = {
+        trainerPricing: gymTrainersPricing.map((t) => ({
+          employeeId: t.employeeId,
+          trainerPricing: {
+            monthly: Number(t.trainerPricing?.monthly || 0),
+            quarterly: Number(t.trainerPricing?.quarterly || 0),
+            halfYearly: Number(t.trainerPricing?.halfYearly || 0),
+            annual: Number(t.trainerPricing?.annual || 0),
+            singleSession: Number(t.trainerPricing?.singleSession || 0),
+          },
+        })),
+      };
+
+      await apiService.updateTrainerPricing(targetGymId, payload);
+      showToast({ message: 'Trainer Membership Tier Pricing updated successfully!', isSuccess: true });
+      fetchGymProfileData();
+    } catch (err) {
+      Alert.alert('Update Failed', err.message || 'Unable to save trainer pricing.');
+    } finally {
+      setIsSavingTrainerPricing(false);
+    }
+  };
 
   const staffEmployees = useMemo(() => {
     return employeesList.filter(
@@ -1562,6 +1650,208 @@ export const SettingsTab = ({ topInset, navigation }) => {
             </Text>
           </View>
         ))}
+      </View>
+
+      {/* 3B. Trainer Membership Tier Pricing Mapping (Matches Web Console) */}
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
+            borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+          },
+        ]}
+      >
+        <View style={styles.cardHeaderWithEdit}>
+          <View style={styles.cardHeaderLeft}>
+            <MaterialIcons name="fitness-center" size={20} color="#722ED1" />
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text
+                style={[
+                  styles.cardHeaderTitleText,
+                  { color: isDark ? '#FFFFFF' : '#0F172A' },
+                ]}
+              >
+                Trainer Membership Tier Pricing ({gymTrainersPricing.length})
+              </Text>
+              <Text
+                style={[
+                  styles.cardSubText,
+                  { color: isDark ? 'rgba(255,255,255,0.55)' : '#64748B' },
+                ]}
+              >
+                Configure specific rates charged to members for each membership tier.
+              </Text>
+            </View>
+          </View>
+          {gymTrainersPricing.length > 0 && (
+            <TouchableOpacity
+              style={[
+                styles.saveTrainerBtn,
+                { backgroundColor: AppColors.primaryColor },
+              ]}
+              onPress={handleSaveTrainerPricing}
+              disabled={isSavingTrainerPricing}
+              activeOpacity={0.8}
+            >
+              {isSavingTrainerPricing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <MaterialIcons name="save" size={14} color="#FFFFFF" />
+                  <Text style={styles.saveTrainerBtnText}>Save</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {gymTrainersPricing.length === 0 ? (
+          <Text style={{ fontSize: 12, color: '#94A3B8', paddingVertical: 8 }}>
+            No personal trainers found. Add trainers in Staff / Employees tab to configure tier pricing.
+          </Text>
+        ) : (
+          gymTrainersPricing.map((item, idx) => (
+            <View
+              key={item.employeeId || idx}
+              style={[
+                styles.trainerPricingItem,
+                {
+                  borderColor: isDark ? AppColors.darkBorder : '#F1F5F9',
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#F8FAFC',
+                },
+              ]}
+            >
+              <View style={styles.trainerHeaderRow}>
+                {item.imageUrl ? (
+                  <Image source={{ uri: item.imageUrl }} style={styles.trainerAvatar} />
+                ) : (
+                  <View
+                    style={[
+                      styles.trainerAvatarFallback,
+                      { backgroundColor: '#722ED1' },
+                    ]}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 }}>
+                      {(item.name || 'T').substring(0, 2).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text
+                    style={[
+                      styles.trainerName,
+                      { color: isDark ? '#FFFFFF' : '#0F172A' },
+                    ]}
+                  >
+                    {item.name || 'Trainer'}
+                  </Text>
+                  <Text style={styles.trainerSpecialty}>
+                    {item.specialty || 'Personal Trainer'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 5-Tier Pricing Input Grid */}
+              <View style={styles.tierInputsGrid}>
+                <View style={styles.tierInputCol}>
+                  <Text style={styles.tierInputLabel}>Monthly (₹)</Text>
+                  <TextInput
+                    style={[
+                      styles.tierInput,
+                      {
+                        backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
+                        borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                        color: isDark ? '#FFFFFF' : '#0F172A',
+                      },
+                    ]}
+                    keyboardType="numeric"
+                    value={String(item.trainerPricing?.monthly || '')}
+                    onChangeText={(val) => handleUpdateTrainerTierRate(idx, 'monthly', val)}
+                    placeholder="0"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+
+                <View style={styles.tierInputCol}>
+                  <Text style={styles.tierInputLabel}>Quarterly (₹)</Text>
+                  <TextInput
+                    style={[
+                      styles.tierInput,
+                      {
+                        backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
+                        borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                        color: isDark ? '#FFFFFF' : '#0F172A',
+                      },
+                    ]}
+                    keyboardType="numeric"
+                    value={String(item.trainerPricing?.quarterly || '')}
+                    onChangeText={(val) => handleUpdateTrainerTierRate(idx, 'quarterly', val)}
+                    placeholder="0"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+
+                <View style={styles.tierInputCol}>
+                  <Text style={styles.tierInputLabel}>Half-Yearly (₹)</Text>
+                  <TextInput
+                    style={[
+                      styles.tierInput,
+                      {
+                        backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
+                        borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                        color: isDark ? '#FFFFFF' : '#0F172A',
+                      },
+                    ]}
+                    keyboardType="numeric"
+                    value={String(item.trainerPricing?.halfYearly || '')}
+                    onChangeText={(val) => handleUpdateTrainerTierRate(idx, 'halfYearly', val)}
+                    placeholder="0"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+
+                <View style={styles.tierInputCol}>
+                  <Text style={styles.tierInputLabel}>Annual (₹)</Text>
+                  <TextInput
+                    style={[
+                      styles.tierInput,
+                      {
+                        backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
+                        borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                        color: isDark ? '#FFFFFF' : '#0F172A',
+                      },
+                    ]}
+                    keyboardType="numeric"
+                    value={String(item.trainerPricing?.annual || '')}
+                    onChangeText={(val) => handleUpdateTrainerTierRate(idx, 'annual', val)}
+                    placeholder="0"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+
+                <View style={styles.tierInputCol}>
+                  <Text style={styles.tierInputLabel}>Single Session (₹)</Text>
+                  <TextInput
+                    style={[
+                      styles.tierInput,
+                      {
+                        backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
+                        borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                        color: isDark ? '#FFFFFF' : '#0F172A',
+                      },
+                    ]}
+                    keyboardType="numeric"
+                    value={String(item.trainerPricing?.singleSession || '')}
+                    onChangeText={(val) => handleUpdateTrainerTierRate(idx, 'singleSession', val)}
+                    placeholder="0"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+              </View>
+            </View>
+          ))
+        )}
       </View>
 
       {/* 4. Facilities & Equipment */}
@@ -4432,6 +4722,74 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  saveTrainerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  saveTrainerBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  trainerPricingItem: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 10,
+  },
+  trainerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  trainerAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
+  trainerAvatarFallback: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trainerName: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  trainerSpecialty: {
+    fontSize: 11.5,
+    color: '#722ED1',
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  tierInputsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tierInputCol: {
+    width: '48%',
+  },
+  tierInputLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  tierInput: {
+    height: 38,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });
 
 export default SettingsTab;
+
