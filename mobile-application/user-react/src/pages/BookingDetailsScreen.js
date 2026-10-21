@@ -17,6 +17,7 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors, AppTheme } from '../theme/appTheme';
 import { MonthlyGridCalendar } from '../widgets/CustomCalendar';
+import { DigitalQrPassCard } from '../widgets/DigitalQrPassCard';
 import { useBookingRepository } from '../data/BookingContext';
 import { useToast } from '../widgets/CustomScaffoldMessage';
 
