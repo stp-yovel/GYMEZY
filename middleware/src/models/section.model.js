@@ -134,13 +134,12 @@ const sectionSchema = new mongoose.Schema(
 );
 
 // Pre-save hook: auto-calculate endDate if not provided
-sectionSchema.pre('save', function (next) {
+sectionSchema.pre('save', function () {
   if (this.startDate && this.durationDays && !this.endDate) {
     const end = new Date(this.startDate);
     end.setDate(end.getDate() + Number(this.durationDays));
     this.endDate = end;
   }
-  next();
 });
 
 export const Section = mongoose.model('Section', sectionSchema);
