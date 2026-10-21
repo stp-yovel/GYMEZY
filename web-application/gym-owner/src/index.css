@@ -349,34 +349,6 @@ button {
   font-weight: var(--font-semibold) !important;
 }
 
-.font-light {
-  font-weight: var(--font-light) !important;
-}
-
-.font-regular {
-  font-weight: var(--font-regular) !important;
-}
-
-.font-medium {
-  font-weight: var(--font-medium) !important;
-}
-
-.font-semibold {
-  font-weight: var(--font-semibold) !important;
-}
-
-.font-bold {
-  font-weight: var(--font-bold) !important;
-}
-
-.font-extrabold {
-  font-weight: var(--font-extrabold) !important;
-}
-
-.font-extrabold {
-  font-weight: var(--font-extrabold) !important;
-}
-
 .tracking-tighter {
   letter-spacing: var(--tracking-tighter) !important;
 }
@@ -686,59 +658,41 @@ html.dark .ant-btn-default:hover {
 }
 
 /* ==========================================================================
-   ANT DESIGN TABLE OPAQUE STICKY / FIXED CELL DARK & LIGHT MODE FIXES
+   ANT DESIGN TABLE STICKY COLUMN FIXES & HORIZONTAL SCROLL
    ========================================================================== */
-.ant-table-wrapper .ant-table-tbody > tr > td {
-  background-color: var(--bg-surface);
+.ant-table-wrapper {
+  width: 100%;
+  max-width: 100%;
 }
 
-html.dark .ant-table-wrapper .ant-table-tbody > tr > td {
-  background-color: #0d1117 !important;
+.ant-table {
+  background: transparent !important;
 }
 
-.ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-right,
-.ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-right-first,
-.ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-right-last {
-  background-color: #fafafa !important;
-  z-index: 3 !important;
-}
-
-.ant-table-wrapper .ant-table-cell-fix-right,
-.ant-table-wrapper .ant-table-cell-fix-right-first,
-.ant-table-wrapper .ant-table-cell-fix-right-last,
-.ant-table-wrapper .ant-table-cell-fix-left,
-.ant-table-wrapper .ant-table-cell-fix-left-first,
-.ant-table-wrapper .ant-table-cell-fix-left-last {
-  background-color: #ffffff !important;
+.ant-table-cell-fix-right,
+.ant-table-cell-fix-left {
+  background-color: var(--bg-surface-elevated) !important;
   z-index: 2 !important;
 }
 
-html.dark .ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-right,
-html.dark .ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-right-first,
-html.dark .ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-right-last {
-  background-color: #161b22 !important;
+.ant-table-thead > tr > th.ant-table-cell-fix-right,
+.ant-table-thead > tr > th.ant-table-cell-fix-left {
+  background-color: var(--bg-surface-subtle) !important;
   z-index: 3 !important;
 }
 
-html.dark .ant-table-wrapper .ant-table-cell-fix-right,
-html.dark .ant-table-wrapper .ant-table-cell-fix-right-first,
-html.dark .ant-table-wrapper .ant-table-cell-fix-right-last,
-html.dark .ant-table-wrapper .ant-table-cell-fix-left,
-html.dark .ant-table-wrapper .ant-table-cell-fix-left-first,
-html.dark .ant-table-wrapper .ant-table-cell-fix-left-last {
-  background-color: #0d1117 !important;
-  z-index: 2 !important;
+[data-theme='dark'] .ant-table-cell-fix-right,
+[data-theme='dark'] .ant-table-cell-fix-left,
+html.dark .ant-table-cell-fix-right,
+html.dark .ant-table-cell-fix-left {
+  background-color: #141414 !important;
 }
 
-html.dark .ant-table-wrapper .ant-table-tbody > tr:hover > td,
-html.dark .ant-table-wrapper .ant-table-tbody > tr:hover > td.ant-table-cell-fix-right,
-html.dark .ant-table-wrapper .ant-table-tbody > tr:hover > td.ant-table-cell-fix-right-first {
-  background-color: #161b22 !important;
-}
-
-.ant-table-wrapper .ant-table-container {
-  overflow: hidden;
-  border-radius: var(--radius-base);
+[data-theme='dark'] .ant-table-thead > tr > th.ant-table-cell-fix-right,
+[data-theme='dark'] .ant-table-thead > tr > th.ant-table-cell-fix-left,
+html.dark .ant-table-thead > tr > th.ant-table-cell-fix-right,
+html.dark .ant-table-thead > tr > th.ant-table-cell-fix-left {
+  background-color: #1f1f1f !important;
 }
 
 /* ==========================================================================
@@ -754,4 +708,29 @@ input[type="password"],
 
 input[type="password"]::-webkit-textfield-decoration-container {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+}
+
+/* ==========================================================================
+   REACTIVE TABLE HYPERLINKS
+   ========================================================================== */
+.table-hyperlink {
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.table-hyperlink:hover {
+  color: #4338ca !important;
+  opacity: 0.85;
+}
+
+html.dark .table-hyperlink:hover {
+  color: #a5b4fc !important;
+}
+
+@media (max-width: 860px) {
+  .responsive-status-grid {
+    grid-template-columns: 1fr !important;
+  }
 }

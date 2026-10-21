@@ -13,6 +13,9 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   AppstoreOutlined,
+  IdcardOutlined,
+  SyncOutlined,
+  StopOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../../theme/ThemeContext';
 import gymezyLogo from '../../assets/logo/gymezy.png';
@@ -40,10 +43,30 @@ export const DEFAULT_NAV_ITEMS = [
     roles: ['owner', 'admin'],
   },
   {
-    key: '/owner/members',
-    icon: <TeamOutlined />,
+    key: 'membership-sub',
+    icon: <IdcardOutlined />,
     label: 'Membership',
     roles: ['owner', 'admin', 'staff'],
+    children: [
+      {
+        key: '/owner/members?tab=members',
+        icon: <TeamOutlined />,
+        label: 'All Members',
+        roles: ['owner', 'admin', 'staff'],
+      },
+      {
+        key: '/owner/members?tab=switches',
+        icon: <SyncOutlined />,
+        label: 'Plan Switch Requests',
+        roles: ['owner', 'admin', 'staff'],
+      },
+      {
+        key: '/owner/members?tab=cancellations',
+        icon: <StopOutlined />,
+        label: 'Cancellation Requests',
+        roles: ['owner', 'admin', 'staff'],
+      },
+    ],
   },
   {
     key: '/owner/bookings',
@@ -101,16 +124,32 @@ export const AppSidebar = ({
 
   const userRoleNormalized = normalizeRole(role);
 
-  // Filter menu items by user role (with flexible normalization)
-  const filteredItems = menuItems
-    .filter((item) => {
-      if (!item.roles || item.roles.length === 0) return true;
-      return item.roles.some((r) => {
-        const itemRoleNorm = normalizeRole(r);
-        return itemRoleNorm === userRoleNormalized || r === role || r === '*';
-      });
-    })
-    .map(({ roles, ...rest }) => rest);
+  // Filter menu items by user role (recursively for sub-menus)
+  const filterByRole = (items) => {
+    return items
+      .filter((item) => {
+        if (!item.roles || item.roles.length === 0) return true;
+        return item.roles.some((r) => {
+          const itemRoleNorm = normalizeRole(r);
+          return itemRoleNorm === userRoleNormalized || r === role || r === '*';
+        });
+      })
+      .map(({ roles, children, ...rest }) => ({
+        ...rest,
+        ...(children ? { children: filterByRole(children) } : {}),
+      }));
+  };
+
+  const filteredItems = filterByRole(menuItems);
+
+  // Compute selected key matching query parameter
+  const getSelectedKey = () => {
+    if (location.pathname === '/owner/members' || location.pathname === '/owner/membership') {
+      const tab = new URLSearchParams(location.search).get('tab') || 'members';
+      return `/owner/members?tab=${tab}`;
+    }
+    return location.pathname;
+  };
 
   return (
     <Sider
@@ -178,7 +217,8 @@ export const AppSidebar = ({
         <Menu
           theme={isDarkMode ? 'dark' : 'light'}
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={[getSelectedKey()]}
+          defaultOpenKeys={['membership-sub']}
           onClick={({ key }) => navigate(key)}
           items={filteredItems}
           style={{

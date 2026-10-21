@@ -1141,6 +1141,13 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
+"@react-native-async-storage/async-storage@2.2.0":
+  version "2.2.0"
+  resolved "https://registry.yarnpkg.com/@react-native-async-storage/async-storage/-/async-storage-2.2.0.tgz#a3aa565253e46286655560172f4e366e8969f5ad"
+  integrity sha512-gvRvjR5JAaUZF8tv2Kcq/Gbt3JHwbKFYfmb445rhOj6NUMx3qPLixmDx5pZAyb9at1bYvJ4/eTUipU5aki45xw==
+  dependencies:
+    merge-options "^3.0.4"
+
 "@react-native-community/cli-clean@20.2.0":
   version "20.2.0"
   resolved "https://registry.yarnpkg.com/@react-native-community/cli-clean/-/cli-clean-20.2.0.tgz#6869513f657df5879069c26bcdc0e8d0161f6627"
@@ -2633,6 +2640,18 @@ expo-font@~57.0.4:
   dependencies:
     fontfaceobserver "^2.1.0"
 
+expo-image-loader@~57.0.1:
+  version "57.0.1"
+  resolved "https://registry.yarnpkg.com/expo-image-loader/-/expo-image-loader-57.0.1.tgz#b031dc3e62ac09004f3e436d7081487236791f53"
+  integrity sha512-uhrZKLT/cTl2mXyR28kPpVkS5O+PK9N1QA/07IFM4f5T4g0lTW1JHT3NEWwEEsGFldPmVX4j7LwUVVZxE+woug==
+
+expo-image-picker@~57.0.20:
+  version "57.0.20"
+  resolved "https://registry.yarnpkg.com/expo-image-picker/-/expo-image-picker-57.0.20.tgz#c32efa3daad2880ebf54e9dc0cddd09e57967a34"
+  integrity sha512-plgcGuMZMWqDchjXQW6S/WepYLB5KqfbZOzwC6xe0+j5IhY4ipvVuRZcXeP/0NgKgU0Jiu/XoTK4Bi8crtZ+sQ==
+  dependencies:
+    expo-image-loader "~57.0.1"
+
 expo-keep-awake@~57.0.2:
   version "57.0.2"
   resolved "https://registry.yarnpkg.com/expo-keep-awake/-/expo-keep-awake-57.0.2.tgz#ce266252ad478523bb3431d40f67bd643f86bd9c"
@@ -2642,6 +2661,13 @@ expo-linear-gradient@~57.0.2:
   version "57.0.2"
   resolved "https://registry.yarnpkg.com/expo-linear-gradient/-/expo-linear-gradient-57.0.2.tgz#a9d85700cd822678556a6166640b0240d31fe011"
   integrity sha512-eGNSfcbdXYvw0B/TQ3nmXKQgj0jLUi3EgsXGlvI79rlXg5RR5dQTkY2yqkf7BQDM3PMd3tqBMZdsLhvBqSUaMg==
+
+expo-location@~57.0.20:
+  version "57.0.20"
+  resolved "https://registry.yarnpkg.com/expo-location/-/expo-location-57.0.20.tgz#1862a3440d1fe785edb3f5681d8cc01761041d54"
+  integrity sha512-E9cr7A5eQS91bm3McMx3FiWy7SCorVTPLq9gLFFW+7dfuSqQp5FLNBZQ6NFJaS8tVhCyl2WyKMFh0TAo/+7K9Q==
+  dependencies:
+    "@expo/image-utils" "^0.11.5"
 
 expo-modules-autolinking@~57.0.13:
   version "57.0.13"
@@ -3152,6 +3178,11 @@ is-number@^7.0.0:
   resolved "https://registry.yarnpkg.com/is-number/-/is-number-7.0.0.tgz#7535345b896734d5f80c4d06c50955527a14f12b"
   integrity sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==
 
+is-plain-obj@^2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/is-plain-obj/-/is-plain-obj-2.1.0.tgz#45e42e37fccf1f40da8e5f76ee21515840c09287"
+  integrity sha512-YWnfyRwxL/+SsrWYfOpUtz5b3YD+nyfkHvjbcanzk8zgyO4ASD67uVMRt8k5bM4lLMDnXfriRhOpemw+NfT1eA==
+
 is-stream@^2.0.0:
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/is-stream/-/is-stream-2.0.1.tgz#fac1e3d53b97ad5a9d0ae9cef2389f5810a5c077"
@@ -3455,6 +3486,11 @@ loose-envify@^1.0.0, loose-envify@^1.4.0:
   dependencies:
     js-tokens "^3.0.0 || ^4.0.0"
 
+lottie-react-native@~7.3.8:
+  version "7.3.8"
+  resolved "https://registry.yarnpkg.com/lottie-react-native/-/lottie-react-native-7.3.8.tgz#266a9630f5009a83fdff489a9d6ae3b01c2d2eb8"
+  integrity sha512-GAOl99TKi0c6xCcB1AJ+o70mgOPIAI/7K2G+Gs+o4po/qBhgvWijPNCKH8h6yNmlwFTg+RN3DmzRvHNFGxZMKQ==
+
 lowercase-keys@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/lowercase-keys/-/lowercase-keys-2.0.0.tgz#2603e78b7b4b0006cbca2fbcc8a3202558ac9479"
@@ -3508,6 +3544,13 @@ memoize-one@^5.0.0:
   version "5.2.1"
   resolved "https://registry.yarnpkg.com/memoize-one/-/memoize-one-5.2.1.tgz#8337aa3c4335581839ec01c3d594090cebe8f00e"
   integrity sha512-zYiwtZUcYyXKo/np96AGZAckk+FWWsUdJ3cHGGmld7+AhvcWmQyGCYUh1hc4Q/pkOhb65dQR/pqCyK0cOaHz4Q==
+
+merge-options@^3.0.4:
+  version "3.0.4"
+  resolved "https://registry.yarnpkg.com/merge-options/-/merge-options-3.0.4.tgz#84709c2aa2a4b24c1981f66c179fe5565cc6dbb7"
+  integrity sha512-2Sug1+knBjkaMsMgf1ctR1Ujx+Ayku4EdJN4Z+C2+JzoeF7A3OZ9KM2GY0CpQS51NR61LTurMJrRKPhSs3ZRTQ==
+  dependencies:
+    is-plain-obj "^2.1.0"
 
 merge-stream@^2.0.0:
   version "2.0.0"

@@ -131,8 +131,10 @@ export const AppBar = ({
         key: 'profile-info',
         label: (
           <div style={{ padding: '6px 0' }}>
-            <div style={{ fontWeight: 600 }}>{currentUser?.name || 'Vikram Sethi'}</div>
-            <div style={{ fontSize: 12, color: '#888888' }}>{currentUser?.email || 'owner@fitzone.com'}</div>
+            <div style={{ fontWeight: 600 }}>{currentUser?.fullName || currentUser?.name || 'Gym Owner'}</div>
+            {currentUser?.email && (
+              <div style={{ fontSize: 12, color: '#888888' }}>{currentUser.email}</div>
+            )}
             <Tag color="blue" style={{ marginTop: 4, fontSize: 11 }}>
               {currentUser?.role ? currentUser.role.replace('_', ' ') : 'FITNESS CENTER OWNER'}
             </Tag>
@@ -200,10 +202,10 @@ export const AppBar = ({
             Gym Name
           </div>
           <div className="app-bar-gym-name" style={{ fontSize: 16, color: isDarkMode ? '#ffffff' : '#0a1629', lineHeight: 1.25 }}>
-            {currentGym?.name || 'FitZone Gym'}
+            {currentGym?.name || currentUser?.gymName || 'Gym Facility'}
           </div>
           <div className="app-bar-subtext" style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#5e718d', lineHeight: 1.15 }}>
-            {currentGym?.branch || 'Anna Nagar, Chennai'}
+            {currentGym?.branch || currentGym?.city || currentGym?.fullAddress || 'Partner Location'}
           </div>
         </div>
       </div>
@@ -225,11 +227,11 @@ export const AppBar = ({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className="app-bar-status" style={{ color: '#00bf62', fontSize: 12, lineHeight: 1.2 }}>
-              {subscriptionPlan} • {subscriptionStatus}
+              {currentGym?.subscriptionType || subscriptionPlan || 'Hybrid Plan'} • {currentGym?.subscriptionStatus || currentGym?.status || subscriptionStatus || 'Active'}
             </span>
             <span style={{ color: isDarkMode ? '#444444' : '#cbd5e1', fontSize: 12 }}>|</span>
             <span className="app-bar-subtext" style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b', lineHeight: 1.2 }}>
-              Renews on {subscriptionExpiry}
+              Partner ID: {currentGym?.partnerId || 'GYM1'}
             </span>
           </div>
         </div>
@@ -259,13 +261,17 @@ export const AppBar = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
             <Badge dot status="success" offset={[-2, 32]}>
               <Avatar
-                src={
-                  currentUser?.avatar ||
-                  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop'
-                }
-                size={36}
-                style={{ border: '2px solid rgba(0, 56, 130, 0.15)' }}
-              />
+                src={currentUser?.avatar}
+                style={{
+                  backgroundColor: '#003882',
+                  color: '#ffffff',
+                  fontWeight: 750,
+                  fontSize: 14,
+                  border: '2px solid rgba(0, 56, 130, 0.15)',
+                }}
+              >
+                {(currentUser?.fullName || currentUser?.name || 'O').charAt(0).toUpperCase()}
+              </Avatar>
             </Badge>
             <div
               className="hide-mobile"
@@ -284,10 +290,10 @@ export const AppBar = ({
                   lineHeight: 1.2,
                 }}
               >
-                {currentUser?.name || 'Vikram Sethi'}
+                {currentUser?.fullName || currentUser?.name || 'Gym Owner'}
               </div>
               <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', lineHeight: 1.2 }}>
-                {currentUser?.role === 'GYM_OWNER' || currentUser?.role === 'owner' ? 'Owner' : 'Member'}
+                {currentUser?.role === 'GYM_OWNER' || currentUser?.role === 'owner' ? 'Owner' : 'Partner'}
               </div>
             </div>
             <DownOutlined style={{ fontSize: 10, color: isDarkMode ? '#888888' : '#64748b', marginLeft: 2 }} />

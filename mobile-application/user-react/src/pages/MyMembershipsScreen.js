@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,41 +7,129 @@ import {
   StyleSheet,
   Image,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
-import { AppColors, AppTheme } from '../theme/appTheme';
+import { AppColors } from '../theme/appTheme';
 import { useBookingRepository } from '../data/BookingContext';
 import { useToast } from '../widgets/CustomScaffoldMessage';
-import { MockData } from '../data/mockData';
+import { useAuth } from '../context/AuthContext';
+import { membershipService } from '../services/membershipService';
+import { calculateMembershipProgress } from '../utils/dateUtils';
 
 const TABS = ['Active', 'Completed', 'Cancelled'];
 
 export const MyMembershipsScreen = ({ navigation }) => {
   const { isDark, colors } = useTheme();
-  const { memberships } = useBookingRepository();
+  const { memberships, setAllMemberships } = useBookingRepository();
   const { showToast } = useToast();
+  const authContext = useAuth();
+  const user = authContext?.user || null;
 
   const [selectedTab, setSelectedTab] = useState('Active');
+  const [isFetching, setIsFetching] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadMemberships = async () => {
+      try {
+        setIsFetching(true);
+        const serverList = await membershipService.fetchMyMemberships(user?.id || user?._id);
+        if (isMounted && Array.isArray(serverList) && serverList.length > 0) {
+          const mapped = serverList.map((m, idx) => {
+            const startDateStr = m.startDate
+              ? new Date(m.startDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+              : '';
+            const endDateStr = m.endDate
+              ? new Date(m.endDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+              : '';
+            const resolvedGymLogo =
+              m.gymLogo
+              || (typeof m.gymId?.logo === 'string' && m.gymId.logo.trim())
+              || m.gymId?.logo?.fileData
+              || m.gymId?.logoUrl
+              || m.gymId?.coverPhoto?.fileData
+              || m.gymId?.coverPhotoUrl
+              || m.gymId?.image
+              || m.gymId?.images?.[0]
+              || m.gymId?.imageUrl
+              || m.gymImageUrl
+              || null;
+
+            let uniqueDocId = `mem_${idx}`;
+            if (m._id) {
+              uniqueDocId = String(m._id);
+            } else if (m.id && m.id !== m.membershipId) {
+              uniqueDocId = String(m.id);
+            } else if (m.membershipId) {
+              uniqueDocId = `${m.membershipId}_${idx}`;
+            }
+
+            return {
+              id: uniqueDocId,
+              membershipId: m.membershipId || uniqueDocId,
+              _id: m._id || uniqueDocId,
+              customerId: m.userId?.fullName || user?.fullName || user?.email || 'Member',
+              gymName: m.gymId?.name || 'Gym Membership',
+              gymLocation:
+                typeof m.gymId?.location === 'string'
+                  ? m.gymId.location
+                  : (m.gymId?.address || m.gymId?.city || m.gymId?.area || ''),
+              gymImageUrl: resolvedGymLogo,
+              planName: `${m.membershipTier} Membership`,
+              membershipTier: m.membershipTier,
+              durationDays: m.durationDays,
+              amountPaid: m.pricing?.totalAmount || 0,
+              startDate: startDateStr,
+              endDate: endDateStr,
+              rawStartDate: m.startDate,
+              rawEndDate: m.endDate,
+              paymentMode: m.payment?.method || 'UPI',
+              status: m.status,
+              otp: m.entryOtp || null,
+              entryOtp: m.entryOtp || null,
+              gymDbId: m.gymId?._id || m.gymId,
+              hasPersonalTrainer: Boolean(m.trainerId),
+              trainerName: m.trainerId?.name || null,
+              trainerSchedule: m.trainerSlot || null,
+              trainerFee: m.pricing?.trainerFee || 0,
+              planDescription: m.planDescription || m.description || null,
+              gym: m.gymId,
+            };
+          });
+          setAllMemberships(mapped);
+        }
+      } catch (err) {
+        console.warn('Could not fetch server memberships:', err.message);
+      } finally {
+        if (isMounted) setIsFetching(false);
+      }
+    };
+
+    void loadMemberships();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, user?._id]);
 
   const filteredMemberships = memberships.filter((m) => {
     if (selectedTab === 'Active') {
-      return m.status === 'Active' || m.status === 'Expiring Soon';
+      return m.status === 'Active' || m.status === 'Upcoming' || m.status === 'Expiring Soon';
     } else if (selectedTab === 'Completed') {
-      return m.status === 'Completed' || m.status === 'Expired';
+      return m.status === 'Completed' || m.status === 'Expired' || m.status === 'Switched';
     } else {
       return m.status === 'Cancelled';
     }
   });
 
   const activeCount = memberships.filter(
-    (m) => m.status === 'Active' || m.status === 'Expiring Soon'
+    (m) => m.status === 'Active' || m.status === 'Upcoming' || m.status === 'Expiring Soon'
   ).length;
   const completedCount = memberships.filter(
-    (m) => m.status === 'Completed' || m.status === 'Expired'
+    (m) => m.status === 'Completed' || m.status === 'Expired' || m.status === 'Switched'
   ).length;
   const cancelledCount = memberships.filter((m) => m.status === 'Cancelled').length;
 
@@ -54,8 +142,7 @@ export const MyMembershipsScreen = ({ navigation }) => {
   };
 
   const openUpgradeFlow = () => {
-    const defaultGym = MockData.gyms[0];
-    navigation.navigate('BuyMembership', { gym: defaultGym });
+    navigation.navigate('HomeTabs');
   };
 
   const primaryNavy = isDark ? '#93C5FD' : AppColors.primaryColor;
@@ -65,9 +152,12 @@ export const MyMembershipsScreen = ({ navigation }) => {
       {/* Top App Bar */}
       <View style={styles.appBar}>
         <Text style={[styles.appBarTitle, { color: colors.text }]}>My Memberships</Text>
-        <TouchableOpacity style={styles.notifBtn} activeOpacity={0.7}>
-          <MaterialIcons name="notifications-none" size={24} color={colors.text} />
-          <View style={styles.notifRedDot} />
+        <TouchableOpacity
+          style={[styles.notifBtn, { backgroundColor: isDark ? '#1E1E1E' : '#F8FAFC', borderColor: colors.border }]}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('Wallet')}
+        >
+          <Ionicons name="wallet-outline" size={22} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -93,7 +183,6 @@ export const MyMembershipsScreen = ({ navigation }) => {
               activeOpacity={0.85}
             >
               <Text style={styles.promoBtnText}>View Plans</Text>
-              <MaterialIcons name="arrow-forward" size={16} color="#1E1B4B" style={{ marginLeft: 4 }} />
             </TouchableOpacity>
           </View>
 
@@ -160,7 +249,14 @@ export const MyMembershipsScreen = ({ navigation }) => {
         </View>
 
         {/* 3. Memberships List */}
-        {filteredMemberships.length === 0 ? (
+        {isFetching && filteredMemberships.length === 0 ? (
+          <View style={[styles.emptyContainer, { paddingVertical: 40 }]}>
+            <ActivityIndicator size="large" color={primaryNavy} />
+            <Text style={[styles.emptySub, { color: colors.subtitle, marginTop: 12 }]}>
+              Loading memberships...
+            </Text>
+          </View>
+        ) : filteredMemberships.length === 0 ? (
           <View style={styles.emptyContainer}>
             <MaterialIcons name="card-membership" size={54} color={colors.subtitle} />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
@@ -171,11 +267,13 @@ export const MyMembershipsScreen = ({ navigation }) => {
             </Text>
           </View>
         ) : (
-          filteredMemberships.map((mbr) => {
+          filteredMemberships.map((mbr, idx) => {
             const isActive = mbr.status === 'Active';
+            const { daysRemaining, progressPercent } = calculateMembershipProgress(mbr);
+            const cardKey = mbr._id ? String(mbr._id) : `${mbr.id || 'mem'}_${idx}`;
             return (
               <TouchableOpacity
-                key={mbr.id}
+                key={cardKey}
                 onPress={() => navigation.navigate('MembershipDetails', { membership: mbr })}
                 activeOpacity={0.88}
                 style={[
@@ -188,7 +286,26 @@ export const MyMembershipsScreen = ({ navigation }) => {
               >
                 {/* Header Row */}
                 <View style={styles.cardHeaderRow}>
-                  <Image source={{ uri: mbr.gymImageUrl }} style={styles.gymAvatar} />
+                  {mbr.gymImageUrl ? (
+                    <Image
+                      source={{ uri: mbr.gymImageUrl }}
+                      style={styles.gymAvatar}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        styles.gymAvatar,
+                        {
+                          backgroundColor: isDark ? '#1E293B' : '#EFF6FF',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        },
+                      ]}
+                    >
+                      <MaterialIcons name="fitness-center" size={24} color={primaryNavy} />
+                    </View>
+                  )}
                   <View style={{ flex: 1, marginLeft: 14 }}>
                     <Text style={[styles.cardGymName, { color: colors.text }]} numberOfLines={1}>
                       {mbr.gymName}
@@ -246,11 +363,11 @@ export const MyMembershipsScreen = ({ navigation }) => {
                 <View style={styles.idRow}>
                   <Text style={[styles.idLabel, { color: colors.subtitle }]}>Membership ID</Text>
                   <TouchableOpacity
-                    onPress={() => copyToClipboard(mbr.id, 'Membership ID')}
+                    onPress={() => copyToClipboard(mbr.membershipId || mbr.id, 'Membership ID')}
                     style={styles.copyRow}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.idVal, { color: primaryNavy }]}>{mbr.id}</Text>
+                    <Text style={[styles.idVal, { color: primaryNavy }]}>{mbr.membershipId || mbr.id}</Text>
                     <MaterialIcons
                       name="content-copy"
                       size={13}
@@ -290,7 +407,7 @@ export const MyMembershipsScreen = ({ navigation }) => {
                       <Text style={[styles.progressLabel, { color: colors.subtitle }]}>
                         Days Remaining
                       </Text>
-                      <Text style={styles.progressVal}>{mbr.durationDays}</Text>
+                      <Text style={styles.progressVal}>{daysRemaining}</Text>
                     </View>
                     <View
                       style={[
@@ -303,7 +420,7 @@ export const MyMembershipsScreen = ({ navigation }) => {
                           styles.progressFill,
                           {
                             backgroundColor: AppColors.secondaryColor,
-                            width: '70%',
+                            width: progressPercent,
                           },
                         ]}
                       />
@@ -330,7 +447,6 @@ export const MyMembershipsScreen = ({ navigation }) => {
                   >
                     <MaterialIcons name="qr-code" size={16} color="#FFFFFF" />
                     <Text style={styles.viewPassBtnText}>View Pass & Details</Text>
-                    <MaterialIcons name="chevron-right" size={18} color="#FFFFFF" />
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>

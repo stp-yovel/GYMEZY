@@ -1,11 +1,122 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
+import LottieView from 'lottie-react-native';
 import * as Clipboard from 'expo-clipboard';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
-import { AppColors, AppTheme } from '../theme/appTheme';
+import { AppColors } from '../theme/appTheme';
 import { useToast } from './CustomScaffoldMessage';
+
+const getStatusTheme = (normStatus) => {
+  if (normStatus === 'ACTIVE') {
+    return {
+      bg: '#E6F7EF',
+      border: '#B7EAD0',
+      text: '#047857',
+    };
+  }
+  if (
+    normStatus === 'IN REVIEW' ||
+    normStatus === 'PENDING_REVIEW' ||
+    normStatus === 'UNDER REVIEW' ||
+    normStatus === 'PENDING_GYM_APPROVAL' ||
+    normStatus === 'PENDING_SUPER_ADMIN_APPROVAL'
+  ) {
+    return {
+      bg: 'transparent',
+      border: 'transparent',
+      text: '#D97706',
+    };
+  }
+  if (normStatus === 'UPCOMING') {
+    return {
+      bg: 'transparent',
+      border: 'transparent',
+      text: '#D97706',
+    };
+  }
+  return {
+    bg: 'transparent',
+    border: 'transparent',
+    text: '#DC2626',
+  };
+};
+
+const getStatusAnimationConfig = (normStatus, primaryDateValue, secondaryDateValue, effectiveAccent, isInReview = false) => {
+  if (
+    isInReview ||
+    normStatus === 'IN REVIEW' ||
+    normStatus === 'PENDING_REVIEW' ||
+    normStatus === 'UNDER REVIEW' ||
+    normStatus === 'PENDING_GYM_APPROVAL' ||
+    normStatus === 'PENDING_SUPER_ADMIN_APPROVAL'
+  ) {
+    return {
+      isReview: true,
+      icon: 'pending-actions',
+      text: 'PLAN SWITCH IN REVIEW',
+      textColor: '#D97706',
+      helpText: 'QR code & entry OTP are paused while your plan change request is under review.',
+    };
+  }
+  if (normStatus === 'UPCOMING') {
+    return {
+      source: require('../../assets/animations/upcoming-calendar.json'),
+      icon: 'event-available',
+      text: `PASS ACTIVATES ON ${primaryDateValue?.toUpperCase() || 'START DATE'}`,
+      textColor: effectiveAccent,
+      helpText: 'QR pass & 6-digit entry OTP will automatically unlock on your start date',
+      loop: true,
+    };
+  }
+  if (
+    normStatus === 'SWITCHED' ||
+    normStatus === 'DOWNGRADED' ||
+    normStatus === 'UPGRADED' ||
+    normStatus === 'TRANSFERRED'
+  ) {
+    return {
+      source: require('../../assets/animations/expired-calender.json'),
+      icon: 'sync-disabled',
+      text: 'MEMBERSHIP SWITCHED',
+      textColor: '#DC2626',
+      helpText: 'This pass was switched to a new plan and is no longer valid for entry',
+      loop: false,
+    };
+  }
+  if (normStatus === 'EXPIRED') {
+    return {
+      source: require('../../assets/animations/expired-calender.json'),
+      icon: 'event-busy',
+      text: `MEMBERSHIP EXPIRED ON ${secondaryDateValue?.toUpperCase() || 'EXPIRY DATE'}`,
+      textColor: '#DC2626',
+      helpText: 'Membership has expired — please renew to gain entry',
+      loop: false,
+    };
+  }
+  if (normStatus === 'CANCELLED') {
+    return {
+      source: require('../../assets/animations/cancel-calender.json'),
+      icon: 'cancel',
+      text: 'MEMBERSHIP CANCELLED',
+      textColor: '#DC2626',
+      helpText: 'This pass has been cancelled and is no longer valid for entry',
+      loop: false,
+    };
+  }
+  if (normStatus === 'INACTIVE') {
+    return {
+      source: require('../../assets/animations/expired-calender.json'),
+      icon: 'event-busy',
+      text: 'MEMBERSHIP INACTIVE',
+      textColor: '#DC2626',
+      helpText: 'This membership is currently inactive',
+      loop: false,
+    };
+  }
+  return null;
+};
 
 export const DigitalQrPassCard = ({
   passId,
@@ -21,6 +132,7 @@ export const DigitalQrPassCard = ({
   iconName = 'workspace-premium',
   gymImageUrl,
   accentColor,
+  isInReview = false,
 }) => {
   const { isDark, colors } = useTheme();
   const { showToast } = useToast();
@@ -29,8 +141,13 @@ export const DigitalQrPassCard = ({
     ? AppColors.darkAccentColor
     : accentColor || AppColors.primaryNavy;
 
-  const qrData = `gymezy://pass?id=${passId}&cust=${customerId}&otp=${otp}`;
-  const otpDigits = (otp || '123456').split('');
+  const qrData = JSON.stringify({
+    type: 'MEMBERSHIP',
+    id: passId,
+    customerId: customerId,
+    entryOtp: otp || null,
+  });
+  const otpDigits = typeof otp === 'string' && otp.trim().length > 0 ? otp.trim().split('') : [];
 
   const copyToClipboard = async (text, label) => {
     await Clipboard.setStringAsync(text);
@@ -40,7 +157,15 @@ export const DigitalQrPassCard = ({
     });
   };
 
-  const isActiveStatus = status?.toUpperCase() === 'ACTIVE';
+  const normStatus = (isInReview ? 'IN REVIEW' : status || 'ACTIVE').toUpperCase();
+  const statusTheme = getStatusTheme(normStatus);
+  const animConfig = getStatusAnimationConfig(
+    normStatus,
+    primaryDateValue,
+    secondaryDateValue,
+    effectiveAccent,
+    isInReview
+  );
 
   return (
     <View
@@ -80,12 +205,8 @@ export const DigitalQrPassCard = ({
             style={[
               styles.statusBadge,
               {
-                backgroundColor: isActiveStatus
-                  ? '#E6F7EF'
-                  : isDark
-                  ? '#262626'
-                  : '#F1F5F9',
-                borderColor: isActiveStatus ? '#B7EAD0' : colors.border,
+                backgroundColor: statusTheme.bg,
+                borderColor: statusTheme.border,
               },
             ]}
           >
@@ -93,7 +214,7 @@ export const DigitalQrPassCard = ({
               style={[
                 styles.statusDot,
                 {
-                  backgroundColor: isActiveStatus ? '#047857' : colors.subtitle,
+                  backgroundColor: statusTheme.text,
                 },
               ]}
             />
@@ -101,11 +222,11 @@ export const DigitalQrPassCard = ({
               style={[
                 styles.statusText,
                 {
-                  color: isActiveStatus ? '#047857' : colors.subtitle,
+                  color: statusTheme.text,
                 },
               ]}
             >
-              {status?.toUpperCase()}
+              {normStatus}
             </Text>
           </View>
         </View>
@@ -171,82 +292,170 @@ export const DigitalQrPassCard = ({
         />
       </View>
 
-      {/* 2. QR Code Canvas with Centered GYMEZY Logo */}
+      {/* 2. QR Code Canvas or Status Review/Lottie Animation */}
       <View style={styles.bodySection}>
-        <View style={styles.qrCanvasWrapper}>
-          <View style={styles.qrCanvas}>
-            <QRCode
-              value={qrData}
-              size={180}
-              color="#0F172A"
-              backgroundColor="#FFFFFF"
-            />
-            {/* Center Logo Overlay */}
-            <View style={styles.qrCenterLogoContainer}>
-              <Image
-                source={require('../../assets/logo/gymezy.png')}
-                style={styles.qrCenterLogo}
-                resizeMode="contain"
-              />
-            </View>
-          </View>
-        </View>
-
-        <Text style={[styles.qrHelpText, { color: colors.subtitle }]}>
-          Show this QR code or 6-digit OTP to gym reception
-        </Text>
-
-        {/* 3. 6-Digit Check-in OTP */}
-        <View
-          style={[
-            styles.otpContainer,
-            {
-              backgroundColor: isDark ? '#262626' : '#F1F5F9',
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <View style={styles.otpHeader}>
-            <View style={styles.otpHeaderLeft}>
-              <MaterialIcons name="pin" size={16} color={effectiveAccent} />
-              <Text style={[styles.otpHeaderLabel, { color: colors.subtitle }]}>
-                ENTRY OTP
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => copyToClipboard(otp, 'OTP')}
-              style={styles.copyBtn}
-            >
-              <MaterialIcons name="content-copy" size={14} color={effectiveAccent} />
-              <Text style={[styles.copyBtnText, { color: effectiveAccent }]}>Copy</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* 6 Digit Boxes */}
-          <View style={styles.digitRow}>
-            {otpDigits.map((digit, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.digitBox,
-                  {
-                    backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
-                    borderColor: isDark ? 'rgba(147, 197, 253, 0.3)' : colors.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.digitText,
-                    { color: isDark ? '#FFFFFF' : effectiveAccent },
-                  ]}
-                >
-                  {digit}
+        {animConfig ? (
+          animConfig.isReview ? (
+            <View style={styles.reviewCanvasWrapper}>
+              <View style={styles.reviewIconCircle}>
+                <MaterialIcons name="pending-actions" size={52} color="#D97706" />
+              </View>
+              <View style={styles.reviewBadge}>
+                <MaterialIcons
+                  name="sync"
+                  size={16}
+                  color="#D97706"
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={[styles.reviewBadgeText, { color: '#D97706' }]}>
+                  {animConfig.text}
                 </Text>
               </View>
-            ))}
+            </View>
+          ) : (
+            <View style={styles.upcomingCanvasWrapper}>
+              <LottieView
+                source={animConfig.source}
+                autoPlay
+                loop={animConfig.loop === true}
+                style={styles.upcomingLottie}
+              />
+              <View style={styles.upcomingBadge}>
+                <MaterialIcons
+                  name={animConfig.icon}
+                  size={16}
+                  color={animConfig.textColor}
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={[styles.upcomingBadgeText, { color: animConfig.textColor }]}>
+                  {animConfig.text}
+                </Text>
+              </View>
+            </View>
+          )
+        ) : (
+          <View style={styles.qrCanvasWrapper}>
+            <View style={styles.qrCanvas}>
+              <QRCode
+                value={qrData}
+                size={180}
+                color="#0F172A"
+                backgroundColor="#FFFFFF"
+              />
+              {/* Center Logo Overlay */}
+              <View style={styles.qrCenterLogoContainer}>
+                <Image
+                  source={require('../../assets/logo/gymezy.png')}
+                  style={styles.qrCenterLogo}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
           </View>
-        </View>
+        )}
+
+        <Text style={[styles.qrHelpText, { color: colors.subtitle }]}>
+          {animConfig
+            ? animConfig.helpText
+            : 'Show this QR code or 6-digit OTP to gym reception'}
+        </Text>
+
+        {/* 3. 6-Digit Check-in OTP (only when strictly Active) */}
+        {!animConfig && otpDigits.length > 0 && (
+          otpDigits.length > 0 ? (
+            <View
+              style={[
+                styles.otpContainer,
+                {
+                  backgroundColor: isDark ? '#262626' : '#F1F5F9',
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <View style={styles.otpHeader}>
+                <View style={styles.otpHeaderLeft}>
+                  <MaterialIcons name="pin" size={16} color={effectiveAccent} />
+                  <Text style={[styles.otpHeaderLabel, { color: colors.subtitle }]}>
+                    ENTRY OTP
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => copyToClipboard(otp, 'OTP')}
+                  style={styles.copyBtn}
+                >
+                  <MaterialIcons name="content-copy" size={14} color={effectiveAccent} />
+                  <Text style={[styles.copyBtnText, { color: effectiveAccent }]}>Copy</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* 6 Digit Boxes */}
+              <View style={styles.digitRow}>
+                {otpDigits.map((digit, idx) => (
+                  <View
+                    key={`otp-box-${idx}-${digit}`}
+                    style={[
+                      styles.digitBox,
+                      {
+                        backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
+                        borderColor: isDark ? 'rgba(147, 197, 253, 0.3)' : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.digitText,
+                        { color: isDark ? '#FFFFFF' : effectiveAccent },
+                      ]}
+                    >
+                      {digit}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.otpContainer,
+                {
+                  backgroundColor: otpFallback.bg,
+                  borderColor: otpFallback.border,
+                  paddingVertical: 14,
+                  paddingHorizontal: 14,
+                  alignItems: 'center',
+                },
+              ]}
+            >
+              <MaterialIcons
+                name={otpFallback.icon}
+                size={20}
+                color={otpFallback.iconColor}
+                style={{ marginBottom: 4 }}
+              />
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: otpFallback.titleColor,
+                  textAlign: 'center',
+                }}
+              >
+                {otpFallback.title}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 11.5,
+                  color: otpFallback.subColor,
+                  textAlign: 'center',
+                  marginTop: 3,
+                  lineHeight: 16,
+                }}
+              >
+                {otpFallback.description}
+              </Text>
+            </View>
+          )
+        )}
 
         {/* 4. Pass Meta Info (Pass ID & Customer ID) */}
         <View
@@ -410,6 +619,49 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 14,
     alignItems: 'center',
+  },
+  upcomingCanvasWrapper: {
+    width: '100%',
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewCanvasWrapper: {
+    width: '100%',
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewIconCircle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  reviewBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  reviewBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  upcomingLottie: {
+    width: 240,
+    height: 160,
+  },
+  upcomingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  upcomingBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.6,
   },
   qrCanvasWrapper: {
     padding: 14,

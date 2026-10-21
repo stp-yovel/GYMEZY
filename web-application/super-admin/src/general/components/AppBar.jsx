@@ -11,7 +11,7 @@ import {
   HomeOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../../theme/ThemeContext';
-import { logout } from '../../redux/slices/authSlice';
+import { useAuth } from '../../hooks';
 
 const { Header } = Layout;
 
@@ -37,23 +37,18 @@ export const AppBar = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const dispatch = useDispatch();
   const { isDarkMode, toggleTheme } = useTheme();
-  const authUser = useSelector((state) => state.auth?.user);
+  const { user: authUser, logout } = useAuth();
 
-  const currentUser = userProp || authUser || {
-    name: 'Chief Administrator',
-    email: 'admin@gymezy.com',
-    role: 'SUPER_ADMIN',
-  };
+  const currentUser = userProp || authUser || null;
 
   const currentTitle = ROUTE_NAMES[location.pathname] || 'Dashboard';
 
-  const handleLogoutAction = () => {
+  const handleLogoutAction = async () => {
     if (onLogout) {
       onLogout();
     } else {
-      dispatch(logout());
+      await logout();
       navigate('/login');
     }
   };
@@ -64,8 +59,10 @@ export const AppBar = ({
         key: 'profile-info',
         label: (
           <div style={{ padding: '6px 0' }}>
-            <div style={{ fontWeight: 600 }}>{currentUser?.name || 'Chief Administrator'}</div>
-            <div style={{ fontSize: 12, color: '#888888' }}>{currentUser?.email || 'admin@gymezy.com'}</div>
+            <div style={{ fontWeight: 600 }}>{currentUser?.fullName || currentUser?.name || 'Administrator'}</div>
+            {currentUser?.email && (
+              <div style={{ fontSize: 12, color: '#888888' }}>{currentUser.email}</div>
+            )}
           </div>
         ),
       },
@@ -85,6 +82,16 @@ export const AppBar = ({
       },
     ],
   };
+
+  const displayName = currentUser?.fullName || currentUser?.name || 'Super Admin';
+  const roleLabel = currentUser?.role ? currentUser.role.replace('_', ' ') : 'Master Admin';
+
+  const userInitials = React.useMemo(() => {
+    if (!displayName) return 'SA';
+    const parts = displayName.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }, [displayName]);
 
   return (
     <Header
@@ -165,6 +172,7 @@ export const AppBar = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
             <Badge dot status="success" offset={[-2, 32]}>
               <Avatar
+                src={currentUser?.avatar || undefined}
                 style={{
                   backgroundColor: '#003882',
                   color: '#ffffff',
@@ -173,7 +181,7 @@ export const AppBar = ({
                 }}
                 size={36}
               >
-                SA
+                {userInitials}
               </Avatar>
             </Badge>
             <div
@@ -193,10 +201,10 @@ export const AppBar = ({
                   lineHeight: 1.2,
                 }}
               >
-                {currentUser?.name || 'Chief Administrator'}
+                {displayName}
               </div>
               <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', lineHeight: 1.2 }}>
-                Master Admin
+                {roleLabel}
               </div>
             </div>
             <DownOutlined style={{ fontSize: 10, color: isDarkMode ? '#888888' : '#64748b', marginLeft: 2 }} />

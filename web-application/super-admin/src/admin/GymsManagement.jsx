@@ -21,6 +21,8 @@ import {
   Badge,
   Tooltip,
   InputNumber,
+  Avatar,
+  Spin,
 } from 'antd';
 import {
   SearchOutlined,
@@ -51,234 +53,161 @@ import {
   FileAddOutlined,
   UploadOutlined,
   RocketOutlined,
+  StarFilled,
+  DiffOutlined,
+  SwapOutlined,
+  CheckOutlined,
+  CloseOutlined,
+  IdcardOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   addGym,
-  approveGym,
-  rejectGym,
   deleteGym,
-  setGymStatus,
+  fetchGyms,
+  updateGymStatusApi,
 } from '../redux/slices/gymSlice';
 import { useTheme } from '../theme/ThemeContext';
+import { apiClient } from '../services/apiClient';
+import { employeeService } from '../services/employeeService';
+import GymDetailsView from './components/GymDetailsView';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 
-// Sample Initial Pending Changes Gyms Data
-const PENDING_APPROVAL_GYMS = [
-  {
-    id: 'pend-1',
-    name: 'FitZone Gym',
-    phone: '+91 98765 43210',
-    location: 'Anna Nagar, Chennai',
-    requestedBy: 'Ramesh Kumar',
-    requestedOn: '21 May 2026, 10:30 AM',
-    changesCount: 8,
-    status: 'Pending',
-    image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Pending Approval',
-    subscriptionType: 'Hybrid',
-    subscriptionStatus: 'Active',
-    membersCount: 420,
-    monthlyRevenue: '₹ 1,85,000',
-    rating: 4.8,
-  },
-  {
-    id: 'pend-2',
-    name: 'StrongFit Fitness',
-    phone: '+91 91234 56789',
-    location: 'Koramangala, Bengaluru',
-    requestedBy: 'Prakash Shetty',
-    requestedOn: '20 May 2026, 06:15 PM',
-    changesCount: 5,
-    status: 'Pending',
-    image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Pending Approval',
-    subscriptionType: 'App Only',
-    subscriptionStatus: 'Active',
-    membersCount: 310,
-    monthlyRevenue: '₹ 1,20,000',
-    rating: 4.6,
-  },
-  {
-    id: 'pend-3',
-    name: 'PowerHouse Gym',
-    phone: '+91 99876 54321',
-    location: 'Thane West, Mumbai',
-    requestedBy: 'Sandeep More',
-    requestedOn: '20 May 2026, 02:20 PM',
-    changesCount: 6,
-    status: 'Pending',
-    image: 'https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Pending Approval',
-    subscriptionType: 'GMS',
-    subscriptionStatus: 'Inactive',
-    membersCount: 580,
-    monthlyRevenue: '₹ 2,40,000',
-    rating: 4.9,
-  },
-  {
-    id: 'pend-4',
-    name: 'Muscle Factory',
-    phone: '+91 90012 34567',
-    location: 'Salt Lake, Kolkata',
-    requestedBy: 'Arindam Ghosh',
-    requestedOn: '19 May 2026, 11:45 AM',
-    changesCount: 3,
-    status: 'Pending',
-    image: 'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Pending Approval',
-    subscriptionType: 'App Only',
-    subscriptionStatus: 'Active',
-    membersCount: 260,
-    monthlyRevenue: '₹ 95,000',
-    rating: 4.5,
-  },
-  {
-    id: 'pend-5',
-    name: 'BodyCraft Gym',
-    phone: '+91 95555 66777',
-    location: 'Viman Nagar, Pune',
-    requestedBy: 'Vikram Patil',
-    requestedOn: '19 May 2026, 09:30 AM',
-    changesCount: 7,
-    status: 'Pending',
-    image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Pending Approval',
-    subscriptionType: 'GMS',
-    subscriptionStatus: 'Inactive',
-    membersCount: 390,
-    monthlyRevenue: '₹ 1,50,000',
-    rating: 4.7,
-  },
-];
+const getGymLocation = (gym) => {
+  if (!gym) return '—';
+  if (typeof gym.location === 'string' && gym.location) return gym.location;
+  const parts = [gym.area, gym.city, gym.state].filter(Boolean);
+  if (parts.length > 0) return parts.join(', ');
+  if (typeof gym.fullAddress === 'string' && gym.fullAddress) return gym.fullAddress;
+  if (typeof gym.address === 'string' && gym.address) return gym.address;
+  if (typeof gym.city === 'string' && gym.city) return gym.city;
+  return '—';
+};
 
-// All Gyms Mock Fleet
-const ALL_GYMS_DATA = [
-  ...PENDING_APPROVAL_GYMS,
-  {
-    id: 'gym-4',
-    name: 'Flex Fitness Studio',
-    phone: '+91 93456 78901',
-    location: 'Banjara Hills, Hyderabad',
-    requestedBy: 'Pooja Reddy',
-    requestedOn: '18 May 2026',
-    changesCount: 0,
-    status: 'Active',
-    image: 'https://images.unsplash.com/photo-1574680096145-d05b474e2155?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Approved',
-    subscriptionType: 'Hybrid',
-    subscriptionStatus: 'Active',
-    membersCount: 520,
-    monthlyRevenue: '₹ 2,10,000',
-    rating: 4.9,
-  },
-  {
-    id: 'gym-7',
-    name: 'Elite Fitness Club',
-    phone: '+91 98811 22334',
-    location: 'Cyber City, Gurgaon',
-    requestedBy: 'Kavita Chawla',
-    requestedOn: '15 May 2026',
-    changesCount: 0,
-    status: 'Active',
-    image: 'https://images.unsplash.com/photo-1576678927484-cc907957088c?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Approved',
-    subscriptionType: 'Listing Only',
-    subscriptionStatus: 'Active',
-    membersCount: 340,
-    monthlyRevenue: '₹ 1,35,000',
-    rating: 4.7,
-  },
-  {
-    id: 'gym-8',
-    name: 'Peak Performance Hub',
-    phone: '+91 97654 32109',
-    location: 'Indiranagar, Bengaluru',
-    requestedBy: 'Arun Venkatesh',
-    requestedOn: '12 May 2026',
-    changesCount: 0,
-    status: 'Active',
-    image: 'https://images.unsplash.com/photo-1593079831268-3381b0db4a77?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'On Hold',
-    subscriptionType: 'Hybrid',
-    subscriptionStatus: 'Active',
-    membersCount: 480,
-    monthlyRevenue: '₹ 1,95,000',
-    rating: 4.8,
-  },
-  {
-    id: 'gym-9',
-    name: 'Spartan Strength Arena',
-    phone: '+91 94455 66778',
-    location: 'T. Nagar, Chennai',
-    requestedBy: 'Karthik Subramanian',
-    requestedOn: '10 May 2026',
-    changesCount: 0,
-    status: 'Active',
-    image: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Approved',
-    subscriptionType: 'Hybrid',
-    subscriptionStatus: 'Active',
-    membersCount: 610,
-    monthlyRevenue: '₹ 2,75,000',
-    rating: 4.9,
-  },
-  {
-    id: 'gym-10',
-    name: 'Olympus Crossfit Lounge',
-    phone: '+91 98112 34455',
-    location: 'Connaught Place, New Delhi',
-    requestedBy: 'Varun Grover',
-    requestedOn: '08 May 2026',
-    changesCount: 0,
-    status: 'Active',
-    image: 'https://images.unsplash.com/photo-1570829460005-c840387bb1ca?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Approved',
-    subscriptionType: 'App Only',
-    subscriptionStatus: 'Active',
-    membersCount: 450,
-    monthlyRevenue: '₹ 1,80,000',
-    rating: 4.8,
-  },
-  {
-    id: 'gym-11',
-    name: 'Titan Barbell Club',
-    phone: '+91 98223 99887',
-    location: 'Kothrud, Pune',
-    requestedBy: 'Anil Deshmukh',
-    requestedOn: '05 May 2026',
-    changesCount: 0,
-    status: 'Inactive',
-    image: 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Rejected',
-    subscriptionType: 'Listing Only',
-    subscriptionStatus: 'Inactive',
-    membersCount: 120,
-    monthlyRevenue: '₹ 45,000',
-    rating: 4.2,
-  },
-  {
-    id: 'gym-12',
-    name: 'Iron Dynasty Fitness',
-    phone: '+91 98334 11223',
-    location: 'Andheri West, Mumbai',
-    requestedBy: 'Rohan Mehta',
-    requestedOn: '02 May 2026',
-    changesCount: 0,
-    status: 'Active',
-    image: 'https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?q=80&w=150&auto=format&fit=crop',
-    approvalStatus: 'Approved',
-    subscriptionType: 'Hybrid',
-    subscriptionStatus: 'Active',
-    membersCount: 710,
-    monthlyRevenue: '₹ 3,20,000',
-    rating: 5.0,
-  },
-];
+const getGymInitials = (name) => {
+  if (!name || typeof name !== 'string') return 'GY';
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return 'GY';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+};
+
+const getGymLogoSrc = (gym) => {
+  if (!gym) return '';
+  // 1. Direct logo fileData (Base64 WebP/PNG)
+  if (gym.logo && typeof gym.logo.fileData === 'string' && gym.logo.fileData.trim()) {
+    return gym.logo.fileData.trim();
+  }
+  // 2. Direct logo URL/string
+  if (typeof gym.logo === 'string' && gym.logo.trim()) {
+    return gym.logo.trim();
+  }
+  // 3. logoUrl convenience field
+  if (typeof gym.logoUrl === 'string' && gym.logoUrl.trim()) {
+    return gym.logoUrl.trim();
+  }
+  // 4. coverPhoto fileData
+  if (gym.coverPhoto && typeof gym.coverPhoto.fileData === 'string' && gym.coverPhoto.fileData.trim()) {
+    return gym.coverPhoto.fileData.trim();
+  }
+  // 5. coverPhoto URL/string
+  if (typeof gym.coverPhoto === 'string' && gym.coverPhoto.trim()) {
+    return gym.coverPhoto.trim();
+  }
+  // 6. coverPhotoUrl convenience field
+  if (typeof gym.coverPhotoUrl === 'string' && gym.coverPhotoUrl.trim()) {
+    return gym.coverPhotoUrl.trim();
+  }
+  // 7. imageUrl or image
+  if (typeof gym.imageUrl === 'string' && gym.imageUrl.trim()) {
+    return gym.imageUrl.trim();
+  }
+  if (typeof gym.image === 'string' && gym.image.trim()) {
+    return gym.image.trim();
+  }
+  if (typeof gym.thumbnailImage === 'string' && gym.thumbnailImage.trim()) {
+    return gym.thumbnailImage.trim();
+  }
+  // 8. Gallery / images array
+  if (Array.isArray(gym.images) && gym.images.length > 0 && typeof gym.images[0] === 'string' && gym.images[0].trim()) {
+    return gym.images[0].trim();
+  }
+  if (Array.isArray(gym.galleryPhotos) && gym.galleryPhotos.length > 0 && gym.galleryPhotos[0]?.fileData) {
+    return gym.galleryPhotos[0].fileData.trim();
+  }
+  return '';
+};
+
+const getGymImage = (gym) => {
+  const resolved = getGymLogoSrc(gym);
+  if (resolved) return resolved;
+  return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=400&auto=format&fit=crop';
+};
+
+const GymLogoAvatar = ({ gym, isDarkMode, size = 38, onClick }) => {
+  const [hasError, setHasError] = useState(false);
+  const logoSrc = getGymLogoSrc(gym);
+  const initials = getGymInitials(gym?.name);
+
+  if (logoSrc && !hasError) {
+    return (
+      <div
+        onClick={onClick}
+        style={{
+          display: 'inline-flex',
+          cursor: onClick ? 'pointer' : 'default',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <img
+          src={logoSrc}
+          alt={gym?.name || 'Gym Logo'}
+          onError={() => setHasError(true)}
+          style={{
+            width: size,
+            height: size,
+            borderRadius: 8,
+            objectFit: 'cover',
+            border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+            backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display: 'inline-flex',
+        cursor: onClick ? 'pointer' : 'default',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Avatar
+        shape="square"
+        size={size}
+        style={{
+          backgroundColor: '#4338ca',
+          color: '#ffffff',
+          fontWeight: 800,
+          fontSize: Math.max(11, Math.round(size * 0.35)),
+          borderRadius: 8,
+        }}
+      >
+        {initials}
+      </Avatar>
+    </div>
+  );
+};
 
 export const GymsManagement = () => {
   const { isDarkMode } = useTheme();
@@ -287,12 +216,16 @@ export const GymsManagement = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get('tab') || 'all';
 
-  // Redux Fleet Data
-  const reduxGyms = useSelector((state) => state.gyms?.gyms) || ALL_GYMS_DATA;
+  // Redux Fleet Data directly from store (zero mock fallbacks)
+  const { gyms: reduxGyms = [], loading = false } = useSelector((state) => state.gyms) || {};
+
+  useEffect(() => {
+    dispatch(fetchGyms({ force: true }));
+  }, [dispatch, currentTab]);
 
   // Navigation Views: 'list' | 'review' | 'timing_diff'
   const [currentView, setCurrentView] = useState('list');
-  const [selectedGym, setSelectedGym] = useState(reduxGyms[0] || ALL_GYMS_DATA[0]);
+  const [selectedGym, setSelectedGym] = useState(reduxGyms[0] || null);
   const [activeSubTab, setActiveSubTab] = useState('profile');
 
   // Filter States for List View
@@ -304,33 +237,140 @@ export const GymsManagement = () => {
 
   // Modals
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+  const [isHoldModalOpen, setIsHoldModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
+  const [isProcessingStatus, setIsProcessingStatus] = useState(false);
   const [quickAddForm] = Form.useForm();
-  const [detailsGym, setDetailsGym] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [holdNotes, setHoldNotes] = useState('');
   const [adminNote, setAdminNote] = useState('');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
 
+  // =========================================================================
+  // TRAINER & EMPLOYEE APPROVALS FLEET STATE (CROSS-GYM)
+  // =========================================================================
+  const [pendingTrainerApprovals, setPendingTrainerApprovals] = useState([]);
+  const [loadingTrainers, setLoadingTrainers] = useState(false);
+  const [trainerSearch, setTrainerSearch] = useState('');
+  const [trainerRoleFilter, setTrainerRoleFilter] = useState('All');
+  const [trainerGymFilter, setTrainerGymFilter] = useState('All');
+  const [trainerActionFilter, setTrainerActionFilter] = useState('All');
+
+  const [selectedTrainerForDiff, setSelectedTrainerForDiff] = useState(null);
+  const [isTrainerDiffModalOpen, setIsTrainerDiffModalOpen] = useState(false);
+  const [trainerToReject, setTrainerToReject] = useState(null);
+  const [isTrainerRejectModalOpen, setIsTrainerRejectModalOpen] = useState(false);
+  const [trainerRejectRemarks, setTrainerRejectRemarks] = useState('');
+
+  const fetchPendingTrainerApprovals = React.useCallback(async () => {
+    setLoadingTrainers(true);
+    try {
+      const list = await employeeService.getPendingApprovals();
+      setPendingTrainerApprovals(Array.isArray(list) ? list : []);
+    } catch (err) {
+      console.error('Failed to fetch pending trainer requests:', err);
+    } finally {
+      setLoadingTrainers(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPendingTrainerApprovals();
+  }, [fetchPendingTrainerApprovals]);
+
+  const handleApproveTrainer = async (trainer) => {
+    try {
+      await employeeService.reviewApproval(trainer.id || trainer._id, 'Approved', 'Approved by Super Admin');
+      message.success(`Approved ${trainer.role || 'employee'} "${trainer.name}" successfully!`);
+      fetchPendingTrainerApprovals();
+      dispatch(fetchGyms());
+      if (isTrainerDiffModalOpen) setIsTrainerDiffModalOpen(false);
+    } catch (err) {
+      message.error(err.message || 'Failed to approve trainer request');
+    }
+  };
+
+  const handleConfirmRejectTrainer = async () => {
+    if (!trainerToReject) return;
+    try {
+      await employeeService.reviewApproval(
+        trainerToReject.id || trainerToReject._id,
+        'Rejected',
+        trainerRejectRemarks || 'Rejected by Super Admin'
+      );
+      message.success(`Rejected request for "${trainerToReject.name}".`);
+      setIsTrainerRejectModalOpen(false);
+      setTrainerToReject(null);
+      setTrainerRejectRemarks('');
+      fetchPendingTrainerApprovals();
+      if (isTrainerDiffModalOpen) setIsTrainerDiffModalOpen(false);
+    } catch (err) {
+      message.error(err.message || 'Failed to reject trainer request');
+    }
+  };
+
+  const filteredTrainerApprovals = useMemo(() => {
+    return pendingTrainerApprovals.filter((t) => {
+      const matchSearch =
+        !trainerSearch ||
+        t.name?.toLowerCase().includes(trainerSearch.toLowerCase()) ||
+        t.employeeId?.toLowerCase().includes(trainerSearch.toLowerCase()) ||
+        t.gymName?.toLowerCase().includes(trainerSearch.toLowerCase()) ||
+        t.gymPartnerId?.toLowerCase().includes(trainerSearch.toLowerCase()) ||
+        t.phone?.includes(trainerSearch);
+
+      const matchRole = trainerRoleFilter === 'All' || t.role === trainerRoleFilter;
+      const matchGym =
+        trainerGymFilter === 'All' ||
+        t.gymId === trainerGymFilter ||
+        t.gymPartnerId === trainerGymFilter;
+
+      const isEdit = Boolean(t.pendingChanges && Object.keys(t.pendingChanges).length > 0);
+      const matchAction =
+        trainerActionFilter === 'All' ||
+        (trainerActionFilter === 'NEW_EMPLOYEE' && !isEdit) ||
+        (trainerActionFilter === 'EDIT_DETAILS' && isEdit);
+
+      return matchSearch && matchRole && matchGym && matchAction;
+    });
+  }, [pendingTrainerApprovals, trainerSearch, trainerRoleFilter, trainerGymFilter, trainerActionFilter]);
+
   // Active dataset depending on active Tab from Redux
   const activeGymsList = useMemo(() => {
-    if (currentTab === 'pending') return reduxGyms.filter((g) => g.approvalStatus === 'Pending Approval' || g.status === 'Pending');
-    if (currentTab === 'approved') return reduxGyms.filter((g) => g.approvalStatus === 'Approved');
-    if (currentTab === 'rejected') return reduxGyms.filter((g) => g.approvalStatus === 'Rejected');
-    if (currentTab === 'on_hold') return reduxGyms.filter((g) => g.approvalStatus === 'On Hold');
+    if (currentTab === 'pending') {
+      return reduxGyms.filter(
+        (g) => g.approvalStatus === 'Pending Approval' || g.status === 'Pending' || g.approvalStatus === 'Pending'
+      );
+    }
+    if (currentTab === 'approved') {
+      return reduxGyms.filter(
+        (g) => g.approvalStatus === 'Approved' || g.status === 'Active' || g.status === 'Approved'
+      );
+    }
+    if (currentTab === 'rejected') {
+      return reduxGyms.filter(
+        (g) => g.approvalStatus === 'Rejected' || g.status === 'Rejected'
+      );
+    }
+    if (currentTab === 'on_hold') {
+      return reduxGyms.filter(
+        (g) => g.approvalStatus === 'On Hold' || g.status === 'On Hold' || g.status === 'Inactive'
+      );
+    }
     return reduxGyms;
   }, [currentTab, reduxGyms]);
 
   const filteredGyms = useMemo(() => {
     return activeGymsList.filter((gym) => {
-      const matchName = (gym.name || '').toLowerCase().includes(searchName.toLowerCase());
-      const matchStatus = searchStatus === 'All' || gym.approvalStatus === searchStatus;
+      const matchName = String(gym.name || '').toLowerCase().includes(searchName.toLowerCase());
+      const matchStatus = searchStatus === 'All' || gym.approvalStatus === searchStatus || gym.status === searchStatus;
       const matchSubType = searchSubscriptionType === 'All' || gym.subscriptionType === searchSubscriptionType;
-      const matchLocation = (gym.location || gym.city || '').toLowerCase().includes(searchLocation.toLowerCase());
-      const matchPhone = (gym.phone || '').toLowerCase().includes(searchPhone.toLowerCase());
+      const locStr = getGymLocation(gym);
+      const matchLocation = locStr.toLowerCase().includes(searchLocation.toLowerCase());
+      const matchPhone = String(gym.phone || '').toLowerCase().includes(searchPhone.toLowerCase());
       return matchName && matchStatus && matchSubType && matchLocation && matchPhone;
     });
   }, [activeGymsList, searchName, searchStatus, searchSubscriptionType, searchLocation, searchPhone]);
@@ -343,12 +383,14 @@ export const GymsManagement = () => {
 
   const handleOpenReview = (gym) => {
     setSelectedGym(gym);
+    setHoldNotes(gym.remark || '');
+    setRejectionReason(gym.remark || gym.rejectionReason || '');
     setCurrentView('review');
   };
 
   const handleOpenDetails = (gym) => {
-    setDetailsGym(gym);
-    setIsDetailsModalOpen(true);
+    setSelectedGym(gym);
+    setCurrentView('details');
   };
 
   const handleTabChange = (key) => {
@@ -357,27 +399,89 @@ export const GymsManagement = () => {
     setCurrentPage(1);
   };
 
-  const handleApproveAll = () => {
-    if (selectedGym) {
-      dispatch(approveGym(selectedGym.id));
-      message.success(`Gym "${selectedGym.name}" approved and published to customer app!`);
+  const handleApproveAll = async (targetGym) => {
+    const target = targetGym || selectedGym;
+    if (target) {
+      const id = target.id || target._id;
+      setIsProcessingStatus(true);
+      try {
+        await dispatch(updateGymStatusApi({ id, status: 'Approved', approvalStatus: 'Approved' })).unwrap();
+        message.success(`Gym "${target.name}" approved and published to customer app!`);
+        dispatch(fetchGyms());
+        setIsApproveModalOpen(false);
+        setCurrentView('list');
+      } catch (err) {
+        message.error(err || 'Failed to approve gym');
+      } finally {
+        setIsProcessingStatus(false);
+      }
+    } else {
+      setIsApproveModalOpen(false);
+      setCurrentView('list');
     }
-    setIsApproveModalOpen(false);
-    setCurrentView('list');
   };
 
-  const handleReject = () => {
-    if (selectedGym) {
-      dispatch(rejectGym({ id: selectedGym.id, reason: rejectionReason }));
-      message.warning(`Changes for "${selectedGym.name}" rejected. Reason sent to owner.`);
+  const handleHold = async (targetGym, notes) => {
+    const target = targetGym || selectedGym;
+    const finalNotes = notes !== undefined ? notes : holdNotes;
+    if (target) {
+      const id = target.id || target._id;
+      setIsProcessingStatus(true);
+      try {
+        await dispatch(updateGymStatusApi({ id, status: 'On Hold', approvalStatus: 'On Hold', remark: finalNotes, notes: finalNotes })).unwrap();
+        message.info(`Gym "${target.name}" put on hold.`);
+        dispatch(fetchGyms());
+        setIsHoldModalOpen(false);
+        setHoldNotes('');
+        setCurrentView('list');
+      } catch (err) {
+        message.error(err || 'Failed to put gym on hold');
+      } finally {
+        setIsProcessingStatus(false);
+      }
+    } else {
+      setIsHoldModalOpen(false);
+      setHoldNotes('');
+      setCurrentView('list');
     }
-    setIsRejectModalOpen(false);
-    setCurrentView('list');
   };
 
-  const handleDeleteGym = (gymId, gymName) => {
-    dispatch(deleteGym(gymId));
-    message.success(`Gym "${gymName}" removed from platform.`);
+  const handleReject = async (targetGym, notes) => {
+    const target = targetGym || selectedGym;
+    const finalNotes = notes !== undefined ? notes : rejectionReason;
+    if (target) {
+      const id = target.id || target._id;
+      setIsProcessingStatus(true);
+      try {
+        await dispatch(updateGymStatusApi({ id, status: 'Rejected', approvalStatus: 'Rejected', rejectionReason: finalNotes, remark: finalNotes })).unwrap();
+        message.warning(`Changes for "${target.name}" rejected. Notes sent to partner.`);
+        dispatch(fetchGyms());
+        setIsRejectModalOpen(false);
+        setRejectionReason('');
+        setCurrentView('list');
+      } catch (err) {
+        message.error(err || 'Failed to reject gym');
+      } finally {
+        setIsProcessingStatus(false);
+      }
+    } else {
+      setIsRejectModalOpen(false);
+      setRejectionReason('');
+      setCurrentView('list');
+    }
+  };
+
+  const handleDeleteGym = async (gymId, gymName) => {
+    try {
+      if (gymId && (gymId.length === 24 || !gymId.startsWith('GYM-'))) {
+        await apiClient.delete(`/gyms/${gymId}`);
+      }
+      dispatch(deleteGym(gymId));
+      message.success(`Gym "${gymName}" deleted successfully.`);
+    } catch {
+      dispatch(deleteGym(gymId));
+      message.success(`Gym "${gymName}" removed.`);
+    }
   };
 
   const handleQuickAddSubmit = (values) => {
@@ -409,6 +513,32 @@ export const GymsManagement = () => {
     setIsQuickAddModalOpen(false);
     quickAddForm.resetFields();
   };
+
+  // =========================================================================
+  // VIEW 4: COMPREHENSIVE FULL-PAGE GYM DETAILS & BOOKINGS VIEW
+  // =========================================================================
+  if (currentView === 'details' && selectedGym) {
+    return (
+      <GymDetailsView
+        gym={selectedGym}
+        allGyms={reduxGyms}
+        onBack={() => setCurrentView('list')}
+        onSelectGym={(g) => setSelectedGym(g)}
+        onApprove={(g) => handleApproveAll(g)}
+        onHold={(g, notes) => handleHold(g, notes)}
+        onReject={(g, notes) => handleReject(g, notes)}
+        onStatusChange={async (id, status) => {
+          try {
+            await dispatch(updateGymStatusApi({ id, status, approvalStatus: status === 'Active' ? 'Approved' : status })).unwrap();
+            message.success(`Status updated to ${status}`);
+            dispatch(fetchGyms());
+          } catch (err) {
+            message.error(err || 'Failed to update status');
+          }
+        }}
+      />
+    );
+  }
 
   // =========================================================================
   // VIEW 3: DETAILED CHANGE COMPARISON (SCREEN 3)
@@ -613,6 +743,22 @@ export const GymsManagement = () => {
   // VIEW 2: REVIEW CHANGES – GYM PROFILE (SCREEN 2)
   // =========================================================================
   if (currentView === 'review') {
+    if (!selectedGym) {
+      return (
+        <div style={{ maxWidth: 800, margin: '60px auto', textAlign: 'center' }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: isDarkMode ? '#fff' : '#0f172a', marginBottom: 12 }}>
+            No Gym Selected
+          </h2>
+          <p style={{ color: '#64748b', marginBottom: 20 }}>
+            Please choose a gym from the fleet list to review its submitted details.
+          </p>
+          <Button type="primary" onClick={() => setCurrentView('list')} style={{ fontWeight: 600 }}>
+            Back to Gyms Directory
+          </Button>
+        </div>
+      );
+    }
+
     return (
       <div style={{ maxWidth: 1280, margin: '0 auto' }}>
         {/* Top Back Link & Switcher */}
@@ -623,7 +769,7 @@ export const GymsManagement = () => {
             onClick={() => setCurrentView('list')}
             style={{ padding: 0, fontWeight: 600, color: 'var(--color-primary)', fontSize: 14 }}
           >
-            ← Back to Gyms Fleet
+            Back to Gyms Fleet
           </Button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -631,9 +777,9 @@ export const GymsManagement = () => {
               Switch Pending Gym:
             </span>
             <Select
-              value={selectedGym?.id}
+              value={selectedGym?.id || selectedGym?._id}
               onChange={(gymId) => {
-                const target = reduxGyms.find((g) => g.id === gymId);
+                const target = reduxGyms.find((g) => (g.id || g._id) === gymId);
                 if (target) setSelectedGym(target);
               }}
               style={{ width: 220 }}
@@ -641,7 +787,7 @@ export const GymsManagement = () => {
               {reduxGyms
                 .filter((g) => g.approvalStatus === 'Pending Approval' || g.status === 'Pending')
                 .map((g) => (
-                  <Option key={g.id} value={g.id}>
+                  <Option key={g.id || g._id} value={g.id || g._id}>
                     {g.name}
                   </Option>
                 ))}
@@ -663,8 +809,17 @@ export const GymsManagement = () => {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h1 style={{ fontSize: 24, fontWeight: 800, margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                {selectedGym.name}
+                {selectedGym?.name || 'Gym Partner'}
               </h1>
+              {selectedGym?.partnerId ? (
+                <Tag color="blue" style={{ fontWeight: 700, fontSize: 13, padding: '2px 8px' }}>
+                  {selectedGym.partnerId}
+                </Tag>
+              ) : (
+                <Tag style={{ fontWeight: 600, fontSize: 13, padding: '2px 8px' }}>
+                  -
+                </Tag>
+              )}
               <span
                 style={{
                   padding: '3px 10px',
@@ -676,21 +831,40 @@ export const GymsManagement = () => {
                   border: `1px solid ${isDarkMode ? 'rgba(245, 158, 11, 0.3)' : '#fed7aa'}`,
                 }}
               >
-                Pending Approval
+                {selectedGym?.approvalStatus || 'Pending Approval'}
               </span>
             </div>
             <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b', marginTop: 4 }}>
-              Requested by <strong style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }}>{selectedGym.requestedBy}</strong> on {selectedGym.requestedOn}
+              Requested by <strong style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }}>{selectedGym?.requestedBy || selectedGym?.ownerName || 'Gym Partner'}</strong> on {selectedGym?.requestedOn || 'Recent'}
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: 12 }}>
             <Button
               danger
-              onClick={() => setIsRejectModalOpen(true)}
+              onClick={() => {
+                setRejectionReason(selectedGym?.remark || '');
+                setIsRejectModalOpen(true);
+              }}
               style={{ borderRadius: 'var(--radius-base)', fontWeight: 600, height: 40, padding: '0 18px' }}
             >
               Reject Changes
+            </Button>
+            <Button
+              onClick={() => {
+                setHoldNotes(selectedGym?.remark || '');
+                setIsHoldModalOpen(true);
+              }}
+              style={{
+                borderRadius: 'var(--radius-base)',
+                fontWeight: 600,
+                height: 40,
+                padding: '0 18px',
+                borderColor: '#fa8c16',
+                color: '#fa8c16',
+              }}
+            >
+              Put on Hold
             </Button>
             <Button
               type="primary"
@@ -698,8 +872,8 @@ export const GymsManagement = () => {
               style={{
                 borderRadius: 'var(--radius-base)',
                 fontWeight: 700,
-                backgroundColor: '#4338ca',
-                borderColor: '#4338ca',
+                backgroundColor: '#16a34a',
+                borderColor: '#16a34a',
                 height: 40,
                 padding: '0 20px',
               }}
@@ -709,224 +883,438 @@ export const GymsManagement = () => {
           </div>
         </div>
 
-        {/* Tab Content Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-            8 changes requested in Gym Profile
-          </div>
-          <Button
-            icon={<ExportOutlined />}
-            onClick={() => message.info('Opening live customer preview...')}
-            style={{ borderRadius: 'var(--radius-base)', fontWeight: 600, color: '#4338ca', borderColor: '#c7d2fe' }}
-          >
-            View in Customer App
-          </Button>
-        </div>
+        {/* Dynamic Changes / Verification Container */}
+        {(() => {
+          const isEditRequest = Boolean(
+            selectedGym?.pendingChanges &&
+            typeof selectedGym.pendingChanges === 'object' &&
+            Object.keys(selectedGym.pendingChanges).length > 0
+          );
 
-        {/* Diff Cards Grid */}
-        <Row gutter={[20, 20]} style={{ marginBottom: 30 }}>
-          {/* Card 1: Gym Photos */}
-          <Col xs={24} lg={12}>
-            <Card
-              title={
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700 }}>Gym Photos</span>
-                  <span style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>Updated 2 images</span>
-                </div>
-              }
-              style={{
-                backgroundColor: 'var(--bg-surface-elevated)',
-                borderColor: 'var(--border-color)',
-                borderRadius: 'var(--radius-base)',
-                height: '100%',
-              }}
-            >
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div>
-                  <Text type="secondary" style={{ fontSize: 11, fontWeight: 700 }}>OLD</Text>
-                  <img
-                    src="https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=400&auto=format&fit=crop"
-                    alt="Old Gym Photo"
-                    style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 8, marginTop: 6 }}
-                  />
-                </div>
-                <div>
-                  <Text type="secondary" style={{ fontSize: 11, fontWeight: 700, color: '#16a34a' }}>NEW</Text>
-                  <img
-                    src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=400&auto=format&fit=crop"
-                    alt="New Gym Photo"
-                    style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 8, marginTop: 6, border: '2px solid #22c55e' }}
-                  />
-                </div>
-              </div>
-            </Card>
-          </Col>
+          const latestAudit =
+            Array.isArray(selectedGym?.auditHistory) && selectedGym.auditHistory.length > 0
+              ? selectedGym.auditHistory[0]
+              : null;
+          const previousSnapshot = latestAudit?.previousSnapshot || selectedGym;
 
-          {/* Card 2: Gym Timings */}
-          <Col xs={24} lg={12}>
-            <Card
-              title={
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700 }}>Gym Timings</span>
-                  <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>Updated</span>
+          const ignoredKeys = new Set([
+            '_id',
+            'id',
+            '__v',
+            'key',
+            'updatedAt',
+            'createdAt',
+            'auditHistory',
+            'pendingChanges',
+            'approvalStatus',
+            'changesCount',
+            'customFacilities',
+          ]);
+
+          const gymDiffRows = isEditRequest
+            ? Object.entries(selectedGym.pendingChanges)
+                .filter(([k]) => !ignoredKeys.has(k))
+                .map(([k, newVal]) => {
+                  let oldVal = latestAudit?.editedFields?.[k]?.oldValue;
+                  if (oldVal === undefined) {
+                    oldVal = previousSnapshot?.[k];
+                  }
+                  if (oldVal === undefined) {
+                    oldVal = selectedGym[k];
+                  }
+
+                  const normalize = (v) => {
+                    if (v === null || v === undefined) return '';
+                    if (typeof v === 'object') return JSON.stringify(v);
+                    return String(v).trim();
+                  };
+
+                  const isIdentical =
+                    normalize(oldVal) === normalize(newVal) &&
+                    latestAudit?.editedFields?.[k] === undefined;
+
+                  return {
+                    fieldKey: k,
+                    fieldName: k.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase()),
+                    oldVal,
+                    newVal,
+                    isIdentical,
+                  };
+                })
+                .filter((row) => !row.isIdentical)
+            : [];
+
+          const renderDiffValue = (val, fieldKey) => {
+            if (val === null || val === undefined || val === '') {
+              return <span style={{ color: isDarkMode ? '#666666' : '#94a3b8' }}>—</span>;
+            }
+            if (typeof val === 'boolean') {
+              return <span>{val ? 'Yes' : 'No'}</span>;
+            }
+            if (fieldKey === 'logo' || fieldKey === 'coverPhoto') {
+              const url = typeof val === 'object' && val.fileData ? val.fileData : val;
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <img
+                    src={url}
+                    alt={fieldKey}
+                    style={{ width: 80, height: 50, objectFit: 'cover', borderRadius: 6 }}
+                  />
+                  <span style={{ fontSize: 12, color: isDarkMode ? '#aaaaaa' : '#64748b' }}>
+                    {fieldKey === 'logo' ? 'Logo' : 'Cover Banner'}
+                  </span>
                 </div>
-              }
-              style={{
-                backgroundColor: 'var(--bg-surface-elevated)',
-                borderColor: 'var(--border-color)',
-                borderRadius: 'var(--radius-base)',
-                height: '100%',
-              }}
-              extra={
-                <Button type="link" onClick={() => setCurrentView('timing_diff')} style={{ padding: 0, fontWeight: 600 }}>
-                  Detailed Diff →
-                </Button>
-              }
-            >
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div style={{ padding: '12px', borderRadius: 8, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : '#f8fafc' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>OLD</div>
-                  <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>Mon - Sun</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', fontFamily: 'monospace' }}>
-                    05:30 AM - 11:00 PM
+              );
+            }
+            if (fieldKey === 'galleryPhotos' && Array.isArray(val)) {
+              return (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {val.map((img, i) => {
+                    const src = typeof img === 'object' && img.fileData ? img.fileData : img;
+                    return (
+                      <img
+                        key={i}
+                        src={src}
+                        alt={`Photo ${i + 1}`}
+                        style={{ width: 50, height: 40, objectFit: 'cover', borderRadius: 4 }}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            }
+            if ((fieldKey === 'pricingPlans' || fieldKey === 'customPricingPlans') && Array.isArray(val)) {
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {val.map((p, i) => (
+                    <div
+                      key={p.id || i}
+                      style={{
+                        fontSize: 12,
+                        padding: '6px 10px',
+                        borderRadius: 6,
+                        backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f8fafc',
+                        border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.08)' : '#e2e8f0'}`,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <span style={{ fontWeight: 700, color: '#3b82f6' }}>{p.name || p.badge || 'Plan'}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontWeight: 800, color: isDarkMode ? '#10b981' : '#059669' }}>
+                            ₹{p.price} {p.duration ? `(${p.duration})` : ''}
+                          </span>
+                          {p.savingsText && (
+                            <Tag color="green" style={{ fontSize: 10, margin: 0, padding: '0 4px', lineHeight: '16px' }}>
+                              {p.savingsText}
+                            </Tag>
+                          )}
+                        </div>
+                      </div>
+                      {p.description && (
+                        <div style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 2 }}>
+                          {p.description}
+                        </div>
+                      )}
+                      {Array.isArray(p.features) && p.features.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                          {p.features.map((feat, fIdx) => (
+                            <Tag key={fIdx} style={{ fontSize: 10, margin: 0 }}>
+                              {feat}
+                            </Tag>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+            if (fieldKey === 'pricingPlans' && typeof val === 'object' && !Array.isArray(val)) {
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {Object.entries(val).map(([k, v]) => (
+                    <Tag key={k} color="blue" style={{ fontSize: 11, margin: 0 }}>
+                      <strong>{k.replace(/([A-Z])/g, ' $1')}:</strong> ₹{String(v)}
+                    </Tag>
+                  ))}
+                </div>
+              );
+            }
+            if ((fieldKey === 'facilities' || fieldKey === 'customFacilities') && Array.isArray(val)) {
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {val.map((f, i) => (
+                    <Tag key={i} color="blue" style={{ fontSize: 11, margin: 0 }}>
+                      {typeof f === 'string' ? f : `${f.name || f.title || 'Facility'}${f.count ? ` (${f.count})` : ''}`}
+                    </Tag>
+                  ))}
+                </div>
+              );
+            }
+            if (['workouts', 'amenities', 'rules', 'safetyMeasures', 'slotsMorning', 'slotsEvening'].includes(fieldKey) && Array.isArray(val)) {
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {val.map((item, i) => (
+                    <Tag key={i} color="geekblue" style={{ fontSize: 11, margin: 0 }}>
+                      {typeof item === 'string' ? item : JSON.stringify(item)}
+                    </Tag>
+                  ))}
+                </div>
+              );
+            }
+            if (fieldKey === 'openingHours' && typeof val === 'object') {
+              return (
+                <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div><strong>Weekday:</strong> {val.weekdayOpen || '05:30 AM'} - {val.weekdayClose || '10:30 PM'}</div>
+                  <div><strong>Weekend:</strong> {val.weekendOpen || '06:00 AM'} - {val.weekendClose || '09:00 PM'}</div>
+                  {val.is24Hours && <div><Tag color="green">24 Hours Open</Tag></div>}
+                  {Array.isArray(val.holidays) && val.holidays.length > 0 && (
+                    <div style={{ marginTop: 4 }}>
+                      <span style={{ fontWeight: 600, color: isDarkMode ? '#cbd5e1' : '#475569' }}>Holidays / Exceptions:</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+                        {val.holidays.map((h, i) => (
+                          <Tag key={h.id || i} color="volcano" style={{ fontSize: 11, margin: 0 }}>
+                            {h.title || h.date}: {h.hours || h.type}
+                          </Tag>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            if (fieldKey === 'bankDetails' && typeof val === 'object') {
+              return (
+                <div style={{ fontSize: 12 }}>
+                  <div><strong>{val.bankName || 'Bank'}</strong> - {val.accountNumber || '—'}</div>
+                  <div>IFSC: {val.ifscCode || '—'} | UPI: {val.upiId || '—'}</div>
+                  {val.accountHolderName && <div>Holder: {val.accountHolderName}</div>}
+                </div>
+              );
+            }
+            if (fieldKey === 'socialLinks' && typeof val === 'object') {
+              return (
+                <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {val.instagramHandle && <div><strong>Instagram:</strong> {val.instagramHandle}</div>}
+                  {val.whatsapp && <div><strong>WhatsApp:</strong> {val.whatsapp}</div>}
+                  {val.website && <div><strong>Website:</strong> {val.website}</div>}
+                  {val.facebook && <div><strong>Facebook:</strong> {val.facebook}</div>}
+                </div>
+              );
+            }
+            if (fieldKey === 'systemSettings' && typeof val === 'object') {
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {Object.entries(val).map(([k, v]) => (
+                    <Tag key={k} style={{ fontSize: 11, margin: 0 }}>
+                      <strong>{k.replace(/([A-Z])/g, ' $1')}:</strong> {typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v)}
+                    </Tag>
+                  ))}
+                </div>
+              );
+            }
+            if (Array.isArray(val)) {
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {val.map((item, i) => (
+                    <Tag key={i} style={{ fontSize: 11, margin: 0 }}>
+                      {typeof item === 'object' && item !== null
+                        ? item.name || item.title || item.label || JSON.stringify(item)
+                        : String(item)}
+                    </Tag>
+                  ))}
+                </div>
+              );
+            }
+            if (typeof val === 'object') {
+              return <span style={{ wordBreak: 'break-word', fontSize: 12 }}>{JSON.stringify(val)}</span>;
+            }
+            return <span style={{ wordBreak: 'break-word' }}>{String(val)}</span>;
+          };
+
+          return (
+            <div style={{ marginBottom: 30 }}>
+              {isEditRequest && gymDiffRows.length > 0 ? (
+                <div>
+                  <div
+                    style={{
+                      padding: '12px 16px',
+                      borderRadius: 8,
+                      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.1)' : '#fffbeb',
+                      border: '1px solid #fde68a',
+                      color: '#b45309',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      marginBottom: 18,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span>
+                      Pending Profile Modifications ({gymDiffRows.length} field(s) changed)
+                    </span>
+                    <Tag color="warning" style={{ fontWeight: 700 }}>
+                      Pending Approval
+                    </Tag>
+                  </div>
+
+                  <div
+                    style={{
+                      borderRadius: 8,
+                      border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <table
+                      style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        fontSize: 13,
+                        tableLayout: 'fixed',
+                      }}
+                    >
+                      <thead>
+                        <tr
+                          style={{
+                            backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+                            borderBottom: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                          }}
+                        >
+                          <th
+                            style={{
+                              padding: '12px 16px',
+                              textAlign: 'left',
+                              fontWeight: 700,
+                              width: '26%',
+                            }}
+                          >
+                            Field Name
+                          </th>
+                          <th
+                            style={{
+                              padding: '12px 16px',
+                              textAlign: 'left',
+                              fontWeight: 700,
+                              width: '37%',
+                              color: '#ef4444',
+                            }}
+                          >
+                            Current Live Value
+                          </th>
+                          <th
+                            style={{
+                              padding: '12px 16px',
+                              textAlign: 'left',
+                              fontWeight: 700,
+                              width: '37%',
+                              color: '#16a34a',
+                            }}
+                          >
+                            Requested Value
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gymDiffRows.map((row, idx) => (
+                          <tr
+                            key={row.fieldKey || idx}
+                            style={{
+                              borderBottom: `1px solid ${isDarkMode ? '#1e293b' : '#f1f5f9'}`,
+                              backgroundColor: idx % 2 === 0 ? 'transparent' : isDarkMode ? 'rgba(255,255,255,0.02)' : '#fafafa',
+                            }}
+                          >
+                            <td
+                              style={{
+                                padding: '12px 16px',
+                                fontWeight: 700,
+                                color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                              }}
+                            >
+                              {row.fieldName}
+                            </td>
+                            <td
+                              style={{
+                                padding: '12px 16px',
+                                color: isDarkMode ? '#cbd5e1' : '#475569',
+                                backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.05)' : '#fef2f2',
+                              }}
+                            >
+                              {renderDiffValue(row.oldVal, row.fieldKey)}
+                            </td>
+                            <td
+                              style={{
+                                padding: '12px 16px',
+                                color: isDarkMode ? '#ffffff' : '#0f172a',
+                                fontWeight: 600,
+                                backgroundColor: isDarkMode ? 'rgba(34, 197, 94, 0.08)' : '#f0fdf4',
+                              }}
+                            >
+                              {renderDiffValue(row.newVal, row.fieldKey)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
+              ) : (
+                /* New Onboard or Full Verification Card View */
+                <Row gutter={[20, 20]}>
+                  <Col xs={24} md={12}>
+                    <Card
+                      title={<span style={{ fontWeight: 700 }}>Basic Information</span>}
+                      style={{ backgroundColor: 'var(--bg-surface-elevated)', borderColor: 'var(--border-color)', borderRadius: 'var(--radius-base)', height: '100%' }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+                        <div><strong>Gym Name:</strong> {selectedGym?.name || '—'}</div>
+                        <div><strong>Owner Name:</strong> {selectedGym?.ownerName || '—'}</div>
+                        <div><strong>Phone:</strong> {selectedGym?.phone || '—'}</div>
+                        <div><strong>Email:</strong> {selectedGym?.email || '—'}</div>
+                        <div><strong>Business Type:</strong> {selectedGym?.businessType || 'Private Limited'}</div>
+                        <div><strong>GST / PAN:</strong> {selectedGym?.gstNumber || '—'} / {selectedGym?.panNumber || '—'}</div>
+                        <div><strong>Address:</strong> {selectedGym?.address || selectedGym?.fullAddress || `${selectedGym?.area || ''} ${selectedGym?.city || ''}`}</div>
+                      </div>
+                    </Card>
+                  </Col>
 
-                <div style={{ padding: '12px', borderRadius: 8, backgroundColor: isDarkMode ? 'rgba(34,197,94,0.08)' : '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#16a34a', marginBottom: 4 }}>NEW</div>
-                  <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>Mon - Sun</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: '#16a34a', fontFamily: 'monospace' }}>
-                    05:00 AM - 11:30 PM
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </Col>
-
-          {/* Card 3: Session Duration & Pricing */}
-          <Col xs={24} lg={12}>
-            <Card
-              title={
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700 }}>Session Duration & Pricing</span>
-                  <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>Updated 3 plans</span>
-                </div>
-              }
-              style={{
-                backgroundColor: 'var(--bg-surface-elevated)',
-                borderColor: 'var(--border-color)',
-                borderRadius: 'var(--radius-base)',
-              }}
-              styles={{ body: { padding: 0 } }}
-            >
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ borderBottom: `1px solid ${isDarkMode ? '#222' : '#f1f5f9'}`, color: isDarkMode ? '#888' : '#64748b' }}>
-                    <th style={{ padding: '12px 20px', textAlign: 'left', fontWeight: 600 }}>Duration</th>
-                    <th style={{ padding: '12px 20px', textAlign: 'left', fontWeight: 600 }}>Old Price</th>
-                    <th style={{ padding: '12px 20px', textAlign: 'left', fontWeight: 600 }}>New Price</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr style={{ borderBottom: `1px solid ${isDarkMode ? '#222' : '#f1f5f9'}` }}>
-                    <td style={{ padding: '12px 20px', fontWeight: 600 }}>60 Minutes</td>
-                    <td style={{ padding: '12px 20px', color: '#888888', textDecoration: 'line-through' }}>₹ 199</td>
-                    <td style={{ padding: '12px 20px', fontWeight: 700, color: '#16a34a' }}>₹ 249</td>
-                  </tr>
-                  <tr style={{ borderBottom: `1px solid ${isDarkMode ? '#222' : '#f1f5f9'}` }}>
-                    <td style={{ padding: '12px 20px', fontWeight: 600 }}>90 Minutes</td>
-                    <td style={{ padding: '12px 20px', color: '#888888', textDecoration: 'line-through' }}>₹ 299</td>
-                    <td style={{ padding: '12px 20px', fontWeight: 700, color: '#16a34a' }}>₹ 349</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: '12px 20px', fontWeight: 600 }}>120 Minutes</td>
-                    <td style={{ padding: '12px 20px', color: '#888888', textDecoration: 'line-through' }}>₹ 399</td>
-                    <td style={{ padding: '12px 20px', fontWeight: 700, color: '#16a34a' }}>₹ 449</td>
-                  </tr>
-                </tbody>
-              </table>
-            </Card>
-          </Col>
-
-          {/* Card 4: Facilities & Amenities */}
-          <Col xs={24} lg={12}>
-            <Card
-              title={
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700 }}>Facilities & Amenities</span>
-                  <span style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>Updated 2 items</span>
-                </div>
-              }
-              style={{
-                backgroundColor: 'var(--bg-surface-elevated)',
-                borderColor: 'var(--border-color)',
-                borderRadius: 'var(--radius-base)',
-              }}
-              styles={{ body: { padding: '20px' } }}
-            >
-              <div style={{ marginBottom: 14 }}>
-                <Text type="secondary" style={{ fontSize: 11, fontWeight: 700, color: '#ef4444' }}>REMOVED</Text>
-                <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                  <Tag color="error" style={{ borderRadius: 4, fontWeight: 600 }}>- Steam Room</Tag>
-                  <Tag color="error" style={{ borderRadius: 4, fontWeight: 600 }}>- Juice Bar</Tag>
-                </div>
-              </div>
-
-              <div>
-                <Text type="secondary" style={{ fontSize: 11, fontWeight: 700, color: '#16a34a' }}>ADDED</Text>
-                <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                  <Tag color="success" style={{ borderRadius: 4, fontWeight: 600 }}>+ Sauna Suite</Tag>
-                  <Tag color="success" style={{ borderRadius: 4, fontWeight: 600 }}>+ Meditation Room</Tag>
-                </div>
-              </div>
-            </Card>
-          </Col>
-
-          {/* Card 5: Terms & Conditions */}
-          <Col xs={24} sm={12}>
-            <Card
-              style={{
-                backgroundColor: 'var(--bg-surface-elevated)',
-                borderColor: 'var(--border-color)',
-                borderRadius: 'var(--radius-base)',
-              }}
-              styles={{ body: { padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }}
-            >
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>Terms & Conditions</div>
-                <div style={{ fontSize: 12, color: '#16a34a' }}>Updated refund & cancellation policy</div>
-              </div>
-              <Button size="small" style={{ borderRadius: 'var(--radius-base)', fontWeight: 600, color: '#4338ca' }}>
-                View Changes
-              </Button>
-            </Card>
-          </Col>
-
-          {/* Card 6: Safety Protocol */}
-          <Col xs={24} sm={12}>
-            <Card
-              style={{
-                backgroundColor: 'var(--bg-surface-elevated)',
-                borderColor: 'var(--border-color)',
-                borderRadius: 'var(--radius-base)',
-              }}
-              styles={{ body: { padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }}
-            >
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>Safety Protocol</div>
-                <div style={{ fontSize: 12, color: '#16a34a' }}>Added IoT Turnstile Emergency Lock Release</div>
-              </div>
-              <Button size="small" style={{ borderRadius: 'var(--radius-base)', fontWeight: 600, color: '#4338ca' }}>
-                View Changes
-              </Button>
-            </Card>
-          </Col>
-        </Row>
+                  <Col xs={24} md={12}>
+                    <Card
+                      title={<span style={{ fontWeight: 700 }}>Facilities & Operations</span>}
+                      style={{ backgroundColor: 'var(--bg-surface-elevated)', borderColor: 'var(--border-color)', borderRadius: 'var(--radius-base)', height: '100%' }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+                        <div>
+                          <strong>Operating Hours:</strong>{' '}
+                          {selectedGym?.openingHours?.displayText ||
+                            `${selectedGym?.openingHours?.weekdayOpen || '05:30 AM'} - ${selectedGym?.openingHours?.weekdayClose || '10:30 PM'}`}
+                        </div>
+                        <div>
+                          <strong>Floor Space / Capacity:</strong> {selectedGym?.floorSpaceSqFt || 3500} sq.ft / {selectedGym?.maxFloorCapacity || 60} persons
+                        </div>
+                        <div>
+                          <strong>Facilities:</strong>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                            {(selectedGym?.facilities || []).map((f, i) => (
+                              <Tag key={i} color="blue">{typeof f === 'string' ? f : f.name}</Tag>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  </Col>
+                </Row>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Screen 4: Confirmation Modal */}
         <Modal
           open={isApproveModalOpen}
-          onCancel={() => setIsApproveModalOpen(false)}
+          onCancel={() => !isProcessingStatus && setIsApproveModalOpen(false)}
+          closable={!isProcessingStatus}
+          maskClosable={!isProcessingStatus}
           footer={null}
           centered
           width={440}
@@ -952,11 +1340,12 @@ export const GymsManagement = () => {
             </h3>
 
             <p style={{ fontSize: 13, color: isDarkMode ? '#aaaaaa' : '#64748b', lineHeight: 1.5, marginBottom: 24 }}>
-              All approved changes will be published and reflected in the customer app immediately. This action cannot be undone.
+              All approved changes will be published and reflected in the customer app immediately. Partner ID will be generated if not assigned yet.
             </p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Button
+                disabled={isProcessingStatus}
                 onClick={() => setIsApproveModalOpen(false)}
                 style={{ height: 42, borderRadius: 'var(--radius-base)', fontWeight: 600 }}
               >
@@ -964,16 +1353,56 @@ export const GymsManagement = () => {
               </Button>
               <Button
                 type="primary"
-                onClick={handleApproveAll}
+                loading={isProcessingStatus}
+                disabled={isProcessingStatus}
+                onClick={() => handleApproveAll(selectedGym)}
                 style={{
                   height: 42,
                   borderRadius: 'var(--radius-base)',
-                  backgroundColor: '#4338ca',
-                  borderColor: '#4338ca',
+                  backgroundColor: '#16a34a',
+                  borderColor: '#16a34a',
                   fontWeight: 700,
                 }}
               >
-                Yes, Approve All
+                Yes, Approve & Publish
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Hold Modal */}
+        <Modal
+          title="Put Gym on Hold"
+          open={isHoldModalOpen}
+          onCancel={() => !isProcessingStatus && setIsHoldModalOpen(false)}
+          closable={!isProcessingStatus}
+          maskClosable={!isProcessingStatus}
+          footer={null}
+          centered
+          width={480}
+        >
+          <div style={{ padding: '12px 0' }}>
+            <p style={{ fontSize: 13, color: isDarkMode ? '#aaaaaa' : '#64748b', marginBottom: 12 }}>
+              Specify the required updates or missing information for <strong>{selectedGym?.name || 'Selected Gym'}</strong>:
+            </p>
+            <TextArea
+              rows={4}
+              disabled={isProcessingStatus}
+              value={holdNotes}
+              onChange={(e) => setHoldNotes(e.target.value)}
+              placeholder="e.g. Please upload trade license with clear stamp, update opening hours..."
+              style={{ marginBottom: 18 }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <Button disabled={isProcessingStatus} onClick={() => setIsHoldModalOpen(false)}>Cancel</Button>
+              <Button
+                type="primary"
+                loading={isProcessingStatus}
+                disabled={isProcessingStatus}
+                onClick={() => handleHold(selectedGym, holdNotes)}
+                style={{ fontWeight: 600, backgroundColor: '#fa8c16', borderColor: '#fa8c16' }}
+              >
+                Confirm Hold
               </Button>
             </div>
           </div>
@@ -983,25 +1412,35 @@ export const GymsManagement = () => {
         <Modal
           title="Reject Gym Changes"
           open={isRejectModalOpen}
-          onCancel={() => setIsRejectModalOpen(false)}
+          onCancel={() => !isProcessingStatus && setIsRejectModalOpen(false)}
+          closable={!isProcessingStatus}
+          maskClosable={!isProcessingStatus}
           footer={null}
           centered
           width={480}
         >
           <div style={{ padding: '12px 0' }}>
             <p style={{ fontSize: 13, color: isDarkMode ? '#aaaaaa' : '#64748b', marginBottom: 12 }}>
-              Please specify the reason for rejecting changes submitted by <strong>{selectedGym.requestedBy}</strong>:
+              Please specify the reason for rejecting changes submitted by <strong>{selectedGym?.requestedBy || selectedGym?.ownerName || 'Gym Partner'}</strong>:
             </p>
             <TextArea
               rows={4}
+              disabled={isProcessingStatus}
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
               placeholder="e.g. Photo resolution too low, pricing does not adhere to platform standard..."
               style={{ marginBottom: 18 }}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <Button onClick={() => setIsRejectModalOpen(false)}>Cancel</Button>
-              <Button danger type="primary" onClick={handleReject} style={{ fontWeight: 600 }}>
+              <Button disabled={isProcessingStatus} onClick={() => setIsRejectModalOpen(false)}>Cancel</Button>
+              <Button
+                danger
+                type="primary"
+                loading={isProcessingStatus}
+                disabled={isProcessingStatus}
+                onClick={() => handleReject(selectedGym, rejectionReason)}
+                style={{ fontWeight: 600 }}
+              >
                 Confirm Rejection
               </Button>
             </div>
@@ -1018,23 +1457,39 @@ export const GymsManagement = () => {
 
   const getHeaderBadge = () => {
     switch (currentTab) {
-      case 'pending':
-        return <Badge count={18} style={{ backgroundColor: '#d97706', fontWeight: 800 }} />;
-      case 'approved':
-        return <Badge count={1180} overflowCount={9999} style={{ backgroundColor: '#16a34a', fontWeight: 800 }} />;
-      case 'on_hold':
-        return <Badge count={35} style={{ backgroundColor: '#3b82f6', fontWeight: 800 }} />;
-      case 'rejected':
-        return <Badge count={15} style={{ backgroundColor: '#ef4444', fontWeight: 800 }} />;
-      default:
-        return <Badge count={1248} overflowCount={9999} style={{ backgroundColor: '#4338ca', fontWeight: 800 }} />;
+      case 'pending': {
+        const count = reduxGyms.filter((g) => g.approvalStatus === 'Pending Approval' || g.status === 'Pending' || g.approvalStatus === 'Pending').length;
+        return count > 0 ? <Badge count={count} style={{ backgroundColor: '#d97706', fontWeight: 800 }} /> : null;
+      }
+      case 'trainer_requests': {
+        const count = pendingTrainerApprovals.length;
+        return count > 0 ? <Badge count={count} style={{ backgroundColor: '#f59e0b', fontWeight: 800 }} /> : null;
+      }
+      case 'approved': {
+        const count = reduxGyms.filter((g) => g.approvalStatus === 'Approved' || g.status === 'Active').length;
+        return count > 0 ? <Badge count={count} overflowCount={9999} style={{ backgroundColor: '#16a34a', fontWeight: 800 }} /> : null;
+      }
+      case 'on_hold': {
+        const count = reduxGyms.filter((g) => g.approvalStatus === 'On Hold' || g.status === 'On Hold' || g.status === 'Inactive').length;
+        return count > 0 ? <Badge count={count} style={{ backgroundColor: '#3b82f6', fontWeight: 800 }} /> : null;
+      }
+      case 'rejected': {
+        const count = reduxGyms.filter((g) => g.approvalStatus === 'Rejected' || g.status === 'Rejected').length;
+        return count > 0 ? <Badge count={count} style={{ backgroundColor: '#ef4444', fontWeight: 800 }} /> : null;
+      }
+      default: {
+        const count = reduxGyms.length;
+        return count > 0 ? <Badge count={count} overflowCount={9999} style={{ backgroundColor: '#4338ca', fontWeight: 800 }} /> : null;
+      }
     }
   };
 
   const getHeaderTitle = () => {
     switch (currentTab) {
       case 'pending':
-        return 'Pending Approval';
+        return 'Gym Edit & Approval Requests';
+      case 'trainer_requests':
+        return 'Trainer & Staff Requests';
       case 'approved':
         return 'Active & Approved Gyms';
       case 'on_hold':
@@ -1049,7 +1504,9 @@ export const GymsManagement = () => {
   const getHeaderSubtitle = () => {
     switch (currentTab) {
       case 'pending':
-        return 'Gyms that have requested profile, timing, pricing, or amenity changes and are awaiting your verification.';
+        return 'Gym partners that have requested profile, timing, pricing, or amenity changes and are awaiting Super Admin verification.';
+      case 'trainer_requests':
+        return 'Review onboarding and profile/salary/role change requests submitted across all gym partners directly.';
       case 'approved':
         return 'Verified and published gym partners operating live on the Gymezy platform.';
       case 'on_hold':
@@ -1057,9 +1514,13 @@ export const GymsManagement = () => {
       case 'rejected':
         return 'Gym listings that did not meet onboarding quality and compliance standards.';
       default:
-        return 'View, search, filter, and manage all 1,248 partner gyms across the nationwide network.';
+        return `View, search, filter, and manage all ${reduxGyms.length} partner gyms across the nationwide network.`;
     }
   };
+
+  const pendingGymsCount = reduxGyms.filter(
+    (g) => g.approvalStatus === 'Pending Approval' || g.status === 'Pending' || g.approvalStatus === 'Pending'
+  ).length;
 
   return (
     <div style={{ maxWidth: 1320, margin: '0 auto' }}>
@@ -1069,7 +1530,7 @@ export const GymsManagement = () => {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 20,
+          marginBottom: 16,
           flexWrap: 'wrap',
           gap: 16,
         }}
@@ -1171,114 +1632,333 @@ export const GymsManagement = () => {
         </div>
       </div>
 
-      {/* 2. Multi-Field Filter Bar */}
-      <Card
-        style={{
-          backgroundColor: 'var(--bg-surface-elevated)',
-          borderColor: 'var(--border-color)',
-          borderRadius: 'var(--radius-base)',
-          marginBottom: 20,
-        }}
-        styles={{ body: { padding: '18px 20px' } }}
-      >
-        <Row gutter={[14, 14]}>
-          <Col xs={24} sm={12} lg={6}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
-              Gym Name
-            </div>
-            <Input
-              placeholder="Search by gym name..."
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
-              style={{ height: 38, borderRadius: 'var(--radius-base)' }}
-              allowClear
-            />
-          </Col>
+      {/* 1.5. Direct Approvals Sub-Switcher (Pill Selector) */}
+      {(currentTab === 'pending' || currentTab === 'trainer_requests') && (
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: 4,
+            marginBottom: 20,
+            borderRadius: 10,
+            backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9',
+            border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => navigate('/admin/gyms?tab=pending')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 18px',
+              borderRadius: 8,
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: 13,
+              backgroundColor: currentTab === 'pending' ? (isDarkMode ? '#0f172a' : '#ffffff') : 'transparent',
+              color: currentTab === 'pending' ? (isDarkMode ? '#ffffff' : '#0f172a') : (isDarkMode ? '#94a3b8' : '#64748b'),
+              boxShadow: currentTab === 'pending' ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <ShopOutlined style={{ color: currentTab === 'pending' ? '#d97706' : undefined }} />
+            <span>Gym Edit Requests</span>
+            {pendingGymsCount > 0 && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: 18,
+                  height: 18,
+                  padding: '0 6px',
+                  borderRadius: 9,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  backgroundColor: currentTab === 'pending' ? '#d97706' : 'rgba(217, 119, 6, 0.25)',
+                  color: currentTab === 'pending' ? '#ffffff' : '#d97706',
+                }}
+              >
+                {pendingGymsCount}
+              </span>
+            )}
+          </button>
 
-          <Col xs={24} sm={12} lg={4}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
-              Approval Status
-            </div>
-            <Select value={searchStatus} onChange={setSearchStatus} style={{ width: '100%', height: 38 }}>
-              <Option value="All">All Status</Option>
-              <Option value="Approved">Approved</Option>
-              <Option value="Pending Approval">Pending Approval</Option>
-              <Option value="Rejected">Rejected</Option>
-              <Option value="On Hold">On Hold</Option>
-            </Select>
-          </Col>
-
-          <Col xs={24} sm={12} lg={5}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
-              Subscription Tier
-            </div>
-            <Select value={searchSubscriptionType} onChange={setSearchSubscriptionType} style={{ width: '100%', height: 38 }}>
-              <Option value="All">All Plans</Option>
-              <Option value="Hybrid">Hybrid (₹ 4,999/mo)</Option>
-              <Option value="App Only">App Only (₹ 2,999/mo)</Option>
-              <Option value="GMS">GMS Only (₹ 1,999/mo)</Option>
-              <Option value="Listing Only">Listing Only (₹ 999/mo)</Option>
-            </Select>
-          </Col>
-
-          <Col xs={24} sm={12} lg={5}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
-              Location / City
-            </div>
-            <Input
-              placeholder="Chennai, Mumbai, Pune..."
-              value={searchLocation}
-              onChange={(e) => setSearchLocation(e.target.value)}
-              suffix={<EnvironmentOutlined style={{ color: '#94a3b8' }} />}
-              style={{ height: 38, borderRadius: 'var(--radius-base)' }}
-              allowClear
-            />
-          </Col>
-
-          <Col xs={24} sm={12} lg={4}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
-              Phone Number
-            </div>
-            <Input
-              placeholder="+91..."
-              value={searchPhone}
-              onChange={(e) => setSearchPhone(e.target.value)}
-              style={{ height: 38, borderRadius: 'var(--radius-base)' }}
-              allowClear
-            />
-          </Col>
-        </Row>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 12, borderTop: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : '#f1f5f9'}` }}>
-          <div style={{ fontSize: 13, color: isDarkMode ? '#888' : '#64748b' }}>
-            Found <strong style={{ color: isDarkMode ? '#fff' : '#0f172a' }}>{filteredGyms.length}</strong> matching gyms
-          </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Button
-              size="small"
-              onClick={() => {
-                setSearchName('');
-                setSearchStatus('All');
-                setSearchSubscriptionType('All');
-                setSearchLocation('');
-                setSearchPhone('');
-              }}
-            >
-              Reset Filters
-            </Button>
-            <Button
-              size="small"
-              icon={<DownloadOutlined />}
-              onClick={() => message.success('Exporting gyms list as CSV...')}
-            >
-              Export CSV
-            </Button>
-          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/admin/gyms?tab=trainer_requests')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 18px',
+              borderRadius: 8,
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: 13,
+              backgroundColor: currentTab === 'trainer_requests' ? (isDarkMode ? '#0f172a' : '#ffffff') : 'transparent',
+              color: currentTab === 'trainer_requests' ? (isDarkMode ? '#ffffff' : '#0f172a') : (isDarkMode ? '#94a3b8' : '#64748b'),
+              boxShadow: currentTab === 'trainer_requests' ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <TeamOutlined style={{ color: currentTab === 'trainer_requests' ? '#f59e0b' : undefined }} />
+            <span>Trainer & Staff Requests</span>
+            {pendingTrainerApprovals.length > 0 && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: 18,
+                  height: 18,
+                  padding: '0 6px',
+                  borderRadius: 9,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  backgroundColor: currentTab === 'trainer_requests' ? '#f59e0b' : 'rgba(245, 158, 11, 0.25)',
+                  color: currentTab === 'trainer_requests' ? '#ffffff' : '#f59e0b',
+                }}
+              >
+                {pendingTrainerApprovals.length}
+              </span>
+            )}
+          </button>
         </div>
-      </Card>
+      )}
 
-      {/* 4. Gyms Table */}
+      {/* 2. Filter Bar (Dedicated Trainer vs Gym Filters) */}
+      {currentTab === 'trainer_requests' ? (
+        <Card
+          style={{
+            backgroundColor: 'var(--bg-surface-elevated)',
+            borderColor: 'var(--border-color)',
+            borderRadius: 'var(--radius-base)',
+            marginBottom: 20,
+          }}
+          styles={{ body: { padding: '18px 20px' } }}
+        >
+          <Row gutter={[14, 14]}>
+            <Col xs={24} sm={12} lg={7}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
+                Search Trainer / Staff / Gym
+              </div>
+              <Input
+                placeholder="Search by name, employee ID, gym name, phone..."
+                value={trainerSearch}
+                onChange={(e) => setTrainerSearch(e.target.value)}
+                prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+                style={{ height: 38, borderRadius: 'var(--radius-base)' }}
+                allowClear
+              />
+            </Col>
+
+            <Col xs={24} sm={12} lg={5}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
+                Staff Role
+              </div>
+              <Select value={trainerRoleFilter} onChange={setTrainerRoleFilter} style={{ width: '100%', height: 38 }}>
+                <Option value="All">All Roles</Option>
+                <Option value="Trainer">Trainer</Option>
+                <Option value="Head Trainer">Head Trainer</Option>
+                <Option value="Nutritionist">Nutritionist</Option>
+                <Option value="Physiotherapist">Physiotherapist</Option>
+                <Option value="Front Desk">Front Desk</Option>
+                <Option value="Manager">Manager</Option>
+                <Option value="Staff">Staff</Option>
+              </Select>
+            </Col>
+
+            <Col xs={24} sm={12} lg={6}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
+                Filter By Gym
+              </div>
+              <Select
+                value={trainerGymFilter}
+                onChange={setTrainerGymFilter}
+                style={{ width: '100%', height: 38 }}
+                showSearch
+                optionFilterProp="children"
+              >
+                <Option value="All">All Gyms ({reduxGyms.length})</Option>
+                {reduxGyms.map((g) => (
+                  <Option key={g.id || g._id} value={g.id || g._id}>
+                    {g.name} ({g.partnerId || g.id || 'GYM'})
+                  </Option>
+                ))}
+              </Select>
+            </Col>
+
+            <Col xs={24} sm={12} lg={6}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
+                Request Type
+              </div>
+              <Select value={trainerActionFilter} onChange={setTrainerActionFilter} style={{ width: '100%', height: 38 }}>
+                <Option value="All">All Request Types</Option>
+                <Option value="NEW_EMPLOYEE">New Employee Onboarding</Option>
+                <Option value="EDIT_DETAILS">Profile / Detail Edits</Option>
+              </Select>
+            </Col>
+          </Row>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: 14,
+              paddingTop: 12,
+              borderTop: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : '#f1f5f9'}`,
+            }}
+          >
+            <div style={{ fontSize: 13, color: isDarkMode ? '#888' : '#64748b' }}>
+              Found <strong style={{ color: isDarkMode ? '#fff' : '#0f172a' }}>{filteredTrainerApprovals.length}</strong> pending trainer & staff requests
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button
+                size="small"
+                onClick={() => {
+                  setTrainerSearch('');
+                  setTrainerRoleFilter('All');
+                  setTrainerGymFilter('All');
+                  setTrainerActionFilter('All');
+                }}
+              >
+                Reset Filters
+              </Button>
+              <Button
+                size="small"
+                icon={<ReloadOutlined spin={loadingTrainers} />}
+                onClick={fetchPendingTrainerApprovals}
+              >
+                Refresh
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <Card
+          style={{
+            backgroundColor: 'var(--bg-surface-elevated)',
+            borderColor: 'var(--border-color)',
+            borderRadius: 'var(--radius-base)',
+            marginBottom: 20,
+          }}
+          styles={{ body: { padding: '18px 20px' } }}
+        >
+          <Row gutter={[14, 14]}>
+            <Col xs={24} sm={12} lg={6}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
+                Gym Name
+              </div>
+              <Input
+                placeholder="Search by gym name..."
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+                style={{ height: 38, borderRadius: 'var(--radius-base)' }}
+                allowClear
+              />
+            </Col>
+
+            <Col xs={24} sm={12} lg={4}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
+                Approval Status
+              </div>
+              <Select value={searchStatus} onChange={setSearchStatus} style={{ width: '100%', height: 38 }}>
+                <Option value="All">All Status</Option>
+                <Option value="Approved">Approved</Option>
+                <Option value="Pending Approval">Pending Approval</Option>
+                <Option value="Rejected">Rejected</Option>
+                <Option value="On Hold">On Hold</Option>
+              </Select>
+            </Col>
+
+            <Col xs={24} sm={12} lg={5}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
+                Subscription Tier
+              </div>
+              <Select value={searchSubscriptionType} onChange={setSearchSubscriptionType} style={{ width: '100%', height: 38 }}>
+                <Option value="All">All Plans</Option>
+                <Option value="Hybrid">Hybrid (₹ 4,999/mo)</Option>
+                <Option value="App Only">App Only (₹ 2,999/mo)</Option>
+                <Option value="GMS">GMS Only (₹ 1,999/mo)</Option>
+                <Option value="Listing Only">Listing Only (₹ 999/mo)</Option>
+              </Select>
+            </Col>
+
+            <Col xs={24} sm={12} lg={5}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
+                Location / City
+              </div>
+              <Input
+                placeholder="Chennai, Mumbai, Pune..."
+                value={searchLocation}
+                onChange={(e) => setSearchLocation(e.target.value)}
+                suffix={<EnvironmentOutlined style={{ color: '#94a3b8' }} />}
+                style={{ height: 38, borderRadius: 'var(--radius-base)' }}
+                allowClear
+              />
+            </Col>
+
+            <Col xs={24} sm={12} lg={4}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
+                Phone Number
+              </div>
+              <Input
+                placeholder="+91..."
+                value={searchPhone}
+                onChange={(e) => setSearchPhone(e.target.value)}
+                style={{ height: 38, borderRadius: 'var(--radius-base)' }}
+                allowClear
+              />
+            </Col>
+          </Row>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 12, borderTop: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.06)' : '#f1f5f9'}` }}>
+            <div style={{ fontSize: 13, color: isDarkMode ? '#888' : '#64748b', display: 'flex', alignItems: 'center', gap: 8 }}>
+              {loading ? (
+                <>
+                  <Spin size="small" />
+                  <span>Loading gyms fleet...</span>
+                </>
+              ) : (
+                <>
+                  Found <strong style={{ color: isDarkMode ? '#fff' : '#0f172a' }}>{filteredGyms.length}</strong> matching gyms
+                </>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Button
+                size="small"
+                onClick={() => {
+                  setSearchName('');
+                  setSearchStatus('All');
+                  setSearchSubscriptionType('All');
+                  setSearchLocation('');
+                  setSearchPhone('');
+                }}
+              >
+                Reset Filters
+              </Button>
+              <Button
+                size="small"
+                icon={<DownloadOutlined />}
+                onClick={() => message.success('Exporting gyms list as CSV...')}
+              >
+                Export CSV
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* 4. Main Tables Area */}
       <Card
         style={{
           backgroundColor: 'var(--bg-surface-elevated)',
@@ -1289,61 +1969,342 @@ export const GymsManagement = () => {
         }}
         styles={{ body: { padding: 0 } }}
       >
-        {isPendingView ? (
+        {currentTab === 'trainer_requests' ? (
+          /* TRAINER & STAFF REQUESTS TABLE */
+          <Table
+            dataSource={filteredTrainerApprovals}
+            rowKey={(record) => record.id || record._id || String(Math.random())}
+            pagination={false}
+            loading={loadingTrainers}
+            scroll={{ x: 1350 }}
+            size="middle"
+            columns={[
+              {
+                title: 'Trainer / Staff',
+                key: 'employee',
+                width: 230,
+                render: (_, record) => {
+                  const initials = getGymInitials(record.name);
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <Avatar
+                        src={record.avatar || undefined}
+                        size={40}
+                        style={{
+                          backgroundColor: '#6366f1',
+                          color: '#fff',
+                          fontWeight: 700,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {initials}
+                      </Avatar>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13.5, color: isDarkMode ? '#f8fafc' : '#0f172a' }}>
+                          {record.name}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                          <Tag color="blue" style={{ fontSize: 10, lineHeight: '16px', margin: 0, padding: '0 5px', fontWeight: 600 }}>
+                            {record.role || 'Trainer'}
+                          </Tag>
+                          <span style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', fontFamily: 'monospace' }}>
+                            {record.employeeId || 'EMP-ID'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                },
+              },
+              {
+                title: 'Gym Partner',
+                key: 'gymInfo',
+                width: 200,
+                render: (_, record) => (
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: isDarkMode ? '#e2e8f0' : '#1e293b' }}>
+                      {record.gymName || 'Gym Partner'}
+                    </div>
+                    <div style={{ fontSize: 11, color: isDarkMode ? '#818cf8' : '#6366f1', fontWeight: 600, letterSpacing: '0.3px' }}>
+                      {record.gymPartnerId || record.gymId || '—'}
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                title: 'Contact',
+                key: 'contact',
+                width: 170,
+                render: (_, record) => (
+                  <div style={{ fontSize: 12 }}>
+                    <div>
+                      <a href={`tel:${record.phone}`} style={{ color: isDarkMode ? '#93c5fd' : '#2563eb', fontWeight: 500 }}>
+                        {record.phone || '—'}
+                      </a>
+                    </div>
+                    <div style={{ color: isDarkMode ? '#94a3b8' : '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {record.email || '—'}
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                title: 'Request Type',
+                key: 'requestType',
+                width: 160,
+                render: (_, record) => {
+                  const isEdit = Boolean(record.pendingChanges && Object.keys(record.pendingChanges).length > 0);
+                  return isEdit ? (
+                    <Tag color="orange" style={{ fontWeight: 700, borderRadius: 4, padding: '2px 8px' }}>
+                      Edit Request
+                    </Tag>
+                  ) : (
+                    <Tag color="green" style={{ fontWeight: 700, borderRadius: 4, padding: '2px 8px' }}>
+                      New Registration
+                    </Tag>
+                  );
+                },
+              },
+              {
+                title: 'Submitted On',
+                dataIndex: 'updatedAt',
+                key: 'updatedAt',
+                width: 130,
+                render: (date, record) => {
+                  const d = date || record.createdAt;
+                  return (
+                    <span style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
+                      {d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent'}
+                    </span>
+                  );
+                },
+              },
+              {
+                title: 'Pending Updates',
+                key: 'changesSummary',
+                width: 180,
+                render: (_, record) => {
+                  if (record.pendingChanges && typeof record.pendingChanges === 'object') {
+                    const keys = Object.keys(record.pendingChanges).filter((k) => k !== '_id' && k !== 'id' && k !== 'customFacilities');
+                    if (keys.length > 0) {
+                      return (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {keys.slice(0, 3).map((k) => (
+                            <Tag key={k} color="warning" style={{ fontSize: 10, margin: 0 }}>
+                              {k}
+                            </Tag>
+                          ))}
+                          {keys.length > 3 && (
+                            <Tag style={{ fontSize: 10, margin: 0 }}>+{keys.length - 3} more</Tag>
+                          )}
+                        </div>
+                      );
+                    }
+                  }
+                  return (
+                    <Tag color="cyan" style={{ fontSize: 11, fontWeight: 600 }}>
+                      Complete Profile Verification
+                    </Tag>
+                  );
+                },
+              },
+              {
+                title: 'Direct Action',
+                key: 'action',
+                width: 220,
+                fixed: 'right',
+                align: 'center',
+                onCell: () => ({
+                  style: {
+                    backgroundColor: isDarkMode ? '#0d1117' : '#ffffff',
+                  },
+                }),
+                render: (_, record) => (
+                  <Space size={6}>
+                    <Button
+                      size="small"
+                      icon={<DiffOutlined />}
+                      onClick={() => {
+                        setSelectedTrainerForDiff(record);
+                        setIsTrainerDiffModalOpen(true);
+                      }}
+                      style={{
+                        fontWeight: 600,
+                        fontSize: 12,
+                        borderRadius: 6,
+                        borderColor: '#818cf8',
+                        color: '#6366f1',
+                        backgroundColor: isDarkMode ? 'rgba(99,102,241,0.1)' : '#eef2ff',
+                      }}
+                    >
+                      View Diff
+                    </Button>
+                    <Popconfirm
+                      title="Approve Employee Request?"
+                      description={`Approve "${record.name}" for ${record.gymName || 'this gym'}?`}
+                      onConfirm={() => handleApproveTrainer(record)}
+                      okText="Approve"
+                      cancelText="Cancel"
+                      okButtonProps={{ style: { backgroundColor: '#16a34a' } }}
+                    >
+                      <Button
+                        size="small"
+                        type="primary"
+                        icon={<CheckOutlined />}
+                        style={{
+                          fontWeight: 700,
+                          fontSize: 12,
+                          borderRadius: 6,
+                          backgroundColor: '#16a34a',
+                          borderColor: '#16a34a',
+                        }}
+                      >
+                        Approve
+                      </Button>
+                    </Popconfirm>
+                    <Button
+                      size="small"
+                      danger
+                      icon={<CloseOutlined />}
+                      onClick={() => {
+                        setTrainerToReject(record);
+                        setTrainerRejectRemarks('');
+                        setIsTrainerRejectModalOpen(true);
+                      }}
+                      style={{
+                        fontWeight: 600,
+                        fontSize: 12,
+                        borderRadius: 6,
+                      }}
+                    >
+                      Reject
+                    </Button>
+                  </Space>
+                ),
+              },
+            ]}
+          />
+        ) : isPendingView ? (
           /* PENDING APPROVAL TABLE */
           <Table
             dataSource={filteredGyms}
-            rowKey="id"
+            rowKey={(record) => record.id || record._id || String(Math.random())}
             pagination={false}
-            scroll={{ x: 1000 }}
+            loading={{
+              spinning: loading,
+              tip: 'Loading pending approvals...',
+              size: 'large',
+            }}
+            scroll={{ x: 1350 }}
             size="middle"
             columns={[
+              {
+                title: 'Partner ID',
+                dataIndex: 'partnerId',
+                key: 'partnerId',
+                width: 110,
+                render: (_, record) => {
+                  const partnerIdDisplay = record.partnerId;
+                  if (!partnerIdDisplay) {
+                    return (
+                      <span style={{ color: isDarkMode ? '#888888' : '#94a3b8', fontWeight: 500, paddingLeft: 4 }}>
+                        -
+                      </span>
+                    );
+                  }
+                  return (
+                    <span
+                      onClick={() => handleOpenDetails(record)}
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 13,
+                        color: isDarkMode ? '#818cf8' : '#4338ca',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        letterSpacing: '0.3px',
+                      }}
+                    >
+                      {partnerIdDisplay}
+                    </span>
+                  );
+                },
+              },
+              {
+                title: 'Gym Logo',
+                key: 'logo',
+                width: 90,
+                align: 'center',
+                render: (_, record) => (
+                  <GymLogoAvatar
+                    gym={record}
+                    isDarkMode={isDarkMode}
+                    onClick={() => handleOpenDetails(record)}
+                  />
+                ),
+              },
               {
                 title: 'Gym Name',
                 dataIndex: 'name',
                 key: 'name',
-                width: 210,
+                width: 200,
                 render: (name, record) => (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <img
-                      src={record.image}
-                      alt={name}
-                      style={{ width: 42, height: 42, borderRadius: 8, objectFit: 'cover', cursor: 'pointer' }}
-                      onClick={() => handleOpenDetails(record)}
-                    />
-                    <div>
-                      <div
-                        onClick={() => handleOpenDetails(record)}
-                        style={{
-                          fontWeight: 700,
-                          color: isDarkMode ? '#818cf8' : '#4338ca',
-                          cursor: 'pointer',
-                          textDecoration: 'underline',
-                        }}
-                      >
-                        {name}
-                      </div>
-                      <div style={{ fontSize: 12, color: isDarkMode ? '#888' : '#64748b' }}>
-                        {record.phone}
-                      </div>
+                  <div>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        color: isDarkMode ? '#f8fafc' : '#0f172a',
+                        fontSize: 13.5,
+                        lineHeight: '1.4',
+                      }}
+                    >
+                      {name}
+                    </span>
+                    <div style={{ marginTop: 3 }}>
+                      <Tag color="cyan" style={{ fontSize: 10, padding: '0 5px', borderRadius: 4, margin: 0, fontWeight: 600 }}>
+                        {record.genderAllowed || 'Unisex'}
+                      </Tag>
                     </div>
                   </div>
+                ),
+              },
+              {
+                title: 'Phone Number',
+                dataIndex: 'phone',
+                key: 'phone',
+                width: 140,
+                render: (phone) => (
+                  <span style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 500 }}>
+                    {phone || '—'}
+                  </span>
                 ),
               },
               {
                 title: 'Location',
                 dataIndex: 'location',
                 key: 'location',
-                width: 200,
-                render: (loc) => (
-                  <span style={{ color: isDarkMode ? '#d1d5db' : '#334155' }}>{loc}</span>
+                width: 190,
+                render: (_, record) => (
+                  <span
+                    style={{
+                      color: isDarkMode ? '#d1d5db' : '#334155',
+                      fontSize: 13,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      lineHeight: '18px',
+                    }}
+                    title={getGymLocation(record)}
+                  >
+                    {getGymLocation(record)}
+                  </span>
                 ),
               },
               {
                 title: 'Requested By',
                 dataIndex: 'requestedBy',
                 key: 'requestedBy',
-                width: 170,
+                width: 160,
                 render: (req, record) => (
                   <span
                     onClick={() => handleOpenDetails(record)}
@@ -1352,9 +2313,10 @@ export const GymsManagement = () => {
                       color: isDarkMode ? '#e2e8f0' : '#1e293b',
                       cursor: 'pointer',
                       textDecoration: 'underline',
+                      fontSize: 13,
                     }}
                   >
-                    {req}
+                    {req || record.ownerName || 'Gym Partner'}
                   </span>
                 ),
               },
@@ -1362,19 +2324,19 @@ export const GymsManagement = () => {
                 title: 'Requested On',
                 dataIndex: 'requestedOn',
                 key: 'requestedOn',
-                width: 180,
+                width: 150,
                 render: (date) => (
-                  <span style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>{date}</span>
+                  <span style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>{date || 'Recent'}</span>
                 ),
               },
               {
                 title: 'Changes',
                 dataIndex: 'changesCount',
                 key: 'changesCount',
-                width: 130,
+                width: 120,
                 render: (count) => (
                   <Tag color="orange" style={{ fontWeight: 700, borderRadius: 4 }}>
-                    {count} Changes
+                    {count || 1} Changes
                   </Tag>
                 ),
               },
@@ -1392,7 +2354,7 @@ export const GymsManagement = () => {
               {
                 title: 'Action',
                 key: 'action',
-                width: 120,
+                width: 110,
                 align: 'center',
                 fixed: 'right',
                 onCell: () => ({
@@ -1423,41 +2385,94 @@ export const GymsManagement = () => {
           /* ALL / APPROVED / ON-HOLD / REJECTED GYMS TABLE */
           <Table
             dataSource={filteredGyms}
-            rowKey="id"
+            rowKey={(record) => record.id || record._id || String(Math.random())}
             pagination={false}
-            scroll={{ x: 1200 }}
+            loading={{
+              spinning: loading,
+              tip: 'Loading gyms fleet...',
+              size: 'large',
+            }}
+            scroll={{ x: 1450 }}
             size="middle"
             columns={[
               {
-                title: 'Gym & Contact',
+                title: 'Partner ID',
+                dataIndex: 'partnerId',
+                key: 'partnerId',
+                width: 110,
+                render: (_, record) => {
+                  const partnerIdDisplay = record.partnerId;
+                  if (!partnerIdDisplay) {
+                    return (
+                      <span style={{ color: isDarkMode ? '#888888' : '#94a3b8', fontWeight: 500, paddingLeft: 4 }}>
+                        -
+                      </span>
+                    );
+                  }
+                  return (
+                    <span
+                      onClick={() => handleOpenDetails(record)}
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 13,
+                        color: isDarkMode ? '#818cf8' : '#4338ca',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        letterSpacing: '0.3px',
+                      }}
+                    >
+                      {partnerIdDisplay}
+                    </span>
+                  );
+                },
+              },
+              {
+                title: 'Gym Logo',
+                key: 'logo',
+                width: 90,
+                align: 'center',
+                render: (_, record) => (
+                  <GymLogoAvatar
+                    gym={record}
+                    isDarkMode={isDarkMode}
+                    onClick={() => handleOpenDetails(record)}
+                  />
+                ),
+              },
+              {
+                title: 'Gym Name',
                 dataIndex: 'name',
                 key: 'name',
-                width: 240,
+                width: 200,
                 render: (name, record) => (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <img
-                      src={record.image}
-                      alt={name}
-                      style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', cursor: 'pointer' }}
-                      onClick={() => handleOpenDetails(record)}
-                    />
-                    <div>
-                      <div
-                        onClick={() => handleOpenDetails(record)}
-                        style={{
-                          fontWeight: 700,
-                          color: isDarkMode ? '#818cf8' : '#4338ca',
-                          cursor: 'pointer',
-                          textDecoration: 'underline',
-                        }}
-                      >
-                        {name}
-                      </div>
-                      <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
-                        {record.phone}
-                      </div>
+                  <div>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        color: isDarkMode ? '#f8fafc' : '#0f172a',
+                        fontSize: 13.5,
+                        lineHeight: '1.4',
+                      }}
+                    >
+                      {name}
+                    </span>
+                    <div style={{ marginTop: 3 }}>
+                      <Tag color="cyan" style={{ fontSize: 10, padding: '0 5px', borderRadius: 4, margin: 0, fontWeight: 600 }}>
+                        {record.genderAllowed || 'Unisex'}
+                      </Tag>
                     </div>
                   </div>
+                ),
+              },
+              {
+                title: 'Phone Number',
+                dataIndex: 'phone',
+                key: 'phone',
+                width: 140,
+                render: (phone) => (
+                  <span style={{ fontSize: 13, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 500 }}>
+                    {phone || '—'}
+                  </span>
                 ),
               },
               {
@@ -1465,13 +2480,28 @@ export const GymsManagement = () => {
                 dataIndex: 'location',
                 key: 'location',
                 width: 190,
-                render: (loc) => <span style={{ color: isDarkMode ? '#d1d5db' : '#334155' }}>{loc}</span>,
+                render: (_, record) => (
+                  <span
+                    style={{
+                      color: isDarkMode ? '#d1d5db' : '#334155',
+                      fontSize: 13,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      lineHeight: '18px',
+                    }}
+                    title={getGymLocation(record)}
+                  >
+                    {getGymLocation(record)}
+                  </span>
+                ),
               },
               {
                 title: 'Partner / Owner',
                 dataIndex: 'requestedBy',
                 key: 'requestedBy',
-                width: 160,
+                width: 150,
                 render: (owner, record) => (
                   <span
                     onClick={() => handleOpenDetails(record)}
@@ -1480,9 +2510,10 @@ export const GymsManagement = () => {
                       color: isDarkMode ? '#e2e8f0' : '#1e293b',
                       cursor: 'pointer',
                       textDecoration: 'underline',
+                      fontSize: 13,
                     }}
                   >
-                    {owner}
+                    {owner || record.ownerName || 'Gym Partner'}
                   </span>
                 ),
               },
@@ -1497,81 +2528,70 @@ export const GymsManagement = () => {
                   else if (status === 'Pending Approval') color = 'warning';
                   else if (status === 'On Hold') color = 'processing';
                   else if (status === 'Rejected') color = 'error';
-                  return <Tag color={color} style={{ fontWeight: 600 }}>{status}</Tag>;
+                  return <Tag color={color} style={{ fontWeight: 600 }}>{status || 'Approved'}</Tag>;
                 },
               },
               {
                 title: 'Subscription Tier',
                 dataIndex: 'subscriptionType',
                 key: 'subscriptionType',
-                width: 150,
+                width: 140,
                 render: (type) => {
                   let color = 'blue';
                   if (type === 'Hybrid') color = 'purple';
                   else if (type === 'GMS') color = 'cyan';
                   else if (type === 'Listing Only') color = 'default';
-                  return <Tag color={color} style={{ fontWeight: 600 }}>{type}</Tag>;
+                  return <Tag color={color} style={{ fontWeight: 600 }}>{type || 'Hybrid'}</Tag>;
                 },
               },
               {
                 title: 'Monthly GMV',
                 dataIndex: 'monthlyRevenue',
                 key: 'monthlyRevenue',
-                width: 140,
-                render: (rev) => (
-                  <span style={{ fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>
-                    {rev || '₹ 1,50,000'}
-                  </span>
-                ),
+                width: 130,
+                render: (rev) => {
+                  const formatted =
+                    typeof rev === 'number'
+                      ? `₹ ${rev.toLocaleString('en-IN')}`
+                      : rev || '₹ 0';
+                  return (
+                    <span style={{ fontWeight: 700, color: '#16a34a', fontFamily: 'monospace', fontSize: 13 }}>
+                      {formatted}
+                    </span>
+                  );
+                },
               },
               {
                 title: 'Plan Status',
                 dataIndex: 'subscriptionStatus',
                 key: 'subscriptionStatus',
-                width: 130,
+                width: 120,
                 render: (status) => (
-                  <Tag color={status === 'Active' ? 'green' : 'red'} style={{ fontWeight: 600 }}>
-                    {status}
+                  <Tag color={status === 'Active' || !status ? 'green' : 'red'} style={{ fontWeight: 600 }}>
+                    {status || 'Active'}
                   </Tag>
                 ),
               },
               {
                 title: 'Action',
                 key: 'actions',
-                width: 140,
+                width: 90,
                 fixed: 'right',
                 align: 'center',
                 onCell: () => ({
                   style: {
-                    backgroundColor: isDarkMode ? '#0d1117' : '#ffffff',
+                    backgroundColor: isDarkMode ? '#0d0d0d' : '#ffffff',
                   },
                 }),
                 render: (_, record) => (
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                    <Button
-                      size="small"
-                      icon={<EyeOutlined />}
-                      onClick={() => handleOpenDetails(record)}
-                      style={{ borderRadius: 6, fontWeight: 600 }}
-                    >
-                      View
-                    </Button>
-                    {record.approvalStatus === 'Pending Approval' && (
-                      <Button
-                        size="small"
-                        type="primary"
-                        onClick={() => handleOpenReview(record)}
-                        style={{
-                          borderRadius: 6,
-                          fontWeight: 700,
-                          backgroundColor: '#4338ca',
-                          borderColor: '#4338ca',
-                        }}
-                      >
-                        Review
-                      </Button>
-                    )}
-                  </div>
+                  <Button
+                    size="small"
+                    icon={<EyeOutlined />}
+                    onClick={() => handleOpenDetails(record)}
+                    style={{ borderRadius: 6, fontWeight: 600 }}
+                  >
+                    View
+                  </Button>
                 ),
               },
             ]}
@@ -1582,153 +2602,355 @@ export const GymsManagement = () => {
       {/* 5. Pagination */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>
-          Showing 1 to {filteredGyms.length} of {isPendingView ? '18' : '1,248'} gyms
+          {currentTab === 'trainer_requests' ? (
+            <>
+              Showing {filteredTrainerApprovals.length > 0 ? (currentPage - 1) * 10 + 1 : 0} to{' '}
+              {Math.min(currentPage * 10, filteredTrainerApprovals.length)} of {filteredTrainerApprovals.length} trainer requests
+            </>
+          ) : (
+            <>
+              Showing {filteredGyms.length > 0 ? (currentPage - 1) * 10 + 1 : 0} to{' '}
+              {Math.min(currentPage * 10, filteredGyms.length)} of {filteredGyms.length} gyms
+            </>
+          )}
         </div>
         <Pagination
           current={currentPage}
-          total={isPendingView ? 18 : 1248}
-          pageSize={5}
+          total={currentTab === 'trainer_requests' ? filteredTrainerApprovals.length : filteredGyms.length}
+          pageSize={10}
           onChange={setCurrentPage}
           showSizeChanger={false}
         />
       </div>
 
-      {/* 6. Comprehensive Gym Profile Details Modal */}
+      {/* 6. Trainer & Staff Diff / Inspection Modal */}
       <Modal
         title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <ShopOutlined style={{ color: '#4338ca', fontSize: 20 }} />
-            <span>Gym Partner Profile Details</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Avatar
+              src={selectedTrainerForDiff?.avatar || undefined}
+              style={{ backgroundColor: '#6366f1', fontWeight: 700 }}
+            >
+              {getGymInitials(selectedTrainerForDiff?.name)}
+            </Avatar>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: isDarkMode ? '#fff' : '#0f172a' }}>
+                {selectedTrainerForDiff?.name || 'Staff Member'}
+              </div>
+              <div style={{ fontSize: 12, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 500 }}>
+                {selectedTrainerForDiff?.role || 'Trainer'} • {selectedTrainerForDiff?.gymName || selectedTrainerForDiff?.gymPartnerId || 'Gym Partner'}
+              </div>
+            </div>
           </div>
         }
-        open={isDetailsModalOpen}
-        onCancel={() => setIsDetailsModalOpen(false)}
-        footer={[
-          <Button key="close" onClick={() => setIsDetailsModalOpen(false)}>
-            Close
-          </Button>,
-          detailsGym?.approvalStatus === 'Pending Approval' ? (
+        open={isTrainerDiffModalOpen}
+        onCancel={() => {
+          setIsTrainerDiffModalOpen(false);
+          setSelectedTrainerForDiff(null);
+        }}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingTop: 10 }}>
             <Button
-              key="review"
-              type="primary"
+              danger
+              icon={<CloseOutlined />}
               onClick={() => {
-                setIsDetailsModalOpen(false);
-                handleOpenReview(detailsGym);
+                setTrainerToReject(selectedTrainerForDiff);
+                setTrainerRejectRemarks('');
+                setIsTrainerRejectModalOpen(true);
               }}
-              style={{ backgroundColor: '#4338ca', borderColor: '#4338ca' }}
             >
-              Review Pending Changes →
+              Reject Request
             </Button>
-          ) : (
-            <Button
-              key="edit"
-              type="primary"
-              onClick={() => {
-                message.info(`Editing configuration for ${detailsGym?.name}`);
-                setIsDetailsModalOpen(false);
-              }}
-              style={{ backgroundColor: '#4338ca', borderColor: '#4338ca' }}
-            >
-              Edit Partner Settings
-            </Button>
-          ),
-        ]}
-        width={720}
-        centered
-      >
-        {detailsGym && (
-          <div style={{ padding: '12px 0' }}>
-            {/* Top Gym Header Card */}
-            <div
-              style={{
-                display: 'flex',
-                gap: 16,
-                alignItems: 'center',
-                padding: 16,
-                borderRadius: 10,
-                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f8fafc',
-                border: `1px solid ${isDarkMode ? '#222' : '#e2e8f0'}`,
-                marginBottom: 20,
-              }}
-            >
-              <img
-                src={detailsGym.image}
-                alt={detailsGym.name}
-                style={{ width: 72, height: 72, borderRadius: 10, objectFit: 'cover' }}
-              />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{detailsGym.name}</h2>
-                  <Tag color={detailsGym.approvalStatus === 'Approved' ? 'success' : detailsGym.approvalStatus === 'Pending Approval' ? 'warning' : 'blue'}>
-                    {detailsGym.approvalStatus}
-                  </Tag>
-                </div>
-                <div style={{ color: isDarkMode ? '#888' : '#64748b', fontSize: 13, marginBottom: 4 }}>
-                  <EnvironmentOutlined style={{ marginRight: 6 }} />
-                  {detailsGym.location}
-                </div>
-                <div style={{ color: isDarkMode ? '#888' : '#64748b', fontSize: 13 }}>
-                  <PhoneOutlined style={{ marginRight: 6 }} />
-                  {detailsGym.phone}
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Metrics Grid */}
-            <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
-              <Col span={6}>
-                <div style={{ padding: 12, borderRadius: 8, backgroundColor: isDarkMode ? '#141414' : '#f1f5f9', textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: '#888', fontWeight: 600 }}>MEMBERS</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#3b82f6', marginTop: 2 }}>{detailsGym.membersCount || 450}</div>
-                </div>
-              </Col>
-              <Col span={6}>
-                <div style={{ padding: 12, borderRadius: 8, backgroundColor: isDarkMode ? '#141414' : '#f1f5f9', textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: '#888', fontWeight: 600 }}>MONTHLY GMV</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#16a34a', marginTop: 2 }}>{detailsGym.monthlyRevenue || '₹ 1.85L'}</div>
-                </div>
-              </Col>
-              <Col span={6}>
-                <div style={{ padding: 12, borderRadius: 8, backgroundColor: isDarkMode ? '#141414' : '#f1f5f9', textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: '#888', fontWeight: 600 }}>PLAN TIER</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: '#8b5cf6', marginTop: 3 }}>{detailsGym.subscriptionType}</div>
-                </div>
-              </Col>
-              <Col span={6}>
-                <div style={{ padding: 12, borderRadius: 8, backgroundColor: isDarkMode ? '#141414' : '#f1f5f9', textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: '#888', fontWeight: 600 }}>RATING</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#f59e0b', marginTop: 2 }}>★ {detailsGym.rating || 4.8}</div>
-                </div>
-              </Col>
-            </Row>
-
-            {/* Key Information Sections */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <div style={{ padding: 14, borderRadius: 8, border: `1px solid ${isDarkMode ? '#222' : '#e2e8f0'}` }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? '#ccc' : '#334155', marginBottom: 8 }}>
-                  Partner / Contact Person
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 2 }}>{detailsGym.requestedBy}</div>
-                <div style={{ fontSize: 12, color: '#888' }}>Authorized Gym Franchise Owner</div>
-                <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>Last verified on 15 May 2026</div>
-              </div>
-
-              <div style={{ padding: 14, borderRadius: 8, border: `1px solid ${isDarkMode ? '#222' : '#e2e8f0'}` }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? '#ccc' : '#334155', marginBottom: 8 }}>
-                  Platform Status
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-                  <Tag color="success">Listed on App</Tag>
-                  <Tag color="blue">IoT Turnstile Active</Tag>
-                </div>
-                <div style={{ fontSize: 12, color: '#888' }}>Payouts enabled via Razorpay Route</div>
-              </div>
-            </div>
+            <Space>
+              <Button onClick={() => setIsTrainerDiffModalOpen(false)}>Close</Button>
+              <Button
+                type="primary"
+                icon={<CheckOutlined />}
+                style={{ backgroundColor: '#16a34a', borderColor: '#16a34a', fontWeight: 700 }}
+                onClick={() => handleApproveTrainer(selectedTrainerForDiff)}
+              >
+                Approve & Publish Changes
+              </Button>
+            </Space>
           </div>
-        )}
+        }
+        width={740}
+        destroyOnClose
+      >
+        {selectedTrainerForDiff && (() => {
+          const changes = selectedTrainerForDiff.pendingChanges;
+          const isEditRequest = Boolean(changes && typeof changes === 'object' && Object.keys(changes).length > 0);
+          
+          // Latest audit record
+          const latestAudit = Array.isArray(selectedTrainerForDiff.auditHistory) && selectedTrainerForDiff.auditHistory.length > 0
+            ? selectedTrainerForDiff.auditHistory[selectedTrainerForDiff.auditHistory.length - 1]
+            : null;
+          const previousSnapshot = latestAudit?.previousSnapshot || selectedTrainerForDiff;
+
+          const ignoredKeys = new Set(['_id', 'id', '__v', 'key', 'updatedAt', 'createdAt', 'auditHistory', 'approvalStatus', 'pendingAction', 'gymId', 'gymPartnerId', 'gymName']);
+
+          const diffRows = isEditRequest
+            ? Object.entries(changes)
+                .filter(([k]) => !ignoredKeys.has(k))
+                .map(([k, newVal]) => {
+                  let oldVal = latestAudit?.editedFields?.[k]?.oldValue;
+                  if (oldVal === undefined) {
+                    oldVal = previousSnapshot?.[k];
+                  }
+                  if (oldVal === undefined) {
+                    oldVal = selectedTrainerForDiff[k];
+                  }
+
+                  const normalize = (v) => {
+                    if (v === null || v === undefined) return '';
+                    if (typeof v === 'object') return JSON.stringify(v);
+                    return String(v).trim();
+                  };
+
+                  const isIdentical = normalize(oldVal) === normalize(newVal) && latestAudit?.editedFields?.[k] === undefined;
+
+                  return {
+                    fieldKey: k,
+                    fieldName: k.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase()),
+                    oldVal,
+                    newVal,
+                    isIdentical,
+                  };
+                })
+                .filter((row) => !row.isIdentical)
+            : [];
+
+          const renderVal = (val, fieldKey) => {
+            if (val === null || val === undefined || val === '') {
+              return <span style={{ color: isDarkMode ? '#666666' : '#94a3b8' }}>—</span>;
+            }
+            if (typeof val === 'boolean') {
+              return <span>{val ? 'Yes' : 'No'}</span>;
+            }
+            if (fieldKey === 'status') {
+              const color = val === 'Active' ? 'green' : val === 'Inactive' ? 'default' : 'orange';
+              return <Tag color={color} style={{ fontWeight: 600 }}>{String(val)}</Tag>;
+            }
+            if (fieldKey === 'role') {
+              return <Tag color="blue" style={{ fontWeight: 600 }}>{String(val)}</Tag>;
+            }
+            if (fieldKey === 'accessType') {
+              return <Tag color="purple" style={{ fontWeight: 600 }}>{String(val)}</Tag>;
+            }
+            if (fieldKey === 'type') {
+              return <Tag color="cyan" style={{ fontWeight: 600 }}>{String(val)}</Tag>;
+            }
+            if (fieldKey === 'experienceYears') {
+              return <span>{val} {Number(val) === 1 ? 'Year' : 'Years'}</span>;
+            }
+            if (fieldKey.toLowerCase().includes('avatar') || (typeof val === 'string' && val.startsWith('data:image'))) {
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Avatar src={val} size={36} />
+                  <span style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Photo Updated</span>
+                </div>
+              );
+            }
+            if (fieldKey === 'schedule' && typeof val === 'object') {
+              const days = Array.isArray(val.workingDays) ? val.workingDays.join(', ') : 'All Days';
+              const hours = val.workingTimeStart && val.workingTimeEnd ? `${val.workingTimeStart} - ${val.workingTimeEnd}` : '';
+              return <span>{days} {hours ? `(${hours})` : ''}</span>;
+            }
+            if (fieldKey === 'compensation' && typeof val === 'object') {
+              const amt = Number(val.payAmount || 0).toLocaleString('en-IN');
+              return <span>₹{amt} ({val.payType || 'Monthly'})</span>;
+            }
+            if (fieldKey === 'emergencyContact' && typeof val === 'object') {
+              const parts = [val.name, val.relationship ? `(${val.relationship})` : '', val.phone].filter(Boolean);
+              return <span>{parts.join(' ') || '—'}</span>;
+            }
+            if (fieldKey === 'documents' && Array.isArray(val)) {
+              return <span>{val.length} Document(s) Attached</span>;
+            }
+            if (Array.isArray(val)) {
+              return <span>{val.join(', ') || '—'}</span>;
+            }
+            if (typeof val === 'object') {
+              return <span style={{ wordBreak: 'break-word', fontSize: 12 }}>{JSON.stringify(val)}</span>;
+            }
+            return <span style={{ wordBreak: 'break-word' }}>{String(val)}</span>;
+          };
+
+          return (
+            <div style={{ padding: '8px 0' }}>
+              {isEditRequest ? (
+                <div>
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 8,
+                      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.1)' : '#fffbeb',
+                      border: '1px solid #fde68a',
+                      color: '#b45309',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      marginBottom: 16,
+                    }}
+                  >
+                    Requested Field Modifications ({diffRows.length} {diffRows.length === 1 ? 'field changed' : 'fields changed'})
+                  </div>
+
+                  <div
+                    style={{
+                      borderRadius: 8,
+                      border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                      overflow: 'hidden',
+                      marginBottom: 16,
+                    }}
+                  >
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', borderBottom: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}` }}>
+                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, width: '28%' }}>Field Name</th>
+                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, width: '36%', color: '#ef4444' }}>Current Value</th>
+                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, width: '36%', color: '#16a34a' }}>Requested Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {diffRows.length > 0 ? (
+                          diffRows.map((row) => (
+                            <tr
+                              key={row.fieldKey}
+                              style={{
+                                borderBottom: `1px solid ${isDarkMode ? '#1e293b' : '#f1f5f9'}`,
+                                backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+                              }}
+                            >
+                              <td style={{ padding: '10px 14px', fontWeight: 600, wordBreak: 'break-word' }}>
+                                {row.fieldName}
+                              </td>
+                              <td style={{ padding: '10px 14px', color: isDarkMode ? '#fca5a5' : '#dc2626', backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.08)' : '#fef2f2', wordBreak: 'break-word' }}>
+                                {renderVal(row.oldVal, row.fieldKey)}
+                              </td>
+                              <td style={{ padding: '10px 14px', color: isDarkMode ? '#86efac' : '#15803d', fontWeight: 600, backgroundColor: isDarkMode ? 'rgba(34, 197, 94, 0.08)' : '#f0fdf4', wordBreak: 'break-word' }}>
+                                {renderVal(row.newVal, row.fieldKey)}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={3} style={{ padding: '16px', textAlign: 'center', color: isDarkMode ? '#888' : '#64748b' }}>
+                              All proposed field values match current record.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+              <div>
+                <div
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    backgroundColor: isDarkMode ? 'rgba(34, 197, 94, 0.1)' : '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    color: '#15803d',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginBottom: 16,
+                  }}
+                >
+                  New Employee Profile Verification
+                </div>
+
+                <Row gutter={[16, 16]}>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 600 }}>STAFF ID</div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{selectedTrainerForDiff.employeeId || '—'}</div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 600 }}>GYM PARTNER</div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>{selectedTrainerForDiff.gymName} ({selectedTrainerForDiff.gymPartnerId})</div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 600 }}>CONTACT PHONE</div>
+                    <div style={{ fontSize: 13 }}>{selectedTrainerForDiff.phone || '—'}</div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 600 }}>EMAIL ADDRESS</div>
+                    <div style={{ fontSize: 13 }}>{selectedTrainerForDiff.email || '—'}</div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 600 }}>ROLE / DESIGNATION</div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}><Tag color="blue">{selectedTrainerForDiff.role}</Tag></div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 600 }}>EMPLOYMENT TYPE</div>
+                    <div style={{ fontSize: 13 }}>{selectedTrainerForDiff.type || 'Full-Time'}</div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 600 }}>EXPERIENCE</div>
+                    <div style={{ fontSize: 13 }}>{selectedTrainerForDiff.experienceYears || 1} Years</div>
+                  </Col>
+                  <Col span={12}>
+                    <div style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 600 }}>SPECIALIZATION</div>
+                    <div style={{ fontSize: 13 }}>{selectedTrainerForDiff.specialty || selectedTrainerForDiff.specialties?.join(', ') || 'General Fitness'}</div>
+                  </Col>
+                  {selectedTrainerForDiff.emergencyContact?.name && (
+                    <Col span={24}>
+                      <div style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: 600, marginTop: 4 }}>EMERGENCY CONTACT</div>
+                      <div style={{ fontSize: 13, backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', padding: '8px 12px', borderRadius: 6, marginTop: 4 }}>
+                        <strong>{selectedTrainerForDiff.emergencyContact.name}</strong> ({selectedTrainerForDiff.emergencyContact.relationship || 'Relation'}) — {selectedTrainerForDiff.emergencyContact.phone}
+                      </div>
+                    </Col>
+                  )}
+                </Row>
+              </div>
+            )}
+          </div>
+        );
+      })()}
       </Modal>
 
-      {/* 7. Fast-Track Quick Add Gym Modal */}
+      {/* 6.5. Trainer & Staff Rejection Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <CloseCircleOutlined style={{ color: '#ef4444', fontSize: 18 }} />
+            <span style={{ fontWeight: 800 }}>Reject Employee Request</span>
+          </div>
+        }
+        open={isTrainerRejectModalOpen}
+        onCancel={() => {
+          setIsTrainerRejectModalOpen(false);
+          setTrainerToReject(null);
+          setTrainerRejectRemarks('');
+        }}
+        footer={null}
+        centered
+        width={480}
+      >
+        <div style={{ padding: '12px 0' }}>
+          <p style={{ fontSize: 13, color: isDarkMode ? '#aaaaaa' : '#64748b', marginBottom: 12 }}>
+            Specify the reason for rejecting the request for <strong>{trainerToReject?.name || 'this employee'}</strong>:
+          </p>
+          <TextArea
+            rows={4}
+            value={trainerRejectRemarks}
+            onChange={(e) => setTrainerRejectRemarks(e.target.value)}
+            placeholder="e.g. Incomplete certificate documents, invalid contact number..."
+            style={{ marginBottom: 18 }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <Button onClick={() => setIsTrainerRejectModalOpen(false)}>Cancel</Button>
+            <Button
+              danger
+              type="primary"
+              onClick={handleConfirmRejectTrainer}
+              style={{ fontWeight: 600 }}
+            >
+              Confirm Rejection
+            </Button>
+          </div>
+        </div>
+      </Modal>
       <Modal
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

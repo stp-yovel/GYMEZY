@@ -5,6 +5,7 @@ import {
   Button,
   Checkbox,
   Switch,
+  Alert,
   message,
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
@@ -17,7 +18,7 @@ import {
   ArrowRightOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../theme/ThemeContext';
-import { loginSuccess } from '../redux/slices/authSlice';
+import { loginUser } from '../redux/slices/authSlice';
 import gymezyLogo from '../assets/logo/gymezy.png';
 import fitnessBg from '../assets/images/onboarding_1.jpg';
 
@@ -27,24 +28,46 @@ export const Login = () => {
   const { isDarkMode, toggleTheme } = useTheme();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState(null);
 
-  const handleLogin = (values) => {
+  const handleLogin = async (values) => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      dispatch(
-        loginSuccess({
-          name: 'Vikram Sethi',
-          email: values.email || 'owner@fitzone.com',
-          role: 'GYM_OWNER',
-          gymId: 'GYM-FZ-01',
-          gymName: 'FitZone Gym',
-          branch: 'Anna Nagar, Chennai',
+    setLoginError(null);
+    try {
+      const resultAction = await dispatch(
+        loginUser({
+          identifier: values.email,
+          password: values.password,
         })
       );
-      message.success('Welcome back, Vikram! Gym Owner Portal loaded.');
-      navigate('/owner/dashboard');
-    }, 500);
+
+      if (loginUser.fulfilled.match(resultAction)) {
+        const user = resultAction.payload.user;
+        const approvalStatus = user.gym?.approvalStatus || 'Approved';
+        const isPendingOrRejected =
+          approvalStatus === 'Pending Approval' ||
+          approvalStatus === 'Pending' ||
+          approvalStatus === 'Rejected';
+
+        if (isPendingOrRejected) {
+          message.info(`Welcome back, ${user.fullName || user.name || 'Partner'}! Your application status is loaded.`);
+          navigate('/application-status');
+        } else {
+          message.success(`Welcome back, ${user.fullName || user.name || 'Partner'}! Gym Owner Portal loaded.`);
+          navigate('/owner/dashboard');
+        }
+      } else {
+        const errorMsg = resultAction.payload || 'Invalid email/phone or password.';
+        setLoginError(errorMsg);
+        message.error(errorMsg);
+      }
+    } catch (err) {
+      const errorMsg = err.message || 'Login failed. Please verify credentials and try again.';
+      setLoginError(errorMsg);
+      message.error(errorMsg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -221,7 +244,7 @@ export const Login = () => {
             </div>
           </div>
 
-          <div style={{ marginBottom: 32 }}>
+          <div style={{ marginBottom: 24 }}>
             <h2
               style={{
                 fontSize: 24,
@@ -235,26 +258,42 @@ export const Login = () => {
             </h2>
           </div>
 
+          {loginError && (
+            <Alert
+              message="Sign In Notice"
+              description={loginError}
+              type="error"
+              showIcon
+              closable
+              onClose={() => setLoginError(null)}
+              style={{
+                marginBottom: 24,
+                borderRadius: 'var(--radius-base)',
+                fontSize: 13,
+              }}
+            />
+          )}
+
           <Form
             form={form}
             layout="vertical"
             onFinish={handleLogin}
             initialValues={{
-              email: 'owner@fitzone.com',
-              password: 'FitZoneSecure@2025',
-              remember: true,
+              email: '',
+              password: '',
+              remember: false,
             }}
             size="large"
           >
             <Form.Item
-              label={<span style={{ color: isDarkMode ? '#cccccc' : '#334155', fontWeight: 600, fontSize: 13 }}>Email</span>}
+              label={<span style={{ color: isDarkMode ? '#cccccc' : '#334155', fontWeight: 600, fontSize: 13 }}>Email / Phone</span>}
               name="email"
-              rules={[{ required: true, message: 'Please enter your email' }]}
+              rules={[{ required: true, message: 'Please enter your email or phone number' }]}
               style={{ marginBottom: 20 }}
             >
               <Input
                 prefix={<UserOutlined style={{ color: '#1677ff' }} />}
-                placeholder="owner@fitzone.com"
+                placeholder="e.g. owner@gym.com or +91 9876543210"
                 style={{
                   height: 46,
                   borderRadius: 'var(--radius-base)',
@@ -317,6 +356,29 @@ export const Login = () => {
                 Sign In
               </Button>
             </Form.Item>
+
+            {/* Link to Gym Partner Registration */}
+            <div
+              style={{
+                marginTop: 24,
+                textAlign: 'center',
+                fontSize: 13,
+                color: isDarkMode ? '#94a3b8' : '#64748b',
+              }}
+            >
+              Want to partner with GYMEZY?{' '}
+              <a
+                onClick={() => navigate('/register')}
+                style={{
+                  color: 'var(--color-primary)',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                }}
+              >
+                Register your Gym
+              </a>
+            </div>
           </Form>
         </div>
       </div>

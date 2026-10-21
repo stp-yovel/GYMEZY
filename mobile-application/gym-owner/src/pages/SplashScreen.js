@@ -9,9 +9,13 @@ import {
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors } from '../theme/appTheme';
+import { useAuth } from '../context/AuthContext';
 
 export const SplashScreen = ({ navigation }) => {
   const { isDark } = useTheme();
+  const { isAuthenticated, gym, isRestoringToken } = useAuth();
+  const authRef = useRef({ isAuthenticated, gym, isRestoringToken });
+  authRef.current = { isAuthenticated, gym, isRestoringToken };
 
   const logoScale = useRef(new Animated.Value(0.7)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -50,17 +54,26 @@ export const SplashScreen = ({ navigation }) => {
       ]).start();
     }, 400);
 
-    // 3. Guaranteed auto-navigate to Onboarding after 2.5 seconds
+    // 3. Auto-navigate based on authenticated JWT session
     const navTimer = setTimeout(() => {
-      navigation.replace('Onboarding');
+      const { isAuthenticated: authed, gym: currentGym } = authRef.current;
+      if (authed) {
+        const approvalStatus = currentGym?.approvalStatus || 'Pending Approval';
+        if (approvalStatus === 'Approved') {
+          navigation.replace('Dashboard');
+        } else {
+          navigation.replace('ApplicationStatus');
+        }
+      } else {
+        navigation.replace('Onboarding');
+      }
     }, 2500);
 
     return () => {
       clearTimeout(textTimer);
       clearTimeout(navTimer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [navigation]);
 
   return (
     <View style={styles.container}>

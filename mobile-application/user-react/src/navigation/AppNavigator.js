@@ -10,6 +10,7 @@ import { BuyMembershipScreen } from '../pages/BuyMembershipScreen';
 import { PaymentSummaryScreen } from '../pages/PaymentSummaryScreen';
 import { BookingDetailsScreen } from '../pages/BookingDetailsScreen';
 import { MembershipDetailsScreen } from '../pages/MembershipDetailsScreen';
+import { WalletScreen } from '../pages/WalletScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -26,6 +27,11 @@ export const AppNavigator = () => {
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="HomeTabs" component={HomeScreen} />
+      <Stack.Screen
+        name="Wallet"
+        component={WalletScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
       <Stack.Screen
         name="GymDetails"
         component={GymDetailsScreen}

@@ -1,0 +1,50 @@
+name: Deploy GYMEZY to VPS
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+
+jobs:
+  deploy-dev:
+    name: Deploy to Dev Environment
+    if: github.ref == 'refs/heads/dev' || (github.event_name == 'workflow_dispatch' && inputs.target_env == 'dev')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Dev Deployment Script via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME || 'root' }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            echo "Starting Dev deployment..."
+            /var/www/gymezy/deploy-dev.sh
+
+  deploy-prod:
+    name: Deploy to Production Environment
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.target_env == 'prod')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Production Deployment Script via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME || 'root' }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            echo "Starting Production deployment..."
+            /var/www/gymezy/deploy-prod.sh

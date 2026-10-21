@@ -848,9 +848,9 @@ export const ReportsManagement = () => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
-              Showing 1 to {filteredData.length} of 12,486 entries
+              Showing {filteredData.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length} entries
             </span>
-            <Pagination current={currentPage} total={12486} pageSize={pageSize} onChange={setCurrentPage} size="small" />
+            <Pagination current={currentPage} total={filteredData.length} pageSize={pageSize} onChange={setCurrentPage} size="small" />
           </div>
         </div>
 
@@ -876,9 +876,9 @@ export const ReportsManagement = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>
-            Showing 1 to {filteredData.length} of 12,486 entries
+            Showing {filteredData.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length} entries
           </span>
-          <Pagination current={currentPage} total={12486} pageSize={pageSize} onChange={setCurrentPage} />
+          <Pagination current={currentPage} total={filteredData.length} pageSize={pageSize} onChange={setCurrentPage} />
         </div>
       </div>
 

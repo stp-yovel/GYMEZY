@@ -328,12 +328,14 @@ const handleFile = (file) => {
 
 ---
 
-## 11. Zero Hardcoded Environment / Tenant Assumptions
+## 11. Zero Hardcoded Environment, Credentials & Tenant Assumptions
 
-Never hardcode fallback demo codes, sample credentials, or static tenant configurations in production source files:
+Never hardcode fallback demo codes, sample credentials, fake emails, or static tenant configurations in production source files:
+- **Forbidden**: `const email = user?.email || 'admin@gymezy.com';` or `|| 'owner@fitzone.com'`
 - **Forbidden**: `const tenantId = activeTenant || "DEMO-TENANT-123";`
-- **Forbidden**: Hardcoded static terms, mock organization names, or sample user objects in core logic.
-- **Required**: Retrieve configuration dynamically from application state, session context, or backend API. If absent, fallback to empty defaults (`""`, `[]`, `null`) and handle loading/empty states cleanly.
+- **Forbidden**: Hardcoding mock credentials in form `initialValues` (e.g. `initialValues={{ email: 'admin@gymezy.com', password: '...' }}`).
+- **Forbidden**: Hardcoded static terms, mock organization names, or sample user objects in headers, sidebars, or core logic.
+- **Required**: Retrieve configuration and user profile dynamically from application state, session context, or backend API. If absent, fallback to clean neutral defaults (`""`, `[]`, `null`) or render empty/loading state conditionally.
 
 ---
 

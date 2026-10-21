@@ -1,0 +1,417 @@
+import { NativeModules } from 'react-native';
+
+const BACKEND_PORT = 5001;
+const LOCAL_WIFI_IP = '192.168.0.102';
+
+const getMetroHost = () => {
+  try {
+    const scriptURL = NativeModules?.SourceCode?.scriptURL;
+    if (scriptURL) {
+      const match = scriptURL.match(/^https?:\/\/([^:/]+)/);
+      if (match?.[1] && match[1] !== 'localhost' && match[1] !== '127.0.0.1') {
+        return match[1];
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } catch (error) {
+    if (error.name === 'AbortError' || error.message?.toLowerCase().includes('aborted')) {
+      throw new Error(
+        `Server connection timed out (${Math.round(timeoutMs / 1000)}s) at ${url}.`
+      );
+    }
+    if (
+      error.message?.toLowerCase().includes('network request failed') ||
+      error.message?.toLowerCase().includes('failed to fetch') ||
+      error.message?.toLowerCase().includes('err_failed')
+    ) {
+      throw new Error(
+        `Unable to reach backend server at ${url.split('/api/v1')[0]}. Ensure server is running on port ${BACKEND_PORT}.`
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+class ApiService {
+  constructor() {
+    this.baseUrl = `http://localhost:${BACKEND_PORT}/api/v1`;
+    this.verifiedBase = null;
+    this.token = null;
+    this.unauthorizedHandler = null;
+  }
+
+  setUnauthorizedHandler(handler) {
+    this.unauthorizedHandler = handler;
+  }
+
+  setBaseUrl(url) {
+    this.baseUrl = url;
+    this.verifiedBase = url;
+  }
+
+  getBaseUrl() {
+    return this.verifiedBase || this.baseUrl;
+  }
+
+  setAuthToken(token) {
+    this.token = token;
+  }
+
+  getHeaders() {
+    const headers = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    };
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
+    }
+    return headers;
+  }
+
+  async executeFetch(endpoint, options = {}, timeoutMs = 4000) {
+    const metroHost = getMetroHost();
+
+    // Priority candidates: USB adb reverse localhost first, then metroHost, then WiFi IP
+    const candidateBases = [
+      this.verifiedBase,
+      `http://localhost:${BACKEND_PORT}/api/v1`,
+      `http://127.0.0.1:${BACKEND_PORT}/api/v1`,
+      metroHost ? `http://${metroHost}:${BACKEND_PORT}/api/v1` : null,
+      `http://${LOCAL_WIFI_IP}:${BACKEND_PORT}/api/v1`,
+      `http://10.0.2.2:${BACKEND_PORT}/api/v1`,
+    ];
+
+    // Filter unique candidates preserving order
+    const uniqueBases = Array.from(new Set(candidateBases.filter(Boolean)));
+
+    let lastError = null;
+    for (let i = 0; i < uniqueBases.length; i++) {
+      const currentBase = uniqueBases[i];
+      const targetUrl = `${currentBase}${endpoint}`;
+      try {
+        const response = await fetchWithTimeout(targetUrl, options, i === 0 && this.verifiedBase ? timeoutMs : 2000);
+        if (response.status === 401 && !endpoint.includes('/auth/login')) {
+          if (typeof this.unauthorizedHandler === 'function') {
+            this.unauthorizedHandler();
+          }
+        }
+        this.verifiedBase = currentBase; // Lock in the working base URL for subsequent calls
+        this.baseUrl = currentBase;
+        return response;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    throw new Error(
+      `Unable to connect to backend server on port ${BACKEND_PORT}. If using a physical phone, please connect to the same Wi-Fi (${LOCAL_WIFI_IP}) or connect via USB with USB debugging enabled.`
+    );
+  }
+
+  async login({ identifier, password }) {
+    const cleanIdentifier = (identifier || '').trim();
+    const cleanPassword = (password || '').trim();
+
+    if (!cleanIdentifier || !cleanPassword) {
+      throw new Error('Email or phone number and password are required.');
+    }
+
+    const response = await this.executeFetch('/auth/login', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        identifier: cleanIdentifier,
+        password: cleanPassword,
+        portal: 'gym-owner',
+        expectedRole: 'GYM_OWNER',
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      const errorMessage =
+        result.message ||
+        (result.errors && result.errors[0]?.msg) ||
+        'Authentication failed. Please verify your credentials.';
+      throw new Error(errorMessage);
+    }
+
+    const data = result.data || {};
+    if (data.token) {
+      this.setAuthToken(data.token);
+    }
+
+    return {
+      user: {
+        id: data.id,
+        fullName: data.fullName,
+        email: data.email,
+        phone: data.phone,
+        role: data.role,
+        gymId: data.gymId,
+      },
+      gym: data.gym || null,
+      token: data.token || null,
+      message: result.message,
+    };
+  }
+
+  async logout() {
+    try {
+      await this.executeFetch('/auth/logout', {
+        method: 'POST',
+        headers: this.getHeaders(),
+      }, 4000);
+    } catch {
+      // Ignore network errors during logout
+    } finally {
+      this.token = null;
+    }
+  }
+
+  async getCurrentUser() {
+    const response = await this.executeFetch('/auth/me', {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to fetch current user session.');
+    }
+    return result.data;
+  }
+
+  async getGym(gymId) {
+    if (!gymId) throw new Error('Gym ID is required to fetch gym profile.');
+    const response = await this.executeFetch(`/gyms/${gymId}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to fetch gym profile.');
+    }
+    return result.data;
+  }
+
+  async updateGym(gymId, payload) {
+    if (!gymId) throw new Error('Gym ID is required to update details.');
+    const response = await this.executeFetch(`/gyms/${gymId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to update gym details.');
+    }
+    return {
+      data: result.data,
+      message: result.message || 'Gym changes submitted successfully. Pending Super Admin approval.',
+    };
+  }
+
+  async resubmitGym(gymId, notes = '') {
+    if (!gymId) throw new Error('Gym ID is required to resubmit application.');
+    const response = await this.executeFetch(`/gyms/${gymId}/resubmit`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ notes }),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to resubmit application.');
+    }
+    return result.data;
+  }
+
+  // Employee & Trainer Management Endpoints
+  async getEmployees(params = {}) {
+    const queryParts = [];
+    Object.entries(params).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && val !== '') {
+        queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(val)}`);
+      }
+    });
+    const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+
+    const response = await this.executeFetch(`/employees${queryString}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to fetch employees list.');
+    }
+    return result.data;
+  }
+
+  async getEmployeeById(id) {
+    if (!id) throw new Error('Employee ID is required.');
+    const response = await this.executeFetch(`/employees/${id}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to fetch employee details.');
+    }
+    return result.data;
+  }
+
+  async createEmployee(payload) {
+    const response = await this.executeFetch('/employees', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to create employee.');
+    }
+    return {
+      data: result.data,
+      message: result.message || 'Employee submitted successfully. Pending Super Admin approval.',
+    };
+  }
+
+  async updateEmployee(id, payload) {
+    if (!id) throw new Error('Employee ID is required to update details.');
+    const response = await this.executeFetch(`/employees/${id}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to update employee.');
+    }
+    return {
+      data: result.data,
+      message: result.message || 'Employee edits submitted successfully. Pending Super Admin approval.',
+    };
+  }
+
+  async deleteEmployee(id) {
+    if (!id) throw new Error('Employee ID is required to deactivate.');
+    const response = await this.executeFetch(`/employees/${id}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to deactivate employee.');
+    }
+    return {
+      data: result.data,
+      message: result.message || 'Employee deactivation requested. Pending Super Admin approval.',
+    };
+  }
+
+  // --- ATTENDANCE METHODS ---
+  async checkInMember(payload) {
+    const response = await this.executeFetch('/attendance/check-in', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Check-in failed. Please verify the code/OTP.');
+    }
+    return result.data;
+  }
+
+  async checkOutMember(payload) {
+    const response = await this.executeFetch('/attendance/check-out', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Check-out failed.');
+    }
+    return result.data;
+  }
+
+  async getTodayAttendance(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const endpoint = query ? `/attendance/today?${query}` : '/attendance/today';
+    const response = await this.executeFetch(endpoint, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || "Failed to retrieve today's attendance logs.");
+    }
+    return result.data;
+  }
+
+  async searchAttendanceMembers(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const endpoint = query ? `/attendance/members?${query}` : '/attendance/members';
+    const response = await this.executeFetch(endpoint, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to search members.');
+    }
+    return result.data;
+  }
+
+  async checkEmail(email) {
+    const response = await this.executeFetch(`/auth/check-email?email=${encodeURIComponent(email)}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    return await response.json();
+  }
+
+  async registerGym(payload) {
+    const response = await this.executeFetch('/gyms/register', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    }, 15000);
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Gym registration failed.');
+    }
+    return result;
+  }
+}
+
+export const apiService = new ApiService();
+export default apiService;

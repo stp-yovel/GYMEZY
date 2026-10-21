@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,14 +11,34 @@ import {
   TextInput,
   Platform,
   Dimensions,
+  ActivityIndicator,
+  NativeModules,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
-import { AppColors, AppTheme } from '../theme/appTheme';
+import { AppColors } from '../theme/appTheme';
 import { useBookingRepository } from '../data/BookingContext';
 import { useToast } from '../widgets/CustomScaffoldMessage';
+import { useAuth } from '../context/AuthContext';
+import { apiService } from '../services/apiService';
+
+// Safely check if native ImagePicker module is registered before requiring
+const getSafeImagePicker = () => {
+  try {
+    const isNativeModuleLinked = Boolean(
+      NativeModules?.ExponentImagePicker ||
+      globalThis?.expo?.modules?.ExponentImagePicker ||
+      globalThis?.ExpoModules?.ExponentImagePicker
+    );
+    if (!isNativeModuleLinked) {
+      return null;
+    }
+    return require('expo-image-picker');
+  } catch {
+    return null;
+  }
+};
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -30,10 +50,17 @@ const FITNESS_GOALS = [
   'General Fitness & Mobility',
 ];
 
-const INVOICES = [
-  { id: 'INV-2025-001', title: 'FitZone Gym Annual Pass', date: '21 May 2025', amount: '₹11,999', status: 'Paid' },
-  { id: 'INV-2025-002', title: 'Olympic Fitness Day Pass', date: '14 May 2025', amount: '₹199', status: 'Paid' },
-  { id: 'INV-2025-003', title: 'PowerHouse 10-Session Pass', date: '02 Apr 2025', amount: '₹1,499', status: 'Paid' },
+const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop';
+
+const AVATAR_PRESETS = [
+  { id: '1', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop', label: 'Pro Athlete' },
+  { id: '2', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop', label: 'Runner' },
+  { id: '3', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop', label: 'Yoga & Core' },
+  { id: '4', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=400&auto=format&fit=crop', label: 'Powerlifter' },
+  { id: '5', url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=400&auto=format&fit=crop', label: 'CrossFit' },
+  { id: '6', url: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=400&auto=format&fit=crop', label: 'Gym Pro' },
+  { id: '7', url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=400&auto=format&fit=crop', label: 'Trainer Dave' },
+  { id: '8', url: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=400&auto=format&fit=crop', label: 'Iron Master' },
 ];
 
 const FAQS = [
@@ -59,15 +86,27 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
   const { isDark, colors } = useTheme();
   const { bookings, memberships } = useBookingRepository();
   const { showToast } = useToast();
+  const { user, logout, updateUser } = useAuth();
 
   // User Profile State
-  const [userName, setUserName] = useState('Alex Morgan');
-  const [userEmail, setUserEmail] = useState('alex.morgan@fitness.io');
-  const [userPhone, setUserPhone] = useState('+91 98765 43210');
-  const [userGender, setUserGender] = useState('Male');
-  const [userEmergencyContact, setUserEmergencyContact] = useState('+91 98123 45678 (Spouse)');
-  const avatarUrl =
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop';
+  const [userName, setUserName] = useState(user?.fullName || 'Alex Morgan');
+  const [userEmail, setUserEmail] = useState(user?.email || 'alex.morgan@fitness.io');
+  const [userPhone, setUserPhone] = useState(user?.phone || '+91 98765 43210');
+  const [userGender, setUserGender] = useState(user?.gender === 'FEMALE' ? 'Female' : 'Male');
+  const [userEmergencyContact, setUserEmergencyContact] = useState(
+    user?.emergencyContact || '+91 98123 45678 (Spouse)'
+  );
+  const avatarUrl = user?.avatar || DEFAULT_AVATAR;
+
+  // Keep local state in sync when auth user updates
+  useEffect(() => {
+    if (user) {
+      if (user.fullName) setUserName(user.fullName);
+      if (user.email) setUserEmail(user.email);
+      if (user.phone) setUserPhone(user.phone);
+      if (user.emergencyContact) setUserEmergencyContact(user.emergencyContact);
+    }
+  }, [user]);
 
   // Body & Fitness Metrics
   const [heightCm, setHeightCm] = useState(178);
@@ -81,6 +120,10 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
   const [biometricLogin, setBiometricLogin] = useState(true);
 
   // Modals state
+  const [showAvatarPickerModal, setShowAvatarPickerModal] = useState(false);
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+  const [customAvatarUrl, setCustomAvatarUrl] = useState('');
+  const [showCustomUrlInput, setShowCustomUrlInput] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showMeasurementsModal, setShowMeasurementsModal] = useState(false);
   const [showInvoicesModal, setShowInvoicesModal] = useState(false);
@@ -114,12 +157,131 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
   const activeBookings = bookings.filter((b) => b.status === 'Upcoming');
   const totalActivePasses = activeMemberships.length + activeBookings.length;
 
+  const userInvoices = useMemo(() => {
+    const list = [];
+    memberships.forEach((m) => {
+      list.push({
+        id: `INV-${m.id || 'MBR'}`,
+        title: `${m.gymName || 'Gym'} • ${m.planName || 'Membership'}`,
+        date: m.startDate || 'Active',
+        amount: `₹${m.amountPaid || 0}`,
+        status: m.status || 'Paid',
+      });
+    });
+    bookings.forEach((b) => {
+      list.push({
+        id: `INV-${b.id || 'BKG'}`,
+        title: `${b.gymName || 'Gym'} • ${b.sessionSubtitle || b.type || 'Pass'}`,
+        date: b.date || 'Recent',
+        amount: `₹${b.amountPaid || 0}`,
+        status: b.status || 'Paid',
+      });
+    });
+    return list;
+  }, [memberships, bookings]);
+
   const primaryNavy = isDark ? '#93C5FD' : '#003882';
   const cardColor = isDark ? '#1E1E1E' : '#FFFFFF';
   const textColor = isDark ? '#FFFFFF' : '#0F172A';
   const subtitleColor = isDark ? 'rgba(255, 255, 255, 0.7)' : '#64748B';
   const borderColor = isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0';
   const inputBgColor = isDark ? '#262626' : '#F8FAFC';
+
+  const handleSaveAvatar = async (newUri) => {
+    setIsUpdatingAvatar(true);
+    setShowAvatarPickerModal(false);
+    try {
+      if (updateUser) {
+        await updateUser({ avatar: newUri });
+      }
+      try {
+        await apiService.updateProfile({ avatar: newUri });
+      } catch {
+        // Backend or offline mode - local state already updated
+      }
+      showToast({ message: 'Profile photo updated successfully!', isSuccess: true });
+    } catch (error) {
+      showToast({ message: 'Failed to update photo: ' + (error.message || 'Error') });
+    } finally {
+      setIsUpdatingAvatar(false);
+    }
+  };
+
+  const handlePickFromGallery = async () => {
+    try {
+      const ImagePicker = getSafeImagePicker();
+      if (!ImagePicker) {
+        showToast({
+          message: 'Device photo library requires app restart (npm run android). Please pick a fitness avatar preset below!',
+        });
+        return;
+      }
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        showToast({ message: 'Permission to access photo gallery was denied.' });
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5, // Native JPEG compression for compact DB storage
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const compressedUri = asset.base64
+          ? `data:image/jpeg;base64,${asset.base64}`
+          : asset.uri;
+        await handleSaveAvatar(compressedUri);
+      }
+    } catch (error) {
+      showToast({ message: 'Could not open photo gallery: ' + (error.message || 'Error') });
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const ImagePicker = getSafeImagePicker();
+      if (!ImagePicker) {
+        showToast({
+          message: 'Device camera requires app restart (npm run android). Please pick a fitness avatar preset below!',
+        });
+        return;
+      }
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        showToast({ message: 'Camera permission is required to take a photo.' });
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5, // Native JPEG compression for compact DB storage
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const compressedUri = asset.base64
+          ? `data:image/jpeg;base64,${asset.base64}`
+          : asset.uri;
+        await handleSaveAvatar(compressedUri);
+      }
+    } catch (error) {
+      showToast({ message: 'Could not open camera: ' + (error.message || 'Error') });
+    }
+  };
+
+  const handleSelectPresetAvatar = async (presetUrl) => {
+    await handleSaveAvatar(presetUrl);
+  };
+
+  const handleRemovePhoto = async () => {
+    await handleSaveAvatar('');
+  };
 
   const handleOpenEditProfile = () => {
     setTempName(userName);
@@ -131,11 +293,39 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
   };
 
   const handleSaveProfile = () => {
-    setUserName(tempName.trim() || userName);
-    setUserEmail(tempEmail.trim() || userEmail);
-    setUserPhone(tempPhone.trim() || userPhone);
-    setUserEmergencyContact(tempEmergency.trim() || userEmergencyContact);
+    const updatedName = tempName.trim() || userName;
+    const updatedEmail = tempEmail.trim() || userEmail;
+    const updatedPhone = tempPhone.trim() || userPhone;
+    const updatedEmergency = tempEmergency.trim() || userEmergencyContact;
+
+    setUserName(updatedName);
+    setUserEmail(updatedEmail);
+    setUserPhone(updatedPhone);
+    setUserEmergencyContact(updatedEmergency);
     setUserGender(tempGender);
+
+    if (updateUser) {
+      updateUser({
+        fullName: updatedName,
+        email: updatedEmail,
+        phone: updatedPhone,
+        emergencyContact: updatedEmergency,
+        gender: tempGender,
+      });
+    }
+
+    try {
+      apiService.updateProfile({
+        fullName: updatedName,
+        email: updatedEmail,
+        phone: updatedPhone,
+        emergencyContact: updatedEmergency,
+        gender: tempGender,
+      }).catch(() => {});
+    } catch {
+      // Offline mode or network error
+    }
+
     setShowEditProfileModal(false);
     showToast({ message: 'Profile updated successfully', isSuccess: true });
   };
@@ -149,9 +339,9 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
   };
 
   const handleSaveMeasurements = () => {
-    const h = parseFloat(tempHeight) || heightCm;
-    const w = parseFloat(tempWeight) || weightKg;
-    const tw = parseFloat(tempTargetWeight) || targetWeightKg;
+    const h = Number.parseFloat(tempHeight) || heightCm;
+    const w = Number.parseFloat(tempWeight) || weightKg;
+    const tw = Number.parseFloat(tempTargetWeight) || targetWeightKg;
     setHeightCm(h);
     setWeightKg(w);
     setTargetWeightKg(tw);
@@ -160,11 +350,14 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
     showToast({ message: 'Measurements updated successfully', isSuccess: true });
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setShowLogoutDialog(false);
+    if (logout) {
+      await logout();
+    }
     showToast({ message: 'Logged out successfully' });
     if (navigation?.replace) {
-      navigation.replace('Onboarding');
+      navigation.replace('Login');
     }
   };
 
@@ -200,8 +393,12 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
         >
           {/* Avatar & User Details */}
           <View style={styles.userInfoRow}>
-            {/* Avatar Stack */}
-            <View style={styles.avatarStack}>
+            {/* Avatar Stack with Tap to Change */}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setShowAvatarPickerModal(true)}
+              style={styles.avatarStack}
+            >
               <View
                 style={[
                   styles.avatarBorder,
@@ -214,14 +411,10 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
                   resizeMode="cover"
                 />
               </View>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => showToast({ message: 'Avatar photo updated', isSuccess: true })}
-                style={styles.cameraBadge}
-              >
+              <View style={styles.cameraBadge}>
                 <MaterialIcons name="photo-camera" size={13} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
 
             {/* User Identity Details */}
             <View style={styles.identityDetails}>
@@ -295,7 +488,7 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
                 >
                   {activeMemberships.length > 0
                     ? activeMemberships[0].gymName
-                    : 'FitZone Gym'}
+                    : 'Explore Partner Gyms'}
                 </Text>
               </View>
               <MaterialIcons
@@ -318,7 +511,7 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
           >
             <MaterialIcons name="fitness-center" size={22} color="#3B82F6" />
             <Text style={[styles.statCardValue, { color: textColor }]} numberOfLines={1}>
-              18
+              {bookings.length}
             </Text>
             <Text style={[styles.statCardLabel, { color: subtitleColor }]} numberOfLines={1}>
               Workouts
@@ -334,7 +527,7 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
           >
             <MaterialIcons name="local-fire-department" size={22} color="#EF4444" />
             <Text style={[styles.statCardValue, { color: textColor }]} numberOfLines={1}>
-              5 Days
+              {user?.streakDays ? `${user.streakDays} Days` : '0 Days'}
             </Text>
             <Text style={[styles.statCardLabel, { color: subtitleColor }]} numberOfLines={1}>
               Streak 🔥
@@ -350,7 +543,7 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
           >
             <MaterialIcons name="card-membership" size={22} color="#10B981" />
             <Text style={[styles.statCardValue, { color: textColor }]} numberOfLines={1}>
-              {totalActivePasses > 0 ? `${totalActivePasses} Active` : '5 Active'}
+              {`${totalActivePasses} Active`}
             </Text>
             <Text style={[styles.statCardLabel, { color: subtitleColor }]} numberOfLines={1}>
               Passes
@@ -366,7 +559,7 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
           >
             <MaterialIcons name="bolt" size={22} color="#F59E0B" />
             <Text style={[styles.statCardValue, { color: textColor }]} numberOfLines={1}>
-              14.2k
+              {bookings.length > 0 ? `${bookings.length * 350}` : '0 kcal'}
             </Text>
             <Text style={[styles.statCardLabel, { color: subtitleColor }]} numberOfLines={1}>
               Calories
@@ -520,6 +713,21 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
 
         <TouchableOpacity
           activeOpacity={0.7}
+          onPress={() => navigation.navigate('Wallet')}
+          style={[styles.menuTile, { backgroundColor: cardColor, borderColor: borderColor }]}
+        >
+          <View style={[styles.menuIconBox, { backgroundColor: isDark ? '#262626' : 'rgba(0, 191, 98, 0.12)' }]}>
+            <Ionicons name="wallet" size={20} color={AppColors.secondaryColor} />
+          </View>
+          <View style={styles.menuTileContent}>
+            <Text style={[styles.menuTileTitle, { color: textColor }]}>GYMEZY Digital Wallet</Text>
+            <Text style={[styles.menuTileSubtitle, { color: subtitleColor }]}>Prorated balance, top-ups & instant payouts</Text>
+          </View>
+          <MaterialIcons name="chevron-right" size={22} color={subtitleColor} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.7}
           onPress={() => setShowInvoicesModal(true)}
           style={[styles.menuTile, { backgroundColor: cardColor, borderColor: borderColor }]}
         >
@@ -666,6 +874,223 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
       </ScrollView>
 
       {/* ============================================================ */}
+      {/* MODAL 0: AVATAR PICKER (Bottom Sheet) */}
+      {/* ============================================================ */}
+      <Modal
+        visible={showAvatarPickerModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAvatarPickerModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdropTouch}
+            activeOpacity={1}
+            onPress={() => setShowAvatarPickerModal(false)}
+          />
+          <View style={[styles.bottomSheetContainer, { backgroundColor: cardColor }]}>
+            {/* Sheet Top Grab Handle */}
+            <View style={styles.sheetGrabHandle} />
+
+            {/* Sheet Header */}
+            <View style={styles.sheetHeaderRow}>
+              <View>
+                <Text style={[styles.sheetTitleText, { color: textColor }]}>Profile Photo</Text>
+                <Text style={[styles.sheetSubtitleText, { color: subtitleColor }]}>
+                  Choose a photo or select an avatar preset
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowAvatarPickerModal(false)}
+                style={styles.sheetCloseBtn}
+              >
+                <MaterialIcons name="close" size={22} color={subtitleColor} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
+              {/* Current Avatar Preview & Status */}
+              <View style={styles.avatarPickerPreviewSection}>
+                <View style={[styles.avatarPickerPreviewCircle, { borderColor: isDark ? '#93C5FD' : '#003882' }]}>
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarPickerPreviewImg} resizeMode="cover" />
+                  {isUpdatingAvatar && (
+                    <View style={styles.avatarLoadingOverlay}>
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.avatarPickerPreviewName, { color: textColor }]}>{userName}</Text>
+                <Text style={[styles.avatarPickerPreviewSub, { color: subtitleColor }]}>Current Profile Avatar</Text>
+              </View>
+
+              {/* Upload Actions: Camera & Gallery */}
+              <View style={styles.avatarActionGrid}>
+                {/* 1. Take Photo */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handleTakePhoto}
+                  style={[
+                    styles.avatarActionCard,
+                    {
+                      backgroundColor: isDark ? '#262626' : '#F1F5F9',
+                      borderColor: borderColor,
+                    },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={['#3B82F6', '#1D4ED8']}
+                    style={styles.avatarActionIconGrad}
+                  >
+                    <MaterialIcons name="photo-camera" size={22} color="#FFFFFF" />
+                  </LinearGradient>
+                  <Text style={[styles.avatarActionTitle, { color: textColor }]}>Take Photo</Text>
+                  <Text style={[styles.avatarActionSub, { color: subtitleColor }]}>Use camera</Text>
+                </TouchableOpacity>
+
+                {/* 2. Choose from Library */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handlePickFromGallery}
+                  style={[
+                    styles.avatarActionCard,
+                    {
+                      backgroundColor: isDark ? '#262626' : '#F1F5F9',
+                      borderColor: borderColor,
+                    },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={['#10B981', '#059669']}
+                    style={styles.avatarActionIconGrad}
+                  >
+                    <MaterialIcons name="photo-library" size={22} color="#FFFFFF" />
+                  </LinearGradient>
+                  <Text style={[styles.avatarActionTitle, { color: textColor }]}>Upload Photo</Text>
+                  <Text style={[styles.avatarActionSub, { color: subtitleColor }]}>From gallery</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Section: Fitness Avatars Presets */}
+              <View style={styles.presetSectionHeader}>
+                <MaterialIcons name="face" size={18} color={isDark ? '#93C5FD' : '#003882'} style={{ marginRight: 6 }} />
+                <Text style={[styles.presetSectionTitle, { color: textColor }]}>
+                  Or Choose a Fitness Avatar
+                </Text>
+              </View>
+
+              <View style={styles.avatarPresetsGrid}>
+                {AVATAR_PRESETS.map((preset) => {
+                  const isSelected = avatarUrl === preset.url;
+                  return (
+                    <TouchableOpacity
+                      key={preset.id}
+                      activeOpacity={0.8}
+                      onPress={() => handleSelectPresetAvatar(preset.url)}
+                      style={styles.presetItem}
+                    >
+                      <View
+                        style={[
+                          styles.presetAvatarWrapper,
+                          isSelected && {
+                            borderColor: '#003882',
+                            borderWidth: 2.5,
+                            shadowColor: '#003882',
+                            shadowOpacity: 0.35,
+                            shadowRadius: 6,
+                            elevation: 4,
+                          },
+                        ]}
+                      >
+                        <Image source={{ uri: preset.url }} style={styles.presetAvatarImage} resizeMode="cover" />
+                        {isSelected && (
+                          <View style={styles.presetCheckmarkBadge}>
+                            <MaterialIcons name="check" size={12} color="#FFFFFF" />
+                          </View>
+                        )}
+                      </View>
+                      <Text
+                        style={[
+                          styles.presetLabel,
+                          {
+                            color: isSelected ? (isDark ? '#93C5FD' : '#003882') : subtitleColor,
+                            fontWeight: isSelected ? '700' : '500',
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {preset.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Custom Image URL Option */}
+              <View style={styles.customUrlSection}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setShowCustomUrlInput(!showCustomUrlInput)}
+                  style={[styles.customUrlHeaderRow, { borderColor: borderColor }]}
+                >
+                  <MaterialIcons name="link" size={18} color={isDark ? '#93C5FD' : '#003882'} style={{ marginRight: 8 }} />
+                  <Text style={[styles.customUrlHeaderText, { color: textColor }]}>
+                    Paste Custom Image URL
+                  </Text>
+                  <MaterialIcons
+                    name={showCustomUrlInput ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                    size={20}
+                    color={subtitleColor}
+                  />
+                </TouchableOpacity>
+
+                {showCustomUrlInput && (
+                  <View style={styles.customUrlInputBox}>
+                    <View style={[styles.inputContainer, { backgroundColor: inputBgColor, borderColor: borderColor, marginBottom: 8 }]}>
+                      <TextInput
+                        value={customAvatarUrl}
+                        onChangeText={setCustomAvatarUrl}
+                        placeholder="https://example.com/photo.jpg"
+                        placeholderTextColor={subtitleColor}
+                        autoCapitalize="none"
+                        style={[styles.textInput, { color: textColor }]}
+                      />
+                    </View>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        if (customAvatarUrl.trim()) {
+                          handleSaveAvatar(customAvatarUrl.trim());
+                          setCustomAvatarUrl('');
+                          setShowCustomUrlInput(false);
+                        } else {
+                          showToast({ message: 'Please enter a valid image URL' });
+                        }
+                      }}
+                      style={styles.applyUrlBtn}
+                    >
+                      <Text style={styles.applyUrlBtnText}>Apply Photo URL</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
+              {/* Remove Photo Option */}
+              {avatarUrl ? (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={handleRemovePhoto}
+                  style={[styles.removeAvatarBtn, { borderColor: borderColor }]}
+                >
+                  <MaterialIcons name="delete-outline" size={18} color="#EF4444" style={{ marginRight: 6 }} />
+                  <Text style={styles.removeAvatarText}>Remove Photo & Reset to Default</Text>
+                </TouchableOpacity>
+              ) : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ============================================================ */}
       {/* MODAL 1: EDIT PERSONAL PROFILE (Bottom Sheet) */}
       {/* ============================================================ */}
       <Modal
@@ -692,6 +1117,30 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
+              {/* Avatar Quick Switch Banner inside Edit Profile */}
+              <View style={[styles.editProfileAvatarBanner, { backgroundColor: inputBgColor, borderColor: borderColor }]}>
+                <View style={styles.editProfileAvatarStack}>
+                  <Image source={{ uri: avatarUrl }} style={styles.editProfileAvatarImg} />
+                  <View style={styles.editProfileCameraBadge}>
+                    <MaterialIcons name="photo-camera" size={11} color="#FFFFFF" />
+                  </View>
+                </View>
+                <View style={styles.editProfileAvatarInfo}>
+                  <Text style={[styles.editProfileAvatarTitle, { color: textColor }]}>Profile Picture</Text>
+                  <Text style={[styles.editProfileAvatarSub, { color: subtitleColor }]}>PNG, JPG or Fitness Preset</Text>
+                </View>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setShowEditProfileModal(false);
+                    setTimeout(() => setShowAvatarPickerModal(true), 250);
+                  }}
+                  style={styles.editProfileChangePhotoBtn}
+                >
+                  <Text style={styles.editProfileChangePhotoText}>Change</Text>
+                </TouchableOpacity>
+              </View>
+
               {/* Full Name */}
               <Text style={[styles.fieldLabel, { color: subtitleColor }]}>Full Name</Text>
               <View style={[styles.inputContainer, { backgroundColor: inputBgColor, borderColor: borderColor }]}>
@@ -948,34 +1397,46 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
-              {INVOICES.map((inv) => (
-                <View
-                  key={inv.id}
-                  style={[
-                    styles.invoiceItemCard,
-                    {
-                      backgroundColor: isDark ? '#262626' : '#F8FAFC',
-                      borderColor: borderColor,
-                    },
-                  ]}
-                >
-                  <View style={styles.invoiceIconBox}>
-                    <MaterialIcons name="receipt-long" size={22} color="#003882" />
-                  </View>
-                  <View style={styles.invoiceContent}>
-                    <Text style={[styles.invoiceTitle, { color: textColor }]}>{inv.title}</Text>
-                    <Text style={[styles.invoiceMeta, { color: subtitleColor }]}>
-                      {inv.id} • {inv.date}
-                    </Text>
-                  </View>
-                  <View style={styles.invoicePriceCol}>
-                    <Text style={[styles.invoiceAmount, { color: textColor }]}>{inv.amount}</Text>
-                    <View style={styles.paidBadge}>
-                      <Text style={styles.paidBadgeText}>PAID</Text>
+              {userInvoices.length === 0 ? (
+                <View style={{ padding: 24, alignItems: 'center' }}>
+                  <MaterialIcons name="receipt" size={44} color={subtitleColor} />
+                  <Text style={{ color: textColor, fontWeight: '700', fontSize: 16, marginTop: 10 }}>
+                    No Invoices Found
+                  </Text>
+                  <Text style={{ color: subtitleColor, fontSize: 13, textAlign: 'center', marginTop: 4 }}>
+                    Your session bookings and gym membership purchases will appear here.
+                  </Text>
+                </View>
+              ) : (
+                userInvoices.map((inv) => (
+                  <View
+                    key={inv.id}
+                    style={[
+                      styles.invoiceItemCard,
+                      {
+                        backgroundColor: isDark ? '#262626' : '#F8FAFC',
+                        borderColor: borderColor,
+                      },
+                    ]}
+                  >
+                    <View style={styles.invoiceIconBox}>
+                      <MaterialIcons name="receipt-long" size={22} color="#003882" />
+                    </View>
+                    <View style={styles.invoiceContent}>
+                      <Text style={[styles.invoiceTitle, { color: textColor }]}>{inv.title}</Text>
+                      <Text style={[styles.invoiceMeta, { color: subtitleColor }]}>
+                        {inv.id} • {inv.date}
+                      </Text>
+                    </View>
+                    <View style={styles.invoicePriceCol}>
+                      <Text style={[styles.invoiceAmount, { color: textColor }]}>{inv.amount}</Text>
+                      <View style={styles.paidBadge}>
+                        <Text style={styles.paidBadgeText}>PAID</Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))}
+                ))
+              )}
             </ScrollView>
           </View>
         </View>
@@ -1406,6 +1867,14 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: Platform.OS === 'ios' ? 34 : 24,
   },
+  sheetGrabHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
   sheetHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1416,8 +1885,226 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '900',
   },
+  sheetSubtitleText: {
+    fontSize: 12.5,
+    marginTop: 2,
+  },
   sheetCloseBtn: {
     padding: 4,
+  },
+
+  /* Avatar Picker Modal Styles */
+  avatarPickerPreviewSection: {
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  avatarPickerPreviewCircle: {
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    borderWidth: 3,
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: 8,
+  },
+  avatarPickerPreviewImg: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarPickerPreviewName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  avatarPickerPreviewSub: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  avatarActionGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 10,
+    marginBottom: 18,
+  },
+  avatarActionCard: {
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  avatarActionIconGrad: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  avatarActionTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  avatarActionSub: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  presetSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  presetSectionTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  avatarPresetsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  presetItem: {
+    width: '22%',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  presetAvatarWrapper: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  presetAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  presetCheckmarkBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#003882',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presetLabel: {
+    fontSize: 10,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  /* Custom URL Section */
+  customUrlSection: {
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  customUrlHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  customUrlHeaderText: {
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+  },
+  customUrlInputBox: {
+    marginTop: 10,
+  },
+  applyUrlBtn: {
+    backgroundColor: '#003882',
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  applyUrlBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+
+  removeAvatarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  removeAvatarText: {
+    color: '#EF4444',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  /* Edit Profile Modal Avatar Banner */
+  editProfileAvatarBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  editProfileAvatarStack: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    position: 'relative',
+  },
+  editProfileAvatarImg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  editProfileCameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#003882',
+    padding: 3,
+    borderRadius: 8,
+  },
+  editProfileAvatarInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  editProfileAvatarTitle: {
+    fontSize: 13.5,
+    fontWeight: 'bold',
+  },
+  editProfileAvatarSub: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  editProfileChangePhotoBtn: {
+    backgroundColor: '#003882',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  editProfileChangePhotoText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   fieldLabel: {
     fontSize: 12.5,

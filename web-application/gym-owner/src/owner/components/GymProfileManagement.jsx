@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateGymProfile } from '../../redux/slices/gymSlice';
+import { updateGymProfile, setGymProfile } from '../../redux/slices/gymSlice';
 import {
   Card,
   Row,
@@ -19,16 +19,18 @@ import {
   message,
   Tabs,
   Space,
-  Upload,
   Switch,
   Table,
   Badge,
   InputNumber,
-  TimePicker,
   Tooltip,
   Checkbox,
   Image,
   DatePicker,
+  Spin,
+  Empty,
+  Popconfirm,
+  Alert,
 } from 'antd';
 import {
   EditOutlined,
@@ -40,26 +42,23 @@ import {
   CrownOutlined,
   CameraOutlined,
   CheckCircleFilled,
-  CheckCircleOutlined,
   ClockCircleOutlined,
   FileTextOutlined,
   PictureOutlined,
   BarChartOutlined,
   ArrowRightOutlined,
   InfoCircleOutlined,
-  QuestionCircleOutlined,
+  BulbOutlined,
   DownOutlined,
   PlusOutlined,
   TeamOutlined,
   UserOutlined,
-  RiseOutlined,
   ShopOutlined,
   DollarCircleOutlined,
   DollarOutlined,
   SafetyCertificateOutlined,
   IdcardOutlined,
   AppstoreOutlined,
-  MobileOutlined,
   EyeOutlined,
   DeleteOutlined,
   WhatsAppOutlined,
@@ -69,116 +68,92 @@ import {
   BankOutlined,
   CreditCardOutlined,
   ToolOutlined,
-  BellOutlined,
   LockOutlined,
-  UnlockOutlined,
   FireOutlined,
-  CheckOutlined,
-  SwapOutlined,
   SaveOutlined,
   CopyOutlined,
+  StarFilled,
+  ReloadOutlined,
+  CheckOutlined,
+  CloseCircleOutlined,
+  AuditOutlined,
 } from '@ant-design/icons';
 import confetti from 'canvas-confetti';
 import { useTheme } from '../../theme/ThemeContext';
+import { apiClient } from '../../services/apiClient';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 
-// Initial Gym Profile Data
-export const INITIAL_GYM_PROFILE = {
-  name: 'FitZone Gym',
-  logo: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=200&auto=format&fit=crop',
-  status: 'Active',
-  address: 'No. 15, 2nd Avenue, Anna Nagar, Chennai, Tamil Nadu - 600040',
-  shortAddress: 'Anna Nagar, Chennai, Tamil Nadu - 600040',
-  phone: '+91 98765 43210',
-  email: 'fitzonegym@gmail.com',
-  website: 'www.fitzonegym.com',
-  about:
-    'We provide world-class equipment, certified trainers, personalized workout plans, and a motivating environment to help you transform.',
-  description:
-    'FitZone Gym is committed to providing the best fitness experience with advanced equipment, expert guidance and flexible membership options for every fitness enthusiast.',
-  joinedOn: '15 May 2024',
-  memberSince: '1 Year 2 Months',
-  gymType: 'Commercial Gym',
-  gstNumber: '33ABCDE1234F1Z5',
-  establishedOn: '01 Jan 2020',
-  ownershipType: 'Sole Proprietorship',
-  area: '3500 Sq.ft',
-  totalEquipment: '45',
-  trainerCount: '5',
-  genderAllowed: 'Male & Female',
-  coverPhoto:
-    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop',
-  gallery: [
-    'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1574680096145-d05b474e2155?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=500&auto=format&fit=crop',
-  ],
+const formatAmountWithCommas = (val) => {
+  if (val === undefined || val === null || val === '') return '';
+  const str = String(val).replace(/,/g, '');
+  const [intPart, decimalPart] = str.split('.');
+  const parsed = Number(intPart);
+  const formattedInt = Number.isNaN(parsed) ? intPart : parsed.toLocaleString('en-IN');
+  return decimalPart !== undefined ? `${formattedInt}.${decimalPart}` : formattedInt;
 };
 
-// Initial Facilities Data
-const INITIAL_FACILITIES = [
-  { id: '1', name: 'Cardio Studio & Treadmills', category: 'Cardio', status: 'Active', count: 14, icon: <FireOutlined /> },
-  { id: '2', name: 'Heavy Free Weights (2.5kg - 50kg)', category: 'Strength', status: 'Active', count: 28, icon: <ToolOutlined /> },
-  { id: '3', name: 'Olympic Squat & Deadlift Platforms', category: 'Strength', status: 'Active', count: 4, icon: <CrownOutlined /> },
-  { id: '4', name: 'Functional Crossfit Rig & Turf', category: 'Functional', status: 'Active', count: 2, icon: <AppstoreOutlined /> },
-  { id: '5', name: 'Steam Room & Sauna Suites', category: 'Wellness', status: 'Active', count: 2, icon: <SafetyCertificateOutlined /> },
-  { id: '6', name: 'Luxury Locker Rooms & Keypad Locks', category: 'Amenities', status: 'Active', count: 120, icon: <LockOutlined /> },
-  { id: '7', name: 'Private Shower & Changing Rooms', category: 'Amenities', status: 'Active', count: 8, icon: <CheckCircleFilled /> },
-  { id: '8', name: 'Protein Shake & Juice Bar', category: 'Nutrition', status: 'Active', count: 1, icon: <ShopOutlined /> },
-  { id: '9', name: 'High-Speed Wi-Fi 6 Network', category: 'Tech', status: 'Active', count: 1, icon: <GlobalOutlined /> },
-  { id: '10', name: 'IoT Optical Turnstiles & NFC Entry', category: 'Tech', status: 'Active', count: 3, icon: <IdcardOutlined /> },
-  { id: '11', name: 'Dedicated Valet & Bike Parking', category: 'Amenities', status: 'Active', count: 40, icon: <EnvironmentOutlined /> },
-  { id: '12', name: 'Certified Personal Training Zone', category: 'Training', status: 'Active', count: 5, icon: <TeamOutlined /> },
+const parseAmountWithoutCommas = (val) => (val ? String(val).replace(/[^0-9.]/g, '') : '');
+
+const FACILITY_OPTIONS = [
+  'AC Gym',
+  'Locker Facility',
+  'Shower Available',
+  'Changing Room',
+  'Free Wi-Fi',
+  'Music System',
+  'Steam & Sauna',
+  'Ice Bath & Recovery',
+  'Dedicated Parking (2W/4W)',
+  'Turnstile Access Control',
+  'First Aid Kit',
+  'CCTV 24/7',
+  'Biometric Entry',
+  'Personal Trainers',
+  'Cardio Theater',
+  'Olympic Barbells Area',
 ];
 
-// Initial Pricing Data
-const INITIAL_PRICING = [
-  {
-    id: 'plan-1',
-    name: 'Walk-In Day Pass',
-    badge: 'Walk-In',
-    price: 399,
-    duration: '1 Day',
-    description: 'Full floor workout access, locker room, and steam suite access.',
-    features: ['All Gym Floor Access', 'Locker & Shower Access', 'Free Wi-Fi', 'Turnstile Optical Pass'],
-    popular: false,
-  },
-  {
-    id: 'plan-2',
-    name: '1-Month Strength & Cardio',
-    badge: 'Monthly',
-    price: 2499,
-    duration: '30 Days',
-    description: 'Perfect for regular workout enthusiasts with general trainer support.',
-    features: ['Unlimited Gym Access', 'General Trainer Guidance', 'Body Composition Analysis', 'Locker & Shower Access'],
-    popular: false,
-  },
-  {
-    id: 'plan-3',
-    name: '3-Month Fitness Pro',
-    badge: 'Quarterly',
-    price: 6499,
-    duration: '90 Days',
-    description: 'Most popular membership plan with free steam and nutrition consultation.',
-    features: ['Unlimited Gym Access', '1 Free Personal Training Session', 'Diet & Nutrition Consultation', 'Steam & Sauna Access', '2 Guest Passes'],
-    popular: true,
-  },
-  {
-    id: 'plan-4',
-    name: '12-Month Annual VIP Elite',
-    badge: 'Annual VIP',
-    price: 18999,
-    duration: '365 Days',
-    description: 'All-inclusive VIP access, zero blackout dates, and priority trainer booking.',
-    features: ['All-Access 365 Days', '4 Free PT Sessions', 'Complete Diet Plan', 'Free Steam & Sauna', '5 Free Walk-in Guest Passes', 'Gym Kit & Shaker'],
-    popular: false,
-  },
+const AMENITY_OPTIONS = [
+  'RO Drinking Water',
+  'Towel Service',
+  'Protein Shake Bar',
+  'Juice & Smoothie Bar',
+  'Personal Locker Rental',
+  'InBody BMI Scanner',
+  'Nutritionist Desk',
+  'Lounge / Rest Area',
+  'Free Sanitizer Stations',
+  'Locker Key Padlocks',
+];
+
+const WORKOUT_OPTIONS = [
+  'GYM / Strength',
+  'Cardio Fitness',
+  'HIIT (High Intensity)',
+  'CrossFit',
+  'Yoga & Mobility',
+  'Zumba & Dance',
+  'Boxing & Kickboxing',
+  'Pilates',
+  'Calisthenics',
+  'MMA & Martial Arts',
+];
+
+const DEFAULT_RULES = [
+  'Carry clean indoor training shoes',
+  'Mandatory personal gym towel on workout benches',
+  'Re-rack dumbbells and plates after set completion',
+  'No outside food or beverages allowed on gym floor',
+];
+
+const DEFAULT_SAFETY = [
+  'Daily multi-session equipment sanitization',
+  'Certified First Aid & CPR staff available on floor',
+  '24/7 CCTV surveillance coverage',
+  'Emergency exits clearly marked and accessible',
 ];
 
 // Time Slot Choices for Dropdown Selectors
@@ -222,11 +197,9 @@ const TIME_SLOTS = [
   '11:00 PM',
   '11:30 PM',
   '12:00 AM',
-  'Closed',
 ];
 
-// Initial Operating Hours Data (Day-by-Day Monday to Sunday)
-const INITIAL_HOURS = [
+const DEFAULT_DAYS = [
   { day: 'Monday', isOpen: true, openTime: '05:30 AM', closeTime: '10:30 PM' },
   { day: 'Tuesday', isOpen: true, openTime: '05:30 AM', closeTime: '10:30 PM' },
   { day: 'Wednesday', isOpen: true, openTime: '05:30 AM', closeTime: '10:30 PM' },
@@ -236,68 +209,331 @@ const INITIAL_HOURS = [
   { day: 'Sunday', isOpen: true, openTime: '06:00 AM', closeTime: '01:00 PM' },
 ];
 
-const INITIAL_HOLIDAYS = [
-  {
-    id: 'hol-1',
-    date: '20 Oct 2026',
-    title: 'Diwali Festival',
-    type: 'Modified Hours',
-    hours: '06:00 AM – 12:00 PM (Morning Only)',
-    notes: 'Evening turnstiles locked for celebrations',
-  },
-  {
-    id: 'hol-2',
-    date: '15 Jan 2027',
-    title: 'Pongal Harvest Festival',
-    type: 'Closed',
-    hours: 'Full Day Closed',
-    notes: 'Annual public holiday closure',
-  },
-  {
-    id: 'hol-3',
-    date: '01 May 2027',
-    title: 'Labour Day & Annual Tech Maintenance',
-    type: 'Closed',
-    hours: 'Full Day Closed',
-    notes: 'Turnstile IoT calibration and server upgrades',
-  },
-];
+const getCategoryIcon = (category) => {
+  const cat = (category || '').toLowerCase();
+  if (cat.includes('cardio')) return <FireOutlined />;
+  if (cat.includes('strength')) return <ToolOutlined />;
+  if (cat.includes('crossfit') || cat.includes('functional')) return <AppstoreOutlined />;
+  if (cat.includes('wellness') || cat.includes('spa') || cat.includes('sauna')) return <SafetyCertificateOutlined />;
+  if (cat.includes('tech') || cat.includes('turnstile')) return <IdcardOutlined />;
+  if (cat.includes('nutrition') || cat.includes('bar')) return <ShopOutlined />;
+  if (cat.includes('trainer') || cat.includes('training')) return <TeamOutlined />;
+  return <ToolOutlined />;
+};
+
+const normalizeGymStandardPlans = (customPlans = [], flatPricing = {}) => {
+  const p = flatPricing || {};
+  const monthlyPrice = Number(p.monthly || 1299);
+  const quarterlyPrice = Number(p.quarterly || 3299);
+  const halfYearlyPrice = Number(p.halfYearly || 5999);
+  const annualPrice = Number(p.annual || 11999);
+
+  const planMap = {};
+  if (Array.isArray(customPlans)) {
+    customPlans.forEach((plan) => {
+      if (!plan) return;
+      const tId = plan.tierId || (
+        plan.badge?.toLowerCase().includes('month') || plan.duration?.includes('30') ? 'monthly' :
+          plan.badge?.toLowerCase().includes('quarter') || plan.duration?.includes('90') ? 'quarterly' :
+            plan.badge?.toLowerCase().includes('half') || plan.duration?.includes('180') ? 'half_yearly' :
+              plan.badge?.toLowerCase().includes('annual') || plan.badge?.toLowerCase().includes('year') || plan.duration?.includes('365') ? 'annual' : null
+      );
+      if (tId) planMap[tId] = plan;
+    });
+  }
+
+  const baseMonthly = planMap.monthly?.price !== undefined ? Number(planMap.monthly.price) : monthlyPrice;
+
+  const calcSavings = (price, months) => {
+    const fullVal = baseMonthly * months;
+    const diff = fullVal - price;
+    return diff > 0 ? `Save ₹${diff.toLocaleString('en-IN')}` : '';
+  };
+
+  const qPrice = planMap.quarterly?.price !== undefined ? Number(planMap.quarterly.price) : quarterlyPrice;
+  const hPrice = planMap.half_yearly?.price !== undefined ? Number(planMap.half_yearly.price) : (planMap.halfYearly?.price !== undefined ? Number(planMap.halfYearly.price) : halfYearlyPrice);
+  const aPrice = planMap.annual?.price !== undefined ? Number(planMap.annual.price) : annualPrice;
+
+  return [
+    {
+      id: 'plan-monthly',
+      tierId: 'monthly',
+      name: planMap.monthly?.name || 'Monthly Plan',
+      badge: 'Monthly',
+      price: baseMonthly,
+      duration: '30 Days',
+      months: 1,
+      description: planMap.monthly?.description || 'Standard 30-day recurring membership.',
+      features: Array.isArray(planMap.monthly?.features) && planMap.monthly.features.length > 0
+        ? planMap.monthly.features
+        : [
+          'Access to all gym facilities',
+          'Free group workout classes',
+          'Locker and shower facility',
+          'Trainer guidance on floor',
+        ],
+      popular: Boolean(planMap.monthly?.popular),
+      savingsText: '',
+    },
+    {
+      id: 'plan-quarterly',
+      tierId: 'quarterly',
+      name: planMap.quarterly?.name || 'Quarterly Plan',
+      badge: 'Quarterly',
+      price: qPrice,
+      duration: '90 Days',
+      months: 3,
+      description: planMap.quarterly?.description || '3-month structured fitness package.',
+      features: Array.isArray(planMap.quarterly?.features) && planMap.quarterly.features.length > 0
+        ? planMap.quarterly.features
+        : [
+          'Access to all gym facilities',
+          'Free group workout classes',
+          'Locker and shower facility',
+          '1 Guest pass per month',
+          '2 Complimentary PT Sessions',
+        ],
+      popular: Boolean(planMap.quarterly?.popular),
+      savingsText: calcSavings(qPrice, 3),
+    },
+    {
+      id: 'plan-half-yearly',
+      tierId: 'half_yearly',
+      name: planMap.half_yearly?.name || planMap.halfYearly?.name || 'Half Yearly Plan',
+      badge: 'Half Yearly',
+      price: hPrice,
+      duration: '180 Days',
+      months: 6,
+      description: planMap.half_yearly?.description || planMap.halfYearly?.description || '6-month transformation package.',
+      features: Array.isArray(planMap.half_yearly?.features || planMap.halfYearly?.features) && (planMap.half_yearly?.features || planMap.halfYearly?.features).length > 0
+        ? (planMap.half_yearly?.features || planMap.halfYearly?.features)
+        : [
+          'Access to all gym facilities',
+          'Free group workout classes',
+          'Locker and shower facility',
+          '1 Guest pass per month',
+          'Personalized nutrition guidance',
+          '4 Complimentary PT Sessions',
+        ],
+      popular: Boolean(planMap.half_yearly?.popular || planMap.halfYearly?.popular),
+      savingsText: calcSavings(hPrice, 6),
+    },
+    {
+      id: 'plan-annual',
+      tierId: 'annual',
+      name: planMap.annual?.name || 'Annual VIP Plan',
+      badge: 'Annual',
+      price: aPrice,
+      duration: '365 Days',
+      months: 12,
+      description: planMap.annual?.description || 'All-inclusive annual membership with priority perks.',
+      features: Array.isArray(planMap.annual?.features) && planMap.annual.features.length > 0
+        ? planMap.annual.features
+        : [
+          'Access to all gym facilities',
+          'Free group workout classes',
+          'Locker and shower facility',
+          '2 Guest passes per month',
+          'Personalized nutrition guidance',
+          'VIP Locker & Towel Service',
+          'Unlimited Steam & Sauna',
+        ],
+      popular: planMap.annual?.popular !== undefined ? Boolean(planMap.annual.popular) : true,
+      savingsText: calcSavings(aPrice, 12),
+    },
+  ];
+};
+
+const renderIconKeywordTooltip = () => (
+  <div style={{ fontSize: 12, lineHeight: 1.5, padding: '4px 2px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, marginBottom: 8, color: '#38bdf8' }}>
+      <BulbOutlined style={{ color: '#fbbf24', fontSize: 15 }} />
+      <span>Mobile App Icon Keywords</span>
+    </div>
+    <div style={{ marginBottom: 8, color: '#cbd5e1', fontSize: 11.5 }}>
+      The customer mobile app automatically matches icons based on keywords in each line:
+    </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {[
+        {
+          kw: 'access / unrestricted',
+          label: 'All Gym Floor',
+          color: '#38bdf8',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M18.6 6.62c-1.44 0-2.8.56-3.77 1.53L12 10.98l-2.83-2.83C8.2 7.18 6.84 6.62 5.4 6.62 2.42 6.62 0 9.04 0 12.02s2.42 5.4 5.4 5.4c1.44 0 2.8-.56 3.77-1.53L12 13.06l2.83 2.83c.97.97 2.33 1.53 3.77 1.53 2.98 0 5.4-2.42 5.4-5.4s-2.42-5.4-5.4-5.4zm-13.2 9c-1.99 0-3.6-1.61-3.6-3.6s1.61-3.6 3.6-3.6c.96 0 1.86.38 2.55 1.06L10.74 12l-2.79 2.56c-.69.68-1.59 1.06-2.55 1.06zm13.2 0c-.96 0-1.86-.38-2.55-1.06L13.26 12l2.79-2.56c.69-.68 1.59-1.06 2.55-1.06 1.99 0 3.6 1.61 3.6 3.6s-1.61 3.6-3.6 3.6z" />
+            </svg>
+          ),
+        },
+        {
+          kw: 'steam / sauna / spa',
+          label: 'Steam & Sauna',
+          color: '#fb7185',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <circle cx="7" cy="6" r="2" />
+              <path d="M11.15 12c-.31-.22-.59-.46-.82-.72l-1.4-1.55c-.19-.21-.43-.38-.69-.5-.29-.14-.62-.23-.96-.23h-.03C6.01 9 5 10.01 5 11.27V13h4.67c.54-.42 1.04-.76 1.48-1zm10.77 4.19c-.39-.41-1.03-.43-1.44-.04-.54.51-1.29.85-2.48.85s-1.94-.34-2.48-.85c-.41-.39-1.05-.37-1.44.04-.39.41-.37 1.05.04 1.44.89.84 2.12 1.37 3.88 1.37s2.99-.53 3.88-1.37c.41-.39.43-1.03.04-1.44zm-7.84 0c-.39-.41-1.03-.43-1.44-.04-.54.51-1.29.85-2.48.85s-1.94-.34-2.48-.85c-.41-.39-1.05-.37-1.44.04-.39.41-.37 1.05.04 1.44.89.84 2.12 1.37 3.88 1.37s2.99-.53 3.88-1.37c.41-.39.43-1.03.04-1.44zM2 20c.6 0 1.15-.17 1.68-.45.92-.48 2.06-.8 3.32-.8 1.26 0 2.4.32 3.32.8.91.48 2.03.8 3.28.8 1.25 0 2.37-.32 3.28-.8.92-.48 2.06-.8 3.32-.8s2.4.32 3.32.8c.53.28 1.08.45 1.68.45 1.1 0 2-.9 2-2v-4H1v4c0 1.1.9 2 2 2z" />
+            </svg>
+          ),
+        },
+        {
+          kw: 'locker / shower',
+          label: 'Locker & Shower',
+          color: '#38bdf8',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM8.9 6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2H8.9V6zM18 20H6V10h12v10z" />
+            </svg>
+          ),
+        },
+        {
+          kw: 'towel',
+          label: 'Towel Service',
+          color: '#a78bfa',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M19.56 11.36 13 8.44V7c0-.55-.45-1-1-1s-1 .45-1 1v1.44l-6.56 2.92C3.59 11.75 3 12.62 3 13.58V20c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-6.42c0-.96-.59-1.83-1.44-2.22zM19 20H5v-6.42l7-3.11 7 3.11V20zM12 1c-1.66 0-3 1.34-3 3 0 .78.3 1.49.79 2.02l1.43-1.43C11.08 4.41 11 4.22 11 4c0-.55.45-1 1-1s1 .45 1 1c0 1.1-.9 2-2 2v2c2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3z" />
+            </svg>
+          ),
+        },
+        {
+          kw: 'wifi / wi-fi',
+          label: 'Free Wi-Fi',
+          color: '#34d399',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4zm0 4.2c3.04 0 5.86 1.07 8.08 2.87L12 19.15 3.92 11.07A12.7 12.7 0 0 1 12 8.2z" />
+            </svg>
+          ),
+        },
+        {
+          kw: 'group / class / pt',
+          label: 'Classes / Trainer',
+          color: '#60a5fa',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+            </svg>
+          ),
+        },
+        {
+          kw: 'guest / pass',
+          label: 'Guest Pass',
+          color: '#f472b6',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M22 10V6c0-1.11-.9-2-2-2H4c-1.1 0-1.99.89-1.99 2v4c1.1 0 1.99.9 1.99 2s-.89 2-2 2v4c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2v-4c-1.1 0-2-.9-2-2s.9-2 2-2zm-9 7.5h-2v-2h2v2zm0-4.5h-2v-2h2v2zm0-4.5h-2v-2h2v2z" />
+            </svg>
+          ),
+        },
+        {
+          kw: 'nutri / diet / meal',
+          label: 'Nutrition Guidance',
+          color: '#4ade80',
+          svg: (
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M8.1 13.34l2.83-2.83L3.91 3.5c-1.56 1.56-1.56 4.09 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z" />
+            </svg>
+          ),
+        },
+      ].map((item) => (
+        <div key={item.kw} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '3px 8px', borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.06)' }}>
+          <span style={{ color: '#93c5fd', fontWeight: 600, fontSize: 11.5 }}>{item.kw}:</span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: item.color }}>
+              {item.svg}
+            </span>
+            <span style={{ color: '#f1f5f9', fontSize: 11.5, fontWeight: 500 }}>{item.label}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 export const GymProfileManagement = () => {
   const { isDarkMode } = useTheme();
   const dispatch = useDispatch();
-  const [profile, setProfile] = useState(INITIAL_GYM_PROFILE);
-  const [activeTab, setActiveTab] = useState('basic');
+  const { user } = useSelector((state) => state.auth);
+  const gymProfileFromRedux = useSelector((state) => state.gym?.gymProfile || state.auth?.user?.gym);
 
-  // Multi-tab datasets
-  const [facilities, setFacilities] = useState(INITIAL_FACILITIES);
-  const [pricingPlans, setPricingPlans] = useState(INITIAL_PRICING);
-  const [operatingHours, setOperatingHours] = useState(INITIAL_HOURS);
-  const [holidayExceptions, setHolidayExceptions] = useState(INITIAL_HOLIDAYS);
+  const targetGymId = useMemo(() => {
+    return (
+      gymProfileFromRedux?._id ||
+      gymProfileFromRedux?.id ||
+      gymProfileFromRedux?.partnerId ||
+      gymProfileFromRedux?.mongoId ||
+      user?.gym?._id ||
+      user?.gym?.id ||
+      user?.gym?.partnerId ||
+      user?.gymId ||
+      user?.id ||
+      user?._id ||
+      'me'
+    );
+  }, [
+    gymProfileFromRedux?._id,
+    gymProfileFromRedux?.id,
+    gymProfileFromRedux?.partnerId,
+    gymProfileFromRedux?.mongoId,
+    user?.gym?._id,
+    user?.gym?.id,
+    user?.gym?.partnerId,
+    user?.gymId,
+    user?.id,
+    user?._id,
+  ]);
+
+  const [activeTab, setActiveTab] = useState('basic');
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isSavingBasic, setIsSavingBasic] = useState(false);
+  const [isSavingPricing, setIsSavingPricing] = useState(false);
+  const [isSavingHours, setIsSavingHours] = useState(false);
+  const [isSavingBank, setIsSavingBank] = useState(false);
+  const [isSavingSocial, setIsSavingSocial] = useState(false);
+  const [isSavingFacility, setIsSavingFacility] = useState(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+
+  // Core Gym Profile State initialized with available Redux profile
+  const [gymData, setGymData] = useState(() => gymProfileFromRedux || user?.gym || null);
+
+  // Tab Specific Working States
+  const [facilities, setFacilities] = useState([]);
+  const [gymWorkouts, setGymWorkouts] = useState([]);
+  const [gymAmenities, setGymAmenities] = useState([]);
+  const [gymRules, setGymRules] = useState(DEFAULT_RULES);
+  const [safetyMeasures, setSafetyMeasures] = useState(DEFAULT_SAFETY);
+  const [isSavingWorkoutsRules, setIsSavingWorkoutsRules] = useState(false);
+  const [newRuleInput, setNewRuleInput] = useState('');
+  const [pricingPlans, setPricingPlans] = useState([]);
+  const [gymTrainersPricing, setGymTrainersPricing] = useState([]);
+  const [isSavingTrainerPricing, setIsSavingTrainerPricing] = useState(false);
+  const [operatingHours, setOperatingHours] = useState(DEFAULT_DAYS);
+  const [holidayExceptions, setHolidayExceptions] = useState([]);
   const [is24HoursOpen, setIs24HoursOpen] = useState(false);
-  const [isAddHolidayModalOpen, setIsAddHolidayModalOpen] = useState(false);
-  const [holidayForm] = Form.useForm();
+  const [isOpenHolidays, setIsOpenHolidays] = useState(true);
+  const [isSplitShift, setIsSplitShift] = useState(false);
   const [bankDetails, setBankDetails] = useState({
-    accountHolder: 'FitZone Fitness LLP',
-    bankName: 'HDFC Bank Ltd.',
-    accountNumber: '50200084729184',
-    ifscCode: 'HDFC0001234',
+    accountHolder: '',
+    bankName: '',
+    accountNumber: '',
+    ifscCode: '',
     accountType: 'Current Account',
-    branch: 'Anna Nagar Main Branch, Chennai',
-    upiId: 'fitzone.gym@hdfcbank',
+    branch: '',
+    upiId: '',
     payoutSchedule: 'Daily T+1 Automated Direct Bank Deposit',
     gstInvoiceEnabled: true,
   });
   const [socialLinks, setSocialLinks] = useState({
-    instagram: 'https://instagram.com/fitzone_chennai',
-    instagramHandle: '@fitzone_chennai',
-    facebook: 'https://facebook.com/fitzonegymchennai',
-    youtube: 'https://youtube.com/@fitzonefitness',
-    whatsapp: '+91 98765 43210',
-    googleRating: '4.8',
-    googleReviewCount: '324',
-    googleBusinessUrl: 'https://maps.google.com/?q=FitZone+Gym+Anna+Nagar',
-    website: 'https://www.fitzonegym.com',
+    instagram: '',
+    instagramHandle: '',
+    facebook: '',
+    youtube: '',
+    whatsapp: '',
+    website: '',
+    googleBusinessUrl: '',
+    googleRating: '4.9',
+    googleReviewCount: '0',
   });
   const [systemSettings, setSystemSettings] = useState({
     turnstileTimeout: 5,
@@ -306,86 +542,409 @@ export const GymProfileManagement = () => {
     smsCheckInAlerts: true,
     whatsappAlerts: true,
     audioChimeEnabled: true,
-    multiBranchSync: false,
     spotWalkInsAllowed: true,
   });
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [auditHistory, setAuditHistory] = useState([]);
 
   // Modal States
   const [isEditDropdownOpen, setIsEditDropdownOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isManageGalleryOpen, setIsManageGalleryOpen] = useState(false);
   const [isPendingRequestsOpen, setIsPendingRequestsOpen] = useState(false);
+  const [isAuditHistoryOpen, setIsAuditHistoryOpen] = useState(false);
   const [isApprovalInfoOpen, setIsApprovalInfoOpen] = useState(false);
   const [isAddPlanModalOpen, setIsAddPlanModalOpen] = useState(false);
   const [isEditPlanModalOpen, setIsEditPlanModalOpen] = useState(false);
   const [selectedPlanForEdit, setSelectedPlanForEdit] = useState(null);
-  const [isAddFacilityModalOpen, setIsAddFacilityModalOpen] = useState(false);
   const [isEditBankModalOpen, setIsEditBankModalOpen] = useState(false);
   const [isEditSocialModalOpen, setIsEditSocialModalOpen] = useState(false);
+  const [isAddHolidayModalOpen, setIsAddHolidayModalOpen] = useState(false);
 
   // Forms
   const [editForm] = Form.useForm();
   const [planForm] = Form.useForm();
   const [editPlanForm] = Form.useForm();
-  const [facilityForm] = Form.useForm();
   const [bankForm] = Form.useForm();
   const [socialForm] = Form.useForm();
+  const [holidayForm] = Form.useForm();
 
-  // Pending Requests State
-  const [pendingRequests, setPendingRequests] = useState([
-    {
-      id: 'REQ-1049',
-      field: 'Operating Hours & Holiday Schedule',
-      requestedOn: '14 Jul 2025',
-      status: 'Pending Admin Review',
-    },
-    {
-      id: 'REQ-1048',
-      field: 'Floor Area Extension (3500 to 4200 Sq.ft)',
-      requestedOn: '12 Jul 2025',
-      status: 'Pending Admin Review',
-    },
-  ]);
-
-  const handleEditSubmit = (values) => {
-    setProfile((prev) => ({
-      ...prev,
-      ...values,
-    }));
-    dispatch(
-      updateGymProfile({
-        name: values.name,
-        branch: values.shortAddress || values.address || profile.shortAddress,
-        email: values.email,
-        phone: values.phone,
-      })
-    );
-    setIsEditModalOpen(false);
-    message.success('Profile changes submitted for admin approval!');
-    setPendingRequests([
-      {
-        id: `REQ-${Math.floor(1000 + Math.random() * 9000)}`,
-        field: 'General Gym Information Update',
-        requestedOn: '21 Jul 2025',
-        status: 'Pending Admin Review',
-      },
-      ...pendingRequests,
-    ]);
+  // Helper to extract clean image url from backend format
+  const extractImageUrl = (img) => {
+    if (!img) return '';
+    if (typeof img === 'string') return img.trim();
+    if (typeof img === 'object') {
+      if (img.fileData && typeof img.fileData === 'string') return img.fileData.trim();
+      if (img.url && typeof img.url === 'string') return img.url.trim();
+      if (img.logoUrl && typeof img.logoUrl === 'string') return img.logoUrl.trim();
+      if (img.coverPhotoUrl && typeof img.coverPhotoUrl === 'string') return img.coverPhotoUrl.trim();
+      if (img.imageUrl && typeof img.imageUrl === 'string') return img.imageUrl.trim();
+      if (img.uri && typeof img.uri === 'string') return img.uri.trim();
+      if (img.data && typeof img.data === 'string') return img.data.trim();
+      if (img.src && typeof img.src === 'string') return img.src.trim();
+    }
+    return '';
   };
 
+  // Synchronize gym document into local states (merging pending changes if under review)
+  const applyGymData = useCallback((data) => {
+    if (!data) return;
+    setGymData(data);
+
+    const pending = (data.pendingChanges && typeof data.pendingChanges === 'object') ? data.pendingChanges : {};
+
+    const effectiveLogo = pending.logo !== undefined ? pending.logo : data.logo;
+    const effectiveCover = pending.coverPhoto !== undefined ? pending.coverPhoto : data.coverPhoto;
+    const effectiveName = pending.name !== undefined ? pending.name : data.name;
+    const effectiveAddress = pending.address !== undefined ? pending.address : data.address;
+    const effectiveArea = pending.area !== undefined ? pending.area : data.area;
+    const effectiveCity = pending.city !== undefined ? pending.city : data.city;
+    const effectiveFullAddress = pending.fullAddress !== undefined ? pending.fullAddress : data.fullAddress;
+    const effectiveOwnerName = pending.ownerName !== undefined ? pending.ownerName : data.ownerName;
+    const effectiveEmail = pending.email !== undefined ? pending.email : data.email;
+    const effectivePhone = pending.phone !== undefined ? pending.phone : data.phone;
+    const effectiveMaxFloorCapacity = pending.maxFloorCapacity !== undefined ? pending.maxFloorCapacity : data.maxFloorCapacity;
+    const effectiveWorkouts = pending.workouts !== undefined ? pending.workouts : data.workouts;
+    const effectiveAmenities = pending.amenities !== undefined ? pending.amenities : data.amenities;
+    const effectiveRules = pending.rules !== undefined ? pending.rules : data.rules;
+    const effectiveSafetyMeasures = pending.safetyMeasures !== undefined ? pending.safetyMeasures : data.safetyMeasures;
+    const effectiveFacilities = pending.facilities !== undefined ? pending.facilities : data.facilities;
+    const effectiveCustomFacilities = pending.customFacilities !== undefined ? pending.customFacilities : data.customFacilities;
+    const effectivePricingPlans = pending.pricingPlans !== undefined ? pending.pricingPlans : data.pricingPlans;
+    const effectiveCustomPricingPlans = pending.customPricingPlans !== undefined ? pending.customPricingPlans : data.customPricingPlans;
+    const effectiveOpeningHours = pending.openingHours !== undefined ? pending.openingHours : data.openingHours;
+    const effectiveBankDetails = pending.bankDetails !== undefined ? pending.bankDetails : data.bankDetails;
+    const effectiveSocialLinks = pending.socialLinks !== undefined ? pending.socialLinks : data.socialLinks;
+    const effectiveSystemSettings = pending.systemSettings !== undefined ? pending.systemSettings : data.systemSettings;
+
+    const resolvedLogo =
+      extractImageUrl(effectiveLogo) ||
+      data.logoUrl ||
+      extractImageUrl(effectiveCover) ||
+      data.coverPhotoUrl ||
+      data.image ||
+      data.imageUrl ||
+      '';
+    const resolvedCover =
+      extractImageUrl(effectiveCover) ||
+      data.coverPhotoUrl ||
+      extractImageUrl(effectiveLogo) ||
+      data.logoUrl ||
+      data.image ||
+      data.imageUrl ||
+      '';
+
+    // Synchronize to Redux store
+    dispatch(
+      setGymProfile({
+        id: data.id || data.partnerId || data._id,
+        partnerId: data.partnerId || 'GYM1',
+        name: effectiveName || '',
+        logo: resolvedLogo,
+        coverPhoto: resolvedCover,
+        branch: effectiveArea ? `${effectiveArea}, ${effectiveCity || ''}` : effectiveCity || effectiveFullAddress || '',
+        city: effectiveCity || '',
+        fullAddress: effectiveFullAddress || effectiveAddress || '',
+        ownerName: effectiveOwnerName || '',
+        email: effectiveEmail || '',
+        phone: effectivePhone || '',
+        floorCapacity: effectiveMaxFloorCapacity || 50,
+        rating: data.rating || 4.9,
+        totalReviews: data.reviewsCount || 0,
+        monthlyRevenue: data.monthlyRevenue || 0,
+        membersCount: data.membersCount || 0,
+        facilities: effectiveFacilities || [],
+        amenities: effectiveAmenities || [],
+        workouts: effectiveWorkouts || [],
+      })
+    );
+
+    // Facilities (Array of strings like Workouts and Amenities)
+    if (Array.isArray(effectiveFacilities) && effectiveFacilities.length > 0) {
+      setFacilities(
+        effectiveFacilities.map((f) => (typeof f === 'string' ? f : f?.name || String(f))).filter(Boolean)
+      );
+    } else if (Array.isArray(effectiveCustomFacilities) && effectiveCustomFacilities.length > 0) {
+      setFacilities(
+        effectiveCustomFacilities.map((f) => (typeof f === 'string' ? f : f?.name || String(f))).filter(Boolean)
+      );
+    } else {
+      setFacilities([]);
+    }
+
+    // Workouts, Amenities, Rules & Safety
+    setGymWorkouts(Array.isArray(effectiveWorkouts) ? effectiveWorkouts : []);
+    setGymAmenities(Array.isArray(effectiveAmenities) ? effectiveAmenities : []);
+    setGymRules(Array.isArray(effectiveRules) && effectiveRules.length > 0 ? effectiveRules : DEFAULT_RULES);
+    setSafetyMeasures(Array.isArray(effectiveSafetyMeasures) && effectiveSafetyMeasures.length > 0 ? effectiveSafetyMeasures : DEFAULT_SAFETY);
+
+    // Standardized 4-Tier Pricing Plans
+    setPricingPlans(normalizeGymStandardPlans(effectiveCustomPricingPlans, effectivePricingPlans));
+
+    // Active Trainers Tier Pricing Mapping
+    if (Array.isArray(data.trainers) && data.trainers.length > 0) {
+      setGymTrainersPricing(
+        data.trainers.map((t) => ({
+          employeeId: t.employeeId || t.id || t._id,
+          name: t.name,
+          specialty: t.specialty,
+          imageUrl: t.imageUrl || t.image?.fileData,
+          trainerPricing: {
+            monthly: t.trainerPricing?.monthly || t.monthlyFee || 0,
+            quarterly: t.trainerPricing?.quarterly || 0,
+            halfYearly: t.trainerPricing?.halfYearly || 0,
+            annual: t.trainerPricing?.annual || 0,
+            singleSession: t.trainerPricing?.singleSession || 0,
+          },
+        }))
+      );
+    }
+
+    // Operating Hours
+    if (effectiveOpeningHours?.schedule && Array.isArray(effectiveOpeningHours.schedule) && effectiveOpeningHours.schedule.length > 0) {
+      setOperatingHours(effectiveOpeningHours.schedule);
+    } else {
+      const openW = effectiveOpeningHours?.weekdayOpen || '05:30 AM';
+      const closeW = effectiveOpeningHours?.weekdayClose || '10:30 PM';
+      const openWe = effectiveOpeningHours?.weekendOpen || '06:00 AM';
+      const closeWe = effectiveOpeningHours?.weekendClose || '09:00 PM';
+      setOperatingHours([
+        { day: 'Monday', isOpen: true, openTime: openW, closeTime: closeW },
+        { day: 'Tuesday', isOpen: true, openTime: openW, closeTime: closeW },
+        { day: 'Wednesday', isOpen: true, openTime: openW, closeTime: closeW },
+        { day: 'Thursday', isOpen: true, openTime: openW, closeTime: closeW },
+        { day: 'Friday', isOpen: true, openTime: openW, closeTime: closeW },
+        { day: 'Saturday', isOpen: true, openTime: openWe, closeTime: closeWe },
+        { day: 'Sunday', isOpen: true, openTime: openWe, closeTime: closeWe },
+      ]);
+    }
+
+    if (effectiveOpeningHours?.holidays && Array.isArray(effectiveOpeningHours.holidays)) {
+      setHolidayExceptions(effectiveOpeningHours.holidays);
+    } else {
+      setHolidayExceptions([]);
+    }
+
+    setIs24HoursOpen(Boolean(effectiveOpeningHours?.is24Hours));
+    setIsOpenHolidays(effectiveOpeningHours?.isOpenHolidays !== undefined ? Boolean(effectiveOpeningHours.isOpenHolidays) : true);
+    setIsSplitShift(Boolean(effectiveOpeningHours?.isSplitShift));
+
+    // Bank Details
+    if (effectiveBankDetails) {
+      setBankDetails({
+        accountHolder: effectiveBankDetails.accountHolder || effectiveOwnerName || '',
+        bankName: effectiveBankDetails.bankName || '',
+        accountNumber: effectiveBankDetails.accountNumber || '',
+        ifscCode: effectiveBankDetails.ifscCode || '',
+        accountType: effectiveBankDetails.accountType || 'Current Account',
+        branch: effectiveBankDetails.branch || effectiveCity || '',
+        upiId: effectiveBankDetails.upiId || '',
+        payoutSchedule: effectiveBankDetails.payoutSchedule || 'Daily T+1 Automated Direct Bank Deposit',
+        gstInvoiceEnabled: effectiveBankDetails.gstInvoiceEnabled !== undefined ? Boolean(effectiveBankDetails.gstInvoiceEnabled) : true,
+      });
+    }
+
+    // Social Links
+    if (effectiveSocialLinks) {
+      setSocialLinks({
+        instagram: effectiveSocialLinks.instagram || '',
+        instagramHandle: effectiveSocialLinks.instagramHandle || '',
+        facebook: effectiveSocialLinks.facebook || '',
+        youtube: effectiveSocialLinks.youtube || '',
+        whatsapp: effectiveSocialLinks.whatsapp || effectivePhone || '',
+        website: effectiveSocialLinks.website || '',
+        googleBusinessUrl: effectiveSocialLinks.googleBusinessUrl || data.googleMapsUrl || '',
+        googleRating: String(effectiveSocialLinks.googleRating || data.rating || '4.9'),
+        googleReviewCount: String(effectiveSocialLinks.googleReviewCount || data.reviewsCount || '0'),
+      });
+    } else {
+      setSocialLinks((prev) => ({
+        ...prev,
+        whatsapp: effectivePhone || '',
+        googleRating: String(data.rating || '4.9'),
+        googleReviewCount: String(data.reviewsCount || '0'),
+        googleBusinessUrl: data.googleMapsUrl || '',
+      }));
+    }
+
+    // System Settings
+    if (effectiveSystemSettings) {
+      setSystemSettings({
+        turnstileTimeout: effectiveSystemSettings.turnstileTimeout || 5,
+        renewalGracePeriod: effectiveSystemSettings.renewalGracePeriod !== undefined ? effectiveSystemSettings.renewalGracePeriod : 3,
+        autoCheckoutHours: effectiveSystemSettings.autoCheckoutHours || 2.5,
+        smsCheckInAlerts: effectiveSystemSettings.smsCheckInAlerts !== undefined ? effectiveSystemSettings.smsCheckInAlerts : true,
+        whatsappAlerts: effectiveSystemSettings.whatsappAlerts !== undefined ? effectiveSystemSettings.whatsappAlerts : true,
+        audioChimeEnabled: effectiveSystemSettings.audioChimeEnabled !== undefined ? effectiveSystemSettings.audioChimeEnabled : true,
+        spotWalkInsAllowed: effectiveSystemSettings.spotWalkInsAllowed !== undefined ? effectiveSystemSettings.spotWalkInsAllowed : true,
+      });
+    }
+
+    // Audit History and Pending Requests
+    if (Array.isArray(data.auditHistory)) {
+      setAuditHistory(data.auditHistory);
+      const pendingLogs = data.auditHistory.filter(
+        (log) => log.approvalStatus === 'Pending Approval' || log.approvalStatus === 'Pending Admin Review'
+      );
+      setPendingRequests(pendingLogs);
+    } else if (data.pendingChanges) {
+      setPendingRequests([
+        {
+          id: 'REQ-LIVE',
+          field: 'Profile Modifications',
+          requestedOn: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+          approvalStatus: 'Pending Admin Review',
+        },
+      ]);
+    } else {
+      setPendingRequests([]);
+      setAuditHistory([]);
+    }
+  }, [dispatch]);
+
+  // Fetch Gym Profile from Backend API (Single run per targetGymId)
+  const fetchGymProfile = useCallback(async () => {
+    if (!targetGymId) return;
+    setIsLoadingProfile(true);
+    try {
+      const res = await apiClient.get(`/gyms/${targetGymId}`);
+      const payload = res.data?.data || res.data;
+      if (payload) {
+        applyGymData(payload);
+      }
+    } catch (err) {
+      console.error('Failed to fetch gym profile from backend:', err);
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  }, [targetGymId, applyGymData]);
+
+  // Initialize and fetch on mount
+  useEffect(() => {
+    if (gymProfileFromRedux && !gymData) {
+      applyGymData(gymProfileFromRedux);
+    }
+    if (targetGymId) {
+      fetchGymProfile();
+    }
+  }, [targetGymId, fetchGymProfile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Derived active gym variables
+  const activeGym = useMemo(() => gymData || gymProfileFromRedux || user?.gym || {}, [gymData, gymProfileFromRedux, user?.gym]);
+
+  const gymName = activeGym?.name || user?.gymName || user?.name || 'My Gym';
+  const gymStatus = activeGym?.approvalStatus || activeGym?.status || activeGym?.subscriptionStatus || 'Active';
+  const gymLogoUrl =
+    extractImageUrl(activeGym?.logo) ||
+    activeGym?.logoUrl ||
+    extractImageUrl(activeGym?.coverPhoto) ||
+    activeGym?.coverPhotoUrl ||
+    activeGym?.image ||
+    activeGym?.imageUrl ||
+    '';
+  const gymCoverUrl =
+    extractImageUrl(activeGym?.coverPhoto) ||
+    activeGym?.coverPhotoUrl ||
+    extractImageUrl(activeGym?.logo) ||
+    activeGym?.logoUrl ||
+    activeGym?.image ||
+    activeGym?.imageUrl ||
+    '';
+  const rawGallery =
+    Array.isArray(activeGym?.galleryPhotos) && activeGym.galleryPhotos.length > 0
+      ? activeGym.galleryPhotos
+      : Array.isArray(activeGym?.images) && activeGym.images.length > 0
+        ? activeGym.images
+        : [];
+  const galleryPhotosList = rawGallery.map((img) => extractImageUrl(img)).filter(Boolean);
+
+  // Dynamic Profile Completion Calculation
+  const profileCompletionStats = useMemo(() => {
+    const checks = [
+      { key: 'basic', label: 'Basic Information', done: Boolean(activeGym?.name && (activeGym?.phone || user?.phone) && (activeGym?.email || user?.email)), tab: 'basic' },
+      { key: 'address', label: 'Address & Location', done: Boolean(activeGym?.address || activeGym?.fullAddress || activeGym?.city || activeGym?.area), tab: 'basic' },
+      { key: 'facilities', label: 'Facilities & Equipment', done: facilities.length > 0 || (Array.isArray(activeGym?.facilities) && activeGym.facilities.length > 0), tab: 'facilities' },
+      { key: 'pricing', label: 'Pricing & Passes', done: pricingPlans.length > 0 || Boolean(activeGym?.pricingPlans), tab: 'pricing' },
+      { key: 'images', label: 'Images & Photos', done: Boolean(gymLogoUrl || gymCoverUrl || galleryPhotosList.length > 0), tab: 'images' },
+      { key: 'hours', label: 'Operating Hours', done: operatingHours.length > 0 || Boolean(activeGym?.openingHours), tab: 'hours' },
+      { key: 'bank', label: 'Bank Details', done: Boolean(bankDetails.accountNumber && bankDetails.ifscCode), tab: 'bank' },
+      { key: 'social', label: 'Social Links', done: Boolean(socialLinks.instagramHandle || socialLinks.website || socialLinks.whatsapp || activeGym?.googleMapsUrl), tab: 'social' },
+    ];
+    const completedCount = checks.filter((c) => c.done).length;
+    const percentage = Math.round((completedCount / checks.length) * 100);
+    return { checks, percentage };
+  }, [activeGym, user?.phone, user?.email, facilities, pricingPlans, operatingHours, bankDetails, socialLinks, gymLogoUrl, gymCoverUrl, galleryPhotosList]);
+
+  // Save Gym Updates to Backend API
+  const saveGymToBackend = async (updatePayload, successMsg = 'Changes submitted successfully! Pending Super Admin approval.') => {
+    if (!targetGymId) {
+      message.error('Gym ID not detected. Please login again.');
+      return null;
+    }
+    try {
+      const res = await apiClient.put(`/gyms/${targetGymId}`, updatePayload);
+      const updatedGym = res.data?.data || res.data;
+      if (updatedGym) {
+        applyGymData(updatedGym);
+      }
+      message.success(res.data?.message || successMsg);
+      return updatedGym;
+    } catch (err) {
+      console.error('Failed to update gym profile:', err);
+      message.error(err.message || 'Failed to update gym profile.');
+      return null;
+    }
+  };
+
+  // Submit Basic Info Edits Form
+  const handleEditSubmit = async (values) => {
+    setIsSavingBasic(true);
+    try {
+      const payload = {
+        name: values.name,
+        ownerName: values.ownerName,
+        phone: values.phone,
+        email: values.email,
+        businessType: values.businessType,
+        yearEstablished: values.yearEstablished,
+        gstNumber: values.gstNumber,
+        panNumber: values.panNumber,
+        address: values.address,
+        area: values.area,
+        city: values.city,
+        state: values.state,
+        pincode: values.pincode,
+        landmark: values.landmark,
+        floorSpaceSqFt: Number(values.floorSpaceSqFt) || 0,
+        maxFloorCapacity: Number(values.maxFloorCapacity) || 0,
+        genderAllowed: values.genderAllowed,
+        aboutText: values.aboutText,
+      };
+      const res = await saveGymToBackend(payload);
+      if (res) {
+        setIsEditModalOpen(false);
+      }
+    } finally {
+      setIsSavingBasic(false);
+    }
+  };
+
+  // Cover Banner Photo Upload
   const handleCoverPhotoUpload = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = e.target.files?.[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (re) => {
+        reader.onload = async (re) => {
           const newCover = re.target?.result;
-          setProfile((prev) => ({ ...prev, coverPhoto: newCover }));
-          dispatch(updateGymProfile({ coverPhoto: newCover }));
-          message.success('Cover banner photo updated!');
+          setIsUploadingMedia(true);
+          try {
+            await saveGymToBackend({ coverPhoto: newCover }, 'Cover banner photo updated successfully!');
+          } finally {
+            setIsUploadingMedia(false);
+          }
         };
         reader.readAsDataURL(file);
       }
@@ -393,25 +952,359 @@ export const GymProfileManagement = () => {
     input.click();
   };
 
+  // Brand Logo Upload
   const handleLogoUpload = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = e.target.files?.[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (re) => {
+        reader.onload = async (re) => {
           const newLogo = re.target?.result;
-          setProfile((prev) => ({ ...prev, logo: newLogo }));
-          dispatch(updateGymProfile({ logo: newLogo }));
-          message.success('Gym brand logo updated successfully!');
+          setIsUploadingMedia(true);
+          try {
+            await saveGymToBackend({ logo: newLogo }, 'Brand logo updated successfully!');
+          } finally {
+            setIsUploadingMedia(false);
+          }
         };
         reader.readAsDataURL(file);
       }
     };
     input.click();
   };
+
+  // Gallery Photos Upload
+  const handleGalleryUpload = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length === 0) return;
+
+      setIsUploadingMedia(true);
+      try {
+        const base64List = await Promise.all(
+          files.map(
+            (file) =>
+              new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (re) => resolve(re.target?.result);
+                reader.readAsDataURL(file);
+              })
+          )
+        );
+
+        const currentGallery = (gymData?.galleryPhotos || []).map((img) => extractImageUrl(img)).filter(Boolean);
+        const combined = [...currentGallery, ...base64List];
+
+        await saveGymToBackend({ galleryPhotos: combined }, `${files.length} photo(s) uploaded to gallery successfully!`);
+      } finally {
+        setIsUploadingMedia(false);
+      }
+    };
+    input.click();
+  };
+
+  // Gallery Photo Delete
+  const handleDeleteGalleryPhoto = async (indexToDelete) => {
+    const currentGallery = (gymData?.galleryPhotos || []).map((img) => extractImageUrl(img)).filter(Boolean);
+    const updated = currentGallery.filter((_, idx) => idx !== indexToDelete);
+    await saveGymToBackend({ galleryPhotos: updated }, 'Photo removed from gallery.');
+  };
+
+  // Save Operating Hours Schedule
+  const handleSaveOperatingHours = async () => {
+    setIsSavingHours(true);
+    try {
+      const payload = {
+        weekdayOpen: operatingHours[0]?.openTime || '05:30 AM',
+        weekdayClose: operatingHours[0]?.closeTime || '10:30 PM',
+        weekendOpen: operatingHours[5]?.openTime || '06:00 AM',
+        weekendClose: operatingHours[5]?.closeTime || '09:00 PM',
+        displayText: `${operatingHours[0]?.openTime || '05:30 AM'} - ${operatingHours[0]?.closeTime || '10:30 PM'}`,
+        schedule: operatingHours,
+        holidays: holidayExceptions,
+        is24Hours: is24HoursOpen,
+        isOpenHolidays: isOpenHolidays,
+        isSplitShift: isSplitShift,
+      };
+      await saveGymToBackend({ openingHours: payload }, 'Operating hours and weekly schedule saved!');
+      try {
+        confetti({ particleCount: 35, spread: 60, origin: { y: 0.85 } });
+      } catch {
+        // Confetti silent fail
+      }
+    } finally {
+      setIsSavingHours(false);
+    }
+  };
+
+  // Add Special Holiday / Blackout Exception
+  const handleAddHoliday = async (vals) => {
+    const formattedDate = vals.date
+      ? typeof vals.date === 'string'
+        ? vals.date
+        : vals.date.format('DD MMM YYYY')
+      : 'Upcoming Date';
+
+    const newEx = {
+      id: `hol-${Date.now()}`,
+      date: formattedDate,
+      title: vals.title,
+      type: vals.type || 'Closed',
+      hours: vals.type === 'Closed' ? 'Full Day Closed' : vals.hours || '06:00 AM - 12:00 PM',
+      notes: vals.notes || 'Special holiday schedule rule',
+    };
+
+    const updatedHolidays = [newEx, ...holidayExceptions];
+    setHolidayExceptions(updatedHolidays);
+    setIsAddHolidayModalOpen(false);
+    holidayForm.resetFields();
+
+    await saveGymToBackend(
+      {
+        openingHours: {
+          ...(gymData?.openingHours || {}),
+          holidays: updatedHolidays,
+        },
+      },
+      `Special holiday rule "${vals.title}" added!`
+    );
+  };
+
+  // Delete Holiday Exception
+  const handleDeleteHoliday = async (holidayId) => {
+    const updated = holidayExceptions.filter((h) => h.id !== holidayId);
+    setHolidayExceptions(updated);
+    await saveGymToBackend(
+      {
+        openingHours: {
+          ...(gymData?.openingHours || {}),
+          holidays: updated,
+        },
+      },
+      'Holiday exception rule removed.'
+    );
+  };
+
+  // Save Facilities & Equipment (Tag-based like Workouts/Amenities)
+  const handleSaveFacilities = async () => {
+    setIsSavingFacility(true);
+    try {
+      await saveGymToBackend(
+        {
+          facilities,
+        },
+        'Facilities & equipment updated successfully!'
+      );
+    } finally {
+      setIsSavingFacility(false);
+    }
+  };
+
+  // Add Pricing Tier
+  const handleAddPlan = async (vals) => {
+    setIsSavingPricing(true);
+    try {
+      const newFeatures = vals.features
+        ? vals.features
+          .split('\n')
+          .map((f) => f.trim())
+          .filter(Boolean)
+        : ['All Gym Floor Access', 'Locker Room Access', 'Free Wi-Fi'];
+
+      const newPlan = {
+        id: `plan-${Date.now()}`,
+        name: vals.name,
+        badge: vals.badge || 'Monthly',
+        price: Number(vals.price) || 0,
+        duration: vals.duration || '30 Days',
+        description: vals.description || 'Standard membership workout plan.',
+        features: newFeatures,
+        popular: vals.popular || false,
+      };
+
+      const updatedPlans = [...pricingPlans, newPlan];
+      setPricingPlans(updatedPlans);
+
+      await saveGymToBackend(
+        {
+          customPricingPlans: updatedPlans,
+        },
+        `Membership plan "${newPlan.name}" created successfully!`
+      );
+      setIsAddPlanModalOpen(false);
+      planForm.resetFields();
+    } finally {
+      setIsSavingPricing(false);
+    }
+  };
+
+  // Edit Pricing Tier
+  const handleEditPlan = async (vals) => {
+    setIsSavingPricing(true);
+    try {
+      const updatedFeatures = vals.features
+        ? vals.features
+          .split('\n')
+          .map((f) => f.trim())
+          .filter(Boolean)
+        : selectedPlanForEdit?.features || [];
+
+      const rawUpdatedPlans = pricingPlans.map((p) =>
+        (p.id === selectedPlanForEdit?.id || (selectedPlanForEdit?.tierId && p.tierId === selectedPlanForEdit?.tierId))
+          ? {
+            ...p,
+            name: vals.name,
+            badge: selectedPlanForEdit?.badge || vals.badge || p.badge,
+            price: Number(vals.price),
+            duration: selectedPlanForEdit?.duration || p.duration,
+            description: vals.description,
+            features: updatedFeatures,
+            popular: Boolean(vals.popular),
+          }
+          : p
+      );
+      const normalizedPlans = normalizeGymStandardPlans(rawUpdatedPlans);
+      setPricingPlans(normalizedPlans);
+
+      await saveGymToBackend(
+        {
+          customPricingPlans: normalizedPlans,
+        },
+        `Plan "${vals.name}" updated successfully!`
+      );
+      setIsEditPlanModalOpen(false);
+    } finally {
+      setIsSavingPricing(false);
+    }
+  };
+
+  // Delete Pricing Tier
+  const handleDeletePlan = async (planId) => {
+    const updatedPlans = pricingPlans.filter((p) => p.id !== planId);
+    setPricingPlans(updatedPlans);
+    await saveGymToBackend(
+      {
+        customPricingPlans: updatedPlans,
+      },
+      'Membership plan removed.'
+    );
+  };
+
+  // Save all trainer tier pricing mappings
+  const handleSaveAllTrainerPricing = async () => {
+    if (!targetGymId) return;
+    setIsSavingTrainerPricing(true);
+    try {
+      const payload = {
+        trainerPricing: gymTrainersPricing.map((t) => ({
+          employeeId: t.employeeId,
+          trainerPricing: t.trainerPricing,
+        })),
+      };
+      const res = await apiClient.put(`/gyms/${targetGymId}/trainer-pricing`, payload);
+      message.success('Trainer membership tier pricing mapping updated successfully!');
+      if (res.data?.data?.trainers) {
+        setGymTrainersPricing(
+          res.data.data.trainers.map((t) => ({
+            employeeId: t.employeeId || t.id || t._id,
+            name: t.name,
+            specialty: t.specialty,
+            imageUrl: t.imageUrl || t.image?.fileData,
+            trainerPricing: {
+              monthly: t.trainerPricing?.monthly || t.monthlyFee || 0,
+              quarterly: t.trainerPricing?.quarterly || 0,
+              halfYearly: t.trainerPricing?.halfYearly || 0,
+              annual: t.trainerPricing?.annual || 0,
+              singleSession: t.trainerPricing?.singleSession || 0,
+            },
+          }))
+        );
+      }
+    } catch (err) {
+      console.error('Failed to update trainer tier pricing:', err);
+      message.error(err?.response?.data?.message || err.message || 'Failed to update trainer tier pricing.');
+    } finally {
+      setIsSavingTrainerPricing(false);
+    }
+  };
+
+  // Save Workouts, Amenities, Rules & Safety
+  const handleSaveWorkoutsRules = async () => {
+    setIsSavingWorkoutsRules(true);
+    try {
+      await saveGymToBackend(
+        {
+          workouts: gymWorkouts,
+          amenities: gymAmenities,
+          rules: gymRules,
+          safetyMeasures: safetyMeasures,
+        },
+        'Workouts, amenities, rules & safety measures saved!'
+      );
+    } finally {
+      setIsSavingWorkoutsRules(false);
+    }
+  };
+
+  const handleAddRule = () => {
+    if (!newRuleInput.trim()) return;
+    setGymRules((prev) => [...prev, newRuleInput.trim()]);
+    setNewRuleInput('');
+  };
+
+  const handleDeleteRule = (idx) => {
+    setGymRules((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAddSafety = () => {
+    if (!newSafetyInput.trim()) return;
+    setSafetyMeasures((prev) => [...prev, newSafetyInput.trim()]);
+    setNewSafetyInput('');
+  };
+
+  const handleDeleteSafety = (idx) => {
+    setSafetyMeasures((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // Save Bank Settlement Details
+  const handleSaveBank = async (vals) => {
+    setIsSavingBank(true);
+    try {
+      const newBank = { ...bankDetails, ...vals };
+      setBankDetails(newBank);
+      await saveGymToBackend({ bankDetails: newBank }, 'Bank settlement details updated successfully!');
+      setIsEditBankModalOpen(false);
+    } finally {
+      setIsSavingBank(false);
+    }
+  };
+
+  // Save Social Media Links
+  const handleSaveSocial = async (vals) => {
+    setIsSavingSocial(true);
+    try {
+      const newSocial = { ...socialLinks, ...vals };
+      setSocialLinks(newSocial);
+      await saveGymToBackend({ socialLinks: newSocial }, 'Social media handles and online links updated!');
+      setIsEditSocialModalOpen(false);
+    } finally {
+      setIsSavingSocial(false);
+    }
+  };
+
+  // Save System Settings
+  const handleSaveSettings = async (updatedSettings) => {
+    setSystemSettings(updatedSettings);
+    await saveGymToBackend({ systemSettings: updatedSettings }, 'Turnstile and system preferences saved!');
+  };
+
 
   const editMenu = {
     items: [
@@ -463,14 +1356,41 @@ export const GymProfileManagement = () => {
         type: 'divider',
       },
       {
+        key: 'audit_history',
+        label: (
+          <div
+            onClick={() => {
+              setIsEditDropdownOpen(false);
+              setIsAuditHistoryOpen(true);
+            }}
+            style={{
+              padding: '8px 12px',
+              minWidth: 260,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+              <AuditOutlined style={{ color: 'var(--color-primary)' }} /> Audit History Log
+            </div>
+            <Tag style={{ margin: 0, fontSize: 11 }}>{auditHistory.length}</Tag>
+          </div>
+        ),
+      },
+      {
+        type: 'divider',
+      },
+      {
         key: 'request_edit',
         label: (
           <div style={{ padding: '6px 4px', minWidth: 260 }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-              Request to Edit Profile
+              Edit Gym Profile Information
             </div>
             <div style={{ fontSize: 11.5, color: isDarkMode ? '#888888' : '#64748b', marginTop: 3, lineHeight: 1.35 }}>
-              Submit your changes for admin approval. Once approved, your profile will be updated.
+              Update legal credentials, address, facilities, or contact numbers.
             </div>
             <Button
               type="primary"
@@ -479,7 +1399,26 @@ export const GymProfileManagement = () => {
               onClick={(e) => {
                 e.stopPropagation();
                 setIsEditDropdownOpen(false);
-                editForm.setFieldsValue(profile);
+                editForm.setFieldsValue({
+                  name: gymData?.name || '',
+                  ownerName: gymData?.ownerName || '',
+                  phone: gymData?.phone || '',
+                  email: gymData?.email || '',
+                  businessType: gymData?.businessType || 'Private Limited',
+                  yearEstablished: gymData?.yearEstablished || '',
+                  gstNumber: gymData?.gstNumber || '',
+                  panNumber: gymData?.panNumber || '',
+                  address: gymData?.address || gymData?.fullAddress || '',
+                  area: gymData?.area || '',
+                  city: gymData?.city || '',
+                  state: gymData?.state || 'Tamil Nadu',
+                  pincode: gymData?.pincode || '',
+                  landmark: gymData?.landmark || '',
+                  floorSpaceSqFt: gymData?.floorSpaceSqFt || '',
+                  maxFloorCapacity: gymData?.maxFloorCapacity || '',
+                  genderAllowed: gymData?.genderAllowed || 'Unisex',
+                  aboutText: gymData?.aboutText || '',
+                });
                 setIsEditModalOpen(true);
               }}
               style={{
@@ -492,7 +1431,7 @@ export const GymProfileManagement = () => {
                 height: 32,
               }}
             >
-              Request Edit
+              Edit Profile
             </Button>
           </div>
         ),
@@ -502,7 +1441,8 @@ export const GymProfileManagement = () => {
 
   const TABS_LIST = [
     { key: 'basic', label: 'Basic Information' },
-    { key: 'facilities', label: 'Facilities & Amenities' },
+    { key: 'facilities', label: 'Facilities' },
+    { key: 'workouts', label: 'Workouts & Rules' },
     { key: 'pricing', label: 'Pricing' },
     { key: 'images', label: 'Images' },
     { key: 'hours', label: 'Operating Hours' },
@@ -512,7 +1452,7 @@ export const GymProfileManagement = () => {
   ];
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1400, margin: '0 auto', paddingBottom: 40 }}>
       {/* Top Header */}
       <div
         style={{
@@ -525,43 +1465,109 @@ export const GymProfileManagement = () => {
         }}
       >
         <div>
-          <Title level={2} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a', fontWeight: 700 }}>
-            Gym Profile
-          </Title>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Title level={2} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a', fontWeight: 700 }}>
+              Gym Profile
+            </Title>
+            {gymData?.partnerId && (
+              <Tag color="blue" style={{ fontSize: 12, fontWeight: 700, borderRadius: 'var(--radius-base)', padding: '2px 8px' }}>
+                ID: {gymData.partnerId}
+              </Tag>
+            )}
+            <Tag
+              color={
+                gymStatus === 'Approved' || gymStatus === 'Active'
+                  ? 'success'
+                  : gymStatus === 'Pending Approval' || gymStatus === 'Pending'
+                    ? 'warning'
+                    : 'default'
+              }
+              style={{ fontWeight: 700, borderRadius: 'var(--radius-base)', padding: '2px 8px' }}
+            >
+              {gymStatus}
+            </Tag>
+          </div>
           <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 14 }}>
-            Manage your gym credentials, facilities, pricing plans, schedule, and online presence.
+            Manage your verified gym credentials, floor facilities, pricing plans, schedule, and online presence.
           </Text>
         </div>
 
-        {/* Edit Profile Split / Dropdown Action */}
-        <Dropdown
-          menu={editMenu}
-          open={isEditDropdownOpen}
-          onOpenChange={setIsEditDropdownOpen}
-          trigger={['click']}
-          placement="bottomRight"
-        >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <Button
-            type="primary"
-            icon={<EditOutlined />}
-            style={{
-              backgroundColor: 'var(--color-primary)',
-              borderColor: 'var(--color-primary)',
-              borderRadius: 'var(--radius-base)',
-              fontWeight: 600,
-              height: 42,
-              padding: '0 18px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              boxShadow: isDarkMode ? 'none' : '0 2px 6px rgba(0, 56, 130, 0.2)',
-            }}
+            icon={<ReloadOutlined spin={isLoadingProfile} />}
+            onClick={fetchGymProfile}
+            disabled={isLoadingProfile}
+            style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
           >
-            <span>Edit Profile</span>
-            <DownOutlined style={{ fontSize: 10 }} />
+            Refresh
           </Button>
-        </Dropdown>
+
+          {/* Edit Profile Split / Dropdown Action */}
+          <Dropdown
+            menu={editMenu}
+            open={isEditDropdownOpen}
+            onOpenChange={setIsEditDropdownOpen}
+            trigger={['click']}
+            placement="bottomRight"
+          >
+            <Button
+              type="primary"
+              icon={<EditOutlined />}
+              style={{
+                backgroundColor: 'var(--color-primary)',
+                borderColor: 'var(--color-primary)',
+                borderRadius: 'var(--radius-base)',
+                fontWeight: 600,
+                height: 40,
+                padding: '0 18px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <span>Edit Profile</span>
+              <DownOutlined style={{ fontSize: 10 }} />
+            </Button>
+          </Dropdown>
+        </div>
       </div>
+
+      {/* Pending Changes Alert Banner */}
+      {Boolean(
+        (gymData?.pendingChanges && Object.keys(gymData.pendingChanges).length > 0) ||
+        pendingRequests.length > 0
+      ) && (
+          <Alert
+            type="warning"
+            showIcon
+            message="Profile Modifications Pending Super Admin Approval"
+            description={
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                }}
+              >
+                <span>
+                  Your recent changes ({gymData?.pendingChanges ? Object.keys(gymData.pendingChanges).length : pendingRequests.length} field(s) updated) have been submitted to the Super Administrator. Once approved, the changes will reflect live on your public profile.
+                </span>
+                <Button
+                  size="small"
+                  type="primary"
+                  ghost
+                  onClick={() => setIsPendingRequestsOpen(true)}
+                  style={{ fontWeight: 600 }}
+                >
+                  View Pending Requests
+                </Button>
+              </div>
+            }
+            style={{ marginBottom: 20, borderRadius: 'var(--radius-base)' }}
+          />
+        )}
 
       {/* Navigation Tabs Bar */}
       <div
@@ -597,1355 +1603,1906 @@ export const GymProfileManagement = () => {
         })}
       </div>
 
-      {/* ========================================================================= */}
-      {/* TAB 1: BASIC INFORMATION (HERO + PROFILE COMPLETION + ABOUT + STATS) */}
-      {/* ========================================================================= */}
-      {activeTab === 'basic' && (
-        <div>
-          {/* TOP ROW: HERO GYM OVERVIEW CARD + PROFILE COMPLETION */}
-          <Row gutter={[20, 20]} style={{ marginBottom: 20 }}>
-            {/* Hero Gym Overview Card */}
-            <Col xs={24} lg={16}>
-              <Card
-                style={{
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                  borderColor: 'var(--border-color)',
-                  borderRadius: 'var(--radius-base)',
-                  boxShadow: isDarkMode ? 'none' : '0 1px 3px rgba(0,0,0,0.03)',
-                  height: '100%',
-                }}
-                styles={{ body: { padding: '20px' } }}
-              >
-                <Row gutter={[20, 16]} align="top">
-                  {/* Gym Cover Photo with Change Photo Overlay */}
-                  <Col xs={24} sm={9}>
-                    <div
-                      style={{
-                        position: 'relative',
-                        borderRadius: 'var(--radius-base)',
-                        overflow: 'hidden',
-                        height: 180,
-                        width: '100%',
-                        backgroundColor: '#1e1e1e',
-                      }}
-                    >
-                      <img
-                        src={profile.coverPhoto}
-                        alt={profile.name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                      <div
-                        onClick={handleCoverPhotoUpload}
-                        style={{
-                          position: 'absolute',
-                          bottom: 10,
-                          left: 10,
-                          right: 10,
-                          padding: '6px 12px',
-                          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                          backdropFilter: 'blur(4px)',
-                          borderRadius: 'var(--radius-base)',
-                          color: '#ffffff',
-                          fontSize: 11.5,
-                          fontWeight: 600,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 6,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <CameraOutlined /> Change Photo
-                      </div>
-                    </div>
-                  </Col>
-
-                  {/* Gym Main Details */}
-                  <Col xs={24} sm={15}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10 }}>
-                      <div
-                        style={{
-                          position: 'relative',
-                          width: 52,
-                          height: 52,
-                          borderRadius: 'var(--radius-base)',
-                          overflow: 'hidden',
-                          border: `2px solid ${isDarkMode ? '#333333' : '#dbeafe'}`,
-                          backgroundColor: isDarkMode ? '#1e1e1e' : '#edf4fe',
-                          flexShrink: 0,
-                          cursor: 'pointer',
-                        }}
-                        onClick={handleLogoUpload}
-                        title="Click to Upload/Change Gym Logo"
-                      >
-                        <img
-                          src={profile.logo || profile.coverPhoto}
-                          alt="Gym Logo"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                        <div
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            backgroundColor: 'rgba(0, 0, 0, 0.45)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#ffffff',
-                            fontSize: 14,
-                            opacity: 0.8,
-                          }}
-                        >
-                          <CameraOutlined />
-                        </div>
-                      </div>
-
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 22, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                            {profile.name}
-                          </span>
-                          <Tag color="success" style={{ fontWeight: 700, borderRadius: 'var(--radius-base)', padding: '2px 8px' }}>
-                            {profile.status}
-                          </Tag>
-                        </div>
-                        <div
-                          onClick={handleLogoUpload}
-                          style={{
-                            fontSize: 11.5,
-                            color: 'var(--color-primary)',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            marginTop: 1,
-                          }}
-                        >
-                          <CameraOutlined /> Upload Brand Logo
-                        </div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: isDarkMode ? '#aaaaaa' : '#64748b', fontSize: 12.5, marginBottom: 6 }}>
-                      <EnvironmentOutlined style={{ color: 'var(--color-primary)' }} />
-                      <span>{profile.shortAddress}</span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: isDarkMode ? '#aaaaaa' : '#64748b', fontSize: 12.5, marginBottom: 6 }}>
-                      <PhoneOutlined style={{ color: 'var(--color-primary)' }} />
-                      <span>{profile.phone}</span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: isDarkMode ? '#aaaaaa' : '#64748b', fontSize: 12.5, marginBottom: 12 }}>
-                      <MailOutlined style={{ color: 'var(--color-primary)' }} />
-                      <span>{profile.email}</span>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <Tag color="purple" style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}>{profile.gymType}</Tag>
-                      <Tag color="blue" style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}>{profile.genderAllowed}</Tag>
-                      <Tag color="cyan" style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}>Est. {profile.establishedOn}</Tag>
-                    </div>
-                  </Col>
-                </Row>
-              </Card>
-            </Col>
-
-            {/* Profile Completion Card */}
-            <Col xs={24} lg={8}>
-              <Card
-                title={
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                      Profile Completion
-                    </span>
-                    <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-primary)' }}>85%</span>
-                  </div>
-                }
-                style={{
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                  borderColor: 'var(--border-color)',
-                  borderRadius: 'var(--radius-base)',
-                  height: '100%',
-                }}
-                styles={{ body: { padding: '16px 20px' } }}
-              >
-                <Progress
-                  percent={85}
-                  showInfo={false}
-                  strokeColor="var(--color-primary)"
-                  trailColor={isDarkMode ? '#222222' : '#f1f5f9'}
-                  style={{ marginBottom: 14 }}
-                />
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-                  {[
-                    { title: 'Basic Information', checked: true, editable: false },
-                    { title: 'Facilities & Amenities', checked: true, editable: false },
-                    { title: 'Pricing', checked: true, editable: false },
-                    { title: 'Images', checked: true, editable: true, tab: 'images' },
-                    { title: 'Operating Hours', checked: true, editable: true, tab: 'hours' },
-                    { title: 'Bank Details', checked: true, editable: true, tab: 'bank' },
-                    { title: 'Social Links', checked: false, editable: true, tab: 'social' },
-                  ].map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {item.checked ? (
-                          <CheckCircleFilled style={{ color: '#00bf62', fontSize: 14 }} />
-                        ) : (
-                          <span
-                            style={{
-                              width: 14,
-                              height: 14,
-                              borderRadius: '50%',
-                              border: `2px solid ${isDarkMode ? '#555555' : '#cbd5e1'}`,
-                            }}
-                          />
-                        )}
-                        <span style={{ color: isDarkMode ? '#cccccc' : '#334155', fontWeight: item.checked ? 500 : 400 }}>
-                          {item.title}
-                        </span>
-                      </div>
-                      {item.editable && (
-                        <span
-                          onClick={() => setActiveTab(item.tab)}
-                          style={{ fontSize: 11.5, color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer' }}
-                        >
-                          Edit
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </Col>
-          </Row>
-
-          {/* MIDDLE ROW: ABOUT GYM, GALLERY, AND GYM STATISTICS */}
-          <Row gutter={[20, 20]} style={{ marginBottom: 20 }}>
-            {/* Left Column: About Gym, Gallery, Address, Description */}
-            <Col xs={24} lg={16}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                {/* 1. About Gym & Gallery in a Row */}
-                <Row gutter={[16, 16]}>
-                  {/* About Gym */}
-                  <Col xs={24} md={12}>
-                    <Card
-                      title={
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                          <FileTextOutlined style={{ color: 'var(--color-primary)' }} /> About Gym
-                        </div>
-                      }
-                      style={{
-                        backgroundColor: 'var(--bg-surface-elevated)',
-                        borderColor: 'var(--border-color)',
-                        borderRadius: 'var(--radius-base)',
-                        height: '100%',
-                      }}
-                      styles={{ body: { padding: '16px' } }}
-                    >
-                      <Paragraph style={{ fontSize: 12, color: isDarkMode ? '#aaaaaa' : '#64748b', lineHeight: 1.4, marginBottom: 14 }}>
-                        {profile.about}
-                      </Paragraph>
-                      <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                        <span style={{ color: isDarkMode ? '#888888' : '#94a3b8' }}>Joined On: {profile.joinedOn}</span>
-                        <span style={{ color: isDarkMode ? '#888888' : '#94a3b8' }}>Member: {profile.memberSince}</span>
-                      </div>
-                    </Card>
-                  </Col>
-
-                  {/* Gallery Manager Preview */}
-                  <Col xs={24} md={12}>
-                    <Card
-                      title={
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                          <PictureOutlined style={{ color: 'var(--color-primary)' }} /> Gallery ({profile.gallery.length})
-                        </div>
-                      }
-                      extra={
-                        <span
-                          onClick={() => setActiveTab('images')}
-                          style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer' }}
-                        >
-                          Manage All
-                        </span>
-                      }
-                      style={{
-                        backgroundColor: 'var(--bg-surface-elevated)',
-                        borderColor: 'var(--border-color)',
-                        borderRadius: 'var(--radius-base)',
-                        height: '100%',
-                      }}
-                      styles={{ body: { padding: '16px' } }}
-                    >
-                      <Row gutter={[8, 8]}>
-                        {profile.gallery.slice(0, 6).map((img, idx) => (
-                          <Col span={8} key={idx}>
-                            <img
-                              src={img}
-                              alt="gallery"
-                              style={{ width: '100%', height: 60, objectFit: 'cover', borderRadius: 'var(--radius-base)', cursor: 'pointer' }}
-                              onClick={() => setActiveTab('images')}
-                            />
-                          </Col>
-                        ))}
-                      </Row>
-                    </Card>
-                  </Col>
-                </Row>
-
-                {/* 2. Gym Address & Location */}
-                <Card
-                  title={
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                      <EnvironmentOutlined style={{ color: 'var(--color-primary)' }} /> Gym Address & Location
-                    </div>
-                  }
-                  style={{
-                    backgroundColor: 'var(--bg-surface-elevated)',
-                    borderColor: 'var(--border-color)',
-                    borderRadius: 'var(--radius-base)',
-                  }}
-                  styles={{ body: { padding: '16px' } }}
-                >
-                  <Text style={{ fontSize: 12.5, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                    {profile.address}
-                  </Text>
-                  <div
-                    style={{
-                      marginTop: 12,
-                      height: 120,
-                      borderRadius: 'var(--radius-base)',
-                      backgroundColor: isDarkMode ? '#1e1e1e' : '#e2e8f0',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: isDarkMode ? '#888888' : '#64748b',
-                      fontSize: 12,
-                      border: `1px solid ${isDarkMode ? '#333333' : '#cbd5e1'}`,
-                    }}
-                  >
-                    <EnvironmentOutlined style={{ marginRight: 6, color: 'var(--color-primary)', fontSize: 16 }} />
-                    Anna Nagar, Chennai • Lat: 13.0850° N, Long: 80.2101° E
-                  </div>
-                </Card>
-
-                {/* 3. Detailed Business Specification Grid */}
-                <Card
-                  title={
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                      <ShopOutlined style={{ color: 'var(--color-primary)' }} /> Business Information
-                    </div>
-                  }
-                  style={{
-                    backgroundColor: 'var(--bg-surface-elevated)',
-                    borderColor: 'var(--border-color)',
-                    borderRadius: 'var(--radius-base)',
-                  }}
-                  styles={{ body: { padding: '16px 20px' } }}
-                >
-                  <Row gutter={[20, 16]}>
-                    {[
-                      { label: 'GYM TYPE', val: profile.gymType },
-                      { label: 'GST NUMBER', val: profile.gstNumber },
-                      { label: 'ESTABLISHED ON', val: profile.establishedOn },
-                      { label: 'OWNERSHIP TYPE', val: profile.ownershipType },
-                      { label: 'FLOOR AREA', val: profile.area },
-                      { label: 'TOTAL EQUIPMENT', val: `${profile.totalEquipment} Units` },
-                      { label: 'CERTIFIED TRAINERS', val: `${profile.trainerCount} Trainers` },
-                      { label: 'GENDER ALLOWED', val: profile.genderAllowed },
-                    ].map((item, idx) => (
-                      <Col xs={12} sm={6} key={idx}>
-                        <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', fontWeight: 600 }}>{item.label}</div>
-                        <div style={{ fontSize: 13.5, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginTop: 2 }}>
-                          {item.val}
-                        </div>
-                      </Col>
-                    ))}
-                  </Row>
-                </Card>
-              </div>
-            </Col>
-
-            {/* Right Column: Gym Statistics */}
-            <Col xs={24} lg={8}>
-              <Card
-                title={
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    <BarChartOutlined style={{ color: 'var(--color-primary)' }} /> Gym Statistics
-                  </div>
-                }
-                style={{
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                  borderColor: 'var(--border-color)',
-                  borderRadius: 'var(--radius-base)',
-                  boxShadow: isDarkMode ? 'none' : '0 1px 3px rgba(0,0,0,0.03)',
-                }}
-                styles={{ body: { padding: '16px' } }}
-              >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  {/* Stat 1: Total Visitors */}
-                  <div style={{ padding: '12px', borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#141414' : '#f8fafc', border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: isDarkMode ? 'rgba(0, 56, 130, 0.3)' : '#e6f4ff', color: '#003882', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
-                        <TeamOutlined />
-                      </div>
-                      <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Total Visitors</div>
-                    </div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>1,248</div>
-                    <div style={{ fontSize: 10.5, color: '#00bf62', fontWeight: 600, marginTop: 2 }}>This Month ↑ 18%</div>
-                  </div>
-
-                  {/* Stat 2: Total Members */}
-                  <div style={{ padding: '12px', borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#141414' : '#f8fafc', border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: isDarkMode ? 'rgba(114, 46, 209, 0.2)' : '#f3effe', color: '#722ed1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
-                        <UserOutlined />
-                      </div>
-                      <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Total Members</div>
-                    </div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>356</div>
-                    <div style={{ fontSize: 10.5, color: '#00bf62', fontWeight: 600, marginTop: 2 }}>This Month ↑ 12%</div>
-                  </div>
-
-                  {/* Stat 3: Walk-in Count */}
-                  <div style={{ padding: '12px', borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#141414' : '#f8fafc', border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: isDarkMode ? 'rgba(0, 191, 98, 0.2)' : '#eaf8ef', color: '#00bf62', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
-                        <UserOutlined />
-                      </div>
-                      <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Walk-in Count</div>
-                    </div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>87</div>
-                    <div style={{ fontSize: 10.5, color: '#00bf62', fontWeight: 600, marginTop: 2 }}>This Month ↑ 8%</div>
-                  </div>
-
-                  {/* Stat 4: App Bookings */}
-                  <div style={{ padding: '12px', borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#141414' : '#f8fafc', border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: isDarkMode ? 'rgba(250, 140, 22, 0.2)' : '#fef4e8', color: '#fa8c16', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
-                        <CalendarOutlined />
-                      </div>
-                      <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>App Bookings</div>
-                    </div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>162</div>
-                    <div style={{ fontSize: 10.5, color: '#00bf62', fontWeight: 600, marginTop: 2 }}>This Month ↑ 22%</div>
-                  </div>
-
-                  {/* Stat 5: Active Members */}
-                  <div style={{ padding: '12px', borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#141414' : '#f8fafc', border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: isDarkMode ? 'rgba(22, 119, 255, 0.2)' : '#edf4fe', color: '#1677ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
-                        <UserOutlined />
-                      </div>
-                      <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Active Members</div>
-                    </div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>312</div>
-                    <div style={{ fontSize: 10.5, color: '#00bf62', fontWeight: 600, marginTop: 2 }}>This Month ↑ 15%</div>
-                  </div>
-
-                  {/* Stat 6: Total Revenue */}
-                  <div style={{ padding: '12px', borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#141414' : '#f8fafc', border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: isDarkMode ? 'rgba(0, 191, 98, 0.2)' : '#eaf8ef', color: '#00bf62', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
-                        <DollarCircleOutlined />
-                      </div>
-                      <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Total Revenue</div>
-                    </div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>₹1,24,560</div>
-                    <div style={{ fontSize: 10.5, color: '#00bf62', fontWeight: 600, marginTop: 2 }}>This Month ↑ 20%</div>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-          </Row>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 2: FACILITIES & AMENITIES */}
-      {/* ========================================================================= */}
-      {activeTab === 'facilities' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
-            <div>
-              <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                Facilities, Equipment & Amenities
-              </Title>
-              <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
-                Showcase gym capabilities, available workout equipment, and premium amenities.
-              </Text>
-            </div>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setIsAddFacilityModalOpen(true)}
-              style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
-            >
-              Add New Facility
-            </Button>
+      {isLoadingProfile ? (
+        <div
+          style={{
+            padding: '90px 24px',
+            textAlign: 'center',
+            background: isDarkMode ? '#1a1d24' : '#ffffff',
+            borderRadius: 16,
+            border: `1px solid ${isDarkMode ? '#2d3748' : '#e2e8f0'}`,
+            marginTop: 20,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
+          }}
+        >
+          <Spin size="large" />
+          <div
+            style={{
+              marginTop: 18,
+              color: isDarkMode ? '#f1f5f9' : '#0f172a',
+              fontSize: 16,
+              fontWeight: 600,
+            }}
+          >
+            Loading complete gym profile & verified credentials...
           </div>
-
-          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-            {facilities.map((fac) => (
-              <Col xs={24} sm={12} md={8} lg={6} key={fac.id}>
-                <Card
-                  style={{
-                    backgroundColor: 'var(--bg-surface-elevated)',
-                    borderColor: 'var(--border-color)',
-                    borderRadius: 'var(--radius-base)',
-                    height: '100%',
-                  }}
-                  styles={{ body: { padding: '16px' } }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div
-                      style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: 'var(--radius-base)',
-                        backgroundColor: 'var(--color-primary-bg)',
-                        color: 'var(--color-primary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 18,
-                      }}
-                    >
-                      {fac.icon}
-                    </div>
-                    <Tag color="success" style={{ fontWeight: 700, borderRadius: 4, margin: 0 }}>
-                      {fac.status}
-                    </Tag>
-                  </div>
-
-                  <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginTop: 12 }}>
-                    {fac.name}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
-                    <span>Category: <strong>{fac.category}</strong></span>
-                    <span>Units: <strong>{fac.count}</strong></span>
-                  </div>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 3: PRICING & MEMBERSHIP PLANS */}
-      {/* ========================================================================= */}
-      {activeTab === 'pricing' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
-            <div>
-              <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                Membership Pricing & Workout Passes
-              </Title>
-              <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
-                Configure membership tiers, daily walk-in passes, and addon packages.
-              </Text>
-            </div>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setIsAddPlanModalOpen(true)}
-              style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
-            >
-              Add Pricing Tier
-            </Button>
+          <div
+            style={{
+              marginTop: 6,
+              color: isDarkMode ? '#94a3b8' : '#64748b',
+              fontSize: 13,
+            }}
+          >
+            Fetching floor facilities, membership plans, operating hours, and media from server
           </div>
-
-          <Row gutter={[20, 20]}>
-            {pricingPlans.map((plan) => (
-              <Col xs={24} sm={12} lg={6} key={plan.id}>
-                <Card
-                  style={{
-                    backgroundColor: 'var(--bg-surface-elevated)',
-                    borderColor: plan.popular ? 'var(--color-primary)' : 'var(--border-color)',
-                    borderWidth: plan.popular ? 2 : 1,
-                    borderRadius: 'var(--radius-base)',
-                    position: 'relative',
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                  }}
-                  styles={{ body: { padding: '22px 18px', display: 'flex', flexDirection: 'column', height: '100%' } }}
-                >
-                  {plan.popular && (
-                    <Tag
-                      color="blue"
-                      style={{
-                        position: 'absolute',
-                        top: -10,
-                        right: 16,
-                        fontWeight: 700,
-                        fontSize: 10.5,
-                        borderRadius: 4,
-                      }}
-                    >
-                      MOST POPULAR
-                    </Tag>
-                  )}
-
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase' }}>
-                    {plan.badge}
-                  </div>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginTop: 4 }}>
-                    {plan.name}
-                  </div>
-
-                  <div style={{ margin: '14px 0 10px 0' }}>
-                    <span style={{ fontSize: 28, fontWeight: 900, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                      ₹{plan.price.toLocaleString('en-IN')}
-                    </span>
-                    <span style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}> / {plan.duration}</span>
-                  </div>
-
-                  <Text style={{ fontSize: 12, color: isDarkMode ? '#aaaaaa' : '#64748b', lineHeight: 1.4, marginBottom: 16 }}>
-                    {plan.description}
-                  </Text>
-
-                  <Divider style={{ margin: '10px 0' }} />
-
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-                    {plan.features.map((feat, fIdx) => (
-                      <div key={fIdx} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: isDarkMode ? '#dddddd' : '#334155' }}>
-                        <CheckCircleFilled style={{ color: '#00bf62', fontSize: 13 }} />
-                        <span>{feat}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <Button
-                    block
-                    onClick={() => {
-                      setSelectedPlanForEdit(plan);
-                      editPlanForm.setFieldsValue({
-                        name: plan.name,
-                        badge: plan.badge,
-                        price: plan.price,
-                        duration: plan.duration,
-                        description: plan.description,
-                        features: plan.features.join('\n'),
-                        popular: plan.popular || false,
-                      });
-                      setIsEditPlanModalOpen(true);
-                    }}
-                    style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
-                  >
-                    Edit Plan Details
-                  </Button>
-                </Card>
-              </Col>
-            ))}
-          </Row>
         </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 4: IMAGES & MEDIA GALLERY */}
-      {/* ========================================================================= */}
-      {activeTab === 'images' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+      ) : (
+        <>
+          {/* ========================================================================= */}
+          {/* TAB 1: BASIC INFORMATION (HERO + PROFILE COMPLETION + ABOUT + STATS) */}
+          {/* ========================================================================= */}
+          {activeTab === 'basic' && (
             <div>
-              <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                Gym Gallery & Cover Photos
-              </Title>
-              <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
-                Upload high-definition photos of your workout floor, turnstiles, cardio deck, and amenities.
-              </Text>
-            </div>
-            <Button
-              type="primary"
-              icon={<CameraOutlined />}
-              onClick={handleCoverPhotoUpload}
-              style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
-            >
-              Upload New Photos
-            </Button>
-          </div>
-
-          <Image.PreviewGroup>
-            <Row gutter={[16, 16]}>
-              {profile.gallery.map((img, idx) => (
-                <Col xs={24} sm={12} md={8} key={idx}>
+              {/* TOP ROW: HERO GYM OVERVIEW CARD + PROFILE COMPLETION */}
+              <Row gutter={[20, 20]} style={{ marginBottom: 20 }}>
+                {/* Hero Gym Overview Card */}
+                <Col xs={24} lg={16}>
                   <Card
-                    hoverable
                     style={{
                       backgroundColor: 'var(--bg-surface-elevated)',
                       borderColor: 'var(--border-color)',
                       borderRadius: 'var(--radius-base)',
-                      overflow: 'hidden',
+                      boxShadow: isDarkMode ? 'none' : '0 1px 3px rgba(0,0,0,0.03)',
+                      height: '100%',
                     }}
-                    styles={{ body: { padding: 0 } }}
+                    styles={{ body: { padding: '20px' } }}
                   >
-                    <div style={{ height: 200, position: 'relative', overflow: 'hidden' }}>
-                      <Image
-                        src={img}
-                        alt={`gym-gallery-${idx}`}
-                        style={{ width: '100%', height: 200, objectFit: 'cover' }}
-                        wrapperStyle={{ width: '100%', height: 200 }}
-                        preview={{
-                          mask: (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
-                              <EyeOutlined /> Preview Photo
+                    <Row gutter={[20, 16]} align="top">
+                      {/* Gym Cover Photo with Change Photo Overlay */}
+                      <Col xs={24} sm={9}>
+                        <div
+                          style={{
+                            position: 'relative',
+                            borderRadius: 'var(--radius-base)',
+                            overflow: 'hidden',
+                            height: 180,
+                            width: '100%',
+                            backgroundColor: isDarkMode ? '#1e1e1e' : '#f1f5f9',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {gymCoverUrl ? (
+                            <img
+                              src={gymCoverUrl}
+                              alt={gymName}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          ) : (
+                            <div style={{ textAlign: 'center', color: isDarkMode ? '#666666' : '#94a3b8' }}>
+                              <PictureOutlined style={{ fontSize: 32, marginBottom: 6 }} />
+                              <div style={{ fontSize: 12 }}>No Cover Photo</div>
                             </div>
-                          ),
-                        }}
-                      />
+                          )}
+                          <div
+                            onClick={handleCoverPhotoUpload}
+                            style={{
+                              position: 'absolute',
+                              bottom: 10,
+                              left: 10,
+                              right: 10,
+                              padding: '6px 12px',
+                              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                              backdropFilter: 'blur(4px)',
+                              borderRadius: 'var(--radius-base)',
+                              color: '#ffffff',
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <CameraOutlined /> {isUploadingMedia ? 'Uploading...' : 'Change Cover Photo'}
+                          </div>
+                        </div>
+                      </Col>
+
+                      {/* Gym Main Details */}
+                      <Col xs={24} sm={15}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10 }}>
+                          <div
+                            style={{
+                              position: 'relative',
+                              width: 54,
+                              height: 54,
+                              borderRadius: 'var(--radius-base)',
+                              overflow: 'hidden',
+                              border: `2px solid ${isDarkMode ? '#333333' : '#dbeafe'}`,
+                              backgroundColor: isDarkMode ? '#1e1e1e' : '#edf4fe',
+                              flexShrink: 0,
+                              cursor: 'pointer',
+                            }}
+                            onClick={handleLogoUpload}
+                            title="Click to Upload Brand Logo"
+                          >
+                            {gymLogoUrl ? (
+                              <img
+                                src={gymLogoUrl}
+                                alt="Gym Logo"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: 'var(--color-primary)',
+                                  fontWeight: 800,
+                                  fontSize: 18,
+                                }}
+                              >
+                                {gymName.slice(0, 2).toUpperCase()}
+                              </div>
+                            )}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                inset: 0,
+                                backgroundColor: 'rgba(0, 0, 0, 0.45)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#ffffff',
+                                fontSize: 14,
+                                opacity: 0.8,
+                              }}
+                            >
+                              <CameraOutlined />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 20, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                                {gymName}
+                              </span>
+                              <Tag color="success" style={{ fontWeight: 700, borderRadius: 'var(--radius-base)', padding: '2px 8px' }}>
+                                {gymStatus}
+                              </Tag>
+                            </div>
+                            <div
+                              onClick={handleLogoUpload}
+                              style={{
+                                fontSize: 11.5,
+                                color: 'var(--color-primary)',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                marginTop: 2,
+                              }}
+                            >
+                              <CameraOutlined /> Upload Brand Logo
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: isDarkMode ? '#aaaaaa' : '#64748b', fontSize: 12.5, marginBottom: 6 }}>
+                          <EnvironmentOutlined style={{ color: 'var(--color-primary)' }} />
+                          <span>{activeGym?.area ? `${activeGym.area}, ${activeGym.city || ''}` : activeGym?.fullAddress || activeGym?.address || activeGym?.city || 'Address not configured'}</span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: isDarkMode ? '#aaaaaa' : '#64748b', fontSize: 12.5, marginBottom: 6 }}>
+                          <PhoneOutlined style={{ color: 'var(--color-primary)' }} />
+                          <span>{activeGym?.phone || user?.phone || 'Phone not provided'}</span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: isDarkMode ? '#aaaaaa' : '#64748b', fontSize: 12.5, marginBottom: 12 }}>
+                          <MailOutlined style={{ color: 'var(--color-primary)' }} />
+                          <span>{activeGym?.email || user?.email || 'Email not provided'}</span>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <Tag color="purple" style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}>
+                            {activeGym?.businessType || 'Private Limited'}
+                          </Tag>
+                          <Tag color="blue" style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}>
+                            {activeGym?.genderAllowed || 'Unisex'}
+                          </Tag>
+                          {activeGym?.yearEstablished && (
+                            <Tag color="cyan" style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}>
+                              Est. {activeGym.yearEstablished}
+                            </Tag>
+                          )}
+                          {activeGym?.gstNumber && (
+                            <Tag color="orange" style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}>
+                              GST: {activeGym.gstNumber}
+                            </Tag>
+                          )}
+                        </div>
+                      </Col>
+                    </Row>
+                  </Card>
+                </Col>
+
+                {/* Profile Completion Card */}
+                <Col xs={24} lg={8}>
+                  <Card
+                    title={
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          Profile Completion
+                        </span>
+                        <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-primary)' }}>
+                          {profileCompletionStats.percentage}%
+                        </span>
+                      </div>
+                    }
+                    style={{
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      borderColor: 'var(--border-color)',
+                      borderRadius: 'var(--radius-base)',
+                      height: '100%',
+                    }}
+                    styles={{ body: { padding: '16px 20px' } }}
+                  >
+                    <Progress
+                      percent={profileCompletionStats.percentage}
+                      showInfo={false}
+                      strokeColor="var(--color-primary)"
+                      railColor={isDarkMode ? '#222222' : '#f1f5f9'}
+                      style={{ marginBottom: 14 }}
+                    />
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                      {profileCompletionStats.checks.map((item, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {item.done ? (
+                              <CheckCircleFilled style={{ color: '#00bf62', fontSize: 14 }} />
+                            ) : (
+                              <span
+                                style={{
+                                  width: 14,
+                                  height: 14,
+                                  borderRadius: '50%',
+                                  border: `2px solid ${isDarkMode ? '#555555' : '#cbd5e1'}`,
+                                }}
+                              />
+                            )}
+                            <span style={{ color: isDarkMode ? '#cccccc' : '#334155', fontWeight: item.done ? 500 : 400 }}>
+                              {item.label}
+                            </span>
+                          </div>
+                          <span
+                            onClick={() => setActiveTab(item.tab)}
+                            style={{ fontSize: 11.5, color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            Edit
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                </Col>
+              </Row>
+
+              {/* MIDDLE ROW: ABOUT GYM, GALLERY, AND GYM STATISTICS */}
+              <Row gutter={[20, 20]} style={{ marginBottom: 20 }}>
+                {/* Left Column: About Gym, Gallery, Address, Description */}
+                <Col xs={24} lg={16}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    {/* 1. About Gym & Gallery in a Row */}
+                    <Row gutter={[16, 16]}>
+                      {/* About Gym */}
+                      <Col xs={24} md={12}>
+                        <Card
+                          title={
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                              <FileTextOutlined style={{ color: 'var(--color-primary)' }} /> About Gym
+                            </div>
+                          }
+                          style={{
+                            backgroundColor: 'var(--bg-surface-elevated)',
+                            borderColor: 'var(--border-color)',
+                            borderRadius: 'var(--radius-base)',
+                            height: '100%',
+                          }}
+                          styles={{ body: { padding: '16px' } }}
+                        >
+                          <Paragraph style={{ fontSize: 12.5, color: isDarkMode ? '#aaaaaa' : '#64748b', lineHeight: 1.5, marginBottom: 14, minHeight: 60 }}>
+                            {activeGym?.aboutText || activeGym?.description || 'No about summary added yet. Click Edit Profile to describe your facility and fitness mission.'}
+                          </Paragraph>
+                          <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                            <span style={{ color: isDarkMode ? '#888888' : '#94a3b8' }}>
+                              Owner: {activeGym?.ownerName || user?.fullName || 'Verified Partner'}
+                            </span>
+                            <span style={{ color: isDarkMode ? '#888888' : '#94a3b8' }}>
+                              Status: {gymStatus}
+                            </span>
+                          </div>
+                        </Card>
+                      </Col>
+
+                      {/* Gallery Manager Preview */}
+                      <Col xs={24} md={12}>
+                        <Card
+                          title={
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                              <PictureOutlined style={{ color: 'var(--color-primary)' }} /> Gallery ({galleryPhotosList.length})
+                            </div>
+                          }
+                          extra={
+                            <span
+                              onClick={() => setActiveTab('images')}
+                              style={{ fontSize: 12, color: 'var(--color-primary)', fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              Manage All
+                            </span>
+                          }
+                          style={{
+                            backgroundColor: 'var(--bg-surface-elevated)',
+                            borderColor: 'var(--border-color)',
+                            borderRadius: 'var(--radius-base)',
+                            height: '100%',
+                          }}
+                          styles={{ body: { padding: '16px' } }}
+                        >
+                          {galleryPhotosList.length > 0 ? (
+                            <Row gutter={[8, 8]}>
+                              {galleryPhotosList.slice(0, 6).map((img, idx) => (
+                                <Col span={8} key={idx}>
+                                  <img
+                                    src={img}
+                                    alt={`gallery-thumb-${idx}`}
+                                    style={{ width: '100%', height: 60, objectFit: 'cover', borderRadius: 'var(--radius-base)', cursor: 'pointer' }}
+                                    onClick={() => setActiveTab('images')}
+                                  />
+                                </Col>
+                              ))}
+                            </Row>
+                          ) : (
+                            <div style={{ textAlign: 'center', padding: '18px 0', color: isDarkMode ? '#666666' : '#94a3b8' }}>
+                              <PictureOutlined style={{ fontSize: 24, marginBottom: 4 }} />
+                              <div style={{ fontSize: 12 }}>No photos uploaded yet</div>
+                              <Button
+                                size="small"
+                                type="link"
+                                onClick={handleGalleryUpload}
+                                style={{ fontSize: 12, padding: 0, marginTop: 4 }}
+                              >
+                                Upload Photos
+                              </Button>
+                            </div>
+                          )}
+                        </Card>
+                      </Col>
+                    </Row>
+
+                    {/* 2. Gym Address & Location */}
+                    <Card
+                      title={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          <EnvironmentOutlined style={{ color: 'var(--color-primary)' }} /> Gym Address & Location
+                        </div>
+                      }
+                      style={{
+                        backgroundColor: 'var(--bg-surface-elevated)',
+                        borderColor: 'var(--border-color)',
+                        borderRadius: 'var(--radius-base)',
+                      }}
+                      styles={{ body: { padding: '16px' } }}
+                    >
+                      <Text style={{ fontSize: 13, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                        {activeGym?.fullAddress || activeGym?.address || `${activeGym?.area || ''} ${activeGym?.city || ''}`}
+                      </Text>
                       <div
                         style={{
-                          position: 'absolute',
-                          top: 10,
-                          right: 10,
+                          marginTop: 12,
+                          padding: '12px 16px',
+                          borderRadius: 'var(--radius-base)',
+                          backgroundColor: isDarkMode ? '#1e1e1e' : '#f8fafc',
                           display: 'flex',
-                          gap: 6,
-                          zIndex: 10,
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: 10,
+                          fontSize: 12,
+                          border: `1px solid ${isDarkMode ? '#333333' : '#e2e8f0'}`,
                         }}
                       >
-                        <Button
-                          size="small"
-                          danger
-                          icon={<DeleteOutlined />}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setProfile((prev) => ({ ...prev, gallery: prev.gallery.filter((_, i) => i !== idx) }));
-                            message.success('Photo removed from gallery.');
-                          }}
-                          style={{
-                            backgroundColor: 'rgba(255, 77, 79, 0.9)',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: 'var(--radius-base)',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-                          }}
-                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: isDarkMode ? '#aaaaaa' : '#64748b' }}>
+                          <EnvironmentOutlined style={{ color: 'var(--color-primary)', fontSize: 15 }} />
+                          <span>
+                            {activeGym?.city || 'City not set'} • {activeGym?.state || 'Tamil Nadu'} • Pincode: {activeGym?.pincode || '—'}
+                          </span>
+                        </div>
+                        {activeGym?.googleMapsUrl && (
+                          <a
+                            href={activeGym.googleMapsUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: 'var(--color-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
+                          >
+                            <GlobalOutlined /> Open on Maps
+                          </a>
+                        )}
+                      </div>
+                    </Card>
+
+                    {/* 3. Detailed Business Specification Grid */}
+                    <Card
+                      title={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          <ShopOutlined style={{ color: 'var(--color-primary)' }} /> Business Information
+                        </div>
+                      }
+                      style={{
+                        backgroundColor: 'var(--bg-surface-elevated)',
+                        borderColor: 'var(--border-color)',
+                        borderRadius: 'var(--radius-base)',
+                      }}
+                      styles={{ body: { padding: '16px 20px' } }}
+                    >
+                      <Row gutter={[20, 16]}>
+                        {[
+                          { label: 'GYM TYPE', val: activeGym?.businessType || 'Private Limited' },
+                          { label: 'GST NUMBER', val: activeGym?.gstNumber || 'Not Specified' },
+                          { label: 'PAN NUMBER', val: activeGym?.panNumber || 'Not Specified' },
+                          { label: 'ESTABLISHED ON', val: activeGym?.yearEstablished ? `Est. ${activeGym.yearEstablished}` : 'Not Specified' },
+                          { label: 'FLOOR AREA', val: activeGym?.floorSpaceSqFt ? `${activeGym.floorSpaceSqFt} Sq.Ft` : 'Not Specified' },
+                          { label: 'MAX FLOOR CAPACITY', val: activeGym?.maxFloorCapacity ? `${activeGym.maxFloorCapacity} Persons` : '50 Persons' },
+                          { label: 'GENDER POLICY', val: activeGym?.genderAllowed || 'Unisex' },
+                          { label: 'ACTIVE FACILITIES', val: `${facilities.length} Categories` },
+                        ].map((item, idx) => (
+                          <Col xs={12} sm={6} key={idx}>
+                            <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', fontWeight: 600 }}>{item.label}</div>
+                            <div style={{ fontSize: 13.5, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginTop: 2 }}>
+                              {item.val}
+                            </div>
+                          </Col>
+                        ))}
+                      </Row>
+                    </Card>
+                  </div>
+                </Col>
+
+                {/* Right Column: Gym Statistics */}
+                <Col xs={24} lg={8}>
+                  <Card
+                    title={
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                        <BarChartOutlined style={{ color: 'var(--color-primary)' }} /> Facility Statistics
+                      </div>
+                    }
+                    style={{
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      borderColor: 'var(--border-color)',
+                      borderRadius: 'var(--radius-base)',
+                      boxShadow: isDarkMode ? 'none' : '0 1px 3px rgba(0,0,0,0.03)',
+                    }}
+                    styles={{ body: { padding: '16px' } }}
+                  >
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      {/* Stat 1: Total Registered Members */}
+                      <div style={{ padding: '12px', borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#141414' : '#f8fafc', border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: isDarkMode ? 'rgba(0, 56, 130, 0.3)' : '#e6f4ff', color: '#003882', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+                            <TeamOutlined />
+                          </div>
+                          <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Members</div>
+                        </div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          {activeGym?.membersCount || 0}
+                        </div>
+                        <div style={{ fontSize: 10.5, color: '#00bf62', fontWeight: 600, marginTop: 2 }}>Registered</div>
+                      </div>
+
+                      {/* Stat 2: Max Capacity */}
+                      <div style={{ padding: '12px', borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#141414' : '#f8fafc', border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: isDarkMode ? 'rgba(114, 46, 209, 0.2)' : '#f3effe', color: '#722ed1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+                            <UserOutlined />
+                          </div>
+                          <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Floor Capacity</div>
+                        </div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          {activeGym?.maxFloorCapacity || 50}
+                        </div>
+                        <div style={{ fontSize: 10.5, color: 'var(--color-primary)', fontWeight: 600, marginTop: 2 }}>Max Limit</div>
+                      </div>
+
+                      {/* Stat 3: Floor Space */}
+                      <div style={{ padding: '12px', borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#141414' : '#f8fafc', border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: isDarkMode ? 'rgba(0, 191, 98, 0.2)' : '#eaf8ef', color: '#00bf62', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+                            <ShopOutlined />
+                          </div>
+                          <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Floor Area</div>
+                        </div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          {activeGym?.floorSpaceSqFt ? `${activeGym.floorSpaceSqFt}` : '—'}
+                        </div>
+                        <div style={{ fontSize: 10.5, color: '#00bf62', fontWeight: 600, marginTop: 2 }}>Sq. Ft</div>
+                      </div>
+
+                      {/* Stat 4: Rating */}
+                      <div style={{ padding: '12px', borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#141414' : '#f8fafc', border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: isDarkMode ? 'rgba(250, 140, 22, 0.2)' : '#fef4e8', color: '#fa8c16', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+                            <StarFilled />
+                          </div>
+                          <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Rating</div>
+                        </div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          {activeGym?.rating || '4.9'}
+                        </div>
+                        <div style={{ fontSize: 10.5, color: '#fa8c16', fontWeight: 600, marginTop: 2 }}>
+                          {activeGym?.reviewsCount || 0} Reviews
+                        </div>
+                      </div>
+
+                      {/* Stat 5: Pricing Tiers */}
+                      <div style={{ padding: '12px', borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#141414' : '#f8fafc', border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: isDarkMode ? 'rgba(22, 119, 255, 0.2)' : '#edf4fe', color: '#1677ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+                            <DollarOutlined />
+                          </div>
+                          <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Active Plans</div>
+                        </div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          {pricingPlans.length}
+                        </div>
+                        <div style={{ fontSize: 10.5, color: '#1677ff', fontWeight: 600, marginTop: 2 }}>Published</div>
+                      </div>
+
+                      {/* Stat 6: Revenue */}
+                      <div style={{ padding: '12px', borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#141414' : '#f8fafc', border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: isDarkMode ? 'rgba(0, 191, 98, 0.2)' : '#eaf8ef', color: '#00bf62', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+                            <DollarCircleOutlined />
+                          </div>
+                          <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>Monthly Revenue</div>
+                        </div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          ₹{Number(activeGym?.monthlyRevenue || 0).toLocaleString('en-IN')}
+                        </div>
+                        <div style={{ fontSize: 10.5, color: '#00bf62', fontWeight: 600, marginTop: 2 }}>Live Status</div>
                       </div>
                     </div>
                   </Card>
                 </Col>
-              ))}
-            </Row>
-          </Image.PreviewGroup>
-        </div>
-      )}
+              </Row>
+            </div>
+          )}
 
-      {/* ========================================================================= */}
-      {/* TAB 5: OPERATING HOURS & SCHEDULE */}
-      {/* ========================================================      {/* ========================================================================= */}
-      {/* TAB 5: OPERATING HOURS & SCHEDULE */}
-      {/* ========================================================================= */}
-      {activeTab === 'hours' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Top Control & Action Bar */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
+          {/* ========================================================================= */}
+          {/* ========================================================================= */}
+          {/* TAB 2: FACILITIES & EQUIPMENT */}
+          {/* ========================================================================= */}
+          {activeTab === 'facilities' && (
             <div>
-              <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                Gym Operating Hours
-              </Title>
-              <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
-                Configure opening and closing timings for each day of the week.
-              </Text>
-            </div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              <Button
-                icon={<CopyOutlined />}
-                onClick={() => {
-                  const mon = operatingHours[0];
-                  setOperatingHours((prev) =>
-                    prev.map((item, i) => {
-                      if (i >= 1) {
-                        return {
-                          ...item,
-                          isOpen: mon.isOpen,
-                          openTime: mon.openTime,
-                          closeTime: mon.closeTime,
-                        };
-                      }
-                      return item;
-                    })
-                  );
-                  message.success('Monday schedule copied to all days (Tue – Sun)!');
-                }}
-                style={{ borderRadius: 'var(--radius-base)' }}
-              >
-                Copy Mon to All Days
-              </Button>
-
-              <Button
-                type="primary"
-                icon={<SaveOutlined />}
-                onClick={() => {
-                  confetti({ particleCount: 35, spread: 60, origin: { y: 0.85 } });
-                  message.success('Operating hours saved and synchronized successfully!');
-                }}
-                style={{ borderRadius: 'var(--radius-base)' }}
-              >
-                Save Schedule
-              </Button>
-            </div>
-          </div>
-
-          {/* Day-by-Day Operating Hours Card */}
-          <Card
-            title={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <ClockCircleOutlined style={{ color: 'var(--color-primary)' }} />
-                <span style={{ fontWeight: 700, fontSize: 15 }}>Day-by-Day Working Hours</span>
-              </div>
-            }
-            style={{
-              backgroundColor: 'var(--bg-surface-elevated)',
-              borderColor: 'var(--border-color)',
-              borderRadius: 'var(--radius-base)',
-            }}
-            styles={{ body: { padding: '20px' } }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {operatingHours.map((item, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: 16,
-                    padding: '14px 20px',
-                    borderRadius: 'var(--radius-base)',
-                    backgroundColor: isDarkMode ? '#141414' : '#f8fafc',
-                    border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}`,
-                  }}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    Facilities & Equipment ({facilities.length})
+                  </Title>
+                  <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
+                    Select gym floor facilities, equipment, and member amenities available at your gym.
+                  </Text>
+                </div>
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  loading={isSavingFacility}
+                  onClick={handleSaveFacilities}
+                  style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
                 >
-                  {/* Day and Status */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 160 }}>
-                    <div
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: '50%',
-                        backgroundColor: item.isOpen ? '#10b981' : '#ef4444',
-                      }}
-                    />
-                    <span style={{ fontWeight: 700, fontSize: 15, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                      {item.day}
+                  Save All Changes
+                </Button>
+              </div>
+
+              {/* Standard Preset Facilities Checkable Tags */}
+              <Card
+                style={{
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  borderColor: 'var(--border-color)',
+                  borderRadius: 'var(--radius-base)',
+                  marginBottom: 16,
+                }}
+                styles={{ body: { padding: '20px' } }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <ToolOutlined style={{ color: '#0EA5E9' }} /> Gym Floor Facilities & Equipment
+                </div>
+                <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b', marginBottom: 14 }}>
+                  Select all floor equipment and infrastructure available at your facility
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {FACILITY_OPTIONS.map((f) => {
+                    const selected = facilities.includes(f);
+                    return (
+                      <Tag.CheckableTag
+                        key={f}
+                        checked={selected}
+                        onChange={(chk) => {
+                          setFacilities(chk ? [...facilities, f] : facilities.filter((x) => x !== f));
+                        }}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: 16,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          backgroundColor: selected ? '#0EA5E9' : (isDarkMode ? '#1e293b' : '#f0f9ff'),
+                          color: selected ? '#ffffff' : (isDarkMode ? '#cbd5e1' : '#0369a1'),
+                          border: `1px solid ${selected ? '#0EA5E9' : (isDarkMode ? '#334155' : '#bae6fd')}`,
+                        }}
+                      >
+                        {f}
+                      </Tag.CheckableTag>
+                    );
+                  })}
+                </div>
+                {facilities.length > 0 && (
+                  <div style={{ marginTop: 10, fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
+                    {facilities.length} facility item(s) selected
+                  </div>
+                )}
+              </Card>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB: WORKOUTS, AMENITIES, RULES & SAFETY */}
+          {/* ========================================================================= */}
+          {activeTab === 'workouts' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    Workouts, Amenities, Rules & Safety
+                  </Title>
+                  <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
+                    Configure fitness disciplines, member amenities, gym rules and safety protocols.
+                  </Text>
+                </div>
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  loading={isSavingWorkoutsRules}
+                  onClick={handleSaveWorkoutsRules}
+                  style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
+                >
+                  Save All Changes
+                </Button>
+              </div>
+
+              {/* Workouts Offered */}
+              <Card
+                style={{ backgroundColor: 'var(--bg-surface-elevated)', borderColor: 'var(--border-color)', borderRadius: 'var(--radius-base)', marginBottom: 16 }}
+                styles={{ body: { padding: '20px' } }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FireOutlined style={{ color: '#EC4899' }} /> Workout Disciplines Offered
+                </div>
+                <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b', marginBottom: 14 }}>Select all fitness categories available at your facility</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {WORKOUT_OPTIONS.map((w) => {
+                    const selected = gymWorkouts.includes(w);
+                    return (
+                      <Tag.CheckableTag
+                        key={w}
+                        checked={selected}
+                        onChange={(chk) => {
+                          setGymWorkouts(chk ? [...gymWorkouts, w] : gymWorkouts.filter((x) => x !== w));
+                        }}
+                        style={{
+                          padding: '6px 14px', borderRadius: 16, fontSize: 13, fontWeight: 600,
+                          backgroundColor: selected ? '#EC4899' : (isDarkMode ? '#1e293b' : '#fdf2f8'),
+                          color: selected ? '#ffffff' : (isDarkMode ? '#cbd5e1' : '#831843'),
+                          border: `1px solid ${selected ? '#EC4899' : (isDarkMode ? '#334155' : '#f9a8d4')}`,
+                        }}
+                      >
+                        {w}
+                      </Tag.CheckableTag>
+                    );
+                  })}
+                </div>
+                {gymWorkouts.length > 0 && (
+                  <div style={{ marginTop: 10, fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
+                    {gymWorkouts.length} discipline(s) selected
+                  </div>
+                )}
+              </Card>
+
+              {/* Amenities */}
+              <Card
+                style={{ backgroundColor: 'var(--bg-surface-elevated)', borderColor: 'var(--border-color)', borderRadius: 'var(--radius-base)', marginBottom: 16 }}
+                styles={{ body: { padding: '20px' } }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <StarFilled style={{ color: '#F59E0B' }} /> Amenities & Member Perks
+                </div>
+                <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b', marginBottom: 14 }}>Select available member services and convenience amenities</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {AMENITY_OPTIONS.map((a) => {
+                    const selected = gymAmenities.includes(a);
+                    return (
+                      <Tag.CheckableTag
+                        key={a}
+                        checked={selected}
+                        onChange={(chk) => {
+                          setGymAmenities(chk ? [...gymAmenities, a] : gymAmenities.filter((x) => x !== a));
+                        }}
+                        style={{
+                          padding: '6px 14px', borderRadius: 16, fontSize: 13, fontWeight: 600,
+                          backgroundColor: selected ? '#F59E0B' : (isDarkMode ? '#1e293b' : '#fffbeb'),
+                          color: selected ? '#ffffff' : (isDarkMode ? '#cbd5e1' : '#92400e'),
+                          border: `1px solid ${selected ? '#F59E0B' : (isDarkMode ? '#334155' : '#fcd34d')}`,
+                        }}
+                      >
+                        {a}
+                      </Tag.CheckableTag>
+                    );
+                  })}
+                </div>
+              </Card>
+
+              <Row gutter={[16, 16]}>
+                {/* Gym Rules */}
+                <Col xs={24} md={12}>
+                  <Card
+                    style={{ backgroundColor: 'var(--bg-surface-elevated)', borderColor: 'var(--border-color)', borderRadius: 'var(--radius-base)', height: '100%' }}
+                    styles={{ body: { padding: '20px' } }}
+                  >
+                    <div style={{ fontSize: 14, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <FileTextOutlined style={{ color: '#6366F1' }} /> Gym Rules & Member Guidelines
+                    </div>
+                    <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b', marginBottom: 14 }}>Set facility rules shown to members</div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                      {gymRules.map((rule, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}` }}>
+                          <CheckOutlined style={{ color: '#6366F1', fontSize: 12, flexShrink: 0 }} />
+                          <span style={{ flex: 1, fontSize: 13, color: isDarkMode ? '#e2e8f0' : '#334155' }}>{rule}</span>
+                          <Button
+                            type="text"
+                            size="small"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => handleDeleteRule(idx)}
+                            style={{ padding: '0 4px', flexShrink: 0 }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Input
+                        placeholder="Add new gym rule..."
+                        value={newRuleInput}
+                        onChange={(e) => setNewRuleInput(e.target.value)}
+                        onPressEnter={handleAddRule}
+                        style={{ borderRadius: 'var(--radius-base)' }}
+                      />
+                      <Button type="primary" ghost icon={<PlusOutlined />} onClick={handleAddRule} style={{ flexShrink: 0 }}>Add</Button>
+                    </div>
+                  </Card>
+                </Col>
+
+                {/* Safety Measures */}
+                <Col xs={24} md={12}>
+                  <Card
+                    style={{ backgroundColor: 'var(--bg-surface-elevated)', borderColor: 'var(--border-color)', borderRadius: 'var(--radius-base)', height: '100%' }}
+                    styles={{ body: { padding: '20px' } }}
+                  >
+                    <div style={{ fontSize: 14, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <SafetyCertificateOutlined style={{ color: '#10B981' }} /> Safety Measures & Protocols
+                    </div>
+                    <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b', marginBottom: 14 }}>List safety standards visible in gym details</div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                      {safetyMeasures.map((measure, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, backgroundColor: isDarkMode ? '#1e293b' : '#f0fdf4', border: `1px solid ${isDarkMode ? '#334155' : '#bbf7d0'}` }}>
+                          <CheckCircleFilled style={{ color: '#10B981', fontSize: 12, flexShrink: 0 }} />
+                          <span style={{ flex: 1, fontSize: 13, color: isDarkMode ? '#e2e8f0' : '#166534' }}>{measure}</span>
+                          <Button
+                            type="text"
+                            size="small"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => handleDeleteSafety(idx)}
+                            style={{ padding: '0 4px', flexShrink: 0 }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Input
+                        placeholder="Add safety measure..."
+                        value={newSafetyInput}
+                        onChange={(e) => setNewSafetyInput(e.target.value)}
+                        onPressEnter={handleAddSafety}
+                        style={{ borderRadius: 'var(--radius-base)' }}
+                      />
+                      <Button type="primary" ghost icon={<PlusOutlined />} onClick={handleAddSafety} style={{ flexShrink: 0 }}>Add</Button>
+                    </div>
+                  </Card>
+                </Col>
+              </Row>
+
+              <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<SaveOutlined />}
+                  loading={isSavingWorkoutsRules}
+                  onClick={handleSaveWorkoutsRules}
+                  style={{ borderRadius: 'var(--radius-base)', fontWeight: 700, minWidth: 180 }}
+                >
+                  Save Workouts & Rules
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 3: PRICING & MEMBERSHIP PLANS */}
+          {/* ========================================================================= */}
+          {activeTab === 'pricing' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    Standard Membership Tiers ({pricingPlans.length})
+                  </Title>
+                  <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
+                    Standardized Monthly, Quarterly, Half Yearly, and Annual membership tiers.
+                  </Text>
+                </div>
+              </div>
+
+              {pricingPlans.length > 0 ? (
+                <Row gutter={[20, 20]}>
+                  {pricingPlans.map((plan) => (
+                    <Col xs={24} sm={12} lg={6} key={plan.id}>
+                      <Card
+                        style={{
+                          backgroundColor: 'var(--bg-surface-elevated)',
+                          borderColor: plan.popular ? 'var(--color-primary)' : 'var(--border-color)',
+                          borderWidth: plan.popular ? 2 : 1,
+                          borderRadius: 'var(--radius-base)',
+                          position: 'relative',
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                        }}
+                        styles={{ body: { padding: '22px 18px', display: 'flex', flexDirection: 'column', height: '100%' } }}
+                      >
+                        {plan.popular && (
+                          <Tag
+                            color="blue"
+                            style={{
+                              position: 'absolute',
+                              top: -10,
+                              right: 16,
+                              fontWeight: 700,
+                              fontSize: 10.5,
+                              borderRadius: 4,
+                            }}
+                          >
+                            MOST POPULAR
+                          </Tag>
+                        )}
+
+                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase' }}>
+                          {plan.badge || 'Plan'}
+                        </div>
+                        <div style={{ fontSize: 17, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginTop: 4 }}>
+                          {plan.name}
+                        </div>
+
+                        <div style={{ margin: '14px 0 10px 0', display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 6 }}>
+                          <span style={{ fontSize: 28, fontWeight: 900, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                            ₹{Number(plan.price).toLocaleString('en-IN')}
+                          </span>
+                          <span style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}> / {plan.duration}</span>
+                          {plan.savingsText && (
+                            <Tag color="success" style={{ fontWeight: 700, fontSize: 11, borderRadius: 4, marginLeft: 2 }}>
+                              {plan.savingsText}
+                            </Tag>
+                          )}
+                        </div>
+
+                        <Text style={{ fontSize: 12, color: isDarkMode ? '#aaaaaa' : '#64748b', lineHeight: 1.4, marginBottom: 16 }}>
+                          {plan.description || 'Full gym access membership.'}
+                        </Text>
+
+                        <Divider style={{ margin: '10px 0' }} />
+
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                          {(plan.features || []).map((feat, fIdx) => (
+                            <div key={fIdx} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: isDarkMode ? '#dddddd' : '#334155' }}>
+                              <CheckCircleFilled style={{ color: '#00bf62', fontSize: 13 }} />
+                              <span>{feat}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <Button
+                          block
+                          onClick={() => {
+                            setSelectedPlanForEdit(plan);
+                            editPlanForm.setFieldsValue({
+                              name: plan.name,
+                              badge: plan.badge,
+                              price: plan.price,
+                              duration: plan.duration,
+                              description: plan.description,
+                              features: Array.isArray(plan.features) ? plan.features.join('\n') : '',
+                              popular: plan.popular || false,
+                            });
+                            setIsEditPlanModalOpen(true);
+                          }}
+                          style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
+                        >
+                          Edit Plan Details
+                        </Button>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              ) : (
+                <Empty
+                  description={
+                    <span style={{ color: isDarkMode ? '#888888' : '#64748b' }}>
+                      No pricing plans added yet. Click "Add Pricing Tier" to create membership passes.
                     </span>
-                    <span
+                  }
+                  style={{ margin: '40px 0' }}
+                />
+              )}
+
+              {/* Divider between gym plans and trainer pricing */}
+              <Divider style={{ margin: '36px 0 24px 0', borderColor: isDarkMode ? '#222222' : '#e2e8f0' }} />
+
+              {/* Trainer-Membership Tier Pricing Mapping */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    Trainer Membership Tier Pricing Mapping ({gymTrainersPricing.length})
+                  </Title>
+                  <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
+                    Configure specific rates charged to members when selecting individual trainers for each membership tier.
+                  </Text>
+                </div>
+                {gymTrainersPricing.length > 0 && (
+                  <Button
+                    type="primary"
+                    icon={<SaveOutlined />}
+                    loading={isSavingTrainerPricing}
+                    onClick={handleSaveAllTrainerPricing}
+                    style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
+                  >
+                    Save Trainer Pricing
+                  </Button>
+                )}
+              </div>
+
+              {gymTrainersPricing.length > 0 ? (
+                <div style={{ overflowX: 'auto' }}>
+                  <Table
+                    size="middle"
+                    bordered
+                    pagination={false}
+                    dataSource={gymTrainersPricing}
+                    rowKey={(r) => r.employeeId || r.name}
+                    columns={[
+                      {
+                        title: 'Trainer Details',
+                        key: 'trainer',
+                        width: 240,
+                        render: (_, record) => (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <Avatar src={record.imageUrl} size={42} style={{ border: '2px solid #722ed1', flexShrink: 0 }}>
+                              {record.name?.[0]?.toUpperCase()}
+                            </Avatar>
+                            <div>
+                              <div style={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', fontSize: 14 }}>
+                                {record.name}
+                              </div>
+                              <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
+                                {record.specialty || 'Personal Trainer'}
+                              </div>
+                            </div>
+                          </div>
+                        ),
+                      },
+                      {
+                        title: 'Monthly Plan (₹)',
+                        key: 'monthly',
+                        render: (_, record, index) => (
+                          <InputNumber
+                            prefix="₹"
+                            min={0}
+                            formatter={formatAmountWithCommas}
+                            parser={parseAmountWithoutCommas}
+                            value={record.trainerPricing?.monthly || 0}
+                            onChange={(val) => {
+                              const cleanVal = Number(String(val || 0).replace(/,/g, '')) || 0;
+                              const updated = [...gymTrainersPricing];
+                              updated[index] = {
+                                ...updated[index],
+                                trainerPricing: { ...updated[index].trainerPricing, monthly: cleanVal },
+                              };
+                              setGymTrainersPricing(updated);
+                            }}
+                            style={{ width: '100%', minWidth: 110, borderRadius: 'var(--radius-base)' }}
+                          />
+                        ),
+                      },
+                      {
+                        title: 'Quarterly Plan (₹)',
+                        key: 'quarterly',
+                        render: (_, record, index) => (
+                          <InputNumber
+                            prefix="₹"
+                            min={0}
+                            formatter={formatAmountWithCommas}
+                            parser={parseAmountWithoutCommas}
+                            value={record.trainerPricing?.quarterly || 0}
+                            onChange={(val) => {
+                              const cleanVal = Number(String(val || 0).replace(/,/g, '')) || 0;
+                              const updated = [...gymTrainersPricing];
+                              updated[index] = {
+                                ...updated[index],
+                                trainerPricing: { ...updated[index].trainerPricing, quarterly: cleanVal },
+                              };
+                              setGymTrainersPricing(updated);
+                            }}
+                            style={{ width: '100%', minWidth: 110, borderRadius: 'var(--radius-base)' }}
+                          />
+                        ),
+                      },
+                      {
+                        title: 'Half Yearly Plan (₹)',
+                        key: 'halfYearly',
+                        render: (_, record, index) => (
+                          <InputNumber
+                            prefix="₹"
+                            min={0}
+                            formatter={formatAmountWithCommas}
+                            parser={parseAmountWithoutCommas}
+                            value={record.trainerPricing?.halfYearly || 0}
+                            onChange={(val) => {
+                              const cleanVal = Number(String(val || 0).replace(/,/g, '')) || 0;
+                              const updated = [...gymTrainersPricing];
+                              updated[index] = {
+                                ...updated[index],
+                                trainerPricing: { ...updated[index].trainerPricing, halfYearly: cleanVal },
+                              };
+                              setGymTrainersPricing(updated);
+                            }}
+                            style={{ width: '100%', minWidth: 110, borderRadius: 'var(--radius-base)' }}
+                          />
+                        ),
+                      },
+                      {
+                        title: 'Annual Plan (₹)',
+                        key: 'annual',
+                        render: (_, record, index) => (
+                          <InputNumber
+                            prefix="₹"
+                            min={0}
+                            formatter={formatAmountWithCommas}
+                            parser={parseAmountWithoutCommas}
+                            value={record.trainerPricing?.annual || 0}
+                            onChange={(val) => {
+                              const cleanVal = Number(String(val || 0).replace(/,/g, '')) || 0;
+                              const updated = [...gymTrainersPricing];
+                              updated[index] = {
+                                ...updated[index],
+                                trainerPricing: { ...updated[index].trainerPricing, annual: cleanVal },
+                              };
+                              setGymTrainersPricing(updated);
+                            }}
+                            style={{ width: '100%', minWidth: 110, borderRadius: 'var(--radius-base)' }}
+                          />
+                        ),
+                      },
+                      {
+                        title: 'Single Session (₹)',
+                        key: 'singleSession',
+                        render: (_, record, index) => (
+                          <InputNumber
+                            prefix="₹"
+                            min={0}
+                            formatter={formatAmountWithCommas}
+                            parser={parseAmountWithoutCommas}
+                            value={record.trainerPricing?.singleSession || 0}
+                            onChange={(val) => {
+                              const cleanVal = Number(String(val || 0).replace(/,/g, '')) || 0;
+                              const updated = [...gymTrainersPricing];
+                              updated[index] = {
+                                ...updated[index],
+                                trainerPricing: { ...updated[index].trainerPricing, singleSession: cleanVal },
+                              };
+                              setGymTrainersPricing(updated);
+                            }}
+                            style={{ width: '100%', minWidth: 110, borderRadius: 'var(--radius-base)' }}
+                          />
+                        ),
+                      },
+                    ]}
+                  />
+                </div>
+              ) : (
+                <Empty
+                  description={
+                    <span style={{ color: isDarkMode ? '#888888' : '#64748b' }}>
+                      No active trainers found for this gym. Add trainers in Employee Management to configure their tier pricing.
+                    </span>
+                  }
+                  style={{ margin: '30px 0' }}
+                />
+              )}
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 4: IMAGES & MEDIA GALLERY */}
+          {/* ========================================================================= */}
+          {activeTab === 'images' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    Gym Gallery & Media ({galleryPhotosList.length} Photos)
+                  </Title>
+                  <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
+                    Upload high-definition photos of your workout floor, turnstiles, cardio deck, and amenities.
+                  </Text>
+                </div>
+                <Button
+                  type="primary"
+                  icon={<CameraOutlined />}
+                  onClick={handleGalleryUpload}
+                  loading={isUploadingMedia}
+                  style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
+                >
+                  Upload Photos
+                </Button>
+              </div>
+
+              {galleryPhotosList.length > 0 ? (
+                <Image.PreviewGroup>
+                  <Row gutter={[16, 16]}>
+                    {galleryPhotosList.map((img, idx) => (
+                      <Col xs={24} sm={12} md={8} lg={6} key={idx}>
+                        <Card
+                          hoverable
+                          style={{
+                            backgroundColor: 'var(--bg-surface-elevated)',
+                            borderColor: 'var(--border-color)',
+                            borderRadius: 'var(--radius-base)',
+                            overflow: 'hidden',
+                          }}
+                          styles={{ body: { padding: 0 } }}
+                        >
+                          <div style={{ height: 190, position: 'relative', overflow: 'hidden' }}>
+                            <Image
+                              src={img}
+                              alt={`gym-gallery-${idx}`}
+                              style={{ width: '100%', height: 190, objectFit: 'cover' }}
+                              wrapperStyle={{ width: '100%', height: 190 }}
+                              preview={{
+                                mask: (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}>
+                                    <EyeOutlined /> Preview Photo
+                                  </div>
+                                ),
+                              }}
+                            />
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                display: 'flex',
+                                gap: 6,
+                                zIndex: 10,
+                              }}
+                            >
+                              <Popconfirm
+                                title="Delete Photo"
+                                description="Are you sure you want to remove this photo?"
+                                onConfirm={() => handleDeleteGalleryPhoto(idx)}
+                                okText="Delete"
+                                cancelText="Cancel"
+                              >
+                                <Button
+                                  size="small"
+                                  danger
+                                  icon={<DeleteOutlined />}
+                                  style={{
+                                    backgroundColor: 'rgba(255, 77, 79, 0.95)',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: 'var(--radius-base)',
+                                  }}
+                                />
+                              </Popconfirm>
+                            </div>
+                          </div>
+                        </Card>
+                      </Col>
+                    ))}
+                  </Row>
+                </Image.PreviewGroup>
+              ) : (
+                <Empty
+                  description={
+                    <span style={{ color: isDarkMode ? '#888888' : '#64748b' }}>
+                      No gallery photos uploaded yet. Click "Upload Photos" to add facility pictures.
+                    </span>
+                  }
+                  style={{ margin: '40px 0' }}
+                />
+              )}
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 5: OPERATING HOURS & SCHEDULE */}
+          {/* ========================================================================= */}
+          {activeTab === 'hours' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Top Control & Action Bar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
+                <div>
+                  <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    Gym Operating Hours & Schedule
+                  </Title>
+                  <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
+                    Configure opening and closing timings for each day of the week.
+                  </Text>
+                </div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Button
+                    icon={<CopyOutlined />}
+                    onClick={() => {
+                      const mon = operatingHours[0];
+                      if (!mon) return;
+                      setOperatingHours((prev) =>
+                        prev.map((item, i) => {
+                          if (i >= 1) {
+                            return {
+                              ...item,
+                              isOpen: mon.isOpen,
+                              openTime: mon.openTime,
+                              closeTime: mon.closeTime,
+                            };
+                          }
+                          return item;
+                        })
+                      );
+                      message.success('Monday schedule copied to all days (Tue - Sun)!');
+                    }}
+                    style={{ borderRadius: 'var(--radius-base)' }}
+                  >
+                    Copy Mon to All Days
+                  </Button>
+
+                  <Button
+                    type="primary"
+                    icon={<SaveOutlined />}
+                    loading={isSavingHours}
+                    onClick={handleSaveOperatingHours}
+                    style={{ borderRadius: 'var(--radius-base)' }}
+                  >
+                    Save Schedule
+                  </Button>
+                </div>
+              </div>
+
+              {/* Day-by-Day Operating Hours Card */}
+              <Card
+                title={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <ClockCircleOutlined style={{ color: 'var(--color-primary)' }} />
+                    <span style={{ fontWeight: 700, fontSize: 15 }}>Day-by-Day Working Hours</span>
+                  </div>
+                }
+                style={{
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  borderColor: 'var(--border-color)',
+                  borderRadius: 'var(--radius-base)',
+                }}
+                styles={{ body: { padding: '20px' } }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {operatingHours.map((item, idx) => (
+                    <div
+                      key={idx}
                       style={{
-                        color: item.isOpen ? '#10b981' : '#ef4444',
-                        fontWeight: 700,
-                        fontSize: 12,
-                        letterSpacing: '0.5px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 16,
+                        padding: '14px 20px',
+                        borderRadius: 'var(--radius-base)',
+                        backgroundColor: isDarkMode ? '#141414' : '#f8fafc',
+                        border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}`,
                       }}
                     >
-                      {item.isOpen ? 'OPEN' : 'CLOSED'}
-                    </span>
+                      {/* Day and Status */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 160 }}>
+                        <div
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            backgroundColor: item.isOpen ? '#10b981' : '#ef4444',
+                          }}
+                        />
+                        <span style={{ fontWeight: 700, fontSize: 15, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          {item.day}
+                        </span>
+                        <span
+                          style={{
+                            color: item.isOpen ? '#10b981' : '#ef4444',
+                            fontWeight: 700,
+                            fontSize: 12,
+                            letterSpacing: '0.5px',
+                          }}
+                        >
+                          {item.isOpen ? 'OPEN' : 'CLOSED'}
+                        </span>
+                      </div>
+
+                      {/* Timing Pickers */}
+                      {item.isOpen ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                          <Text style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>From</Text>
+                          <Select
+                            value={item.openTime || '05:30 AM'}
+                            onChange={(val) => {
+                              setOperatingHours((prev) =>
+                                prev.map((d, i) => (i === idx ? { ...d, openTime: val } : d))
+                              );
+                            }}
+                            style={{ width: 130 }}
+                            size="middle"
+                          >
+                            {TIME_SLOTS.map((t) => (
+                              <Option key={t} value={t}>{t}</Option>
+                            ))}
+                          </Select>
+                          <Text style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>to</Text>
+                          <Select
+                            value={item.closeTime || '10:30 PM'}
+                            onChange={(val) => {
+                              setOperatingHours((prev) =>
+                                prev.map((d, i) => (i === idx ? { ...d, closeTime: val } : d))
+                              );
+                            }}
+                            style={{ width: 130 }}
+                            size="middle"
+                          >
+                            {TIME_SLOTS.map((t) => (
+                              <Option key={t} value={t}>{t}</Option>
+                            ))}
+                          </Select>
+                        </div>
+                      ) : (
+                        <Text style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#94a3b8', fontStyle: 'italic' }}>
+                          Gym Closed on {item.day}
+                        </Text>
+                      )}
+
+                      {/* Toggle Switch */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Text style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
+                          {item.isOpen ? 'Open' : 'Closed'}
+                        </Text>
+                        <Switch
+                          checked={item.isOpen}
+                          onChange={(checked) => {
+                            setOperatingHours((prev) =>
+                              prev.map((d, i) => (i === idx ? { ...d, isOpen: checked } : d))
+                            );
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              {/* Special Holidays & Planned Closures Card */}
+              <Card
+                title={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    <CalendarOutlined style={{ color: 'var(--color-primary)' }} /> Special Holidays & Planned Closures ({holidayExceptions.length})
+                  </div>
+                }
+                extra={
+                  <Button
+                    icon={<PlusOutlined />}
+                    onClick={() => setIsAddHolidayModalOpen(true)}
+                    style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
+                  >
+                    Add Exception
+                  </Button>
+                }
+                style={{
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  borderColor: 'var(--border-color)',
+                  borderRadius: 'var(--radius-base)',
+                }}
+                styles={{ body: { padding: '20px' } }}
+              >
+                <Paragraph style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13, marginBottom: 16 }}>
+                  Turnstiles will automatically enforce blackout dates or modified shift hours. Members will receive notifications 24 hours prior.
+                </Paragraph>
+
+                {holidayExceptions.length > 0 ? (
+                  <Table
+                    dataSource={holidayExceptions}
+                    rowKey="id"
+                    pagination={false}
+                    scroll={{ x: 800 }}
+                    size="middle"
+                    columns={[
+                      {
+                        title: 'Date',
+                        dataIndex: 'date',
+                        key: 'date',
+                        width: 140,
+                        render: (date) => (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: isDarkMode ? '#e2e8f0' : '#334155' }}>
+                            <CalendarOutlined style={{ color: 'var(--color-primary)' }} />
+                            <span>{date}</span>
+                          </div>
+                        ),
+                      },
+                      {
+                        title: 'Occasion / Event',
+                        dataIndex: 'title',
+                        key: 'title',
+                        render: (title) => (
+                          <span style={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                            {title}
+                          </span>
+                        ),
+                      },
+                      {
+                        title: 'Schedule Type',
+                        dataIndex: 'type',
+                        key: 'type',
+                        width: 150,
+                        render: (type) => {
+                          const isClosed = (type || '').toLowerCase().includes('closed');
+                          const isModified = (type || '').toLowerCase().includes('modified');
+                          const color = isClosed ? '#ef4444' : isModified ? '#d97706' : '#10b981';
+                          return (
+                            <span style={{ color, fontWeight: 700, fontSize: 12, textTransform: 'uppercase' }}>
+                              {type}
+                            </span>
+                          );
+                        },
+                      },
+                      {
+                        title: 'Effective Timings',
+                        dataIndex: 'hours',
+                        key: 'hours',
+                        render: (hours) => (
+                          <span style={{ color: isDarkMode ? '#d1d5db' : '#334155', fontSize: 13 }}>
+                            {hours || 'Full Day Closed'}
+                          </span>
+                        ),
+                      },
+                      {
+                        title: 'Notes',
+                        dataIndex: 'notes',
+                        key: 'notes',
+                        render: (notes) => (
+                          <span style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
+                            {notes || '—'}
+                          </span>
+                        ),
+                      },
+                      {
+                        title: 'Actions',
+                        key: 'actions',
+                        width: 80,
+                        align: 'center',
+                        render: (_, record) => (
+                          <Popconfirm
+                            title="Remove Exception"
+                            description={`Remove holiday rule for ${record.title}?`}
+                            onConfirm={() => handleDeleteHoliday(record.id)}
+                            okText="Delete"
+                            cancelText="Cancel"
+                          >
+                            <Button type="text" danger icon={<DeleteOutlined />} />
+                          </Popconfirm>
+                        ),
+                      },
+                    ]}
+                  />
+                ) : (
+                  <Empty description="No holiday exception rules added yet." style={{ margin: '20px 0' }} />
+                )}
+              </Card>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 6: BANK DETAILS & PAYOUT SETTLEMENT */}
+          {/* ========================================================================= */}
+          {activeTab === 'bank' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    Bank Details & Direct Settlements
+                  </Title>
+                  <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
+                    Configure primary receiving bank account, branch details, and instant UPI settlement ID.
+                  </Text>
+                </div>
+                <Button
+                  type="primary"
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    bankForm.setFieldsValue(bankDetails);
+                    setIsEditBankModalOpen(true);
+                  }}
+                  style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
+                >
+                  Update Bank Details
+                </Button>
+              </div>
+
+              <Row gutter={[20, 20]}>
+                {/* Primary Bank Card */}
+                <Col xs={24} md={14}>
+                  <Card
+                    title={
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                        <BankOutlined style={{ color: 'var(--color-primary)' }} /> Primary Settlement Account
+                      </div>
+                    }
+                    style={{
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      borderColor: 'var(--border-color)',
+                      borderRadius: 'var(--radius-base)',
+                      height: '100%',
+                    }}
+                    styles={{ body: { padding: '20px' } }}
+                  >
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 11 }}>ACCOUNT HOLDER</Text>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          {bankDetails.accountHolder || gymData?.ownerName || 'Not Provided'}
+                        </div>
+                      </div>
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 11 }}>BANK NAME</Text>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          {bankDetails.bankName || 'Not Provided'}
+                        </div>
+                      </div>
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 11 }}>ACCOUNT NUMBER</Text>
+                        <div style={{ fontWeight: 700, fontSize: 14, fontFamily: 'monospace' }}>
+                          {bankDetails.accountNumber ? `•••• •••• ${bankDetails.accountNumber.slice(-4)}` : 'Not Provided'}
+                        </div>
+                      </div>
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 11 }}>IFSC CODE</Text>
+                        <div style={{ fontWeight: 700, fontSize: 14, fontFamily: 'monospace' }}>
+                          {bankDetails.ifscCode || 'Not Provided'}
+                        </div>
+                      </div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <Text type="secondary" style={{ fontSize: 11 }}>BRANCH ADDRESS</Text>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          {bankDetails.branch || gymData?.city || 'Not Provided'}
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                </Col>
+
+                {/* Instant UPI Settlement */}
+                <Col xs={24} md={10}>
+                  <Card
+                    title={
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                        <CreditCardOutlined style={{ color: 'var(--color-primary)' }} /> Instant UPI Settlement
+                      </div>
+                    }
+                    style={{
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      borderColor: 'var(--border-color)',
+                      borderRadius: 'var(--radius-base)',
+                      height: '100%',
+                    }}
+                    styles={{ body: { padding: '20px' } }}
+                  >
+                    <div style={{ marginBottom: 20 }}>
+                      <Text type="secondary" style={{ fontSize: 11 }}>INSTANT UPI SETTLEMENT ID</Text>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-primary)', fontFamily: 'monospace', marginTop: 4 }}>
+                        {bankDetails.upiId || 'Not Configured'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <Tag color="success" style={{ borderRadius: 4, fontWeight: 700, padding: '4px 8px' }}>
+                        <CheckCircleFilled /> GST Compliant & Verified
+                      </Tag>
+                    </div>
+                  </Card>
+                </Col>
+              </Row>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 7: SOCIAL LINKS & ONLINE PRESENCE */}
+          {/* ========================================================================= */}
+          {activeTab === 'social' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                  <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    Social Media & Digital Brand Presence
+                  </Title>
+                  <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
+                    Connect social media pages, Google Maps ratings, and WhatsApp booking channel.
+                  </Text>
+                </div>
+                <Button
+                  type="primary"
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    socialForm.setFieldsValue(socialLinks);
+                    setIsEditSocialModalOpen(true);
+                  }}
+                  style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
+                >
+                  Edit Social Handles
+                </Button>
+              </div>
+
+              <Row gutter={[16, 16]}>
+                {/* Instagram */}
+                <Col xs={24} sm={12} lg={6}>
+                  <Card
+                    style={{
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      borderColor: 'var(--border-color)',
+                      borderRadius: 'var(--radius-base)',
+                    }}
+                    styles={{ body: { padding: '20px' } }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#e1306c', fontSize: 24 }}>
+                      <InstagramOutlined />
+                      <span style={{ fontSize: 15, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>Instagram</span>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', marginTop: 8 }}>
+                      {socialLinks.instagramHandle || 'Not Connected'}
+                    </div>
+                    <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 4 }}>
+                      Brand Account
+                    </div>
+                  </Card>
+                </Col>
+
+                {/* Google Maps Profile */}
+                <Col xs={24} sm={12} lg={6}>
+                  <Card
+                    style={{
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      borderColor: 'var(--border-color)',
+                      borderRadius: 'var(--radius-base)',
+                    }}
+                    styles={{ body: { padding: '20px' } }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#4285f4', fontSize: 24 }}>
+                      <GlobalOutlined />
+                      <span style={{ fontSize: 15, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>Google Maps</span>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#fa8c16', marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <StarFilled style={{ color: '#fa8c16' }} /> {socialLinks.googleRating || gymData?.rating || '4.9'} / 5.0
+                    </div>
+                    <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 4 }}>
+                      {socialLinks.googleReviewCount || gymData?.reviewsCount || 0} Verified Reviews
+                    </div>
+                  </Card>
+                </Col>
+
+                {/* WhatsApp Business */}
+                <Col xs={24} sm={12} lg={6}>
+                  <Card
+                    style={{
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      borderColor: 'var(--border-color)',
+                      borderRadius: 'var(--radius-base)',
+                    }}
+                    styles={{ body: { padding: '20px' } }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#25d366', fontSize: 24 }}>
+                      <WhatsAppOutlined />
+                      <span style={{ fontSize: 15, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>WhatsApp</span>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: isDarkMode ? '#ffffff' : '#0f172a', marginTop: 8 }}>
+                      {socialLinks.whatsapp || gymData?.phone || 'Not Connected'}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#00bf62', marginTop: 4, fontWeight: 600 }}>
+                      Active Contact
+                    </div>
+                  </Card>
+                </Col>
+
+                {/* Website */}
+                <Col xs={24} sm={12} lg={6}>
+                  <Card
+                    style={{
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      borderColor: 'var(--border-color)',
+                      borderRadius: 'var(--radius-base)',
+                    }}
+                    styles={{ body: { padding: '20px' } }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#1677ff', fontSize: 24 }}>
+                      <GlobalOutlined />
+                      <span style={{ fontSize: 15, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>Website</span>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: isDarkMode ? '#ffffff' : '#0f172a', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {socialLinks.website || 'Not Configured'}
+                    </div>
+                    <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 4 }}>
+                      Official Portal
+                    </div>
+                  </Card>
+                </Col>
+              </Row>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 8: GYM SYSTEM SETTINGS & PREFERENCES */}
+          {/* ========================================================================= */}
+          {activeTab === 'settings' && (
+            <div>
+              <div style={{ marginBottom: 18 }}>
+                <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                  Gym System & Turnstile Configurations
+                </Title>
+                <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
+                  Configure optical turnstile delay, member renewal grace periods, and SMS/WhatsApp notifications.
+                </Text>
+              </div>
+
+              <Card
+                style={{
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  borderColor: 'var(--border-color)',
+                  borderRadius: 'var(--radius-base)',
+                }}
+                styles={{ body: { padding: '24px' } }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  {/* Setting 1: Turnstile Timeout */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                        Turnstile Auto-Lock Duration
+                      </div>
+                      <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
+                        Number of seconds the optical turnstile gate barrier stays open after valid QR scan
+                      </div>
+                    </div>
+                    <Select
+                      value={systemSettings.turnstileTimeout}
+                      onChange={(v) => {
+                        const updated = { ...systemSettings, turnstileTimeout: v };
+                        handleSaveSettings(updated);
+                      }}
+                      style={{ width: 140 }}
+                    >
+                      <Option value={3}>3 Seconds</Option>
+                      <Option value={5}>5 Seconds</Option>
+                      <Option value={8}>8 Seconds</Option>
+                    </Select>
                   </div>
 
-                  {/* Timing: From When to When */}
-                  {item.isOpen ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <Text style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>From</Text>
-                      <Select
-                        value={item.openTime}
-                        onChange={(val) => {
-                          setOperatingHours((prev) =>
-                            prev.map((d, i) => (i === idx ? { ...d, openTime: val } : d))
-                          );
-                        }}
-                        style={{ width: 130 }}
-                        size="middle"
-                      >
-                        {TIME_SLOTS.filter((t) => t !== 'Closed').map((t) => (
-                          <Option key={t} value={t}>{t}</Option>
-                        ))}
-                      </Select>
-                      <Text style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>to</Text>
-                      <Select
-                        value={item.closeTime}
-                        onChange={(val) => {
-                          setOperatingHours((prev) =>
-                            prev.map((d, i) => (i === idx ? { ...d, closeTime: val } : d))
-                          );
-                        }}
-                        style={{ width: 130 }}
-                        size="middle"
-                      >
-                        {TIME_SLOTS.filter((t) => t !== 'Closed').map((t) => (
-                          <Option key={t} value={t}>{t}</Option>
-                        ))}
-                      </Select>
-                    </div>
-                  ) : (
-                    <Text style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#94a3b8', fontStyle: 'italic' }}>
-                      Gym Closed on {item.day}
-                    </Text>
-                  )}
+                  <Divider style={{ margin: 0 }} />
 
-                  {/* Toggle Switch */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
-                      {item.isOpen ? 'Open' : 'Closed'}
-                    </Text>
+                  {/* Setting 2: Renewal Grace Period */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                        Membership Renewal Grace Period
+                      </div>
+                      <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
+                        Allow members to check in for N days post-expiry before turnstile denies entry
+                      </div>
+                    </div>
+                    <Select
+                      value={systemSettings.renewalGracePeriod}
+                      onChange={(v) => {
+                        const updated = { ...systemSettings, renewalGracePeriod: v };
+                        handleSaveSettings(updated);
+                      }}
+                      style={{ width: 140 }}
+                    >
+                      <Option value={0}>0 Days (Strict)</Option>
+                      <Option value={3}>3 Days</Option>
+                      <Option value={7}>7 Days</Option>
+                    </Select>
+                  </div>
+
+                  <Divider style={{ margin: 0 }} />
+
+                  {/* Setting 3: SMS Alerts */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                        SMS Check-In Alerts
+                      </div>
+                      <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
+                        Send instant SMS confirmation when a member checks in via QR / NFC
+                      </div>
+                    </div>
                     <Switch
-                      checked={item.isOpen}
-                      onChange={(checked) => {
-                        setOperatingHours((prev) =>
-                          prev.map((d, i) => (i === idx ? { ...d, isOpen: checked } : d))
-                        );
+                      checked={systemSettings.smsCheckInAlerts}
+                      onChange={(chk) => {
+                        const updated = { ...systemSettings, smsCheckInAlerts: chk };
+                        handleSaveSettings(updated);
                       }}
                     />
                   </div>
-                </div>
-              ))}
-            </div>
-          </Card>
 
-          {/* Special Holidays & Planned Closures Card */}
-          <Card
-            title={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                <CalendarOutlined style={{ color: 'var(--color-primary)' }} /> Special Holidays & Planned Closures
-              </div>
-            }
-            extra={
-              <Button
-                icon={<PlusOutlined />}
-                onClick={() => setIsAddHolidayModalOpen(true)}
-                style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
-              >
-                Add Exception
-              </Button>
-            }
-            style={{
-              backgroundColor: 'var(--bg-surface-elevated)',
-              borderColor: 'var(--border-color)',
-              borderRadius: 'var(--radius-base)',
-              marginTop: 20,
-            }}
-            styles={{ body: { padding: '20px' } }}
-          >
-            <Paragraph style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13, marginBottom: 16 }}>
-              Turnstiles will automatically enforce these blackout dates or modified shift hours. Members will receive in-app push notifications 24 hours prior.
-            </Paragraph>
+                  <Divider style={{ margin: 0 }} />
 
-            <Table
-              dataSource={holidayExceptions}
-              rowKey="id"
-              pagination={false}
-              scroll={{ x: 1100 }}
-              tableLayout="fixed"
-              size="middle"
-              columns={[
-                {
-                  title: 'Date',
-                  dataIndex: 'date',
-                  key: 'date',
-                  width: 150,
-                  render: (date) => (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: isDarkMode ? '#e2e8f0' : '#334155', whiteSpace: 'nowrap' }}>
-                      <CalendarOutlined style={{ color: 'var(--color-primary)' }} />
-                      <span>{date}</span>
+                  {/* Setting 4: WhatsApp Alerts */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                        WhatsApp Renewal Notifications
+                      </div>
+                      <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
+                        Send automated renewal reminders to expiring members 3 days in advance
+                      </div>
                     </div>
-                  ),
-                },
-                {
-                  title: 'Occasion / Event',
-                  dataIndex: 'title',
-                  key: 'title',
-                  width: 250,
-                  ellipsis: true,
-                  render: (title) => (
-                    <span style={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                      {title}
-                    </span>
-                  ),
-                },
-                {
-                  title: 'Schedule Type',
-                  dataIndex: 'type',
-                  key: 'type',
-                  width: 160,
-                  render: (type) => {
-                    const isClosed = type?.toLowerCase().includes('closed');
-                    const isModified = type?.toLowerCase().includes('modified');
-                    const color = isClosed ? '#ef4444' : isModified ? '#d97706' : '#10b981';
-                    return (
-                      <span
-                        style={{
-                          color,
-                          fontWeight: 700,
-                          fontSize: 12,
-                          letterSpacing: '0.5px',
-                          textTransform: 'uppercase',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {type}
-                      </span>
-                    );
-                  },
-                },
-                {
-                  title: 'Effective Timings',
-                  dataIndex: 'hours',
-                  key: 'hours',
-                  width: 240,
-                  ellipsis: true,
-                  render: (hours) => (
-                    <span style={{ color: isDarkMode ? '#d1d5db' : '#334155', fontSize: 13 }}>
-                      {hours}
-                    </span>
-                  ),
-                },
-                {
-                  title: 'Turnstile & Staff Notes',
-                  dataIndex: 'notes',
-                  key: 'notes',
-                  width: 280,
-                  ellipsis: true,
-                  render: (notes) => (
-                    <Tooltip title={notes}>
-                      <span style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
-                        {notes}
-                      </span>
-                    </Tooltip>
-                  ),
-                },
-                {
-                  title: 'Actions',
-                  key: 'actions',
-                  width: 80,
-                  align: 'center',
-                  fixed: 'right',
-                  onCell: () => ({
-                    style: {
-                      backgroundColor: isDarkMode ? '#0d1117' : '#ffffff',
-                    },
-                  }),
-                  render: (_, record) => (
-                    <Button
-                      type="text"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() => {
-                        setHolidayExceptions((prev) => prev.filter((h) => h.id !== record.id));
-                        message.success(`Removed "${record.title}" exception rule`);
+                    <Switch
+                      checked={systemSettings.whatsappAlerts}
+                      onChange={(chk) => {
+                        const updated = { ...systemSettings, whatsappAlerts: chk };
+                        handleSaveSettings(updated);
                       }}
                     />
-                  ),
-                },
-              ]}
-            />
-          </Card>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 6: BANK DETAILS & PAYOUT SETTLEMENT */}
-      {/* ========================================================================= */}
-      {activeTab === 'bank' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
-            <div>
-              <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                Bank Details & Direct Settlements
-              </Title>
-              <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
-                Configure primary receiving bank account, branch details, and instant UPI settlement ID.
-              </Text>
+                  </div>
+                </div>
+              </Card>
             </div>
-            <Button
-              type="primary"
-              icon={<EditOutlined />}
-              onClick={() => {
-                bankForm.setFieldsValue(bankDetails);
-                setIsEditBankModalOpen(true);
-              }}
-              style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
-            >
-              Update Bank Details
-            </Button>
-          </div>
-
-          <Row gutter={[20, 20]}>
-            {/* Primary Bank Card */}
-            <Col xs={24} md={14}>
-              <Card
-                title={
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    <BankOutlined style={{ color: 'var(--color-primary)' }} /> Primary Settlement Account
-                  </div>
-                }
-                style={{
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                  borderColor: 'var(--border-color)',
-                  borderRadius: 'var(--radius-base)',
-                  height: '100%',
-                }}
-                styles={{ body: { padding: '20px' } }}
-              >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                  <div>
-                    <Text type="secondary" style={{ fontSize: 11 }}>ACCOUNT HOLDER</Text>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: isDarkMode ? '#ffffff' : '#0f172a' }}>{bankDetails.accountHolder}</div>
-                  </div>
-                  <div>
-                    <Text type="secondary" style={{ fontSize: 11 }}>BANK NAME</Text>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: isDarkMode ? '#ffffff' : '#0f172a' }}>{bankDetails.bankName}</div>
-                  </div>
-                  <div>
-                    <Text type="secondary" style={{ fontSize: 11 }}>ACCOUNT NUMBER</Text>
-                    <div style={{ fontWeight: 700, fontSize: 14, fontFamily: 'monospace' }}>•••• •••• {bankDetails.accountNumber.slice(-4)}</div>
-                  </div>
-                  <div>
-                    <Text type="secondary" style={{ fontSize: 11 }}>IFSC CODE</Text>
-                    <div style={{ fontWeight: 700, fontSize: 14, fontFamily: 'monospace' }}>{bankDetails.ifscCode}</div>
-                  </div>
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>BRANCH ADDRESS</Text>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: isDarkMode ? '#ffffff' : '#0f172a' }}>{bankDetails.branch}</div>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-
-            {/* Instant UPI Settlement */}
-            <Col xs={24} md={10}>
-              <Card
-                title={
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    <CreditCardOutlined style={{ color: 'var(--color-primary)' }} /> Instant UPI Settlement
-                  </div>
-                }
-                style={{
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                  borderColor: 'var(--border-color)',
-                  borderRadius: 'var(--radius-base)',
-                  height: '100%',
-                }}
-                styles={{ body: { padding: '20px' } }}
-              >
-                <div style={{ marginBottom: 20 }}>
-                  <Text type="secondary" style={{ fontSize: 11 }}>INSTANT UPI SETTLEMENT ID</Text>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-primary)', fontFamily: 'monospace', marginTop: 4 }}>
-                    {bankDetails.upiId}
-                  </div>
-                </div>
-
-                <div>
-                  <Tag color="success" style={{ borderRadius: 4, fontWeight: 700, padding: '4px 8px' }}>
-                    <CheckCircleFilled /> GST Compliant & Verified
-                  </Tag>
-                </div>
-              </Card>
-            </Col>
-          </Row>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 7: SOCIAL LINKS & ONLINE PRESENCE */}
-      {/* ========================================================================= */}
-      {activeTab === 'social' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
-            <div>
-              <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                Social Media & Digital Brand Presence
-              </Title>
-              <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
-                Connect social media pages, Google Business ratings, and WhatsApp booking channel.
-              </Text>
-            </div>
-            <Button
-              type="primary"
-              icon={<EditOutlined />}
-              onClick={() => {
-                socialForm.setFieldsValue(socialLinks);
-                setIsEditSocialModalOpen(true);
-              }}
-              style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
-            >
-              Edit Social Handles
-            </Button>
-          </div>
-
-          <Row gutter={[16, 16]}>
-            {/* Instagram */}
-            <Col xs={24} sm={12} lg={6}>
-              <Card
-                style={{
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                  borderColor: 'var(--border-color)',
-                  borderRadius: 'var(--radius-base)',
-                }}
-                styles={{ body: { padding: '20px' } }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#e1306c', fontSize: 24 }}>
-                  <InstagramOutlined />
-                  <span style={{ fontSize: 15, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>Instagram</span>
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', marginTop: 8 }}>
-                  {socialLinks.instagramHandle}
-                </div>
-                <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 4 }}>
-                  12.4K Fitness Followers
-                </div>
-              </Card>
-            </Col>
-
-            {/* Google Business Profile */}
-            <Col xs={24} sm={12} lg={6}>
-              <Card
-                style={{
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                  borderColor: 'var(--border-color)',
-                  borderRadius: 'var(--radius-base)',
-                }}
-                styles={{ body: { padding: '20px' } }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#4285f4', fontSize: 24 }}>
-                  <GlobalOutlined />
-                  <span style={{ fontSize: 15, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>Google Maps</span>
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#fa8c16', marginTop: 8 }}>
-                  ★ {socialLinks.googleRating} / 5.0
-                </div>
-                <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 4 }}>
-                  {socialLinks.googleReviewCount} Verified Reviews
-                </div>
-              </Card>
-            </Col>
-
-            {/* WhatsApp Business */}
-            <Col xs={24} sm={12} lg={6}>
-              <Card
-                style={{
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                  borderColor: 'var(--border-color)',
-                  borderRadius: 'var(--radius-base)',
-                }}
-                styles={{ body: { padding: '20px' } }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#25d366', fontSize: 24 }}>
-                  <WhatsAppOutlined />
-                  <span style={{ fontSize: 15, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>WhatsApp</span>
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: isDarkMode ? '#ffffff' : '#0f172a', marginTop: 8 }}>
-                  {socialLinks.whatsapp}
-                </div>
-                <div style={{ fontSize: 11, color: '#00bf62', marginTop: 4, fontWeight: 600 }}>
-                  Active Hotline
-                </div>
-              </Card>
-            </Col>
-
-            {/* YouTube */}
-            <Col xs={24} sm={12} lg={6}>
-              <Card
-                style={{
-                  backgroundColor: 'var(--bg-surface-elevated)',
-                  borderColor: 'var(--border-color)',
-                  borderRadius: 'var(--radius-base)',
-                }}
-                styles={{ body: { padding: '20px' } }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#ff0000', fontSize: 24 }}>
-                  <YoutubeOutlined />
-                  <span style={{ fontSize: 15, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>YouTube</span>
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: isDarkMode ? '#ffffff' : '#0f172a', marginTop: 8 }}>
-                  FitZone Workout Channel
-                </div>
-                <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 4 }}>
-                  Workout Guides & Nutrition Tips
-                </div>
-              </Card>
-            </Col>
-          </Row>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 8: GYM SYSTEM SETTINGS & PREFERENCES */}
-      {/* ========================================================================= */}
-      {activeTab === 'settings' && (
-        <div>
-          <div style={{ marginBottom: 18 }}>
-            <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-              Gym System & Turnstile Configurations
-            </Title>
-            <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
-              Configure optical turnstile delays and member renewal grace periods.
-            </Text>
-          </div>
-
-          <Card
-            style={{
-              backgroundColor: 'var(--bg-surface-elevated)',
-              borderColor: 'var(--border-color)',
-              borderRadius: 'var(--radius-base)',
-            }}
-            styles={{ body: { padding: '24px' } }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Setting 1: Turnstile Timeout */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    Turnstile Auto-Lock Duration
-                  </div>
-                  <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
-                    Number of seconds the physical gate barrier stays open after valid QR scan
-                  </div>
-                </div>
-                <Select
-                  value={systemSettings.turnstileTimeout}
-                  onChange={(v) => {
-                    setSystemSettings({ ...systemSettings, turnstileTimeout: v });
-                    message.success(`Turnstile auto-lock set to ${v} seconds.`);
-                  }}
-                  style={{ width: 140 }}
-                >
-                  <Option value={3}>3 Seconds</Option>
-                  <Option value={5}>5 Seconds</Option>
-                  <Option value={8}>8 Seconds</Option>
-                </Select>
-              </div>
-
-              <Divider style={{ margin: 0 }} />
-
-              {/* Setting 2: Renewal Grace Period */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    Membership Renewal Grace Period
-                  </div>
-                  <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
-                    Allow members to check in for N days post-expiry before turnstile denies entry
-                  </div>
-                </div>
-                <Select
-                  value={systemSettings.renewalGracePeriod}
-                  onChange={(v) => {
-                    setSystemSettings({ ...systemSettings, renewalGracePeriod: v });
-                    message.success(`Grace period set to ${v} days.`);
-                  }}
-                  style={{ width: 140 }}
-                >
-                  <Option value={0}>0 Days (Strict)</Option>
-                  <Option value={3}>3 Days</Option>
-                  <Option value={7}>7 Days</Option>
-                </Select>
-              </div>
-            </div>
-          </Card>
-        </div>
+          )}
+        </>
       )}
 
       {/* ========================================================================= */}
@@ -1954,14 +3511,13 @@ export const GymProfileManagement = () => {
 
       {/* 1. EDIT PROFILE MODAL */}
       <Modal
-        title="Request Gym Profile Edits"
+        title="Edit Gym Profile Information"
         open={isEditModalOpen}
         onCancel={() => setIsEditModalOpen(false)}
         footer={null}
-        width={650}
+        width={720}
       >
         <Form form={editForm} layout="vertical" onFinish={handleEditSubmit}>
-          {/* Logo & Cover Photo Upload Cards */}
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={12}>
               <div
@@ -1974,14 +3530,13 @@ export const GymProfileManagement = () => {
                   alignItems: 'center',
                   gap: 12,
                   cursor: 'pointer',
-                  transition: 'border-color 0.2s',
                 }}
                 onClick={handleLogoUpload}
               >
                 <Avatar
                   shape="square"
                   size={46}
-                  src={profile.logo}
+                  src={gymLogoUrl}
                   icon={<ShopOutlined />}
                   style={{ borderRadius: 'var(--radius-base)', flexShrink: 0 }}
                 />
@@ -2006,14 +3561,13 @@ export const GymProfileManagement = () => {
                   alignItems: 'center',
                   gap: 12,
                   cursor: 'pointer',
-                  transition: 'border-color 0.2s',
                 }}
                 onClick={handleCoverPhotoUpload}
               >
                 <Avatar
                   shape="square"
                   size={46}
-                  src={profile.coverPhoto}
+                  src={gymCoverUrl}
                   icon={<PictureOutlined />}
                   style={{ borderRadius: 'var(--radius-base)', flexShrink: 0 }}
                 />
@@ -2032,39 +3586,105 @@ export const GymProfileManagement = () => {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="name" label="Gym Name" rules={[{ required: true, message: 'Please enter gym name' }]}>
-                <Input />
+                <Input placeholder="e.g. FitZone Elite Fitness" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="phone" label="Phone Number" rules={[{ required: true }]}>
-                <Input />
+              <Form.Item name="ownerName" label="Owner / Partner Name" rules={[{ required: true, message: 'Please enter owner name' }]}>
+                <Input placeholder="e.g. Rajesh Kumar" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="email" label="Contact Email" rules={[{ required: true }]}>
-                <Input />
+              <Form.Item name="phone" label="Phone Number" rules={[{ required: true, message: 'Please enter phone' }]}>
+                <Input placeholder="e.g. 9876543210" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="area" label="Floor Area">
-                <Input />
+              <Form.Item name="email" label="Contact Email" rules={[{ required: true, type: 'email', message: 'Please enter valid email' }]}>
+                <Input placeholder="e.g. contact@fitzone.in" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="businessType" label="Business Type">
+                <Select>
+                  <Option value="Sole Proprietorship">Sole Proprietorship</Option>
+                  <Option value="Partnership">Partnership</Option>
+                  <Option value="Private Limited">Private Limited</Option>
+                  <Option value="LLP">LLP</Option>
+                  <Option value="Other">Other</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="genderAllowed" label="Gender Policy">
+                <Select>
+                  <Option value="Unisex">Unisex</Option>
+                  <Option value="Men Only">Men Only</Option>
+                  <Option value="Women Only">Women Only</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="gstNumber" label="GST Number">
+                <Input placeholder="e.g. 33AAAAA0000A1Z5" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="panNumber" label="PAN Number">
+                <Input placeholder="e.g. ABCDE1234F" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="yearEstablished" label="Year Established">
+                <Input placeholder="e.g. 2021" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="floorSpaceSqFt" label="Floor Space (Sq. Ft)">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="e.g. 3500" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="maxFloorCapacity" label="Max Floor Capacity">
+                <InputNumber style={{ width: '100%' }} min={1} placeholder="e.g. 60" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="area" label="Area / Locality">
+                <Input placeholder="e.g. Anna Nagar West" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="city" label="City" rules={[{ required: true, message: 'Please enter city' }]}>
+                <Input placeholder="e.g. Chennai" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="state" label="State">
+                <Input placeholder="e.g. Tamil Nadu" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="pincode" label="Pincode">
+                <Input placeholder="e.g. 600040" />
               </Form.Item>
             </Col>
             <Col span={24}>
-              <Form.Item name="address" label="Full Street Address">
-                <Input />
+              <Form.Item name="address" label="Full Street Address" rules={[{ required: true, message: 'Please enter street address' }]}>
+                <Input placeholder="e.g. Plot No. 12, 4th Main Road, Anna Nagar West" />
               </Form.Item>
             </Col>
             <Col span={24}>
-              <Form.Item name="about" label="About Gym Summary">
-                <TextArea rows={3} />
+              <Form.Item name="aboutText" label="About Gym Summary">
+                <TextArea rows={3} placeholder="Describe gym training style, equipment brands, certified trainers..." />
               </Form.Item>
             </Col>
           </Row>
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
             <Button onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
-            <Button type="primary" htmlType="submit">
-              Submit for Admin Review
+            <Button type="primary" htmlType="submit" loading={isSavingBasic}>
+              Save Profile Changes
             </Button>
           </div>
         </Form>
@@ -2075,7 +3695,7 @@ export const GymProfileManagement = () => {
         title="Pending Admin Approval Requests"
         open={isPendingRequestsOpen}
         onCancel={() => setIsPendingRequestsOpen(false)}
-        width={580}
+        width={600}
         footer={[
           <Button key="close" type="primary" onClick={() => setIsPendingRequestsOpen(false)}>
             Close
@@ -2083,37 +3703,115 @@ export const GymProfileManagement = () => {
         ]}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '10px 0' }}>
-          {pendingRequests.map((req) => (
-            <div
-              key={req.id}
-              style={{
-                padding: '12px 14px',
-                borderRadius: 'var(--radius-base)',
-                border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}`,
-                backgroundColor: isDarkMode ? '#141414' : '#f8fafc',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: 12,
-              }}
-            >
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 13, color: isDarkMode ? '#ffffff' : '#0f172a' }}>{req.field}</div>
-                <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
-                  Request ID: {req.id} • Requested on {req.requestedOn}
+          {pendingRequests.length > 0 ? (
+            pendingRequests.map((req, idx) => (
+              <div
+                key={req.id || idx}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 'var(--radius-base)',
+                  border: `1px solid ${isDarkMode ? '#222222' : '#e2e8f0'}`,
+                  backgroundColor: isDarkMode ? '#141414' : '#f8fafc',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    {req.field || req.changeType || 'Profile Update'}
+                  </div>
+                  <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
+                    Requested by {req.changedBy || 'Partner'} • {req.requestedOn || (req.changedAt ? new Date(req.changedAt).toLocaleDateString('en-GB') : 'Recent')}
+                  </div>
+                  {req.adminRemarks && (
+                    <div style={{ fontSize: 11.5, color: '#fa8c16', marginTop: 4 }}>
+                      Admin Notes: {req.adminRemarks}
+                    </div>
+                  )}
                 </div>
+                <Tag color="warning" style={{ fontWeight: 600, whiteSpace: 'nowrap', margin: 0 }}>
+                  {req.approvalStatus || 'Pending Admin Review'}
+                </Tag>
               </div>
-              <Tag color="warning" style={{ fontWeight: 600, whiteSpace: 'nowrap', margin: 0 }}>
-                {req.status}
-              </Tag>
-            </div>
-          ))}
+            ))
+          ) : (
+            <Empty description="No pending approval requests. All changes are in sync." style={{ margin: '20px 0' }} />
+          )}
         </div>
+      </Modal>
+
+      {/* 2.1 AUDIT HISTORY MODAL */}
+      <Modal
+        title="Gym Profile Audit Log History"
+        open={isAuditHistoryOpen}
+        onCancel={() => setIsAuditHistoryOpen(false)}
+        width={750}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setIsAuditHistoryOpen(false)}>
+            Close
+          </Button>,
+        ]}
+      >
+        {auditHistory.length > 0 ? (
+          <Table
+            dataSource={auditHistory}
+            rowKey={(r, i) => r._id || r.id || i}
+            pagination={{ pageSize: 5 }}
+            size="small"
+            columns={[
+              {
+                title: 'Action / Field',
+                key: 'field',
+                render: (_, r) => (
+                  <div>
+                    <div style={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                      {r.field || r.changeType || 'Update'}
+                    </div>
+                    <div style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b' }}>
+                      By: {r.changedBy || 'Partner'} ({r.changedByRole || 'Owner'})
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                title: 'Timestamp',
+                dataIndex: 'changedAt',
+                key: 'changedAt',
+                width: 140,
+                render: (val) => (val ? new Date(val).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'),
+              },
+              {
+                title: 'Status',
+                dataIndex: 'approvalStatus',
+                key: 'approvalStatus',
+                width: 130,
+                render: (status) => (
+                  <Tag
+                    color={
+                      status === 'Approved'
+                        ? 'success'
+                        : status === 'Pending Approval' || status === 'Pending Admin Review'
+                          ? 'warning'
+                          : 'error'
+                    }
+                    style={{ fontWeight: 600 }}
+                  >
+                    {status || 'Approved'}
+                  </Tag>
+                ),
+              },
+            ]}
+          />
+        ) : (
+          <Empty description="No audit records logged yet." style={{ margin: '20px 0' }} />
+        )}
       </Modal>
 
       {/* 3. ADD PRICING PLAN MODAL */}
       <Modal
-        title="Create New Membership / Workout Plan"
+        title="Create Membership / Workout Plan"
         open={isAddPlanModalOpen}
         onCancel={() => setIsAddPlanModalOpen(false)}
         footer={null}
@@ -2123,26 +3821,7 @@ export const GymProfileManagement = () => {
           form={planForm}
           layout="vertical"
           initialValues={{ badge: 'Monthly', popular: false }}
-          onFinish={(vals) => {
-            const newFeatures = vals.features
-              ? vals.features.split('\n').map((f) => f.trim()).filter(Boolean)
-              : ['All Gym Floor Access', 'Locker Room Access', 'Free Wi-Fi'];
-
-            const newPlan = {
-              id: `plan-${Date.now()}`,
-              name: vals.name,
-              badge: vals.badge || 'Monthly',
-              price: Number(vals.price),
-              duration: vals.duration,
-              description: vals.description || 'Standard membership workout plan.',
-              features: newFeatures,
-              popular: vals.popular || false,
-            };
-            setPricingPlans([...pricingPlans, newPlan]);
-            setIsAddPlanModalOpen(false);
-            planForm.resetFields();
-            message.success(`Plan "${newPlan.name}" created successfully!`);
-          }}
+          onFinish={handleAddPlan}
         >
           <Row gutter={16}>
             <Col span={14}>
@@ -2154,6 +3833,7 @@ export const GymProfileManagement = () => {
               <Form.Item name="badge" label="Category / Badge" rules={[{ required: true, message: 'Select category' }]}>
                 <Select>
                   <Option value="Walk-In">Walk-In</Option>
+                  <Option value="Weekly">Weekly</Option>
                   <Option value="Monthly">Monthly</Option>
                   <Option value="Quarterly">Quarterly</Option>
                   <Option value="Semi-Annual">Semi-Annual</Option>
@@ -2177,15 +3857,25 @@ export const GymProfileManagement = () => {
           <Form.Item name="description" label="Short Description">
             <TextArea rows={2} placeholder="Brief summary of what's included..." />
           </Form.Item>
-          <Form.Item name="features" label="Included Features (one per line)">
-            <TextArea rows={4} placeholder="All Gym Floor Access&#10;Locker & Shower Access&#10;Steam & Sauna Access" />
+          <Form.Item
+            name="features"
+            label={
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span>Included Features (one per line)</span>
+                <Tooltip overlayStyle={{ maxWidth: 390 }} title={renderIconKeywordTooltip()}>
+                  <InfoCircleOutlined style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: 13 }} />
+                </Tooltip>
+              </span>
+            }
+          >
+            <TextArea rows={4} placeholder="Access to all gym facilities&#10;Free group workout classes&#10;VIP Locker & Towel Service&#10;Free Wi-Fi" />
           </Form.Item>
           <Form.Item name="popular" valuePropName="checked">
             <Checkbox>Mark as "Most Popular" Plan</Checkbox>
           </Form.Item>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
             <Button onClick={() => setIsAddPlanModalOpen(false)}>Cancel</Button>
-            <Button type="primary" htmlType="submit">
+            <Button type="primary" htmlType="submit" loading={isSavingPricing}>
               Save Plan
             </Button>
           </div>
@@ -2200,34 +3890,7 @@ export const GymProfileManagement = () => {
         footer={null}
         width={560}
       >
-        <Form
-          form={editPlanForm}
-          layout="vertical"
-          onFinish={(vals) => {
-            const updatedFeatures = vals.features
-              ? vals.features.split('\n').map((f) => f.trim()).filter(Boolean)
-              : selectedPlanForEdit?.features || [];
-
-            setPricingPlans((prev) =>
-              prev.map((p) =>
-                p.id === selectedPlanForEdit?.id
-                  ? {
-                      ...p,
-                      name: vals.name,
-                      badge: vals.badge,
-                      price: Number(vals.price),
-                      duration: vals.duration,
-                      description: vals.description,
-                      features: updatedFeatures,
-                      popular: vals.popular,
-                    }
-                  : p
-              )
-            );
-            setIsEditPlanModalOpen(false);
-            message.success(`Plan "${vals.name}" updated successfully!`);
-          }}
-        >
+        <Form form={editPlanForm} layout="vertical" onFinish={handleEditPlan}>
           <Row gutter={16}>
             <Col span={14}>
               <Form.Item name="name" label="Plan Name" rules={[{ required: true, message: 'Please enter plan name' }]}>
@@ -2235,14 +3898,8 @@ export const GymProfileManagement = () => {
               </Form.Item>
             </Col>
             <Col span={10}>
-              <Form.Item name="badge" label="Category / Badge" rules={[{ required: true }]}>
-                <Select>
-                  <Option value="Walk-In">Walk-In</Option>
-                  <Option value="Monthly">Monthly</Option>
-                  <Option value="Quarterly">Quarterly</Option>
-                  <Option value="Semi-Annual">Semi-Annual</Option>
-                  <Option value="Annual VIP">Annual VIP</Option>
-                </Select>
+              <Form.Item name="badge" label="Tier Badge">
+                <Input disabled />
               </Form.Item>
             </Col>
           </Row>
@@ -2253,99 +3910,39 @@ export const GymProfileManagement = () => {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="duration" label="Duration" rules={[{ required: true, message: 'Please enter duration' }]}>
-                <Input placeholder="e.g. 90 Days" />
+              <Form.Item name="duration" label="Duration (Standardized)">
+                <Input disabled />
               </Form.Item>
             </Col>
           </Row>
           <Form.Item name="description" label="Short Description">
             <TextArea rows={2} placeholder="Brief summary of what's included..." />
           </Form.Item>
-          <Form.Item name="features" label="Included Features (one per line)">
-            <TextArea rows={4} placeholder="All Gym Floor Access&#10;Locker & Shower Access&#10;Steam & Sauna Access" />
+          <Form.Item
+            name="features"
+            label={
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span>Included Features (one per line)</span>
+                <Tooltip overlayStyle={{ maxWidth: 390 }} title={renderIconKeywordTooltip()}>
+                  <InfoCircleOutlined style={{ color: 'var(--color-primary)', cursor: 'pointer', fontSize: 13 }} />
+                </Tooltip>
+              </span>
+            }
+          >
+            <TextArea rows={4} placeholder="Access to all gym facilities&#10;Free group workout classes&#10;VIP Locker & Towel Service&#10;Free Wi-Fi" />
           </Form.Item>
           <Form.Item name="popular" valuePropName="checked">
             <Checkbox>Mark as "Most Popular" Plan</Checkbox>
           </Form.Item>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
-            <Button
-              danger
-              type="text"
-              icon={<DeleteOutlined />}
-              onClick={() => {
-                if (selectedPlanForEdit) {
-                  setPricingPlans((prev) => prev.filter((p) => p.id !== selectedPlanForEdit.id));
-                  setIsEditPlanModalOpen(false);
-                  message.success('Plan deleted successfully.');
-                }
-              }}
-            >
-              Delete Plan
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+            <Button onClick={() => setIsEditPlanModalOpen(false)}>Cancel</Button>
+            <Button type="primary" htmlType="submit" loading={isSavingPricing}>
+              Save Changes
             </Button>
-            <Space size={10}>
-              <Button onClick={() => setIsEditPlanModalOpen(false)}>Cancel</Button>
-              <Button type="primary" htmlType="submit">
-                Save Changes
-              </Button>
-            </Space>
           </div>
         </Form>
       </Modal>
 
-      {/* 4. ADD FACILITY MODAL */}
-      <Modal
-        title="Add Facility or Equipment Spec"
-        open={isAddFacilityModalOpen}
-        onCancel={() => setIsAddFacilityModalOpen(false)}
-        footer={null}
-      >
-        <Form
-          form={facilityForm}
-          layout="vertical"
-          onFinish={(vals) => {
-            const newFac = {
-              id: `fac-${Date.now()}`,
-              name: vals.name,
-              category: vals.category || 'General',
-              status: 'Active',
-              count: vals.count || 1,
-              icon: <ToolOutlined />,
-            };
-            setFacilities([...facilities, newFac]);
-            setIsAddFacilityModalOpen(false);
-            facilityForm.resetFields();
-            message.success(`Facility ${newFac.name} added!`);
-          }}
-        >
-          <Form.Item name="name" label="Facility / Equipment Name" rules={[{ required: true }]}>
-            <Input placeholder="e.g. Battle Ropes & Plyo Boxes" />
-          </Form.Item>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="category" label="Category">
-                <Select defaultValue="Strength">
-                  <Option value="Cardio">Cardio</Option>
-                  <Option value="Strength">Strength</Option>
-                  <Option value="Functional">Functional</Option>
-                  <Option value="Wellness">Wellness</Option>
-                  <Option value="Amenities">Amenities</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="count" label="Total Units / Count">
-                <InputNumber style={{ width: '100%' }} defaultValue={1} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-            <Button onClick={() => setIsAddFacilityModalOpen(false)}>Cancel</Button>
-            <Button type="primary" htmlType="submit">
-              Add Facility
-            </Button>
-          </div>
-        </Form>
-      </Modal>
 
       {/* 5. EDIT BANK DETAILS MODAL */}
       <Modal
@@ -2355,29 +3952,21 @@ export const GymProfileManagement = () => {
         footer={null}
         width={560}
       >
-        <Form
-          form={bankForm}
-          layout="vertical"
-          onFinish={(vals) => {
-            setBankDetails({ ...bankDetails, ...vals });
-            setIsEditBankModalOpen(false);
-            message.success('Bank settlement details updated!');
-          }}
-        >
+        <Form form={bankForm} layout="vertical" onFinish={handleSaveBank}>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="accountHolder" label="Account Holder Name" rules={[{ required: true }]}>
-                <Input />
+              <Form.Item name="accountHolder" label="Account Holder Name" rules={[{ required: true, message: 'Enter account holder name' }]}>
+                <Input placeholder="e.g. FitZone Enterprises" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="bankName" label="Bank Name" rules={[{ required: true }]}>
-                <Input />
+              <Form.Item name="bankName" label="Bank Name" rules={[{ required: true, message: 'Enter bank name' }]}>
+                <Input placeholder="e.g. HDFC Bank" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="accountNumber" label="Account Number" rules={[{ required: true }]}>
-                <Input />
+              <Form.Item name="accountNumber" label="Account Number" rules={[{ required: true, message: 'Enter account number' }]}>
+                <Input placeholder="e.g. 50100123456789" />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -2385,9 +3974,17 @@ export const GymProfileManagement = () => {
                 <Input placeholder="e.g. HDFC0001234" />
               </Form.Item>
             </Col>
-            <Col span={24}>
-              <Form.Item name="branch" label="Branch Address" rules={[{ required: true, message: 'Please enter branch address' }]}>
-                <Input placeholder="e.g. No. 15, 2nd Avenue, Anna Nagar Main Branch, Chennai" />
+            <Col span={12}>
+              <Form.Item name="accountType" label="Account Type" initialValue="Current Account">
+                <Select>
+                  <Option value="Current Account">Current Account</Option>
+                  <Option value="Savings Account">Savings Account</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="branch" label="Branch Address" rules={[{ required: true, message: 'Please enter branch' }]}>
+                <Input placeholder="e.g. Anna Nagar Branch, Chennai" />
               </Form.Item>
             </Col>
             <Col span={24}>
@@ -2398,7 +3995,7 @@ export const GymProfileManagement = () => {
           </Row>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
             <Button onClick={() => setIsEditBankModalOpen(false)}>Cancel</Button>
-            <Button type="primary" htmlType="submit">
+            <Button type="primary" htmlType="submit" loading={isSavingBank}>
               Save Bank Details
             </Button>
           </div>
@@ -2413,34 +4010,29 @@ export const GymProfileManagement = () => {
         footer={null}
         width={560}
       >
-        <Form
-          form={socialForm}
-          layout="vertical"
-          onFinish={(vals) => {
-            setSocialLinks({ ...socialLinks, ...vals });
-            setIsEditSocialModalOpen(false);
-            message.success('Social handles updated!');
-          }}
-        >
+        <Form form={socialForm} layout="vertical" onFinish={handleSaveSocial}>
           <Form.Item name="instagramHandle" label="Instagram Handle">
-            <Input prefix={<InstagramOutlined />} placeholder="@fitzone_chennai" />
+            <Input prefix={<InstagramOutlined />} placeholder="e.g. @fitzone_chennai" />
           </Form.Item>
           <Form.Item name="whatsapp" label="WhatsApp Business Number">
-            <Input prefix={<WhatsAppOutlined />} placeholder="+91 98765 43210" />
+            <Input prefix={<WhatsAppOutlined />} placeholder="e.g. +91 98765 43210" />
           </Form.Item>
           <Form.Item name="website" label="Website URL">
-            <Input prefix={<GlobalOutlined />} placeholder="https://www.fitzonegym.com" />
+            <Input prefix={<GlobalOutlined />} placeholder="e.g. https://www.fitzonegym.com" />
+          </Form.Item>
+          <Form.Item name="googleBusinessUrl" label="Google Business / Maps URL">
+            <Input prefix={<GlobalOutlined />} placeholder="e.g. https://maps.google.com/..." />
           </Form.Item>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
             <Button onClick={() => setIsEditSocialModalOpen(false)}>Cancel</Button>
-            <Button type="primary" htmlType="submit">
+            <Button type="primary" htmlType="submit" loading={isSavingSocial}>
               Save Social Links
             </Button>
           </div>
         </Form>
       </Modal>
 
-      {/* 6.5 ADD HOLIDAY / EXCEPTION MODAL */}
+      {/* 7. ADD HOLIDAY / EXCEPTION MODAL */}
       <Modal
         title="Add Special Holiday or Blackout Schedule"
         open={isAddHolidayModalOpen}
@@ -2448,47 +4040,18 @@ export const GymProfileManagement = () => {
         footer={null}
         width={540}
       >
-        <Form
-          form={holidayForm}
-          layout="vertical"
-          initialValues={{ type: 'Closed' }}
-          onFinish={(vals) => {
-            const formattedDate = vals.date
-              ? typeof vals.date === 'string'
-                ? vals.date
-                : vals.date.format('DD MMM YYYY')
-              : 'Upcoming Date';
-
-            const newEx = {
-              id: `hol-${Date.now()}`,
-              date: formattedDate,
-              title: vals.title,
-              type: vals.type,
-              hours: vals.type === 'Closed' ? 'Full Day Closed' : vals.hours || '06:00 AM – 12:00 PM',
-              notes: vals.notes || 'Special holiday schedule rule',
-            };
-
-            setHolidayExceptions((prev) => [newEx, ...prev]);
-            setIsAddHolidayModalOpen(false);
-            holidayForm.resetFields();
-            message.success(`Special holiday rule for "${vals.title}" added successfully!`);
-          }}
-        >
+        <Form form={holidayForm} layout="vertical" initialValues={{ type: 'Closed' }} onFinish={handleAddHoliday}>
           <Form.Item
             name="title"
             label="Occasion / Holiday Title"
             rules={[{ required: true, message: 'Please enter event or holiday name' }]}
           >
-            <Input placeholder="e.g. New Year's Day, Independence Day, Floor Renovation" />
+            <Input placeholder="e.g. New Year's Day, Independence Day, Annual Maintenance" />
           </Form.Item>
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item
-                name="date"
-                label="Date"
-                rules={[{ required: true, message: 'Please select or enter the date' }]}
-              >
+              <Form.Item name="date" label="Date" rules={[{ required: true, message: 'Please select date' }]}>
                 <DatePicker style={{ width: '100%' }} format="DD MMM YYYY" placeholder="Select date" />
               </Form.Item>
             </Col>
@@ -2514,7 +4077,7 @@ export const GymProfileManagement = () => {
                   label="Modified Operating Hours"
                   rules={[{ required: true, message: 'Specify modified shift hours' }]}
                 >
-                  <Input placeholder="e.g. 06:00 AM – 01:00 PM (Morning Only)" />
+                  <Input placeholder="e.g. 06:00 AM - 01:00 PM (Morning Only)" />
                 </Form.Item>
               ) : null
             }
@@ -2523,7 +4086,7 @@ export const GymProfileManagement = () => {
           <Form.Item name="notes" label="Turnstile & Member Notice Note">
             <TextArea
               rows={2}
-              placeholder="e.g. Turnstiles will lock at 1:00 PM. Cleaners on site from 2:00 PM."
+              placeholder="e.g. Optical turnstiles will lock at 1:00 PM for floor sanitation."
             />
           </Form.Item>
 
@@ -2534,24 +4097,6 @@ export const GymProfileManagement = () => {
             </Button>
           </div>
         </Form>
-      </Modal>
-
-      {/* 7. HOW APPROVAL WORKS MODAL */}
-      <Modal
-        title="How Profile Updates & Approvals Work"
-        open={isApprovalInfoOpen}
-        onCancel={() => setIsApprovalInfoOpen(false)}
-        footer={[
-          <Button key="close" type="primary" onClick={() => setIsApprovalInfoOpen(false)}>
-            Got it
-          </Button>,
-        ]}
-      >
-        <div style={{ fontSize: 13, color: isDarkMode ? '#cccccc' : '#334155', lineHeight: 1.6, padding: '10px 0' }}>
-          <p><strong>1. Request Submission:</strong> When you modify your business credentials, GST, location, or facility details, a change request is created.</p>
-          <p><strong>2. Super Admin Verification:</strong> GYMEZY operations team reviews the update to ensure brand consistency and legal compliance.</p>
-          <p><strong>3. Instant Sync:</strong> Once verified, your changes go live immediately across member mobile apps and turnstile entry points.</p>
-        </div>
       </Modal>
     </div>
   );

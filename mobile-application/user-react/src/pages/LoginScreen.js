@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,42 +10,92 @@ import {
   Image,
   ActivityIndicator,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialIcons, Ionicons, Feather } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors } from '../theme/appTheme';
 import { useToast } from '../widgets/CustomScaffoldMessage';
+import { useAuth } from '../context/AuthContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const FITNESS_GOALS = [
+  { id: 'GENERAL_FITNESS', label: 'General Fitness' },
+  { id: 'WEIGHT_LOSS', label: 'Weight Loss' },
+  { id: 'HYPERTROPHY', label: 'Muscle Building' },
+  { id: 'STRENGTH', label: 'Strength Training' },
+];
 
 export const LoginScreen = ({ navigation }) => {
   const { isDark, colors } = useTheme();
   const { showToast } = useToast();
+  const {
+    login,
+    register,
+    savedIdentifier,
+    isLoading,
+    sessionExpiredMessage,
+    clearSessionExpiredMessage,
+  } = useAuth();
 
-  const [email, setEmail] = useState('');
+  // Tab State: 'SIGN_IN' or 'SIGN_UP'
+  const [authMode, setAuthMode] = useState('SIGN_IN');
+
+  // Sign In State
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [obscurePassword, setObscurePassword] = useState(true);
   const [rememberMe, setRememberMe] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // Sign Up State
+  const [signupName, setSignupName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPhone, setSignupPhone] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupObscurePassword, setSignupObscurePassword] = useState(true);
+  const [selectedGoal, setSelectedGoal] = useState('GENERAL_FITNESS');
+
+  // Display session expired notification if auto-logged out
+  useEffect(() => {
+    if (sessionExpiredMessage) {
+      showToast({
+        message: sessionExpiredMessage,
+        isError: true,
+      });
+      clearSessionExpiredMessage();
+    }
+  }, [sessionExpiredMessage, clearSessionExpiredMessage, showToast]);
+
+  // Load saved remember me identifier on mount
+  useEffect(() => {
+    if (savedIdentifier) {
+      setIdentifier(savedIdentifier);
+    }
+  }, [savedIdentifier]);
+
   const fillDemoCredentials = () => {
-    setEmail('sam@gmail.com');
+    setAuthMode('SIGN_IN');
+    setIdentifier('sam@gmail.com');
     setPassword('123456');
     setErrors({});
     showToast({
-      message: 'Demo credentials loaded! Tap Log In to continue.',
+      message: 'Demo credentials filled! Tap Log In to continue.',
+      isSuccess: true,
     });
   };
 
-  const validate = () => {
+  const validateSignIn = () => {
     const newErrors = {};
-    if (!email.trim()) {
-      newErrors.email = 'Please enter your email';
-    } else if (!/\S+@\S+\.\S+/.test(email.trim())) {
-      newErrors.email = 'Please enter a valid email';
+    const cleanId = identifier.trim();
+
+    if (!cleanId) {
+      newErrors.identifier = 'Please enter your email or phone number';
+    } else if (cleanId.includes('@') && !/\S+@\S+\.\S+/.test(cleanId)) {
+      newErrors.identifier = 'Please enter a valid email address';
     }
 
     if (!password) {
@@ -58,31 +108,99 @@ export const LoginScreen = ({ navigation }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleLogin = async () => {
-    if (!validate()) return;
+  const validateSignUp = () => {
+    const newErrors = {};
+    const cleanName = signupName.trim();
+    const cleanEmail = signupEmail.trim();
+    const cleanPhone = signupPhone.trim();
 
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      if (email.trim() === 'sam@gmail.com' && password === '123456') {
-        navigation.replace('HomeTabs');
-      } else {
-        showToast({
-          message: 'Invalid credentials! Tap "Auto-Fill Demo" above.',
-          isError: true,
-        });
-      }
-    }, 600);
+    if (!cleanName || cleanName.length < 2) {
+      newErrors.signupName = 'Please enter your full name (at least 2 characters)';
+    }
+
+    if (!cleanEmail) {
+      newErrors.signupEmail = 'Please enter your email address';
+    } else if (!/\S+@\S+\.\S+/.test(cleanEmail)) {
+      newErrors.signupEmail = 'Please enter a valid email address';
+    }
+
+    if (!cleanPhone) {
+      newErrors.signupPhone = 'Please enter your phone number';
+    } else if (cleanPhone.length < 10) {
+      newErrors.signupPhone = 'Please enter a valid 10-digit phone number';
+    }
+
+    if (!signupPassword) {
+      newErrors.signupPassword = 'Please choose a password';
+    } else if (signupPassword.length < 6) {
+      newErrors.signupPassword = 'Password must be at least 6 characters';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
+  const handleSignIn = async () => {
+    if (!validateSignIn()) return;
+
+    const result = await login({
+      identifier: identifier.trim(),
+      password,
+      rememberMe,
+    });
+
+    if (result.success) {
+      showToast({
+        message: result.data?.message || 'Login successful! Welcome back.',
+        isSuccess: true,
+      });
+      navigation.replace('HomeTabs');
+    } else {
+      showToast({
+        message: result.message || 'Login failed. Please check your credentials.',
+        isError: true,
+      });
+    }
+  };
+
+  const handleSignUp = async () => {
+    if (!validateSignUp()) return;
+
+    const result = await register({
+      fullName: signupName.trim(),
+      email: signupEmail.trim(),
+      phone: signupPhone.trim(),
+      password: signupPassword,
+      fitnessGoal: selectedGoal,
+    });
+
+    if (result.success) {
+      showToast({
+        message: result.data?.message || 'Account created successfully! Welcome to GYMEZY.',
+        isSuccess: true,
+      });
+      navigation.replace('HomeTabs');
+    } else {
+      showToast({
+        message: result.message || 'Registration failed. Please try again.',
+        isError: true,
+      });
+    }
+  };
+
+
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* 1. TOP HERO: Cinematic Visual with Vignette & GYMEZY Silhouette Logo */}
+        {/* ==================== 1. TOP HERO BANNER ==================== */}
         <View style={styles.topHeroContainer}>
           <Image
             source={require('../../assets/pages/onboarding/onboarding_1.jpg')}
@@ -94,23 +212,23 @@ export const LoginScreen = ({ navigation }) => {
             colors={
               isDark
                 ? [
-                    'rgba(0,0,0,0.55)',
-                    'transparent',
-                    'rgba(18,18,18,0.7)',
+                    'rgba(0,0,0,0.65)',
+                    'rgba(0,0,0,0.3)',
+                    'rgba(18,18,18,0.85)',
                     AppColors.darkBackground,
                   ]
                 : [
-                    'rgba(0,0,0,0.45)',
-                    'transparent',
-                    'rgba(0,0,0,0.15)',
-                    'rgba(0,0,0,0.55)',
+                    'rgba(0,0,0,0.5)',
+                    'rgba(0,0,0,0.2)',
+                    'rgba(0,0,0,0.3)',
+                    'rgba(0,0,0,0.65)',
                   ]
             }
-            stops={isDark ? [0, 0.4, 0.75, 1] : [0, 0.35, 0.7, 1]}
+            stops={[0, 0.35, 0.75, 1]}
             style={styles.gradientOverlay}
           />
 
-          {/* Centered Brand Logo */}
+          {/* Centered Brand Identity */}
           <SafeAreaView style={styles.heroCenterContent}>
             <Image
               source={require('../../assets/logo/gymezy.png')}
@@ -119,219 +237,473 @@ export const LoginScreen = ({ navigation }) => {
             />
             <Text style={styles.heroSubtitle}>ELEVATE YOUR FITNESS</Text>
           </SafeAreaView>
-
-          {/* Quick Demo Auto-Fill Pill */}
-          <SafeAreaView style={styles.demoPillWrapper}>
-            <TouchableOpacity
-              onPress={fillDemoCredentials}
-              style={styles.demoPill}
-              activeOpacity={0.8}
-            >
-              <MaterialIcons name="bolt" size={14} color={AppColors.secondaryColor} />
-              <Text style={styles.demoPillText}>Auto-Fill Demo</Text>
-            </TouchableOpacity>
-          </SafeAreaView>
         </View>
 
-        {/* 2. FORM & ACTIONS SECTION */}
+        {/* ==================== 2. SEGMENTED TAB SWITCHER ==================== */}
         <View style={styles.formContainer}>
-          <Text style={[styles.welcomeTitle, { color: colors.text }]}>
-            Welcome Back
-          </Text>
-          <Text style={[styles.welcomeSubtitle, { color: colors.subtitle }]}>
-            Log in to manage your bookings and passes
-          </Text>
-
-          {/* Email Field */}
-          <Text style={[styles.fieldLabel, { color: colors.text }]}>
-            Email Address
-          </Text>
           <View
             style={[
-              styles.inputWrapper,
+              styles.tabSwitcherCard,
               {
-                backgroundColor: colors.card,
-                borderColor: errors.email ? '#EF4444' : colors.border,
+                backgroundColor: isDark ? AppColors.darkSurface : '#F1F5F9',
+                borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
               },
             ]}
           >
-            <MaterialIcons
-              name="mail-outline"
-              size={20}
-              color={isDark ? 'rgba(255,255,255,0.6)' : AppColors.primaryColor}
-              style={styles.inputPrefixIcon}
-            />
-            <TextInput
-              style={[styles.inputField, { color: colors.text }]}
-              placeholder="e.g. sam@gmail.com"
-              placeholderTextColor={isDark ? 'rgba(255,255,255,0.4)' : '#94A3B8'}
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                if (errors.email) setErrors((prev) => ({ ...prev, email: null }));
+            <TouchableOpacity
+              style={[
+                styles.tabSwitchBtn,
+                authMode === 'SIGN_IN' && [
+                  styles.tabSwitchBtnActive,
+                  { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF' },
+                ],
+              ]}
+              onPress={() => {
+                setAuthMode('SIGN_IN');
+                setErrors({});
               }}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-          </View>
-          {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
-
-          {/* Password Field */}
-          <Text style={[styles.fieldLabel, { color: colors.text, marginTop: 16 }]}>
-            Password
-          </Text>
-          <View
-            style={[
-              styles.inputWrapper,
-              {
-                backgroundColor: colors.card,
-                borderColor: errors.password ? '#EF4444' : colors.border,
-              },
-            ]}
-          >
-            <MaterialIcons
-              name="lock-outline"
-              size={20}
-              color={isDark ? 'rgba(255,255,255,0.6)' : AppColors.primaryColor}
-              style={styles.inputPrefixIcon}
-            />
-            <TextInput
-              style={[styles.inputField, { color: colors.text }]}
-              placeholder="Enter your password"
-              placeholderTextColor={isDark ? 'rgba(255,255,255,0.4)' : '#94A3B8'}
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                if (errors.password) setErrors((prev) => ({ ...prev, password: null }));
-              }}
-              secureTextEntry={obscurePassword}
-            />
-            <TouchableOpacity
-              onPress={() => setObscurePassword(!obscurePassword)}
-              style={styles.inputSuffixBtn}
-            >
-              <MaterialIcons
-                name={obscurePassword ? 'visibility-off' : 'visibility'}
-                size={20}
-                color={colors.subtitle}
-              />
-            </TouchableOpacity>
-          </View>
-          {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-
-          {/* Remember Me & Forgot Password */}
-          <View style={styles.rememberForgotRow}>
-            <TouchableOpacity
-              onPress={() => setRememberMe(!rememberMe)}
-              style={styles.rememberRow}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.checkbox,
-                  {
-                    backgroundColor: rememberMe
-                      ? AppColors.secondaryColor
-                      : 'transparent',
-                    borderColor: rememberMe
-                      ? AppColors.secondaryColor
-                      : colors.border,
-                  },
-                ]}
-              >
-                {rememberMe && (
-                  <MaterialIcons name="check" size={14} color="#FFFFFF" />
-                )}
-              </View>
-              <Text style={[styles.rememberText, { color: colors.subtitle }]}>
-                Remember me
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() =>
-                showToast({
-                  message: 'Password reset link sent to registered email.',
-                })
-              }
+              activeOpacity={0.8}
             >
               <Text
                 style={[
-                  styles.forgotText,
-                  { color: isDark ? AppColors.darkAccentColor : AppColors.primaryColor },
+                  styles.tabSwitchText,
+                  {
+                    color:
+                      authMode === 'SIGN_IN'
+                        ? AppColors.primaryColor
+                        : isDark
+                        ? '#94A3B8'
+                        : '#64748B',
+                    fontWeight: authMode === 'SIGN_IN' ? '800' : '600',
+                  },
                 ]}
               >
-                Forgot Password?
+                Sign In
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.tabSwitchBtn,
+                authMode === 'SIGN_UP' && [
+                  styles.tabSwitchBtnActive,
+                  { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF' },
+                ],
+              ]}
+              onPress={() => {
+                setAuthMode('SIGN_UP');
+                setErrors({});
+              }}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.tabSwitchText,
+                  {
+                    color:
+                      authMode === 'SIGN_UP'
+                        ? AppColors.primaryColor
+                        : isDark
+                        ? '#94A3B8'
+                        : '#64748B',
+                    fontWeight: authMode === 'SIGN_UP' ? '800' : '600',
+                  },
+                ]}
+              >
+                Create Account
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Log In Button */}
-          <TouchableOpacity
-            onPress={handleLogin}
-            disabled={isLoading}
-            style={[
-              styles.loginBtn,
-              { backgroundColor: AppColors.secondaryColor },
-            ]}
-            activeOpacity={0.85}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <View style={styles.loginBtnContent}>
-                <Text style={styles.loginBtnText}>Log In</Text>
+          {/* ==================== 3. SIGN IN MODE ==================== */}
+          {authMode === 'SIGN_IN' && (
+            <View>
+              <Text style={[styles.welcomeTitle, { color: colors.text }]}>Welcome Back</Text>
+              <Text style={[styles.welcomeSubtitle, { color: colors.subtitle }]}>
+                Log in to access your workouts, passes, and gym memberships
+              </Text>
+
+              {/* Email / Phone Field */}
+              <Text style={[styles.fieldLabel, { color: colors.text }]}>Email or Phone Number</Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: errors.identifier ? '#EF4444' : colors.border,
+                  },
+                ]}
+              >
                 <MaterialIcons
-                  name="arrow-forward"
-                  size={18}
-                  color="#FFFFFF"
-                  style={{ marginLeft: 8 }}
+                  name="person-outline"
+                  size={20}
+                  color={isDark ? 'rgba(255,255,255,0.6)' : AppColors.primaryColor}
+                  style={styles.inputPrefixIcon}
+                />
+                <TextInput
+                  style={[styles.inputField, { color: colors.text }]}
+                  placeholder="e.g. sam@gmail.com or 9876543210"
+                  placeholderTextColor={isDark ? 'rgba(255,255,255,0.4)' : '#94A3B8'}
+                  value={identifier}
+                  onChangeText={(text) => {
+                    setIdentifier(text);
+                    if (errors.identifier) setErrors((prev) => ({ ...prev, identifier: null }));
+                  }}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
                 />
               </View>
-            )}
-          </TouchableOpacity>
+              {errors.identifier && <Text style={styles.errorText}>{errors.identifier}</Text>}
 
-          {/* Social Login Divider */}
-          <View style={styles.dividerRow}>
-            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-            <Text style={[styles.dividerText, { color: colors.subtitle }]}>
-              or continue with
-            </Text>
-            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-          </View>
+              {/* Password Field */}
+              <Text style={[styles.fieldLabel, { color: colors.text, marginTop: 16 }]}>Password</Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: errors.password ? '#EF4444' : colors.border,
+                  },
+                ]}
+              >
+                <MaterialIcons
+                  name="lock-outline"
+                  size={20}
+                  color={isDark ? 'rgba(255,255,255,0.6)' : AppColors.primaryColor}
+                  style={styles.inputPrefixIcon}
+                />
+                <TextInput
+                  style={[styles.inputField, { color: colors.text }]}
+                  placeholder="Enter your password"
+                  placeholderTextColor={isDark ? 'rgba(255,255,255,0.4)' : '#94A3B8'}
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (errors.password) setErrors((prev) => ({ ...prev, password: null }));
+                  }}
+                  secureTextEntry={obscurePassword}
+                />
+                <TouchableOpacity
+                  onPress={() => setObscurePassword(!obscurePassword)}
+                  style={styles.inputSuffixBtn}
+                >
+                  <MaterialIcons
+                    name={obscurePassword ? 'visibility-off' : 'visibility'}
+                    size={20}
+                    color={colors.subtitle}
+                  />
+                </TouchableOpacity>
+              </View>
+              {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
 
-          {/* Explore as Guest Button */}
-          <TouchableOpacity
-            onPress={() => navigation.replace('HomeTabs')}
-            style={[
-              styles.guestBtn,
-              { borderColor: colors.border },
-            ]}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons
-              name="explore"
-              size={18}
-              color={colors.text}
-              style={{ marginRight: 8 }}
-            />
-            <Text style={[styles.guestBtnText, { color: colors.text }]}>
-              Explore as Guest
-            </Text>
-          </TouchableOpacity>
+              {/* Remember Me & Forgot Password */}
+              <View style={styles.rememberForgotRow}>
+                <TouchableOpacity
+                  onPress={() => setRememberMe(!rememberMe)}
+                  style={styles.rememberRow}
+                  activeOpacity={0.7}
+                >
+                  <View
+                    style={[
+                      styles.checkbox,
+                      {
+                        backgroundColor: rememberMe ? AppColors.secondaryColor : 'transparent',
+                        borderColor: rememberMe ? AppColors.secondaryColor : colors.border,
+                      },
+                    ]}
+                  >
+                    {rememberMe && <MaterialIcons name="check" size={14} color="#FFFFFF" />}
+                  </View>
+                  <Text style={[styles.rememberText, { color: colors.subtitle }]}>Remember me</Text>
+                </TouchableOpacity>
 
-          {/* Sign Up Footer */}
+                <TouchableOpacity
+                  onPress={() =>
+                    showToast({
+                      message: 'Password reset link sent to your registered email or phone.',
+                    })
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.forgotText,
+                      { color: isDark ? AppColors.darkAccentColor : AppColors.primaryColor },
+                    ]}
+                  >
+                    Forgot Password?
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Log In Button */}
+              <TouchableOpacity
+                onPress={handleSignIn}
+                disabled={isLoading}
+                style={[styles.loginBtn, { backgroundColor: AppColors.secondaryColor }]}
+                activeOpacity={0.85}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <View style={styles.loginBtnContent}>
+                    <Text style={styles.loginBtnText}>Log In</Text>
+                    <MaterialIcons
+                      name="arrow-forward"
+                      size={18}
+                      color="#FFFFFF"
+                      style={{ marginLeft: 8 }}
+                    />
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ==================== 4. SIGN UP MODE ==================== */}
+          {authMode === 'SIGN_UP' && (
+            <View>
+              <Text style={[styles.welcomeTitle, { color: colors.text }]}>Join GYMEZY</Text>
+              <Text style={[styles.welcomeSubtitle, { color: colors.subtitle }]}>
+                Start your fitness journey and explore top gyms near you
+              </Text>
+
+              {/* Full Name */}
+              <Text style={[styles.fieldLabel, { color: colors.text }]}>Full Name *</Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: errors.signupName ? '#EF4444' : colors.border,
+                  },
+                ]}
+              >
+                <MaterialIcons
+                  name="badge"
+                  size={20}
+                  color={isDark ? 'rgba(255,255,255,0.6)' : AppColors.primaryColor}
+                  style={styles.inputPrefixIcon}
+                />
+                <TextInput
+                  style={[styles.inputField, { color: colors.text }]}
+                  placeholder="e.g. Rahul Sharma"
+                  placeholderTextColor={isDark ? 'rgba(255,255,255,0.4)' : '#94A3B8'}
+                  value={signupName}
+                  onChangeText={(text) => {
+                    setSignupName(text);
+                    if (errors.signupName) setErrors((prev) => ({ ...prev, signupName: null }));
+                  }}
+                />
+              </View>
+              {errors.signupName && <Text style={styles.errorText}>{errors.signupName}</Text>}
+
+              {/* Email Address */}
+              <Text style={[styles.fieldLabel, { color: colors.text, marginTop: 14 }]}>
+                Email Address *
+              </Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: errors.signupEmail ? '#EF4444' : colors.border,
+                  },
+                ]}
+              >
+                <MaterialIcons
+                  name="mail-outline"
+                  size={20}
+                  color={isDark ? 'rgba(255,255,255,0.6)' : AppColors.primaryColor}
+                  style={styles.inputPrefixIcon}
+                />
+                <TextInput
+                  style={[styles.inputField, { color: colors.text }]}
+                  placeholder="e.g. rahul@domain.com"
+                  placeholderTextColor={isDark ? 'rgba(255,255,255,0.4)' : '#94A3B8'}
+                  value={signupEmail}
+                  onChangeText={(text) => {
+                    setSignupEmail(text);
+                    if (errors.signupEmail) setErrors((prev) => ({ ...prev, signupEmail: null }));
+                  }}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              </View>
+              {errors.signupEmail && <Text style={styles.errorText}>{errors.signupEmail}</Text>}
+
+              {/* Phone Number */}
+              <Text style={[styles.fieldLabel, { color: colors.text, marginTop: 14 }]}>
+                Phone Number *
+              </Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: errors.signupPhone ? '#EF4444' : colors.border,
+                  },
+                ]}
+              >
+                <MaterialIcons
+                  name="phone-iphone"
+                  size={20}
+                  color={isDark ? 'rgba(255,255,255,0.6)' : AppColors.primaryColor}
+                  style={styles.inputPrefixIcon}
+                />
+                <TextInput
+                  style={[styles.inputField, { color: colors.text }]}
+                  placeholder="9876543210"
+                  placeholderTextColor={isDark ? 'rgba(255,255,255,0.4)' : '#94A3B8'}
+                  value={signupPhone}
+                  onChangeText={(text) => {
+                    setSignupPhone(text);
+                    if (errors.signupPhone) setErrors((prev) => ({ ...prev, signupPhone: null }));
+                  }}
+                  keyboardType="phone-pad"
+                />
+              </View>
+              {errors.signupPhone && <Text style={styles.errorText}>{errors.signupPhone}</Text>}
+
+              {/* Password */}
+              <Text style={[styles.fieldLabel, { color: colors.text, marginTop: 14 }]}>
+                Password *
+              </Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: errors.signupPassword ? '#EF4444' : colors.border,
+                  },
+                ]}
+              >
+                <MaterialIcons
+                  name="lock-outline"
+                  size={20}
+                  color={isDark ? 'rgba(255,255,255,0.6)' : AppColors.primaryColor}
+                  style={styles.inputPrefixIcon}
+                />
+                <TextInput
+                  style={[styles.inputField, { color: colors.text }]}
+                  placeholder="At least 6 characters"
+                  placeholderTextColor={isDark ? 'rgba(255,255,255,0.4)' : '#94A3B8'}
+                  value={signupPassword}
+                  onChangeText={(text) => {
+                    setSignupPassword(text);
+                    if (errors.signupPassword)
+                      setErrors((prev) => ({ ...prev, signupPassword: null }));
+                  }}
+                  secureTextEntry={signupObscurePassword}
+                />
+                <TouchableOpacity
+                  onPress={() => setSignupObscurePassword(!signupObscurePassword)}
+                  style={styles.inputSuffixBtn}
+                >
+                  <MaterialIcons
+                    name={signupObscurePassword ? 'visibility-off' : 'visibility'}
+                    size={20}
+                    color={colors.subtitle}
+                  />
+                </TouchableOpacity>
+              </View>
+              {errors.signupPassword && (
+                <Text style={styles.errorText}>{errors.signupPassword}</Text>
+              )}
+
+              {/* Fitness Goal */}
+              <Text style={[styles.fieldLabel, { color: colors.text, marginTop: 14 }]}>
+                Primary Fitness Goal
+              </Text>
+              <View style={styles.goalChipsRow}>
+                {FITNESS_GOALS.map((goal) => {
+                  const isSelected = selectedGoal === goal.id;
+                  return (
+                    <TouchableOpacity
+                      key={goal.id}
+                      onPress={() => setSelectedGoal(goal.id)}
+                      style={[
+                        styles.goalChip,
+                        {
+                          backgroundColor: isSelected
+                            ? AppColors.primaryColor
+                            : isDark
+                            ? AppColors.darkSurface
+                            : '#F1F5F9',
+                          borderColor: isSelected
+                            ? AppColors.primaryColor
+                            : isDark
+                            ? AppColors.darkBorder
+                            : '#E2E8F0',
+                        },
+                      ]}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.goalChipText,
+                          {
+                            color: isSelected ? '#FFFFFF' : isDark ? '#FFFFFF' : '#0F172A',
+                            fontWeight: isSelected ? '700' : '500',
+                          },
+                        ]}
+                      >
+                        {goal.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Register Button */}
+              <TouchableOpacity
+                onPress={handleSignUp}
+                disabled={isLoading}
+                style={[
+                  styles.loginBtn,
+                  { backgroundColor: AppColors.primaryColor, marginTop: 20 },
+                ]}
+                activeOpacity={0.85}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <View style={styles.loginBtnContent}>
+                    <Text style={styles.loginBtnText}>Create My Account</Text>
+                    <MaterialIcons
+                      name="check-circle"
+                      size={18}
+                      color="#FFFFFF"
+                      style={{ marginLeft: 8 }}
+                    />
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
+
+
+          {/* Footer Toggle */}
           <View style={styles.footerRow}>
             <Text style={[styles.footerText, { color: colors.subtitle }]}>
-              Don't have an account?{' '}
+              {authMode === 'SIGN_IN'
+                ? "Don't have an account? "
+                : 'Already have an account? '}
             </Text>
-            <TouchableOpacity onPress={fillDemoCredentials}>
-              <Text style={styles.signUpLink}>Sign Up</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setAuthMode(authMode === 'SIGN_IN' ? 'SIGN_UP' : 'SIGN_IN');
+                setErrors({});
+              }}
+            >
+              <Text style={styles.signUpLink}>
+                {authMode === 'SIGN_IN' ? 'Sign Up' : 'Log In'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -344,7 +716,7 @@ const styles = StyleSheet.create({
     paddingBottom: 36,
   },
   topHeroContainer: {
-    height: SCREEN_HEIGHT * 0.35,
+    height: SCREEN_HEIGHT * 0.32,
     position: 'relative',
     overflow: 'hidden',
     borderBottomLeftRadius: 32,
@@ -393,9 +765,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     borderWidth: 0.8,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.35)',
   },
   demoPillText: {
     color: '#FFFFFF',
@@ -407,16 +779,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 16,
   },
+  tabSwitcherCard: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 4,
+    marginBottom: 20,
+  },
+  tabSwitchBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+  },
+  tabSwitchBtnActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabSwitchText: {
+    fontSize: 13,
+  },
   welcomeTitle: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
   welcomeSubtitle: {
-    fontSize: 13.5,
+    fontSize: 13,
     letterSpacing: 0.1,
     marginTop: 4,
-    marginBottom: 20,
+    marginBottom: 18,
   },
   fieldLabel: {
     fontSize: 12.5,
@@ -426,17 +822,17 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
-    borderRadius: 16,
+    height: 50,
+    borderRadius: 14,
     borderWidth: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
   },
   inputPrefixIcon: {
     marginRight: 10,
   },
   inputField: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '500',
   },
   inputSuffixBtn: {
@@ -452,7 +848,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 12,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   rememberRow: {
     flexDirection: 'row',
@@ -475,8 +871,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   loginBtn: {
-    height: 52,
-    borderRadius: 16,
+    height: 50,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -486,39 +882,30 @@ const styles = StyleSheet.create({
   },
   loginBtnText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
-  dividerRow: {
+  goalChipsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
   },
-  dividerLine: {
-    flex: 1,
-    height: 0.8,
+  goalChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
   },
-  dividerText: {
+  goalChipText: {
     fontSize: 12,
-    marginHorizontal: 14,
   },
-  guestBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 50,
-    borderRadius: 16,
-    borderWidth: 1.2,
-  },
-  guestBtnText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-  },
+
   footerRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 26,
+    marginTop: 22,
   },
   footerText: {
     fontSize: 13,
@@ -529,3 +916,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+
+export default LoginScreen;

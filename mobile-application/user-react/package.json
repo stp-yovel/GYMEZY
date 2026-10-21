@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo-google-fonts/outfit": "^0.4.3",
     "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.19.1",
     "@react-navigation/native": "^7.4.1",
     "@react-navigation/native-stack": "^7.19.1",
@@ -13,8 +14,11 @@
     "expo-blur": "~57.0.3",
     "expo-clipboard": "~57.0.2",
     "expo-font": "~57.0.4",
+    "expo-image-picker": "~57.0.20",
     "expo-linear-gradient": "~57.0.2",
+    "expo-location": "~57.0.20",
     "expo-status-bar": "~57.0.1",
+    "lottie-react-native": "~7.3.8",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-gesture-handler": "~2.32.0",
@@ -25,7 +29,7 @@
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo run:android",
+    "android": "adb reverse tcp:5001 tcp:5001 2>/dev/null; expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web"
   },

@@ -36,6 +36,7 @@ import {
   ClockCircleOutlined,
   RightOutlined,
   ShopOutlined,
+  StarFilled,
 } from '@ant-design/icons';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -1383,9 +1384,9 @@ export const CustomersManagement = () => {
       {/* 4. PAGINATION */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 24 }}>
         <div style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>
-          Showing 1 to {filteredCustomers.length} of 1,248 customers
+          Showing {filteredCustomers.length > 0 ? (currentPage - 1) * 10 + 1 : 0} to {Math.min(currentPage * 10, filteredCustomers.length)} of {filteredCustomers.length} customers
         </div>
-        <Pagination current={currentPage} total={1248} pageSize={10} onChange={setCurrentPage} />
+        <Pagination current={currentPage} total={filteredCustomers.length} pageSize={10} onChange={setCurrentPage} />
       </div>
 
       {/* ADD NEW CUSTOMER MODAL */}
@@ -1476,13 +1477,17 @@ export const CustomersManagement = () => {
           <div style={{ padding: '12px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ padding: '12px', background: isDarkMode ? '#1e293b' : '#f8fafc', borderRadius: 8 }}>
               <div style={{ fontWeight: 800, fontSize: 16 }}>{selectedGymInfo.name}</div>
-              <div style={{ fontSize: 12, color: '#64748b' }}>{selectedGymInfo.location || 'Anna Nagar, Chennai'}</div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>
+                {typeof selectedGymInfo.location === 'string' && selectedGymInfo.location
+                  ? selectedGymInfo.location
+                  : [selectedGymInfo.area, selectedGymInfo.city].filter(Boolean).join(', ') || selectedGymInfo.fullAddress || selectedGymInfo.address || 'Anna Nagar, Chennai'}
+              </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 13 }}>
               <div><span style={{ color: '#888' }}>Status:</span> <Tag color="success">Approved & Live</Tag></div>
               <div><span style={{ color: '#888' }}>Drop-in Rate:</span> <strong>₹ 199 / session</strong></div>
               <div><span style={{ color: '#888' }}>Facilities:</span> <span>AC, Lockers, Showers, Parking</span></div>
-              <div><span style={{ color: '#888' }}>Rating:</span> <span>⭐ 4.8 (Verified)</span></div>
+              <div><span style={{ color: '#888' }}>Rating:</span> <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><StarFilled style={{ color: '#fbbf24', fontSize: 12 }} /> 4.8 (Verified)</span></div>
             </div>
           </div>
         )}

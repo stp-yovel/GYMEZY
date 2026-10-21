@@ -6,13 +6,17 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Image,
   Animated,
   StatusBar,
   Platform,
   Alert,
   Modal,
+  PermissionsAndroid,
+  Dimensions,
 } from 'react-native';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('screen');
+import Camera from 'react-native-camera-kit/dist/Camera.android';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -20,135 +24,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors } from '../theme/appTheme';
 import { useToast } from '../widgets/CustomScaffoldMessage';
-
-const MOCK_MEMBERS = [
-  {
-    id: 'MEM100245',
-    customerId: 'CUST100245',
-    bookingId: 'BK1002456',
-    name: 'Arun Kumar',
-    phone: '+91 91509 55071',
-    age: 28,
-    gender: 'Male',
-    status: 'Active',
-    bookingType: 'App Booking',
-    bookingDate: '21 May 2026, 07:00 AM',
-    session: 'General Workout',
-    plan: 'Gold Membership',
-    planType: 'Monthly',
-    startDate: '21 Apr 2026',
-    endDate: '21 May 2026 (30 Days)',
-    daysRemaining: 8,
-    totalCheckins: 18,
-    lastCheckin: '19 May 2026, 07:05 AM',
-    avatar: 'AK',
-  },
-  {
-    id: 'MEM100124',
-    customerId: 'CUST100124',
-    bookingId: 'BK1001240',
-    name: 'Rahul Krishnan',
-    phone: '+91 91509 55072',
-    age: 26,
-    gender: 'Male',
-    status: 'Active',
-    bookingType: 'Annual Pass',
-    bookingDate: '21 May 2026, 06:30 AM',
-    session: 'Strength Zone',
-    plan: 'Annual VIP Pass',
-    planType: 'Annual',
-    startDate: '01 Jan 2026',
-    endDate: '31 Dec 2026',
-    daysRemaining: 224,
-    totalCheckins: 76,
-    lastCheckin: '20 May 2026, 06:45 AM',
-    avatar: 'RK',
-  },
-  {
-    id: 'MEM100125',
-    customerId: 'CUST100125',
-    bookingId: 'BK1001250',
-    name: 'Priya Sharma',
-    phone: '+91 91509 55073',
-    age: 24,
-    gender: 'Female',
-    status: 'Active',
-    bookingType: 'Quarterly Pass',
-    bookingDate: '21 May 2026, 07:15 AM',
-    session: 'Yoga / HIIT',
-    plan: 'Quarterly Pro',
-    planType: 'Quarterly',
-    startDate: '15 Mar 2026',
-    endDate: '15 Jun 2026',
-    daysRemaining: 25,
-    totalCheckins: 34,
-    lastCheckin: '19 May 2026, 07:20 AM',
-    avatar: 'PS',
-  },
-  {
-    id: 'MEM100126',
-    customerId: 'CUST100126',
-    bookingId: 'BK1001260',
-    name: 'Sneha Nair',
-    phone: '+91 91509 55074',
-    age: 27,
-    gender: 'Female',
-    status: 'Active',
-    bookingType: 'Monthly Pass',
-    bookingDate: '21 May 2026, 07:45 AM',
-    session: 'Cardio Studio',
-    plan: 'Monthly Standard',
-    planType: 'Monthly',
-    startDate: '01 May 2026',
-    endDate: '31 May 2026',
-    daysRemaining: 10,
-    totalCheckins: 14,
-    lastCheckin: '18 May 2026, 08:00 AM',
-    avatar: 'SN',
-  },
-  {
-    id: 'MEM100127',
-    customerId: 'CUST100127',
-    bookingId: 'BK1001270',
-    name: 'Vijay Joseph',
-    phone: '+91 91509 55075',
-    age: 31,
-    gender: 'Male',
-    status: 'Expired',
-    bookingType: 'Day Pass',
-    bookingDate: '18 May 2026, 06:00 AM',
-    session: 'General Workout',
-    plan: 'Single Day Pass',
-    planType: 'Daily',
-    startDate: '18 May 2026',
-    endDate: '18 May 2026',
-    daysRemaining: 0,
-    totalCheckins: 1,
-    lastCheckin: '18 May 2026, 06:00 AM',
-    avatar: 'VJ',
-  },
-  {
-    id: 'MEM100128',
-    customerId: 'CUST100128',
-    bookingId: 'BK1001280',
-    name: 'Deepa Krishnan',
-    phone: '+91 91509 55076',
-    age: 29,
-    gender: 'Female',
-    status: 'Active',
-    bookingType: 'Personal Training VIP',
-    bookingDate: '21 May 2026, 08:00 AM',
-    session: 'Trainer 1-on-1',
-    plan: 'VIP Coach Pass',
-    planType: 'Quarterly',
-    startDate: '10 Apr 2026',
-    endDate: '10 Jul 2026',
-    daysRemaining: 50,
-    totalCheckins: 42,
-    lastCheckin: '20 May 2026, 08:00 AM',
-    avatar: 'DK',
-  },
-];
+import { useAuth } from '../context/AuthContext';
+import { apiService } from '../services/apiService';
 
 const SEARCH_FILTER_CHIPS = [
   'Customer Name',
@@ -170,6 +47,7 @@ const SESSION_AREAS = [
 export const CheckInScreen = ({ navigation, route }) => {
   const { isDark } = useTheme();
   const { showToast } = useToast();
+  const { gym } = useAuth();
   const insets = useSafeAreaInsets();
 
   // Mode: 'HUB' | 'QR' | 'SEARCH' | 'DETAILS' | 'SUCCESS'
@@ -180,10 +58,36 @@ export const CheckInScreen = ({ navigation, route }) => {
   const [searchCategoryTab, setSearchCategoryTab] = useState('Customer Check-in'); // 'Customer Check-in' | 'Member Check-in'
   const [activeChip, setActiveChip] = useState('Customer Name');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMember, setSelectedMember] = useState(MOCK_MEMBERS[0]);
+  const [liveMembers, setLiveMembers] = useState([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
   const [selectedArea, setSelectedArea] = useState('General Workout');
   const [showAreaModal, setShowAreaModal] = useState(false);
   const [flashlight, setFlashlight] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState(null);
+  const isScanningRef = useRef(false);
+
+  // Fetch live members for check-in
+  useEffect(() => {
+    const gymId = gym?.id || gym?._id || gym?.partnerId;
+    if (!gymId) return;
+
+    const fetchLiveMembers = async () => {
+      try {
+        setIsLoadingMembers(true);
+        const res = await apiService.searchAttendanceMembers({ gymId, query: '' });
+        if (Array.isArray(res)) {
+          setLiveMembers(res);
+        }
+      } catch (err) {
+        console.log('Error fetching members for check-in:', err.message);
+      } finally {
+        setIsLoadingMembers(false);
+      }
+    };
+
+    fetchLiveMembers();
+  }, [gym?.id, gym?._id, gym?.partnerId]);
 
   // Animated laser bar for QR scanner
   const laserAnim = useRef(new Animated.Value(0)).current;
@@ -196,6 +100,36 @@ export const CheckInScreen = ({ navigation, route }) => {
     insets.top,
     Platform.OS === 'android' ? (StatusBar.currentHeight || 36) : 44
   );
+
+  // Check and request camera permission on QR screen
+  useEffect(() => {
+    if (currentStep === 'QR') {
+      isScanningRef.current = false;
+      const checkPermission = async () => {
+        if (Platform.OS === 'android') {
+          try {
+            const has = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.CAMERA);
+            if (has) {
+              setHasCameraPermission(true);
+            } else {
+              const res = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA, {
+                title: 'Camera Access Needed',
+                message: 'GYMEZY requires camera access to scan member QR passes.',
+                buttonPositive: 'Allow',
+                buttonNegative: 'Cancel',
+              });
+              setHasCameraPermission(res === PermissionsAndroid.RESULTS.GRANTED);
+            }
+          } catch {
+            setHasCameraPermission(false);
+          }
+        } else {
+          setHasCameraPermission(true);
+        }
+      };
+      checkPermission();
+    }
+  }, [currentStep]);
 
   // Laser scanner loop animation
   useEffect(() => {
@@ -239,22 +173,23 @@ export const CheckInScreen = ({ navigation, route }) => {
   }, [currentStep, successScaleAnim, successRotateAnim]);
 
   // Filter members based on search query and active search chip
-  const filteredResults = MOCK_MEMBERS.filter((m) => {
+  const filteredResults = liveMembers.filter((m) => {
     if (!searchQuery.trim()) return false;
     const q = searchQuery.toLowerCase().trim();
 
-    if (activeChip === 'Customer Name') return m.name.toLowerCase().includes(q);
-    if (activeChip === 'Phone Number') return m.phone.includes(q);
-    if (activeChip === 'Customer ID') return m.customerId.toLowerCase().includes(q);
-    if (activeChip === 'Member ID') return m.id.toLowerCase().includes(q);
-    if (activeChip === 'Booking ID') return m.bookingId.toLowerCase().includes(q);
+    if (activeChip === 'Customer Name') return m.name?.toLowerCase().includes(q);
+    if (activeChip === 'Phone Number') return m.phone?.includes(q);
+    if (activeChip === 'Customer ID') return m.customerId?.toLowerCase().includes(q) || m.userId?.toLowerCase().includes(q);
+    if (activeChip === 'Member ID') return m.membershipId?.toLowerCase().includes(q) || m.id?.toLowerCase().includes(q);
+    if (activeChip === 'Booking ID') return m.bookingId?.toLowerCase().includes(q);
 
     return (
-      m.name.toLowerCase().includes(q) ||
-      m.phone.includes(q) ||
-      m.customerId.toLowerCase().includes(q) ||
-      m.id.toLowerCase().includes(q) ||
-      m.bookingId.toLowerCase().includes(q)
+      m.name?.toLowerCase().includes(q) ||
+      m.phone?.includes(q) ||
+      m.customerId?.toLowerCase().includes(q) ||
+      m.userId?.toLowerCase().includes(q) ||
+      m.membershipId?.toLowerCase().includes(q) ||
+      m.bookingId?.toLowerCase().includes(q)
     );
   });
 
@@ -263,8 +198,27 @@ export const CheckInScreen = ({ navigation, route }) => {
     setCurrentStep('DETAILS');
   };
 
-  const handleConfirmCheckin = () => {
-    if (selectedMember.status === 'Expired') {
+  const handleConfirmCheckin = async () => {
+    if (!selectedMember) return;
+    const now = new Date();
+    const isUpcoming =
+      selectedMember.status === 'UPCOMING' ||
+      selectedMember.status === 'Upcoming' ||
+      (selectedMember.startDate && new Date(selectedMember.startDate) > now);
+
+    if (isUpcoming) {
+      const startStr = selectedMember.startDate
+        ? new Date(selectedMember.startDate).toLocaleDateString()
+        : 'a future date';
+      Alert.alert(
+        'Upcoming Membership',
+        `This membership pass is not active yet (Starts on ${startStr}). Entry is not permitted before the start date.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    if (selectedMember.status === 'EXPIRED' || selectedMember.status === 'Expired' || (selectedMember.endDate && new Date(selectedMember.endDate) < now)) {
       Alert.alert(
         'Expired Membership',
         'This membership pass has expired. Please renew the membership before marking check-in.',
@@ -273,20 +227,101 @@ export const CheckInScreen = ({ navigation, route }) => {
       return;
     }
 
-    showToast({
-      message: `${selectedMember.name} checked in successfully for ${selectedArea}!`,
-      isSuccess: true,
-    });
-    setCurrentStep('SUCCESS');
+    if (selectedMember.status === 'CANCELLED' || selectedMember.status === 'Cancelled') {
+      Alert.alert(
+        'Cancelled Membership',
+        'This membership pass has been cancelled. Entry is not permitted.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    try {
+      const gymId = gym?.id || gym?._id || gym?.partnerId;
+      await apiService.checkInMember({
+        gymId,
+        code: selectedMember.membershipId || selectedMember.id || selectedMember.entryOtp,
+        otp: selectedMember.entryOtp,
+        area: selectedArea,
+        method: currentStep === 'QR' ? 'QR' : 'Manual',
+        verifiedBy: 'Gym Owner App',
+      });
+
+      showToast({
+        message: `${selectedMember.name} checked in successfully for ${selectedArea}!`,
+        isSuccess: true,
+      });
+      setCurrentStep('SUCCESS');
+    } catch (err) {
+      Alert.alert('Check-In Failed', err.message || 'Unable to check in member.');
+    }
   };
 
-  const handleSimulateQRScan = () => {
-    setSelectedMember(MOCK_MEMBERS[0]);
-    showToast({
-      message: 'QR Code verified: ' + MOCK_MEMBERS[0].name,
-      isSuccess: true,
-    });
-    setCurrentStep('DETAILS');
+  // Live QR Code Scanner detection handler
+  const handleScanCode = async (rawCode) => {
+    if (!rawCode || isScanningRef.current) return;
+    const cleanCode = String(rawCode).trim();
+    isScanningRef.current = true;
+
+    let codeToSend = cleanCode;
+    let otpToSend = null;
+    try {
+      if (cleanCode.startsWith('{') && cleanCode.endsWith('}')) {
+        const parsed = JSON.parse(cleanCode);
+        codeToSend = parsed.id || parsed.membershipId || parsed.code || cleanCode;
+        otpToSend = parsed.entryOtp || parsed.otp || null;
+      }
+    } catch {}
+
+    try {
+      const gymId = gym?.id || gym?._id || gym?.partnerId;
+      const res = await apiService.checkInMember({
+        gymId,
+        code: codeToSend,
+        otp: otpToSend,
+        area: selectedArea,
+        method: 'QR',
+        verifiedBy: 'Mobile QR Camera Scanner',
+      });
+
+      const memberData = res?.member || {};
+      setSelectedMember({
+        id: memberData.membershipId || memberData.id || codeToSend,
+        membershipId: memberData.membershipId || codeToSend,
+        name: memberData.name || 'Gym Member',
+        plan: memberData.tier ? `${memberData.tier} Pass` : 'Gym Access Pass',
+        avatar: (memberData.name || 'M').charAt(0).toUpperCase(),
+        phone: memberData.phone || '',
+        status: 'Active',
+        entryOtp: memberData.entryOtp || otpToSend || codeToSend,
+      });
+
+      showToast({
+        message: `${memberData.name || 'Member'} verified successfully!`,
+        isSuccess: true,
+      });
+      setCurrentStep('SUCCESS');
+    } catch (err) {
+      Alert.alert(
+        'QR Code Not Recognized',
+        err.message || 'Could not find an active membership pass for this QR code.',
+        [
+          {
+            text: 'Try Again',
+            onPress: () => {
+              isScanningRef.current = false;
+            },
+          },
+          {
+            text: 'Manual Search',
+            onPress: () => {
+              isScanningRef.current = false;
+              setCurrentStep('SEARCH');
+            },
+          },
+        ]
+      );
+    }
   };
 
   /* -------------------------------------------------------------------------- */
@@ -406,20 +441,45 @@ export const CheckInScreen = ({ navigation, route }) => {
     <View style={styles.qrContainer}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Mock Camera Background Overlay */}
-      <View style={styles.cameraBackground}>
-        <Image
-          source={{
-            uri: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop',
+      {/* 1. Real Device Camera Feed (or Permission fallback) */}
+      {hasCameraPermission ? (
+        <Camera
+          style={[StyleSheet.absoluteFillObject, { width: SCREEN_WIDTH, height: SCREEN_HEIGHT }]}
+          cameraType="back"
+          scanBarcode={true}
+          showFrame={false}
+          torchMode={flashlight ? 'on' : 'off'}
+          onReadCode={(event) => {
+            const scanned = event?.nativeEvent?.codeStringValue;
+            if (scanned) {
+              handleScanCode(scanned).catch(() => {});
+            }
           }}
-          style={styles.cameraImage}
-          resizeMode="cover"
         />
-        <View style={styles.darkCameraBackdrop} />
-      </View>
+      ) : (
+        <View style={styles.permissionContainer}>
+          <MaterialIcons name="camera-alt" size={56} color="#818CF8" />
+          <Text style={styles.permissionTitle}>Camera Access Required</Text>
+          <Text style={styles.permissionSubtitle}>
+            GYMEZY requires camera access to scan member QR passes in real time.
+          </Text>
+          <TouchableOpacity
+            style={styles.grantPermissionBtn}
+            onPress={async () => {
+              if (Platform.OS === 'android') {
+                const res = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+                setHasCameraPermission(res === PermissionsAndroid.RESULTS.GRANTED);
+              }
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.grantPermissionText}>Grant Permission</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
-      {/* Top Floating Controls */}
-      <View style={[styles.qrTopBar, { top: topInset + 10 }]}>
+      {/* 2. Top Floating Controls with Status Bar Clearance */}
+      <View style={[styles.qrTopBar, { paddingTop: Math.max(topInset + 8, 48) }]}>
         <TouchableOpacity
           style={styles.qrGlassBtn}
           onPress={() => setCurrentStep('HUB')}
@@ -428,10 +488,13 @@ export const CheckInScreen = ({ navigation, route }) => {
           <MaterialIcons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
 
-        <Text style={styles.qrHeaderTitle}>Scan Member Pass</Text>
+        <View style={styles.qrHeaderTitleContainer}>
+          <Text style={styles.qrHeaderTitle}>Scan Member Pass</Text>
+          <Text style={styles.qrHeaderSubtitle}>Optical Turnstile Fast Entry</Text>
+        </View>
 
         <TouchableOpacity
-          style={[styles.qrGlassBtn, flashlight && { backgroundColor: 'rgba(245, 158, 11, 0.4)' }]}
+          style={[styles.qrGlassBtn, flashlight && { backgroundColor: 'rgba(245, 158, 11, 0.5)' }]}
           onPress={() => setFlashlight(!flashlight)}
           activeOpacity={0.8}
         >
@@ -439,23 +502,14 @@ export const CheckInScreen = ({ navigation, route }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Center Viewfinder with Laser Scanner */}
+      {/* 3. Center Viewfinder with Laser Scanner */}
       <View style={styles.viewfinderWrapper}>
-        <TouchableOpacity
-          style={styles.viewfinderFrame}
-          onPress={handleSimulateQRScan}
-          activeOpacity={0.9}
-        >
+        <View style={styles.viewfinderFrame}>
           {/* Neon Border Corners */}
           <View style={[styles.frameCorner, styles.cornerTL]} />
           <View style={[styles.frameCorner, styles.cornerTR]} />
           <View style={[styles.frameCorner, styles.cornerBL]} />
           <View style={[styles.frameCorner, styles.cornerBR]} />
-
-          {/* QR Code Illustration */}
-          <View style={styles.qrIllustrationBox}>
-            <Ionicons name="qr-code-outline" size={160} color="#FFFFFF" style={{ opacity: 0.9 }} />
-          </View>
 
           {/* Animated Laser Bar */}
           <Animated.View
@@ -466,22 +520,13 @@ export const CheckInScreen = ({ navigation, route }) => {
               },
             ]}
           />
-        </TouchableOpacity>
+        </View>
 
-        <Text style={styles.viewfinderHint}>Align the QR code within the frame to scan</Text>
-
-        <TouchableOpacity
-          style={styles.simulateScanPill}
-          onPress={handleSimulateQRScan}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="sparkles" size={16} color="#FFFFFF" />
-          <Text style={styles.simulateScanText}>Tap to Simulate Scan</Text>
-        </TouchableOpacity>
+        <Text style={styles.viewfinderHint}>Align member's QR code within the frame</Text>
       </View>
 
-      {/* Bottom Switch to Manual Check-in */}
-      <View style={[styles.qrBottomBar, { paddingBottom: insets.bottom + 24 }]}>
+      {/* 4. Bottom Switch to Manual Check-in */}
+      <View style={[styles.qrBottomBar, { paddingBottom: Math.max(insets.bottom + 16, 24) }]}>
         <TouchableOpacity
           style={styles.switchToManualBtn}
           onPress={() => setCurrentStep('SEARCH')}
@@ -706,11 +751,25 @@ export const CheckInScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             </View>
 
-            {MOCK_MEMBERS.map((m) => {
-              const isExpired = m.status === 'Expired';
+            {liveMembers.slice(0, 10).map((m) => {
+              const isExpired = m.status === 'EXPIRED' || m.status === 'Expired';
+              const isUpcoming = m.status === 'UPCOMING' || m.status === 'Upcoming';
+              const isCancelled = m.status === 'CANCELLED' || m.status === 'Cancelled';
+              const avatarInitials = m.avatar && m.avatar.length <= 3 ? m.avatar : (m.name ? m.name.slice(0, 2).toUpperCase() : 'GM');
+              const badgeBg = isExpired || isCancelled
+                ? 'rgba(239, 68, 68, 0.12)'
+                : isUpcoming
+                ? 'rgba(245, 158, 11, 0.12)'
+                : 'rgba(0, 191, 98, 0.12)';
+              const badgeColor = isExpired || isCancelled
+                ? AppColors.dangerRed
+                : isUpcoming
+                ? '#D97706'
+                : AppColors.secondaryColor;
+
               return (
                 <TouchableOpacity
-                  key={m.id}
+                  key={m.key || m.id || m.membershipId}
                   style={[
                     styles.resultCard,
                     {
@@ -722,14 +781,14 @@ export const CheckInScreen = ({ navigation, route }) => {
                   activeOpacity={0.85}
                 >
                   <View style={styles.resultAvatarCircle}>
-                    <Text style={styles.resultAvatarText}>{m.avatar}</Text>
+                    <Text style={styles.resultAvatarText}>{avatarInitials}</Text>
                   </View>
                   <View style={styles.resultInfo}>
                     <Text style={[styles.resultName, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
                       {m.name}
                     </Text>
                     <Text style={[styles.resultId, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                      Member ID: {m.id}
+                      Member ID: {m.membershipId || m.id}
                     </Text>
                     <Text style={[styles.resultPhone, { color: isDark ? 'rgba(255,255,255,0.5)' : '#94A3B8' }]}>
                       {m.phone}
@@ -739,14 +798,14 @@ export const CheckInScreen = ({ navigation, route }) => {
                     style={[
                       styles.memberStatusBadge,
                       {
-                        backgroundColor: isExpired ? 'rgba(239, 68, 68, 0.12)' : 'rgba(0, 191, 98, 0.12)',
+                        backgroundColor: badgeBg,
                       },
                     ]}
                   >
                     <Text
                       style={[
                         styles.memberStatusText,
-                        { color: isExpired ? AppColors.dangerRed : AppColors.secondaryColor },
+                        { color: badgeColor },
                       ]}
                     >
                       {m.status}
@@ -765,7 +824,46 @@ export const CheckInScreen = ({ navigation, route }) => {
   /* STEP 4: VERIFICATION & CHECK-IN DETAILS VIEW                               */
   /* -------------------------------------------------------------------------- */
   const renderDetailsView = () => {
-    const isExpired = selectedMember.status === 'Expired';
+    if (!selectedMember) {
+      return (
+        <View style={[styles.container, { backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground }]}>
+          <View style={[styles.searchTopHeader, { paddingTop: topInset + 10 }]}>
+            <TouchableOpacity
+              style={[styles.backIconBtn, { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
+              onPress={() => setCurrentStep('SEARCH')}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="arrow-back" size={22} color={isDark ? '#FFFFFF' : '#0F172A'} />
+            </TouchableOpacity>
+            <Text style={[styles.searchScreenTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+              Verify Check-in
+            </Text>
+            <View style={{ width: 40 }} />
+          </View>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <Text style={{ color: isDark ? '#FFFFFF' : '#0F172A', fontSize: 15, fontWeight: '600' }}>
+              No member selected
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    const now = new Date();
+    const isExpired = selectedMember?.status?.toUpperCase() === 'EXPIRED' || (selectedMember?.endDate && new Date(selectedMember.endDate) < now);
+    const isUpcoming = selectedMember?.status?.toUpperCase() === 'UPCOMING' || (selectedMember?.startDate && new Date(selectedMember.startDate) > now);
+    const isCancelled = selectedMember?.status?.toUpperCase() === 'CANCELLED';
+
+    const detailBadgeBg = isExpired || isCancelled
+      ? 'rgba(239, 68, 68, 0.12)'
+      : isUpcoming
+      ? 'rgba(245, 158, 11, 0.12)'
+      : 'rgba(0, 191, 98, 0.12)';
+    const detailBadgeColor = isExpired || isCancelled
+      ? AppColors.dangerRed
+      : isUpcoming
+      ? '#D97706'
+      : AppColors.secondaryColor;
 
     return (
       <View style={[styles.container, { backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground }]}>
@@ -800,41 +898,41 @@ export const CheckInScreen = ({ navigation, route }) => {
           >
             <View style={styles.profileVerifyTop}>
               <View style={styles.detailsAvatarCircle}>
-                <Text style={styles.detailsAvatarText}>{selectedMember.avatar}</Text>
+                <Text style={styles.detailsAvatarText}>{selectedMember?.avatar || 'M'}</Text>
               </View>
               <View style={styles.detailsProfileInfo}>
                 <View style={styles.detailsNameRow}>
                   <Text style={[styles.detailsName, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                    {selectedMember.name}
+                    {selectedMember?.name || 'Member'}
                   </Text>
                   <View
                     style={[
                       styles.memberStatusBadge,
                       {
-                        backgroundColor: isExpired ? 'rgba(239, 68, 68, 0.12)' : 'rgba(0, 191, 98, 0.12)',
+                        backgroundColor: detailBadgeBg,
                       },
                     ]}
                   >
                     <Text
                       style={[
                         styles.memberStatusText,
-                        { color: isExpired ? AppColors.dangerRed : AppColors.secondaryColor },
+                        { color: detailBadgeColor },
                       ]}
                     >
-                      {selectedMember.status}
+                      {selectedMember?.status || 'Active'}
                     </Text>
                   </View>
                 </View>
                 <Text style={[styles.detailsMetaId, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                  Customer ID: {selectedMember.customerId}
+                  Customer ID: {selectedMember?.customerId || ''}
                 </Text>
                 <View style={styles.detailsContactRow}>
                   <Ionicons name="call" size={13} color={AppColors.primaryColor} />
                   <Text style={[styles.detailsPhone, { color: isDark ? 'rgba(255,255,255,0.7)' : '#334155' }]}>
-                    {selectedMember.phone}
+                    {selectedMember?.phone || '--'}
                   </Text>
                   <Text style={[styles.detailsAgeGender, { color: isDark ? 'rgba(255,255,255,0.5)' : '#94A3B8' }]}>
-                    • Age: {selectedMember.age} • {selectedMember.gender}
+                    • Age: {selectedMember?.age || '--'} • {selectedMember?.gender || '--'}
                   </Text>
                 </View>
               </View>
@@ -860,7 +958,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Booking Type
               </Text>
               <Text style={[styles.tableValuePill, { color: isDark ? '#93C5FD' : AppColors.primaryColor }]}>
-                {selectedMember.bookingType}
+                {selectedMember?.bookingType || 'Standard'}
               </Text>
             </View>
 
@@ -869,7 +967,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Booking ID
               </Text>
               <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedMember.bookingId}
+                {selectedMember?.bookingId || '--'}
               </Text>
             </View>
 
@@ -878,7 +976,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Booking Date
               </Text>
               <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedMember.bookingDate}
+                {selectedMember?.bookingDate || '--'}
               </Text>
             </View>
 
@@ -887,7 +985,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Session / Plan
               </Text>
               <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedMember.plan}
+                {selectedMember?.plan || '--'}
               </Text>
             </View>
 
@@ -896,7 +994,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Subscription End Date
               </Text>
               <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedMember.endDate}
+                {selectedMember?.endDate || '--'}
               </Text>
             </View>
 
@@ -908,12 +1006,12 @@ export const CheckInScreen = ({ navigation, route }) => {
                 style={[
                   styles.tableValue,
                   {
-                    color: selectedMember.daysRemaining > 0 ? AppColors.secondaryColor : AppColors.dangerRed,
+                    color: (selectedMember?.daysRemaining || 0) > 0 ? AppColors.secondaryColor : AppColors.dangerRed,
                     fontWeight: '800',
                   },
                 ]}
               >
-                {selectedMember.daysRemaining > 0 ? `${selectedMember.daysRemaining} Days` : 'Expired'}
+                {(selectedMember?.daysRemaining || 0) > 0 ? `${selectedMember?.daysRemaining} Days` : 'Expired'}
               </Text>
             </View>
 
@@ -922,7 +1020,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Total Check-ins
               </Text>
               <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedMember.totalCheckins}
+                {selectedMember?.totalCheckins || 0}
               </Text>
             </View>
 
@@ -931,7 +1029,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Last Check-in
               </Text>
               <Text style={[styles.tableValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                {selectedMember.lastCheckin}
+                {selectedMember?.lastCheckin || '--'}
               </Text>
             </View>
           </View>
@@ -987,7 +1085,7 @@ export const CheckInScreen = ({ navigation, route }) => {
                 Check-in at:
               </Text>
               <Text style={[styles.actionParamValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                FitZone Arena
+                {gym?.name || 'Gym Facility'}
               </Text>
             </View>
 
@@ -1016,14 +1114,21 @@ export const CheckInScreen = ({ navigation, route }) => {
             <TouchableOpacity
               style={[
                 styles.confirmCheckinBtn,
-                isExpired && { backgroundColor: '#94A3B8' },
+                (isExpired || isCancelled) && { backgroundColor: '#94A3B8' },
+                isUpcoming && { backgroundColor: '#F59E0B' },
               ]}
               onPress={handleConfirmCheckin}
               activeOpacity={0.88}
             >
               <MaterialIcons name="check-circle" size={20} color="#FFFFFF" />
               <Text style={styles.confirmCheckinBtnText}>
-                {isExpired ? 'Membership Expired' : 'Confirm Check-in'}
+                {isExpired
+                  ? 'Membership Expired'
+                  : isUpcoming
+                  ? 'Upcoming (Not Active)'
+                  : isCancelled
+                  ? 'Membership Cancelled'
+                  : 'Confirm Check-in'}
               </Text>
             </TouchableOpacity>
 
@@ -1366,114 +1471,176 @@ const styles = StyleSheet.create({
   qrContainer: {
     flex: 1,
     backgroundColor: '#000000',
+    position: 'relative',
   },
-  cameraBackground: {
+  permissionContainer: {
     ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0B0F19',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
   },
-  cameraImage: {
-    width: '100%',
-    height: '100%',
+  permissionTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  darkCameraBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+  permissionSubtitle: {
+    color: '#94A3B8',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  grantPermissionBtn: {
+    backgroundColor: AppColors.primaryColor,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  grantPermissionText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
   qrTopBar: {
     position: 'absolute',
-    left: 20,
-    right: 20,
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    zIndex: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    zIndex: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  qrHeaderTitleContainer: {
+    alignItems: 'center',
+  },
+  qrHeaderTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  qrHeaderSubtitle: {
+    color: 'rgba(255, 255, 255, 0.65)',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
   },
   qrGlassBtn: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  qrHeaderTitle: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '700',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   viewfinderWrapper: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
+    zIndex: 10,
+    backgroundColor: 'transparent',
+    pointerEvents: 'box-none',
   },
   viewfinderFrame: {
-    width: 250,
-    height: 250,
+    width: 260,
+    height: 260,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    backgroundColor: 'transparent',
     borderRadius: 24,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   frameCorner: {
     position: 'absolute',
-    width: 32,
-    height: 32,
-    borderColor: '#818CF8',
+    width: 36,
+    height: 36,
+    borderColor: '#38BDF8',
   },
   cornerTL: {
     top: 0,
     left: 0,
     borderTopWidth: 4,
     borderLeftWidth: 4,
-    borderTopLeftRadius: 18,
+    borderTopLeftRadius: 20,
   },
   cornerTR: {
     top: 0,
     right: 0,
     borderTopWidth: 4,
     borderRightWidth: 4,
-    borderTopRightRadius: 18,
+    borderTopRightRadius: 20,
   },
   cornerBL: {
     bottom: 0,
     left: 0,
     borderBottomWidth: 4,
     borderLeftWidth: 4,
-    borderBottomLeftRadius: 18,
+    borderBottomLeftRadius: 20,
   },
   cornerBR: {
     bottom: 0,
     right: 0,
     borderBottomWidth: 4,
     borderRightWidth: 4,
-    borderBottomRightRadius: 18,
-  },
-  qrIllustrationBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderBottomRightRadius: 20,
   },
   laserLine: {
     position: 'absolute',
-    top: 25,
+    top: 20,
     left: 15,
     right: 15,
     height: 3,
     backgroundColor: '#38BDF8',
     shadowColor: '#38BDF8',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
+    shadowOpacity: 1,
     shadowRadius: 10,
     borderRadius: 2,
+    elevation: 4,
   },
   viewfinderHint: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
-    marginTop: 24,
+    marginTop: 22,
     textAlign: 'center',
-    opacity: 0.85,
+    opacity: 0.9,
+  },
+  areaSelectorPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  areaSelectorText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
   },
   simulateScanPill: {
     flexDirection: 'row',
@@ -1483,7 +1650,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    marginTop: 18,
+    marginTop: 14,
   },
   simulateScanText: {
     color: '#FFFFFF',
@@ -1491,15 +1658,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   qrBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 20,
+    paddingTop: 16,
     alignItems: 'center',
+    zIndex: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   switchToManualBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    height: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    height: 52,
     width: '100%',
     borderRadius: 16,
     gap: 8,

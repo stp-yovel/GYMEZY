@@ -26,6 +26,12 @@ const NAV_ITEMS = [
     outlineIcon: 'people-outline',
   },
   {
+    label: 'Employee',
+    iconName: 'badge',
+    iconFamily: 'MaterialIcons',
+    outlineIcon: 'badge',
+  },
+  {
     label: 'Analytics',
     iconName: 'bar-chart',
     iconFamily: 'MaterialIcons',
@@ -98,11 +104,12 @@ const AnimatedNavItem = ({ item, isSelected, onTap, isDark }) => {
         style={[
           styles.navLabel,
           {
-            fontSize: isSelected ? 10.5 : 9.5,
+            fontSize: isSelected ? 10 : 9,
             fontWeight: isSelected ? '700' : '500',
             color: isSelected ? activeColor : inactiveColor,
           },
         ]}
+        numberOfLines={1}
       >
         {item.label}
       </Text>

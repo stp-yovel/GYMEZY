@@ -45,170 +45,28 @@ import {
   CloseCircleOutlined,
 } from '@ant-design/icons';
 import confetti from 'canvas-confetti';
+import jsQR from 'jsqr';
 import { useTheme } from '../theme/ThemeContext';
 import { recordCheckIn, recordCheckOut } from '../redux/slices/gymSlice';
+import { apiClient } from '../services/apiClient';
 
 const { Title, Text } = Typography;
-
-// Rich searchable database of members and bookings
-const SEARCHABLE_MEMBERS_DB = [
-  {
-    key: 'm-1',
-    name: 'Rahul Verma',
-    phone: '+91 98765 43210',
-    userId: 'USR-1029',
-    membershipId: 'MBR-2024-089',
-    bookingId: 'BKG-78210',
-    plan: 'Annual VIP All-Access Pass',
-    status: 'ACTIVE',
-    planExpiry: '14 Dec 2026',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop',
-    gymBranch: 'Anna Nagar, Chennai',
-  },
-  {
-    key: 'm-2',
-    name: 'Sneha Patel',
-    phone: '+91 98412 88990',
-    userId: 'USR-2041',
-    membershipId: 'MBR-2024-042',
-    bookingId: 'BKG-99412',
-    plan: 'Monthly Strength & Cardio',
-    status: 'ACTIVE',
-    planExpiry: '28 Oct 2026',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=150&auto=format&fit=crop',
-    gymBranch: 'Anna Nagar, Chennai',
-  },
-  {
-    key: 'm-3',
-    name: 'Pooja Sundaram',
-    phone: '+91 91509 55071',
-    userId: 'USR-3304',
-    membershipId: 'WLK-2024-105',
-    bookingId: 'BKG-33019',
-    plan: 'Daily Walk-In Day Pass',
-    status: 'ACTIVE',
-    planExpiry: 'Today (Midnight)',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=150&auto=format&fit=crop',
-    gymBranch: 'Moulivakkam, Chennai',
-  },
-  {
-    key: 'm-4',
-    name: 'Ananya Reddy',
-    phone: '+91 99620 44321',
-    userId: 'USR-4912',
-    membershipId: 'MBR-2024-118',
-    bookingId: 'BKG-11029',
-    plan: 'Quarterly HIIT & Strength',
-    status: 'ACTIVE',
-    planExpiry: '15 Jan 2027',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150&auto=format&fit=crop',
-    gymBranch: 'Anna Nagar, Chennai',
-  },
-  {
-    key: 'm-5',
-    name: 'Sam Kumar',
-    phone: '+91 97890 12345',
-    userId: 'CUST789012',
-    membershipId: 'MBR-2024-550',
-    bookingId: 'BKG-44580',
-    plan: 'Annual Premium Pass',
-    status: 'ACTIVE',
-    planExpiry: '20 May 2027',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop',
-    gymBranch: 'Anna Nagar, Chennai',
-  },
-  {
-    key: 'm-6',
-    name: 'Vikram Malhotra',
-    phone: '+91 98409 77654',
-    userId: 'USR-5509',
-    membershipId: 'MBR-2022-310',
-    bookingId: 'BKG-99201',
-    plan: 'Annual VIP Pass (Expired)',
-    status: 'EXPIRED',
-    planExpiry: '13 Sep 2026 (Expired)',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=150&auto=format&fit=crop',
-    gymBranch: 'Anna Nagar, Chennai',
-  },
-];
-
-// Initial sample check-in logs
-const INITIAL_LOGS = [
-  {
-    key: 'log-1',
-    passId: 'MBR-2024-089',
-    userId: 'USR-1029',
-    customerId: 'USR-1029',
-    membershipId: 'MBR-2024-089',
-    bookingId: 'BKG-78210',
-    memberName: 'Rahul Verma',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop',
-    plan: 'Annual VIP Pass',
-    time: '11:58 AM',
-    otp: '942185',
-    status: 'GRANTED',
-    method: 'QR Code',
-    planExpiry: '14 Dec 2026',
-  },
-  {
-    key: 'log-2',
-    passId: 'MBR-2024-042',
-    userId: 'USR-2041',
-    customerId: 'USR-2041',
-    membershipId: 'MBR-2024-042',
-    bookingId: 'BKG-99412',
-    memberName: 'Sneha Patel',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=150&auto=format&fit=crop',
-    plan: 'Monthly Strength & Cardio',
-    time: '11:54 AM',
-    otp: '618304',
-    status: 'GRANTED',
-    method: 'OTP Passcode',
-    planExpiry: '28 Oct 2026',
-  },
-  {
-    key: 'log-3',
-    passId: 'WLK-2024-105',
-    userId: 'USR-3304',
-    customerId: 'USR-3304',
-    membershipId: 'WLK-2024-105',
-    bookingId: 'BKG-33019',
-    memberName: 'Pooja Sundaram',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=150&auto=format&fit=crop',
-    plan: 'Daily Walk-In Day Pass',
-    time: '11:42 AM',
-    otp: '502917',
-    status: 'GRANTED',
-    method: 'OTP Passcode',
-    planExpiry: 'Today (Midnight)',
-  },
-  {
-    key: 'log-4',
-    passId: 'MBR-2022-310',
-    userId: 'USR-5509',
-    customerId: 'USR-5509',
-    membershipId: 'MBR-2022-310',
-    bookingId: 'BKG-99201',
-    memberName: 'Vikram Malhotra',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop',
-    plan: 'Annual VIP Pass',
-    time: '11:35 AM',
-    otp: '119284',
-    status: 'DENIED',
-    method: 'QR Code',
-    denialReason: 'Membership Expired',
-    planExpiry: '13 Sep 2026 (Expired)',
-  },
-];
 
 export const QrCheckIn = () => {
   const dispatch = useDispatch();
   const { isDarkMode } = useTheme();
+  const { user } = useSelector((state) => state.auth || {});
+  const gym = user?.gym || {};
+  const gymId = gym._id || gym.id || user?.gymId || user?.partnerId || user?._id;
   const { liveOccupancy: reduxOccupancy, capacity: reduxCapacity } = useSelector((state) => state.gym || {});
 
-  const [occupancy, setOccupancy] = useState(reduxOccupancy || 42);
+  const [occupancy, setOccupancy] = useState(reduxOccupancy || 0);
   const totalCapacity = reduxCapacity || 120;
-  const [logs, setLogs] = useState(INITIAL_LOGS);
+  const [logs, setLogs] = useState([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [searchableMembers, setSearchableMembers] = useState([]);
+  const [isSearchingMembers, setIsSearchingMembers] = useState(false);
+
   const [activeOption, setActiveOption] = useState('qr'); // 'qr' | 'otp' | 'search'
   const [otpInput, setOtpInput] = useState('');
   const [manualInput, setManualInput] = useState('');
@@ -222,21 +80,19 @@ export const QrCheckIn = () => {
   const videoRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const [cameraState, setCameraState] = useState('idle'); // 'idle' | 'requesting' | 'active' | 'denied'
+  const cameraStateRef = useRef('idle');
+  const animFrameIdRef = useRef(null);
+  const canvasRef = useRef(null);
+  const barcodeDetectorRef = useRef(null);
+  const isScanningCooldownRef = useRef(false);
 
-  const [lastVerified, setLastVerified] = useState({
-    status: 'GRANTED',
-    memberName: 'Rahul Verma',
-    userId: 'USR-1029',
-    customerId: 'USR-1029',
-    membershipId: 'MBR-2024-089',
-    bookingId: 'BKG-78210',
-    passId: 'MBR-2024-089',
-    plan: 'Annual VIP Pass',
-    time: '11:58 AM',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop',
-    method: 'QR Code',
-    planExpiry: '14 Dec 2026',
-  });
+  const [qrDetectedHighlight, setQrDetectedHighlight] = useState(false);
+  const [lastScannedCode, setLastScannedCode] = useState('');
+  const [lastVerified, setLastVerified] = useState(null);
+
+  useEffect(() => {
+    cameraStateRef.current = cameraState;
+  }, [cameraState]);
 
   const fireSuccessConfetti = () => {
     try {
@@ -248,6 +104,136 @@ export const QrCheckIn = () => {
       });
     } catch (e) {
       // safe fallback
+    }
+  };
+
+  // Play audio chime on successful QR scan
+  const playScanBeep = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const audioCtx = new AudioCtx();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime); // 880Hz A5
+      osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.12); // chime up
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.16);
+    } catch {
+      // safe audio fallback
+    }
+  };
+
+  // Callback when QR code is detected
+  const handleQrDetected = (rawCode) => {
+    if (!rawCode || isScanningCooldownRef.current) return;
+    const cleanCode = rawCode.trim();
+    if (!cleanCode) return;
+
+    isScanningCooldownRef.current = true;
+    setQrDetectedHighlight(true);
+    setLastScannedCode(cleanCode);
+    playScanBeep();
+
+    let parsed = null;
+    if (cleanCode.startsWith('{') && cleanCode.endsWith('}')) {
+      try {
+        parsed = JSON.parse(cleanCode);
+      } catch {}
+    }
+
+    const displayName = parsed?.customerId || parsed?.name || parsed?.id || parsed?.entryOtp || cleanCode;
+    message.success(`QR Detected: ${displayName}`);
+
+    handleVerify({
+      code: cleanCode,
+      raw: cleanCode,
+      id: parsed?.id || parsed?.membershipId || undefined,
+      membershipId: parsed?.id || parsed?.membershipId || undefined,
+      entryOtp: parsed?.entryOtp || parsed?.otp || undefined,
+    });
+
+    setTimeout(() => {
+      setQrDetectedHighlight(false);
+    }, 1500);
+
+    setTimeout(() => {
+      isScanningCooldownRef.current = false;
+    }, 3000);
+  };
+
+  // Continuous frame analysis loop
+  const scanVideoFrame = () => {
+    if (
+      videoRef.current &&
+      videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA &&
+      cameraStateRef.current === 'active'
+    ) {
+      const video = videoRef.current;
+      if (!canvasRef.current) {
+        canvasRef.current = document.createElement('canvas');
+      }
+      const canvas = canvasRef.current;
+
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        }
+
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Hardware-accelerated BarcodeDetector (Chrome, Edge, Android Chrome)
+        if ('BarcodeDetector' in window) {
+          try {
+            if (!barcodeDetectorRef.current) {
+              barcodeDetectorRef.current = new window.BarcodeDetector({ formats: ['qr_code'] });
+            }
+            barcodeDetectorRef.current
+              .detect(video)
+              .then((barcodes) => {
+                if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                  handleQrDetected(barcodes[0].rawValue);
+                } else {
+                  // Fallback to jsQR
+                  decodeFrameWithJsQr(ctx, canvas);
+                }
+              })
+              .catch(() => {
+                decodeFrameWithJsQr(ctx, canvas);
+              });
+          } catch {
+            decodeFrameWithJsQr(ctx, canvas);
+          }
+        } else {
+          decodeFrameWithJsQr(ctx, canvas);
+        }
+      }
+    }
+
+    if (cameraStateRef.current === 'active') {
+      animFrameIdRef.current = requestAnimationFrame(scanVideoFrame);
+    }
+  };
+
+  const decodeFrameWithJsQr = (ctx, canvas) => {
+    if (isScanningCooldownRef.current) return;
+    try {
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'dontInvert',
+      });
+      if (code && code.data) {
+        handleQrDetected(code.data);
+      }
+    } catch {
+      // ignore frame decode error
     }
   };
 
@@ -274,14 +260,26 @@ export const QrCheckIn = () => {
         videoRef.current.srcObject = stream;
       }
       setCameraState('active');
+      cameraStateRef.current = 'active';
+
+      // Start frame scanning loop
+      if (animFrameIdRef.current) {
+        cancelAnimationFrame(animFrameIdRef.current);
+      }
+      animFrameIdRef.current = requestAnimationFrame(scanVideoFrame);
     } catch (err) {
       setCameraState('denied');
+      cameraStateRef.current = 'denied';
       message.warning('Camera permission was not granted.');
     }
   };
 
   // Stop Camera
   const stopCamera = () => {
+    if (animFrameIdRef.current) {
+      cancelAnimationFrame(animFrameIdRef.current);
+      animFrameIdRef.current = null;
+    }
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((t) => t.stop());
       mediaStreamRef.current = null;
@@ -290,10 +288,14 @@ export const QrCheckIn = () => {
       videoRef.current.srcObject = null;
     }
     setCameraState('idle');
+    cameraStateRef.current = 'idle';
   };
 
   useEffect(() => {
     return () => {
+      if (animFrameIdRef.current) {
+        cancelAnimationFrame(animFrameIdRef.current);
+      }
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach((t) => t.stop());
       }
@@ -303,110 +305,187 @@ export const QrCheckIn = () => {
   useEffect(() => {
     if (cameraState === 'active' && videoRef.current && mediaStreamRef.current) {
       videoRef.current.srcObject = mediaStreamRef.current;
+      if (!animFrameIdRef.current) {
+        animFrameIdRef.current = requestAnimationFrame(scanVideoFrame);
+      }
     }
   }, [cameraState]);
 
-  // Member verification
-  const handleVerify = (customData = null) => {
-    setIsVerifying(true);
-
-    setTimeout(() => {
-      setIsVerifying(false);
-
-      if (customData?.isDenied || customData?.status === 'EXPIRED') {
-        const deniedItem = {
-          key: `log-${Date.now()}`,
-          passId: customData?.membershipId || customData?.passId || 'MBR-DENIED',
-          userId: customData?.userId || 'USR-5509',
-          customerId: customData?.userId || 'USR-5509',
-          membershipId: customData?.membershipId || 'MBR-2022-310',
-          bookingId: customData?.bookingId || 'BKG-99201',
-          memberName: customData?.name || customData?.memberName || 'Vikram Malhotra',
-          avatar: customData?.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop',
-          plan: customData?.plan || 'Annual Pass (Expired)',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          otp: customData?.otp || '119284',
-          status: 'DENIED',
-          denialReason: customData?.denialReason || customData?.reason || 'Membership Expired',
-          method: customData?.method || (activeOption === 'search' ? 'Manual Lookup' : activeOption === 'otp' ? 'OTP Passcode' : 'QR Code'),
-          planExpiry: customData?.planExpiry || 'Expired',
-        };
-
-        setLogs((prev) => [deniedItem, ...prev]);
-        setLastVerified(deniedItem);
-        message.error(`Access Denied: ${deniedItem.memberName}'s membership is expired.`);
-        return;
+  // Load live today attendance logs
+  const fetchTodayAttendance = async () => {
+    if (!gymId) return;
+    try {
+      setIsLoadingLogs(true);
+      const res = await apiClient.get(`/attendance/today?gymId=${gymId}`);
+      if (res.data?.success && res.data?.data) {
+        setLogs(res.data.data.logs || []);
+        if (typeof res.data.data.summary?.currentlyInside === 'number') {
+          setOccupancy(res.data.data.summary.currentlyInside);
+        }
       }
-
-      // Check if manual input matches any member in the searchable DB
-      let matchedDbMember = null;
-      if (!customData && manualInput.trim()) {
-        const q = manualInput.trim().toLowerCase();
-        const cleanQuery = q.replace(/[\s+-]/g, '');
-        matchedDbMember = SEARCHABLE_MEMBERS_DB.find((item) => {
-          const cleanPhone = item.phone.replace(/[\s+-]/g, '');
-          return (
-            cleanPhone.includes(cleanQuery) ||
-            item.phone.toLowerCase().includes(q) ||
-            item.userId.toLowerCase() === q ||
-            item.membershipId.toLowerCase() === q ||
-            item.bookingId.toLowerCase() === q ||
-            item.name.toLowerCase() === q
-          );
-        });
-      }
-
-      const verifiedItem = {
-        key: `log-${Date.now()}`,
-        passId: customData?.membershipId || customData?.bookingId || customData?.passId || matchedDbMember?.membershipId || (otpInput ? `OTP-${otpInput}` : `MBR-${Math.floor(1000 + Math.random() * 9000)}`),
-        userId: customData?.userId || matchedDbMember?.userId || `USR-${Math.floor(1000 + Math.random() * 9000)}`,
-        customerId: customData?.userId || matchedDbMember?.userId || `USR-${Math.floor(1000 + Math.random() * 9000)}`,
-        membershipId: customData?.membershipId || matchedDbMember?.membershipId || `MBR-${Math.floor(1000 + Math.random() * 9000)}`,
-        bookingId: customData?.bookingId || matchedDbMember?.bookingId || `BKG-${Math.floor(10000 + Math.random() * 90000)}`,
-        memberName: customData?.name || customData?.memberName || matchedDbMember?.name || (otpInput === '618304' ? 'Sneha Patel' : otpInput === '502917' ? 'Pooja Sundaram' : 'Rahul Verma'),
-        avatar: customData?.avatar || matchedDbMember?.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=150&auto=format&fit=crop',
-        plan: customData?.plan || matchedDbMember?.plan || (otpInput === '502917' ? 'Daily Walk-In Pass' : 'VIP Platinum All-Access'),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        otp: customData?.otp || (otpInput ? otpInput : '---'),
-        status: 'GRANTED',
-        method: customData?.method || (activeOption === 'search' ? 'Manual Lookup' : activeOption === 'otp' ? 'OTP Passcode' : 'QR Code'),
-        planExpiry: customData?.planExpiry || matchedDbMember?.planExpiry || '30 Dec 2026',
-      };
-
-      setLogs((prev) => [verifiedItem, ...prev]);
-      setLastVerified(verifiedItem);
-      setOccupancy((prev) => Math.min(totalCapacity, prev + 1));
-      dispatch(recordCheckIn(verifiedItem));
-      message.success(`Access Granted: ${verifiedItem.memberName}`);
-      fireSuccessConfetti();
-      setOtpInput('');
-      setManualInput('');
-      setSearchQuery('');
-    }, 300);
+    } catch (err) {
+      console.warn('Failed to load today attendance logs:', err.message);
+    } finally {
+      setIsLoadingLogs(false);
+    }
   };
 
-  const handleManualExit = (record) => {
-    const exitItem = {
-      key: `log-${Date.now()}`,
-      passId: record?.passId || 'MBR-EXIT',
-      memberName: record?.memberName || 'Member',
-      avatar: record?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop',
-      plan: record?.plan || 'Regular Pass',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      otp: '---',
-      status: 'CHECKED_OUT',
-      method: 'Turnstile Exit',
-      planExpiry: 'Active',
-    };
+  // Load searchable gym members
+  const fetchMembers = async (query = '') => {
+    if (!gymId) return;
+    try {
+      setIsSearchingMembers(true);
+      const res = await apiClient.get(`/attendance/members?gymId=${gymId}&query=${encodeURIComponent(query)}`);
+      if (res.data?.success && Array.isArray(res.data?.data)) {
+        setSearchableMembers(res.data.data);
+      }
+    } catch (err) {
+      console.warn('Failed to search members:', err.message);
+    } finally {
+      setIsSearchingMembers(false);
+    }
+  };
 
-    setLogs((prev) => [exitItem, ...prev]);
-    setOccupancy((prev) => Math.max(0, prev - 1));
-    dispatch(recordCheckOut());
-    message.info(`Exit recorded for ${record.memberName}`);
+  useEffect(() => {
+    if (gymId) {
+      fetchTodayAttendance();
+      fetchMembers('');
+    }
+  }, [gymId]);
+
+  useEffect(() => {
+    if (activeOption === 'search' && gymId) {
+      fetchMembers(searchQuery);
+    }
+  }, [searchQuery, activeOption, gymId]);
+
+  // Member verification
+  const handleVerify = async (customData = null) => {
+    let rawString = '';
+    let parsedJson = null;
+
+    if (typeof customData === 'string') {
+      rawString = customData.trim();
+    } else if (typeof customData?.code === 'string') {
+      rawString = customData.code.trim();
+    } else if (typeof customData?.raw === 'string') {
+      rawString = customData.raw.trim();
+    }
+
+    if (rawString.startsWith('{') && rawString.endsWith('}')) {
+      try {
+        parsedJson = JSON.parse(rawString);
+      } catch {}
+    }
+
+    const rawLookup =
+      parsedJson?.id ||
+      parsedJson?.membershipId ||
+      parsedJson?.entryOtp ||
+      customData?.id ||
+      customData?.membershipId ||
+      customData?.entryOtp ||
+      customData?.code ||
+      customData?.raw ||
+      customData?.membershipDbId ||
+      customData?.userId ||
+      (activeOption === 'otp' ? otpInput : manualInput);
+
+    const lookupCode = (rawLookup || '').toString().trim();
+    if (!lookupCode) {
+      message.warning('Please enter or scan an OTP, QR code, or Member ID.');
+      return;
+    }
+
+    setIsVerifying(true);
+    let checkInMethod = 'QR';
+    if (activeOption === 'otp') {
+      checkInMethod = 'OTP';
+    } else if (activeOption === 'search') {
+      checkInMethod = 'Manual';
+    }
+
+    const otpVal =
+      parsedJson?.entryOtp ||
+      parsedJson?.otp ||
+      (activeOption === 'otp' ? otpInput : (customData?.entryOtp || customData?.otp || undefined));
+
+    try {
+      const payload = {
+        gymId,
+        code: rawString || lookupCode,
+        otp: otpVal,
+        method: checkInMethod,
+        area: 'General Workout',
+        verifiedBy: 'Turnstile Fast Check-In',
+      };
+
+      const res = await apiClient.post('/attendance/check-in', payload);
+      if (res.data?.success && res.data?.data) {
+        const verified = res.data.data;
+        const memberInfo = verified.member || {};
+        const verifiedItem = {
+          key: verified.attendanceId,
+          attendanceId: verified.attendanceId,
+          passId: memberInfo.membershipId || lookupCode,
+          userId: memberInfo.id || 'N/A',
+          customerId: memberInfo.id || 'N/A',
+          membershipId: memberInfo.membershipId || lookupCode,
+          bookingId: memberInfo.bookingId || null,
+          memberName: memberInfo.name || 'Gym Member',
+          avatar: memberInfo.avatar || null,
+          plan: memberInfo.tier ? `${memberInfo.tier} Pass` : 'Membership Pass',
+          time: new Date(verified.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          otp: memberInfo.entryOtp || otpInput || '------',
+          status: 'GRANTED',
+          attendanceStatus: 'Checked-In',
+          method: verified.method === 'OTP' ? 'OTP Passcode' : 'QR Code',
+          planExpiry: memberInfo.endDate ? new Date(memberInfo.endDate).toLocaleDateString() : 'Active',
+        };
+
+        setLastVerified(verifiedItem);
+        message.success(`Access Granted: ${verifiedItem.memberName}`);
+        fireSuccessConfetti();
+        setOtpInput('');
+        setManualInput('');
+        setSearchQuery('');
+        await fetchTodayAttendance();
+      }
+    } catch (err) {
+      const errMsg = err.response?.data?.message || err.message || 'Access Denied: Verification failed.';
+      message.error(errMsg);
+      setLastVerified({
+        status: 'DENIED',
+        memberName: customData?.name || 'Visitor / Member',
+        membershipId: lookupCode,
+        passId: lookupCode,
+        plan: customData?.plan || 'Unknown Pass',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        method: activeOption === 'otp' ? 'OTP Passcode' : 'QR Code',
+        denialReason: errMsg,
+        avatar: customData?.avatar || null,
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleManualExit = async (record) => {
+    try {
+      const attId = record.attendanceId || record.key;
+      await apiClient.post('/attendance/check-out', {
+        attendanceId: attId,
+        gymId,
+      });
+      message.info(`Exit recorded for ${record.memberName}`);
+      await fetchTodayAttendance();
+    } catch (err) {
+      message.error(err.response?.data?.message || err.message || 'Failed to record check-out.');
+    }
   };
 
   // Filter Search Results
-  const filteredSearchResults = SEARCHABLE_MEMBERS_DB.filter((item) => {
+  const filteredSearchResults = (searchableMembers || []).filter((item) => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return false;
 
@@ -750,23 +829,40 @@ export const QrCheckIn = () => {
                   </div>
                 </div>
 
-                {/* Primary Action Button */}
-                {cameraState !== 'active' && (
-                  <Button
-                    type="primary"
-                    icon={<VideoCameraOutlined />}
-                    loading={cameraState === 'requesting'}
-                    onClick={startCamera}
-                    style={{
-                      height: 40,
-                      borderRadius: 'var(--radius-base)',
-                      fontWeight: 600,
-                      backgroundColor: 'var(--color-primary)',
-                    }}
-                  >
-                    Start Camera Scanner
-                  </Button>
-                )}
+                {/* Action Buttons: Start Camera & Upload Image */}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {cameraState !== 'active' ? (
+                    <Button
+                      type="primary"
+                      icon={<VideoCameraOutlined />}
+                      loading={cameraState === 'requesting'}
+                      onClick={startCamera}
+                      style={{
+                        flex: 1,
+                        height: 40,
+                        borderRadius: 'var(--radius-base)',
+                        fontWeight: 600,
+                        backgroundColor: 'var(--color-primary)',
+                      }}
+                    >
+                      Start Camera Scanner
+                    </Button>
+                  ) : (
+                    <Button
+                      danger
+                      icon={<StopOutlined />}
+                      onClick={stopCamera}
+                      style={{
+                        flex: 1,
+                        height: 40,
+                        borderRadius: 'var(--radius-base)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Stop Camera
+                    </Button>
+                  )}
+                </div>
 
                 {/* Manual Fast Input */}
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -946,7 +1042,7 @@ export const QrCheckIn = () => {
                                   {member.name}
                                 </span>
                                 <Tag
-                                  color={member.status === 'ACTIVE' ? 'success' : 'error'}
+                                  color={member.status === 'ACTIVE' ? 'success' : member.status === 'UPCOMING' ? 'blue' : 'error'}
                                   style={{ fontWeight: 700, fontSize: 10, margin: 0, borderRadius: 3 }}
                                 >
                                   {member.status}
@@ -990,7 +1086,7 @@ export const QrCheckIn = () => {
                             type="primary"
                             size="small"
                             loading={isVerifying}
-                            danger={member.status === 'EXPIRED'}
+                            danger={member.status === 'EXPIRED' || member.status === 'CANCELLED'}
                             onClick={() => handleVerify(member)}
                             style={{
                               borderRadius: 'var(--radius-base)',
@@ -999,9 +1095,11 @@ export const QrCheckIn = () => {
                               height: 32,
                               padding: '0 14px',
                               flexShrink: 0,
+                              backgroundColor: member.status === 'UPCOMING' ? '#d97706' : undefined,
+                              borderColor: member.status === 'UPCOMING' ? '#d97706' : undefined,
                             }}
                           >
-                            {member.status === 'EXPIRED' ? 'Expired (Check)' : 'Verify & Check In'}
+                            {member.status === 'EXPIRED' ? 'Expired (Check)' : member.status === 'UPCOMING' ? 'Upcoming (Check)' : 'Verify & Check In'}
                           </Button>
                         </div>
                       ))
@@ -1045,7 +1143,11 @@ export const QrCheckIn = () => {
           <Card
             title={
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700 }}>
-                <SafetyCertificateFilled style={{ color: lastVerified.status === 'GRANTED' ? '#52c41a' : '#ff4d4f' }} />
+                <SafetyCertificateFilled
+                  style={{
+                    color: lastVerified?.status === 'GRANTED' ? '#52c41a' : lastVerified ? '#ff4d4f' : '#1677ff',
+                  }}
+                />
                 <span>Verification Result</span>
               </div>
             }
@@ -1278,29 +1380,37 @@ export const QrCheckIn = () => {
               title: 'Status',
               dataIndex: 'status',
               key: 'status',
-              render: (status) => (
-                <Tag
-                  color={status === 'GRANTED' ? 'success' : status === 'DENIED' ? 'error' : 'default'}
-                  style={{ borderRadius: 4, fontWeight: 700, fontSize: 11 }}
-                >
-                  {status}
-                </Tag>
-              ),
+              render: (status, record) => {
+                const isInside = record.attendanceStatus === 'Checked-In' || status === 'GRANTED';
+                return (
+                  <Tag
+                    color={isInside ? 'success' : status === 'DENIED' ? 'error' : 'blue'}
+                    style={{ borderRadius: 4, fontWeight: 700, fontSize: 11 }}
+                  >
+                    {isInside ? 'INSIDE' : status === 'DENIED' ? 'DENIED' : 'CHECKED OUT'}
+                  </Tag>
+                );
+              },
             },
             {
               title: 'Action',
               key: 'action',
               align: 'right',
               render: (_, record) =>
-                record.status === 'GRANTED' ? (
+                (record.attendanceStatus === 'Checked-In' || record.status === 'GRANTED') ? (
                   <Button
                     size="small"
+                    danger
                     onClick={() => handleManualExit(record)}
-                    style={{ borderRadius: 'var(--radius-base)', fontSize: 11 }}
+                    style={{ borderRadius: 'var(--radius-base)', fontSize: 11, fontWeight: 600 }}
                   >
                     Check Out
                   </Button>
-                ) : null,
+                ) : (
+                  <span style={{ fontSize: 11.5, color: isDarkMode ? '#888888' : '#94a3b8' }}>
+                    {record.checkOutStr && record.checkOutStr !== '-' ? `Out at ${record.checkOutStr}` : 'Completed'}
+                  </span>
+                ),
             },
           ]}
         />

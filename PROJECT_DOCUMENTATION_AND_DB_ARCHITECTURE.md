@@ -23,6 +23,7 @@
 5. [State Machine Architecture](#5-state-machine-architecture)
 6. [API Architecture & RESTful Endpoint Contracts](#6-api-architecture--restful-endpoint-contracts)
 7. [Non-Functional Requirements, Security & Scalability](#7-non-functional-requirements-security--scalability)
+8. [Platform System Accounts & Initial Seed Credentials](#8-platform-system-accounts--initial-seed-credentials)
 
 ---
 
@@ -68,7 +69,7 @@ flowchart TB
     subgraph Persistence_Layer ["Data & Cache Storage Tier"]
         MDB[("MongoDB Cluster (Primary Document DB)")]
         REDIS[("Redis Cache & Distributed Lock Manager")]
-        S3[("AWS S3 / Cloudinary (Media & Photos)")]
+        MEDIA[("Cloudinary / Server Media Storage (Photos & Assets)")]
     end
 
     UA -->|HTTPS / WSS| GW
@@ -80,7 +81,7 @@ flowchart TB
 
     USVC & GSVC & BSVC & MSVC & PSVC & ASVC --> MDB
     BSVC & ASVC --> REDIS
-    USVC & GSVC --> S3
+    USVC & GSVC --> MEDIA
 ```
 
 ---
@@ -719,6 +720,33 @@ stateDiagram-v2
 ### 7.3 High Availability & Observability
 - **Database Replication:** MongoDB Replica Set with automatic failover and read-preference distribution (`primaryPreferred`).
 - **Telemetry & Monitoring:** Structured Winston/Morgan logging, Prometheus metrics, and APM tracing for all booking and payment state transitions.
+
+---
+
+## 8. Platform System Accounts & Initial Seed Credentials
+
+### 8.1 Default Super Admin Account
+
+For administrative access, platform oversight, and initial database bootstrap:
+
+| Attribute | Value / Specification |
+|---|---|
+| **Account Name** | `Gymezy` |
+| **Email Address** | `admin@gymezy.com` |
+| **Phone Number** | `+91 9150955071` / `+91 9884881983` |
+| **Initial Password** | `SuperAdmin@Gymezy2026!` |
+| **User Role** | `SUPER_ADMIN` |
+| **Status** | `isActive: true`, `isVerified: true` |
+| **Registered Office** | Second Floor, Mahalakshmi Nagar, Plot No 5, Jyothi Nagar, Moulivakkam, Kolathuvancheri, Tamil Nadu 600125 |
+
+### 8.2 Database Seeding Command
+
+To seed or refresh the Super Admin account in the active database cluster:
+
+```bash
+cd middleware
+node src/scripts/seedSuperAdmin.js
+```
 
 ---
 *Authored for the GYMEZY Platform Engineering & Architecture Team.*

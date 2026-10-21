@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Layout } from 'antd';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useTheme } from '../theme/ThemeContext';
 import AppSidebar from '../general/components/AppSidebar';
@@ -11,7 +11,17 @@ const { Content } = Layout;
 export const OwnerLayout = () => {
   const { isDarkMode } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
-  const { user } = useSelector((state) => state.auth);
+  const { user } = useSelector((state) => state.auth || {});
+
+  const approvalStatus = user?.gym?.approvalStatus || 'Approved';
+  const isPendingOrRejected =
+    approvalStatus === 'Pending Approval' ||
+    approvalStatus === 'Pending' ||
+    approvalStatus === 'Rejected';
+
+  if (user?.role !== 'SUPER_ADMIN' && isPendingOrRejected) {
+    return <Navigate to="/application-status" replace />;
+  }
 
   return (
     <Layout style={{ minHeight: '100vh', backgroundColor: isDarkMode ? '#000000' : '#f8fafc' }}>
