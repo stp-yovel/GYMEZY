@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,6 @@ import {
   Modal,
   Alert,
   Linking,
-  Dimensions,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -21,28 +20,13 @@ import { AppColors } from '../../theme/appTheme';
 import { useToast } from '../../widgets/CustomScaffoldMessage';
 import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/apiService';
-import { getSafeImageUri, getGymLogoUri } from '../../utils/mediaUtils';
+import { getSafeImageUri } from '../../utils/mediaUtils';
 
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const MEMBER_FILTER_TABS = ['All', 'Active', 'Expiring Soon', 'Expired', 'Cancelled'];
 const SWITCH_FILTER_TABS = ['All', 'Pending Review', 'Sent to Admin', 'Approved', 'Rejected'];
 const BOOKING_FILTER_TABS = ['All', 'Upcoming', 'Checked-in', 'Completed'];
 const CANCEL_FILTER_TABS = ['All', 'Sent to Admin', 'In Review', 'Approved', 'Rejected'];
-
-const GENDER_OPTIONS = ['Male', 'Female', 'Other'];
-const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
-const FITNESS_GOALS = [
-  'General Fitness',
-  'Weight Loss & Fat Burn',
-  'Muscle Building & Hypertrophy',
-  'CrossFit & High Intensity',
-  'Strength & Powerlifting',
-  'Endurance & Stamina',
-  'Rehab & Mobility',
-  'Athletic Performance',
-];
 const PAYMENT_METHODS = ['UPI', 'Cash', 'Credit / Debit Card', 'Net Banking'];
 
 const DEFAULT_PLANS = [
@@ -51,6 +35,47 @@ const DEFAULT_PLANS = [
   { id: 'platinum', name: 'Platinum (6 Months)', duration: '6 Months', price: 7999, days: 180 },
   { id: 'annual', name: 'Annual VIP (12 Months)', duration: '12 Months', price: 14999, days: 365 },
 ];
+
+const mapMembership = (m) => {
+  const startStr = m.startDate
+    ? new Date(m.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : '';
+  const endStr = m.endDate
+    ? new Date(m.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : '';
+  const daysRemaining = Math.max(0, Math.ceil((new Date(m.endDate) - Date.now()) / (1000 * 60 * 60 * 24)));
+  return {
+    id: m._id,
+    key: m._id,
+    memberId: m.membershipId || (m._id ? `MEM-${m._id.toString().substring(m._id.toString().length - 6).toUpperCase()}` : 'MEM'),
+    name: m.userId?.fullName || 'Member',
+    phone: m.userId?.phone || '',
+    email: m.userId?.email || '',
+    avatar:
+      m.userId?.avatar ||
+      m.userId?.profilePicture ||
+      m.avatar ||
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop',
+    avatarInitials: (m.userId?.fullName || 'M')
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase(),
+    plan: m.membershipTier || 'Standard',
+    startDate: startStr,
+    expiryDate: endStr,
+    daysLeft: `${daysRemaining} days left`,
+    status: m.status || 'Active',
+    paymentType: m.payment?.method || 'Online',
+    amount: `₹${Number(m.pricing?.totalAmount || 0).toLocaleString('en-IN')}`,
+    trainerName: m.trainerId?.name || (m.hasTrainer ? 'Assigned' : 'None'),
+    emergencyContact: m.userId?.emergencyContact || m.emergencyContact || 'Not Specified',
+    gender: m.userId?.gender || 'Not Specified',
+    bloodGroup: m.userId?.bloodGroup || 'Not Specified',
+    fitnessGoals: m.userId?.fitnessGoals || ['General Fitness'],
+  };
+};
 
 export const MembersTab = ({ topInset, navigation }) => {
   const { isDark } = useTheme();
@@ -67,10 +92,19 @@ export const MembersTab = ({ topInset, navigation }) => {
   const [bookingFilter, setBookingFilter] = useState('All');
   const [cancelFilter, setCancelFilter] = useState('All');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isMembersLoading, setIsMembersLoading] = useState(false);
 
-  // Live Data States
+  // Pagination & Infinite Scroll States for Members
   const [members, setMembers] = useState([]);
+  const [memberPage, setMemberPage] = useState(1);
+  const [hasMoreMembers, setHasMoreMembers] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isInitialMembersLoading, setIsInitialMembersLoading] = useState(false);
+  const [totalMembersCount, setTotalMembersCount] = useState(0);
+
+  const isFetchingMoreRef = useRef(false);
+  const prevFilterRef = useRef(memberFilter);
+
+  // Other Live Data States
   const [switchRequests, setSwitchRequests] = useState([]);
   const [membershipSummary, setMembershipSummary] = useState(null);
   const [bookings, setBookings] = useState([]);
@@ -89,10 +123,75 @@ export const MembersTab = ({ topInset, navigation }) => {
   const [extendPlan, setExtendPlan] = useState(DEFAULT_PLANS[1]);
   const [extendAmount, setExtendAmount] = useState('4499');
   const [extendPaymentMethod, setExtendPaymentMethod] = useState('UPI');
-  const [extendFromOption, setExtendFromOption] = useState('EXPIRY'); // 'EXPIRY' | 'TODAY'
 
-  // Fetch Live Data from Backend API
-  const fetchAllData = useCallback(async () => {
+  // Fetch Members Page (Server-side Paginated with Infinite Scroll)
+  const fetchMembersPage = useCallback(
+    async (pageToFetch = 1, isAppend = false) => {
+      const targetGymId = gym?._id || gym?.id || gym?.partnerId;
+      if (!targetGymId) return;
+
+      if (isAppend) {
+        if (isFetchingMoreRef.current) return;
+        isFetchingMoreRef.current = true;
+        setIsLoadingMore(true);
+      } else {
+        setIsInitialMembersLoading(true);
+      }
+
+      try {
+        const params = {
+          page: pageToFetch,
+          limit: 15,
+        };
+        if (searchQuery.trim()) {
+          params.search = searchQuery.trim();
+        }
+        if (memberFilter && memberFilter !== 'All') {
+          params.status = memberFilter;
+        }
+
+        const res = await apiService.getMemberships(targetGymId, params);
+
+        if (res?.summary) {
+          setMembershipSummary(res.summary);
+        }
+
+        if (typeof res?.total === 'number') {
+          setTotalMembersCount(res.total);
+        }
+
+        const rawList = Array.isArray(res?.memberships) ? res.memberships : [];
+        const mapped = rawList.map(mapMembership);
+
+        if (isAppend) {
+          setMembers((prev) => {
+            const existingIds = new Set(prev.map((m) => m.id));
+            const freshItems = mapped.filter((m) => !existingIds.has(m.id));
+            return [...prev, ...freshItems];
+          });
+        } else {
+          setMembers(mapped);
+        }
+
+        const totalPages = res?.totalPages || Math.ceil((res?.total || 0) / 15) || 1;
+        setMemberPage(pageToFetch);
+        setHasMoreMembers(pageToFetch < totalPages && mapped.length > 0);
+      } catch (err) {
+        console.warn('Error fetching gym members page:', err.message);
+      } finally {
+        if (isAppend) {
+          isFetchingMoreRef.current = false;
+          setIsLoadingMore(false);
+        } else {
+          setIsInitialMembersLoading(false);
+        }
+      }
+    },
+    [gym?._id, gym?.id, gym?.partnerId, searchQuery, memberFilter]
+  );
+
+  // Fetch Support Data (Employees, Switch Requests, etc.)
+  const fetchSupportData = useCallback(async () => {
     try {
       if (refreshGymProfile) {
         await refreshGymProfile();
@@ -100,9 +199,8 @@ export const MembersTab = ({ topInset, navigation }) => {
 
       const targetGymId = gym?._id || gym?.id || gym?.partnerId;
 
-      const [employees, membershipsRes, switchRes] = await Promise.all([
+      const [employees, switchRes] = await Promise.all([
         apiService.getEmployees().catch(() => []),
-        targetGymId ? apiService.getMemberships(targetGymId, { limit: 100 }).catch(() => null) : null,
         targetGymId ? apiService.getSwitchRequests(targetGymId).catch(() => null) : null,
       ]);
 
@@ -113,65 +211,59 @@ export const MembersTab = ({ topInset, navigation }) => {
         setTrainersList(trainers.length > 0 ? trainers : employees);
       }
 
-      if (membershipsRes?.summary) {
-        setMembershipSummary(membershipsRes.summary);
-      }
-
-      if (Array.isArray(membershipsRes?.memberships)) {
-        const mapped = membershipsRes.memberships.map((m) => {
-          const startStr = m.startDate
-            ? new Date(m.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-            : '';
-          const endStr = m.endDate
-            ? new Date(m.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-            : '';
-          const daysRemaining = Math.max(0, Math.ceil((new Date(m.endDate) - new Date()) / (1000 * 60 * 60 * 24)));
-          return {
-            id: m._id,
-            key: m._id,
-            memberId: m.membershipId || (m._id ? `MEM-${m._id.toString().substring(m._id.toString().length - 6).toUpperCase()}` : 'MEM'),
-            name: m.userId?.fullName || 'Member',
-            phone: m.userId?.phone || '',
-            email: m.userId?.email || '',
-            avatar:
-              m.userId?.avatar ||
-              m.userId?.profilePicture ||
-              m.avatar ||
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&auto=format&fit=crop',
-            avatarInitials: (m.userId?.fullName || 'M')
-              .split(' ')
-              .map((n) => n[0])
-              .join('')
-              .substring(0, 2)
-              .toUpperCase(),
-            plan: m.membershipTier || 'Standard',
-            startDate: startStr,
-            expiryDate: endStr,
-            daysLeft: `${daysRemaining} days left`,
-            status: m.status || 'Active',
-            paymentType: m.payment?.method || 'Online',
-            amount: `₹${Number(m.pricing?.totalAmount || 0).toLocaleString('en-IN')}`,
-            trainerName: m.trainerId?.name || (m.hasTrainer ? 'Assigned' : 'None'),
-            emergencyContact: m.userId?.emergencyContact || m.emergencyContact || 'Not Specified',
-            gender: m.userId?.gender || 'Not Specified',
-            bloodGroup: m.userId?.bloodGroup || 'Not Specified',
-            fitnessGoals: m.userId?.fitnessGoals || ['General Fitness'],
-          };
-        });
-        setMembers(mapped);
-      }
-
       if (Array.isArray(switchRes?.requests)) {
         setSwitchRequests(switchRes.requests);
       }
     } catch (err) {
-      console.warn('Error fetching gym live data:', err.message);
+      console.warn('Error fetching gym support data:', err.message);
     }
   }, [gym?._id, gym?.id, gym?.partnerId, refreshGymProfile]);
 
   useEffect(() => {
-    fetchAllData();
-  }, [fetchAllData]);
+    fetchSupportData();
+  }, [fetchSupportData]);
+
+  // Debounced search and filter watcher
+  useEffect(() => {
+    if (activeMode !== 'MEMBERS') return;
+
+    const isFilterChange = prevFilterRef.current !== memberFilter;
+    prevFilterRef.current = memberFilter;
+
+    const delay = isFilterChange ? 0 : 350;
+    const timer = setTimeout(() => {
+      fetchMembersPage(1, false);
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, memberFilter, activeMode, fetchMembersPage]);
+
+  // Infinite Scroll Handler on ScrollView
+  const handleScroll = (event) => {
+    if (
+      activeMode !== 'MEMBERS' ||
+      isLoadingMore ||
+      !hasMoreMembers ||
+      isInitialMembersLoading
+    ) {
+      return;
+    }
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 160;
+    const isNearBottom =
+      layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+
+    if (isNearBottom) {
+      fetchMembersPage(memberPage + 1, true);
+    }
+  };
+
+  const fetchAllData = useCallback(async () => {
+    await Promise.all([
+      fetchMembersPage(1, false),
+      fetchSupportData(),
+    ]);
+  }, [fetchMembersPage, fetchSupportData]);
 
   const onRefresh = async () => {
     setIsRefreshing(true);
@@ -541,6 +633,8 @@ export const MembersTab = ({ topInset, navigation }) => {
           },
         ]}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={32}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -569,7 +663,7 @@ export const MembersTab = ({ topInset, navigation }) => {
               ]}
             >
               {activeMode === 'MEMBERS'
-                ? `${members.length} registered members in gym roster`
+                ? `${totalMembersCount || members.length} registered members in gym roster`
                 : activeMode === 'SWITCHES'
                 ? `${switchRequests.length} plan switch requests from members`
                 : activeMode === 'BOOKINGS'
@@ -842,7 +936,19 @@ export const MembersTab = ({ topInset, navigation }) => {
         {/* --- 5A. MEMBERS ROSTER VIEW --- */}
         {activeMode === 'MEMBERS' && (
           <>
-            {filteredMembers.length === 0 ? (
+            {isInitialMembersLoading && members.length === 0 ? (
+              <View style={styles.initialLoadingBox}>
+                <ActivityIndicator size="large" color={AppColors.primaryColor} />
+                <Text
+                  style={[
+                    styles.initialLoadingText,
+                    { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' },
+                  ]}
+                >
+                  Loading members roster...
+                </Text>
+              </View>
+            ) : filteredMembers.length === 0 ? (
               <View
                 style={[
                   styles.emptyState,
@@ -1024,6 +1130,35 @@ export const MembersTab = ({ topInset, navigation }) => {
                   </TouchableOpacity>
                 );
               })
+            )}
+
+            {/* Infinite Scroll Load More / End Of List Indicators */}
+            {isLoadingMore && (
+              <View style={styles.loadingMoreBox}>
+                <ActivityIndicator size="small" color={AppColors.primaryColor} />
+                <Text
+                  style={[
+                    styles.loadingMoreText,
+                    { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' },
+                  ]}
+                >
+                  Loading more members...
+                </Text>
+              </View>
+            )}
+
+            {!hasMoreMembers && members.length > 0 && !isLoadingMore && (
+              <View style={styles.endOfListBox}>
+                <MaterialIcons name="check-circle" size={14} color={AppColors.secondaryColor} />
+                <Text
+                  style={[
+                    styles.endOfListText,
+                    { color: isDark ? 'rgba(255,255,255,0.45)' : '#94A3B8' },
+                  ]}
+                >
+                  All {totalMembersCount || members.length} members loaded
+                </Text>
+              </View>
             )}
           </>
         )}
@@ -3617,5 +3752,37 @@ const styles = StyleSheet.create({
   switchRejectBtnText: {
     fontWeight: '700',
     fontSize: 12,
+  },
+  loadingMoreBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    gap: 8,
+  },
+  loadingMoreText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  endOfListBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    gap: 6,
+  },
+  endOfListText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  initialLoadingBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    gap: 12,
+  },
+  initialLoadingText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
