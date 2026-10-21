@@ -877,37 +877,149 @@ export const AddEmployeeModal = ({
                   })}
                 </View>
 
-                {/* Added Employment Documents List */}
-                <View style={{ marginTop: 4 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginBottom: 0 }]}>
-                      Added Employment Documents ({empDocs.length})
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.attachBtn}
-                      onPress={() => openAttachDocModal('employment')}
+                {/* Employment Documents */}
+                <View style={{ marginTop: 12 }}>
+                  <View style={styles.sectionHeaderRow}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                      <MaterialIcons name="description" size={17} color={AppColors.primaryColor} />
+                      <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginBottom: 0 }]}>
+                        Employment Documents
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.countBadge,
+                        {
+                          backgroundColor: empDocs.length > 0
+                            ? (isDark ? 'rgba(37,99,235,0.15)' : '#EFF6FF')
+                            : (isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9'),
+                        },
+                      ]}
                     >
-                      <MaterialIcons name="attach-file" size={14} color="#722ED1" />
-                      <Text style={styles.attachBtnText}>Attach Document</Text>
-                    </TouchableOpacity>
+                      <Text
+                        style={[
+                          styles.countBadgeText,
+                          { color: empDocs.length > 0 ? AppColors.primaryColor : isDark ? '#94A3B8' : '#64748B' },
+                        ]}
+                      >
+                        {empDocs.length > 0 ? `${empDocs.length} Attached` : 'Optional'}
+                      </Text>
+                    </View>
                   </View>
 
-                  {empDocs.map((doc, idx) => (
-                    <View key={doc.key || idx} style={[styles.docListItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF' }]}>
-                      <MaterialIcons name="description" size={18} color="#722ED1" />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.docListTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>{doc.docType}</Text>
-                        <Text style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }}>
-                          {doc.fileName} • {doc.addedOn}
+                  {empDocs.length === 0 ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.uploadDropzone,
+                        {
+                          borderColor: isDark ? 'rgba(37,99,235,0.35)' : '#BFDBFE',
+                          backgroundColor: isDark ? 'rgba(37,99,235,0.04)' : '#F8FAFC',
+                        },
+                      ]}
+                      onPress={() => openAttachDocModal('employment')}
+                      activeOpacity={0.75}
+                    >
+                      <View
+                        style={[
+                          styles.uploadDropzoneIconCircle,
+                          { backgroundColor: isDark ? 'rgba(37,99,235,0.15)' : '#DBEAFE' },
+                        ]}
+                      >
+                        <MaterialIcons name="cloud-upload" size={22} color={AppColors.primaryColor} />
+                      </View>
+                      <Text style={[styles.uploadDropzoneTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                        Attach Employment Documents
+                      </Text>
+                      <Text style={[styles.uploadDropzoneSub, { color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }]}>
+                        Relieving letter, offer letter, pay slips, or experience proof
+                      </Text>
+                      <View
+                        style={[
+                          styles.uploadDropzoneActionBadge,
+                          {
+                            borderColor: isDark ? 'rgba(37,99,235,0.4)' : '#BFDBFE',
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF',
+                          },
+                        ]}
+                      >
+                        <MaterialIcons name="add" size={14} color={AppColors.primaryColor} />
+                        <Text style={[styles.uploadDropzoneActionText, { color: AppColors.primaryColor }]}>
+                          Choose Document / File
                         </Text>
                       </View>
-                      <TouchableOpacity onPress={() => setEmpDocs(empDocs.filter((_, i) => i !== idx))}>
-                        <MaterialIcons name="delete" size={18} color="#EF4444" />
+                    </TouchableOpacity>
+                  ) : (
+                    <View>
+                      {empDocs.map((doc, idx) => (
+                        <View
+                          key={doc.key || idx}
+                          style={[
+                            styles.attachedDocCard,
+                            {
+                              backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF',
+                              borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                            },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.docIconWrapper,
+                              { backgroundColor: isDark ? 'rgba(37,99,235,0.15)' : '#EFF6FF' },
+                            ]}
+                          >
+                            <MaterialIcons name="description" size={18} color={AppColors.primaryColor} />
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 10 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <Text style={[styles.docTitleText, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                                {doc.docType}
+                              </Text>
+                              {doc.docNum && doc.docNum !== '—' && (
+                                <View
+                                  style={[
+                                    styles.docBadge,
+                                    { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9' },
+                                  ]}
+                                >
+                                  <Text style={[styles.docBadgeText, { color: isDark ? '#CBD5E1' : '#475569' }]}>
+                                    {doc.docNum}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text
+                              style={[styles.docSubText, { color: isDark ? 'rgba(255,255,255,0.45)' : '#64748B' }]}
+                              numberOfLines={1}
+                            >
+                              {doc.fileName || 'Attached'} • {doc.addedOn}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => setEmpDocs(empDocs.filter((_, i) => i !== idx))}
+                            style={styles.deleteDocBtn}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <MaterialIcons name="delete-outline" size={18} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+
+                      <TouchableOpacity
+                        style={[
+                          styles.addAnotherDocBtn,
+                          {
+                            borderColor: isDark ? 'rgba(37,99,235,0.35)' : '#BFDBFE',
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#F8FAFC',
+                          },
+                        ]}
+                        onPress={() => openAttachDocModal('employment')}
+                      >
+                        <MaterialIcons name="add" size={16} color={AppColors.primaryColor} />
+                        <Text style={[styles.addAnotherDocText, { color: AppColors.primaryColor }]}>
+                          Attach Another Employment Doc
+                        </Text>
                       </TouchableOpacity>
                     </View>
-                  ))}
-                  {empDocs.length === 0 && (
-                    <Text style={{ fontSize: 11, color: '#94A3B8' }}>No employment documents attached yet.</Text>
                   )}
                 </View>
               </View>
@@ -1038,38 +1150,147 @@ export const AddEmployeeModal = ({
                   },
                 ]}
               >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={styles.sectionHeaderRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
                     <MaterialIcons name="badge" size={18} color="#10B981" />
                     <Text style={[styles.subSectionTitle, { color: isDark ? '#FFFFFF' : '#0F172A', marginBottom: 0 }]}>
-                      Personal Verification Documents ({personalDocs.length})
+                      Government ID / Verification
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.attachBtn}
-                    onPress={() => openAttachDocModal('personal')}
+                  <View
+                    style={[
+                      styles.countBadge,
+                      {
+                        backgroundColor: personalDocs.length > 0
+                          ? (isDark ? 'rgba(16,185,129,0.15)' : '#DCFCE7')
+                          : (isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9'),
+                      },
+                    ]}
                   >
-                    <MaterialIcons name="attach-file" size={14} color="#722ED1" />
-                    <Text style={styles.attachBtnText}>Attach Document</Text>
-                  </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.countBadgeText,
+                        { color: personalDocs.length > 0 ? '#10B981' : isDark ? '#94A3B8' : '#64748B' },
+                      ]}
+                    >
+                      {personalDocs.length > 0 ? `${personalDocs.length} Attached` : 'Optional'}
+                    </Text>
+                  </View>
                 </View>
 
-                {personalDocs.map((doc, idx) => (
-                  <View key={doc.key || idx} style={[styles.docListItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF' }]}>
-                    <MaterialIcons name="badge" size={18} color="#10B981" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.docListTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>{doc.docType}</Text>
-                      <Text style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }}>
-                        No: {doc.docNum || '—'} • {doc.fileName}
+                {personalDocs.length === 0 ? (
+                  <TouchableOpacity
+                    style={[
+                      styles.uploadDropzone,
+                      {
+                        borderColor: isDark ? 'rgba(16,185,129,0.35)' : '#86EFAC',
+                        backgroundColor: isDark ? 'rgba(16,185,129,0.04)' : '#F0FDF4',
+                      },
+                    ]}
+                    onPress={() => openAttachDocModal('personal')}
+                    activeOpacity={0.75}
+                  >
+                    <View
+                      style={[
+                        styles.uploadDropzoneIconCircle,
+                        { backgroundColor: isDark ? 'rgba(16,185,129,0.15)' : '#DCFCE7' },
+                      ]}
+                    >
+                      <MaterialIcons name="cloud-upload" size={22} color="#10B981" />
+                    </View>
+                    <Text style={[styles.uploadDropzoneTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                      Attach Government ID Proof
+                    </Text>
+                    <Text style={[styles.uploadDropzoneSub, { color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }]}>
+                      Aadhar Card, PAN Card, Passport, or Driving License
+                    </Text>
+                    <View
+                      style={[
+                        styles.uploadDropzoneActionBadge,
+                        {
+                          borderColor: isDark ? 'rgba(16,185,129,0.4)' : '#86EFAC',
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF',
+                        },
+                      ]}
+                    >
+                      <MaterialIcons name="add" size={14} color="#10B981" />
+                      <Text style={[styles.uploadDropzoneActionText, { color: '#10B981' }]}>
+                        Choose ID Proof
                       </Text>
                     </View>
-                    <TouchableOpacity onPress={() => setPersonalDocs(personalDocs.filter((_, i) => i !== idx))}>
-                      <MaterialIcons name="delete" size={18} color="#EF4444" />
+                  </TouchableOpacity>
+                ) : (
+                  <View>
+                    {personalDocs.map((doc, idx) => (
+                      <View
+                        key={doc.key || idx}
+                        style={[
+                          styles.attachedDocCard,
+                          {
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF',
+                            borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                          },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.docIconWrapper,
+                            { backgroundColor: isDark ? 'rgba(16,185,129,0.15)' : '#DCFCE7' },
+                          ]}
+                        >
+                          <MaterialIcons name="badge" size={18} color="#10B981" />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <Text style={[styles.docTitleText, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                              {doc.docType}
+                            </Text>
+                            {doc.docNum && doc.docNum !== '—' && (
+                              <View
+                                style={[
+                                  styles.docBadge,
+                                  { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9' },
+                                ]}
+                              >
+                                <Text style={[styles.docBadgeText, { color: isDark ? '#CBD5E1' : '#475569' }]}>
+                                  {doc.docNum}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text
+                            style={[styles.docSubText, { color: isDark ? 'rgba(255,255,255,0.45)' : '#64748B' }]}
+                            numberOfLines={1}
+                          >
+                            {doc.fileName || 'Attached'} • {doc.addedOn}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => setPersonalDocs(personalDocs.filter((_, i) => i !== idx))}
+                          style={styles.deleteDocBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <MaterialIcons name="delete-outline" size={18} color="#EF4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+
+                    <TouchableOpacity
+                      style={[
+                        styles.addAnotherDocBtn,
+                        {
+                          borderColor: isDark ? 'rgba(16,185,129,0.35)' : '#86EFAC',
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#F8FAFC',
+                        },
+                      ]}
+                      onPress={() => openAttachDocModal('personal')}
+                    >
+                      <MaterialIcons name="add" size={16} color="#10B981" />
+                      <Text style={[styles.addAnotherDocText, { color: '#10B981' }]}>
+                        Attach Another ID Proof
+                      </Text>
                     </TouchableOpacity>
                   </View>
-                ))}
-                {personalDocs.length === 0 && (
-                  <Text style={{ fontSize: 11, color: '#94A3B8' }}>No personal verification documents attached yet.</Text>
                 )}
               </View>
 
@@ -1083,38 +1304,147 @@ export const AddEmployeeModal = ({
                   },
                 ]}
               >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={styles.sectionHeaderRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
                     <MaterialIcons name="card-membership" size={18} color="#F59E0B" />
                     <Text style={[styles.subSectionTitle, { color: isDark ? '#FFFFFF' : '#0F172A', marginBottom: 0 }]}>
-                      Trainer Certificate ({trainerCerts.length})
+                      Trainer Certificate & Proofs
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.attachBtn}
-                    onPress={() => openAttachDocModal('trainer')}
+                  <View
+                    style={[
+                      styles.countBadge,
+                      {
+                        backgroundColor: trainerCerts.length > 0
+                          ? (isDark ? 'rgba(245,158,11,0.15)' : '#FEF3C7')
+                          : (isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9'),
+                      },
+                    ]}
                   >
-                    <MaterialIcons name="attach-file" size={14} color="#722ED1" />
-                    <Text style={styles.attachBtnText}>Attach Certificate</Text>
-                  </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.countBadgeText,
+                        { color: trainerCerts.length > 0 ? '#D97706' : isDark ? '#94A3B8' : '#64748B' },
+                      ]}
+                    >
+                      {trainerCerts.length > 0 ? `${trainerCerts.length} Attached` : 'Optional'}
+                    </Text>
+                  </View>
                 </View>
 
-                {trainerCerts.map((cert, idx) => (
-                  <View key={cert.key || idx} style={[styles.docListItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF' }]}>
-                    <MaterialIcons name="verified" size={18} color="#F59E0B" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.docListTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>{cert.certType}</Text>
-                      <Text style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }}>
-                        ID: {cert.certNum || '—'} • {cert.fileName}
+                {trainerCerts.length === 0 ? (
+                  <TouchableOpacity
+                    style={[
+                      styles.uploadDropzone,
+                      {
+                        borderColor: isDark ? 'rgba(245,158,11,0.35)' : '#FDE68A',
+                        backgroundColor: isDark ? 'rgba(245,158,11,0.04)' : '#FFFBEB',
+                      },
+                    ]}
+                    onPress={() => openAttachDocModal('trainer')}
+                    activeOpacity={0.75}
+                  >
+                    <View
+                      style={[
+                        styles.uploadDropzoneIconCircle,
+                        { backgroundColor: isDark ? 'rgba(245,158,11,0.15)' : '#FEF3C7' },
+                      ]}
+                    >
+                      <MaterialIcons name="cloud-upload" size={22} color="#F59E0B" />
+                    </View>
+                    <Text style={[styles.uploadDropzoneTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                      Attach Trainer Certificate
+                    </Text>
+                    <Text style={[styles.uploadDropzoneSub, { color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }]}>
+                      ACE CPT, CSCS, CPR/AED, Nutrition, or CrossFit certificate
+                    </Text>
+                    <View
+                      style={[
+                        styles.uploadDropzoneActionBadge,
+                        {
+                          borderColor: isDark ? 'rgba(245,158,11,0.4)' : '#FDE68A',
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF',
+                        },
+                      ]}
+                    >
+                      <MaterialIcons name="add" size={14} color="#F59E0B" />
+                      <Text style={[styles.uploadDropzoneActionText, { color: '#D97706' }]}>
+                        Choose Certificate
                       </Text>
                     </View>
-                    <TouchableOpacity onPress={() => setTrainerCerts(trainerCerts.filter((_, i) => i !== idx))}>
-                      <MaterialIcons name="delete" size={18} color="#EF4444" />
+                  </TouchableOpacity>
+                ) : (
+                  <View>
+                    {trainerCerts.map((cert, idx) => (
+                      <View
+                        key={cert.key || idx}
+                        style={[
+                          styles.attachedDocCard,
+                          {
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#FFFFFF',
+                            borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                          },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.docIconWrapper,
+                            { backgroundColor: isDark ? 'rgba(245,158,11,0.15)' : '#FEF3C7' },
+                          ]}
+                        >
+                          <MaterialIcons name="verified" size={18} color="#F59E0B" />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <Text style={[styles.docTitleText, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                              {cert.certType}
+                            </Text>
+                            {cert.certNum && cert.certNum !== '—' && (
+                              <View
+                                style={[
+                                  styles.docBadge,
+                                  { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9' },
+                                ]}
+                              >
+                                <Text style={[styles.docBadgeText, { color: isDark ? '#CBD5E1' : '#475569' }]}>
+                                  {cert.certNum}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text
+                            style={[styles.docSubText, { color: isDark ? 'rgba(255,255,255,0.45)' : '#64748B' }]}
+                            numberOfLines={1}
+                          >
+                            {cert.fileName || 'Attached'} • {cert.addedOn}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => setTrainerCerts(trainerCerts.filter((_, i) => i !== idx))}
+                          style={styles.deleteDocBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <MaterialIcons name="delete-outline" size={18} color="#EF4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+
+                    <TouchableOpacity
+                      style={[
+                        styles.addAnotherDocBtn,
+                        {
+                          borderColor: isDark ? 'rgba(245,158,11,0.35)' : '#FDE68A',
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#F8FAFC',
+                        },
+                      ]}
+                      onPress={() => openAttachDocModal('trainer')}
+                    >
+                      <MaterialIcons name="add" size={16} color="#F59E0B" />
+                      <Text style={[styles.addAnotherDocText, { color: '#D97706' }]}>
+                        Attach Another Certificate
+                      </Text>
                     </TouchableOpacity>
                   </View>
-                ))}
-                {trainerCerts.length === 0 && (
-                  <Text style={{ fontSize: 11, color: '#94A3B8' }}>No trainer certificates attached yet.</Text>
                 )}
               </View>
 
@@ -1240,26 +1570,93 @@ export const AddEmployeeModal = ({
                 ]}
               />
 
-              <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 4 }]}>
-                Upload Document File
+              <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 10 }]}>
+                Upload Document File <Text style={{ color: '#EF4444' }}>*</Text>
               </Text>
               <TouchableOpacity
                 style={[
                   styles.fileUploadBox,
                   {
-                    borderColor: isDark ? AppColors.darkBorder : '#CBD5E1',
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
+                    borderColor: attachDocFile
+                      ? '#10B981'
+                      : isDark
+                      ? 'rgba(37,99,235,0.4)'
+                      : '#93C5FD',
+                    backgroundColor: attachDocFile
+                      ? (isDark ? 'rgba(16,185,129,0.06)' : '#F0FDF4')
+                      : (isDark ? 'rgba(37,99,235,0.03)' : '#F8FAFC'),
                   },
                 ]}
                 onPress={handleSelectDocFile}
+                activeOpacity={0.75}
               >
-                <MaterialIcons name="cloud-upload" size={32} color={AppColors.primaryColor} />
-                <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 6 }}>
-                  {attachDocFile ? attachDocFile.name || 'File Selected' : 'Tap to Choose File / Photo'}
-                </Text>
-                <Text style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B', marginTop: 2 }}>
-                  Supports PDF, JPG, PNG up to 5MB
-                </Text>
+                {attachDocFile ? (
+                  <View style={{ alignItems: 'center', width: '100%' }}>
+                    <View
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        backgroundColor: isDark ? 'rgba(16,185,129,0.18)' : '#DCFCE7',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: 6,
+                      }}
+                    >
+                      <MaterialIcons name="check-circle" size={26} color="#10B981" />
+                    </View>
+                    <Text
+                      style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#FFFFFF' : '#0F172A', textAlign: 'center' }}
+                      numberOfLines={1}
+                    >
+                      {attachDocFile.name || 'File Attached'}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#10B981', fontWeight: '600', marginTop: 3 }}>
+                      File selected • Tap to replace
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{ alignItems: 'center' }}>
+                    <View
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        backgroundColor: isDark ? 'rgba(37,99,235,0.15)' : '#DBEAFE',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: 6,
+                      }}
+                    >
+                      <MaterialIcons name="cloud-upload" size={24} color={AppColors.primaryColor} />
+                    </View>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#FFFFFF' : '#0F172A' }}>
+                      Choose Document or Photo
+                    </Text>
+                    <Text style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B', marginTop: 2 }}>
+                      Supports PDF, JPG, PNG up to 5MB
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                        marginTop: 8,
+                        paddingHorizontal: 12,
+                        paddingVertical: 5,
+                        borderRadius: 16,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#EFF6FF',
+                        borderWidth: 1,
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#BFDBFE',
+                      }}
+                    >
+                      <MaterialIcons name="folder-open" size={13} color={AppColors.primaryColor} />
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: AppColors.primaryColor }}>
+                        Browse Device Files
+                      </Text>
+                    </View>
+                  </View>
+                )}
               </TouchableOpacity>
 
               <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
@@ -1439,6 +1836,114 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     marginBottom: 6,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  countBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  countBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
+  uploadDropzone: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  uploadDropzoneIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  uploadDropzoneTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  uploadDropzoneSub: {
+    fontSize: 11,
+    marginTop: 3,
+    textAlign: 'center',
+  },
+  uploadDropzoneActionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginTop: 10,
+  },
+  uploadDropzoneActionText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  attachedDocCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  docIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  docTitleText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  docSubText: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  docBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 6,
+  },
+  docBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  deleteDocBtn: {
+    padding: 6,
+  },
+  addAnotherDocBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    marginTop: 8,
+  },
+  addAnotherDocText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   attachBtn: {
     flexDirection: 'row',
