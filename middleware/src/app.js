@@ -15,18 +15,39 @@ const app = express();
 app.use(helmet());
 
 // CORS configuration supporting credentials (cookies)
-const allowedOrigins = [
-  ENV.CLIENT_URL,
+const configuredOrigins = (ENV.CLIENT_URL || '')
+  .split(',')
+  .map((url) => url.trim())
+  .filter(Boolean);
+
+const defaultOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
+  'http://localhost:5001',
+  'http://localhost:5002',
   'http://localhost:3000',
-].filter(Boolean);
+];
+
+const allowedOrigins = new Set([...configuredOrigins, ...defaultOrigins]);
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true; // Mobile apps, curl, Postman
+  if (allowedOrigins.has(origin)) return true;
+  try {
+    const { hostname } = new URL(origin);
+    if (hostname === 'gymezy.com' || hostname.endsWith('.gymezy.com')) {
+      return true;
+    }
+  } catch {
+    // ignore invalid URL
+  }
+  return false;
+};
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g., mobile apps, Postman) or matched allowed origins
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
       return callback(new Error(`CORS blocked for origin: ${origin}`));
