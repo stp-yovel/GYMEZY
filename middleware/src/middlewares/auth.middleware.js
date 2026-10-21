@@ -36,7 +36,11 @@ const extractAuthToken = (req) => {
     token = req.cookies?.[COOKIE_NAME] || req.cookies?.authToken || req.cookies?.token;
   }
 
-  return token || null;
+  if (!token || token === 'undefined' || token === 'null') {
+    return null;
+  }
+
+  return token;
 };
 
 /**
@@ -52,15 +56,21 @@ export const authenticate = async (req, _res, next) => {
     }
 
     const decoded = verifyToken(token);
-    if (!decoded?.userId) {
+    const candidateUserId = decoded?.userId || decoded?.id || decoded?._id;
+    const candidateEmail = decoded?.email;
+
+    if (!candidateUserId && !candidateEmail) {
       throw ApiError.unauthorized('Invalid or expired authentication token. Please sign in again.');
     }
 
-    if (!mongoose.Types.ObjectId.isValid(decoded.userId)) {
-      throw ApiError.unauthorized('Invalid user ID in token.');
+    let user = null;
+    if (candidateUserId && mongoose.Types.ObjectId.isValid(candidateUserId)) {
+      user = await User.findById(candidateUserId).lean().maxTimeMS(5000);
+    }
+    if (!user && candidateEmail) {
+      user = await User.findOne({ email: candidateEmail.toLowerCase() }).lean().maxTimeMS(5000);
     }
 
-    const user = await User.findById(decoded.userId).lean().maxTimeMS(5000);
     if (!user) {
       throw ApiError.unauthorized('User account no longer exists.');
     }
