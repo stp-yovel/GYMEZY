@@ -1492,22 +1492,6 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                 <Text style={[styles.detailSectionHeading, { color: textColor }]}>
                   Assigned Trainer
                 </Text>
-                {selectedSection.trainerId ? (
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={handleOpenTrainerProfile}
-                    style={styles.trainerDetailActionBtn}
-                  >
-                    <Text style={[styles.trainerDetailActionText, { color: isDark ? '#93C5FD' : '#003882' }]}>
-                      View Details
-                    </Text>
-                    <MaterialIcons
-                      name="chevron-right"
-                      size={16}
-                      color={isDark ? '#93C5FD' : '#003882'}
-                    />
-                  </TouchableOpacity>
-                ) : null}
               </View>
               <TouchableOpacity
                 activeOpacity={selectedSection.trainerId ? 0.7 : 1}
@@ -1530,11 +1514,6 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                   <Text style={[styles.trainerDetailRole, { color: subtitleColor }]}>
                     {selectedSection.trainerId?.specialization || 'Head Fitness Instructor'}
                   </Text>
-                  {selectedSection.trainerId?.employeeId ? (
-                    <Text style={[styles.trainerDetailCode, { color: subtitleColor }]}>
-                      Staff ID: {selectedSection.trainerId?.employeeId}
-                    </Text>
-                  ) : null}
                 </View>
                 <MaterialIcons
                   name="chevron-right"
