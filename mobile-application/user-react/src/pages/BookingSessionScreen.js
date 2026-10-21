@@ -248,7 +248,7 @@ export const BookingSessionScreen = ({ route, navigation }) => {
 
     const activeSection = sectionOverride || selectedSection;
 
-    if (currentView === 'group_classes' && activeSection) {
+    if ((currentView === 'group_classes' || currentView === 'group_class_detail') && activeSection) {
       title = `Group Class: ${activeSection.title}`;
       const startStr = formatToDDMMYYYY(activeSection.startDate);
       const endStr = formatToDDMMYYYY(activeSection.endDate);
@@ -301,6 +301,8 @@ export const BookingSessionScreen = ({ route, navigation }) => {
         return 'Book Gym Session';
       case 'group_classes':
         return 'Group Classes & Batches';
+      case 'group_class_detail':
+        return 'Batch Details';
       case 'weekly_plan':
         return 'Weekly Plan';
       case 'custom_dates':
@@ -315,7 +317,9 @@ export const BookingSessionScreen = ({ route, navigation }) => {
   };
 
   const handleBackPress = () => {
-    if (currentView === 'weekly_plan' || currentView === 'custom_dates') {
+    if (currentView === 'group_class_detail') {
+      setCurrentView('group_classes');
+    } else if (currentView === 'weekly_plan' || currentView === 'custom_dates') {
       setCurrentView('gym_booking');
     } else if (currentView !== 'categories') {
       setCurrentView('categories');
@@ -1143,10 +1147,9 @@ export const BookingSessionScreen = ({ route, navigation }) => {
               </View>
             )}
 
-            {/* Batch Cards */}
+            {/* Batch Listing Cards (Clean Master Listing) */}
             {!isLoadingSections &&
               filteredSections.map((sec) => {
-                const isSelected = selectedSection?._id === sec._id;
                 const catStyle = getCategoryBadgeStyle(sec.category, isDark);
                 const trainerName = sec.trainerId?.name || 'Assigned Coach';
                 const trainerAvatar = sec.trainerId?.avatar;
@@ -1158,14 +1161,16 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                 return (
                   <TouchableOpacity
                     key={sec._id}
-                    activeOpacity={0.9}
-                    onPress={() => setSelectedSection(sec)}
+                    activeOpacity={0.88}
+                    onPress={() => {
+                      setSelectedSection(sec);
+                      setCurrentView('group_class_detail');
+                    }}
                     style={[
-                      styles.sectionCard,
+                      styles.sectionListCard,
                       {
                         backgroundColor: cardColor,
-                        borderColor: isSelected ? '#003882' : borderColor,
-                        borderWidth: isSelected ? 2 : 1,
+                        borderColor: borderColor,
                       },
                     ]}
                   >
@@ -1234,158 +1239,289 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                       ) : null}
                     </View>
 
-                    {/* Schedule Block */}
-                    <View style={[styles.sectionScheduleBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC', borderColor: borderColor }]}>
-                      {/* Dates */}
-                      <View style={styles.scheduleRow}>
-                        <MaterialIcons name="date-range" size={16} color={isDark ? '#93C5FD' : '#003882'} style={{ marginRight: 8 }} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.scheduleLabel, { color: subtitleColor }]}>Batch Dates</Text>
-                          <Text style={[styles.scheduleValue, { color: textColor }]}>
-                            {formatToDDMMYYYY(sec.startDate)} to {formatToDDMMYYYY(sec.endDate)}
-                          </Text>
-                        </View>
-                        <View style={[styles.durationBadge, { backgroundColor: isDark ? 'rgba(96,165,250,0.18)' : 'rgba(0,56,130,0.08)' }]}>
-                          <Text style={[styles.durationBadgeText, { color: isDark ? '#93C5FD' : '#003882' }]}>
-                            {sec.durationDays || 20} Days
-                          </Text>
-                        </View>
+                    {/* Quick Timing & Duration Info */}
+                    <View style={styles.listQuickInfoRow}>
+                      <View style={[styles.listInfoChip, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#F8FAFC', borderColor: borderColor }]}>
+                        <MaterialIcons name="schedule" size={13} color={isDark ? '#93C5FD' : '#003882'} style={{ marginRight: 5 }} />
+                        <Text style={[styles.listInfoChipText, { color: textColor }]}>
+                          {sec.startTime} - {sec.endTime}
+                        </Text>
                       </View>
-
-                      {/* Timings */}
-                      <View style={[styles.scheduleRow, { marginTop: 8 }]}>
-                        <MaterialIcons name="schedule" size={16} color={isDark ? '#93C5FD' : '#003882'} style={{ marginRight: 8 }} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.scheduleLabel, { color: subtitleColor }]}>Daily Timing</Text>
-                          <Text style={[styles.scheduleValue, { color: textColor }]}>
-                            {sec.startTime} - {sec.endTime}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Active Days */}
-                      <View style={[styles.scheduleRow, { marginTop: 8, alignItems: 'flex-start' }]}>
-                        <MaterialIcons name="repeat" size={16} color={isDark ? '#93C5FD' : '#003882'} style={{ marginRight: 8, marginTop: 2 }} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.scheduleLabel, { color: subtitleColor, marginBottom: 4 }]}>Weekly Schedule</Text>
-                          <View style={styles.daysPillRow}>
-                            {ALL_WEEK_DAYS.map((d) => {
-                              const isDayActive = Array.isArray(sec.activeDays) && sec.activeDays.includes(d);
-                              return (
-                                <View
-                                  key={d}
-                                  style={[
-                                    styles.smallDayPill,
-                                    {
-                                      backgroundColor: isDayActive
-                                        ? (isDark ? 'rgba(96,165,250,0.25)' : 'rgba(0,56,130,0.12)')
-                                        : (isDark ? 'rgba(255,255,255,0.04)' : '#E2E8F0'),
-                                      borderColor: isDayActive ? (isDark ? '#60A5FA' : '#003882') : 'transparent',
-                                    },
-                                  ]}
-                                >
-                                  <Text
-                                    style={[
-                                      styles.smallDayPillText,
-                                      {
-                                        color: isDayActive
-                                          ? (isDark ? '#93C5FD' : '#003882')
-                                          : subtitleColor,
-                                        fontWeight: isDayActive ? 'bold' : 'normal',
-                                      },
-                                    ]}
-                                  >
-                                    {d}
-                                  </Text>
-                                </View>
-                              );
-                            })}
-                          </View>
-                        </View>
+                      <View style={[styles.listInfoChip, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#F8FAFC', borderColor: borderColor }]}>
+                        <MaterialIcons name="date-range" size={13} color={isDark ? '#93C5FD' : '#003882'} style={{ marginRight: 5 }} />
+                        <Text style={[styles.listInfoChipText, { color: textColor }]}>
+                          {sec.durationDays || 20} Days Batch
+                        </Text>
                       </View>
                     </View>
 
-                    {/* Description if present */}
-                    {sec.description ? (
-                      <Text style={[styles.sectionDescText, { color: subtitleColor }]} numberOfLines={2}>
-                        {sec.description}
-                      </Text>
-                    ) : null}
-
-                    {/* Footer Row: Fee & Select Radio */}
-                    <View style={styles.sectionCardFooter}>
+                    {/* Footer Row: Fee & View Details */}
+                    <View style={styles.listCardFooter}>
                       <View>
-                        <Text style={[styles.sectionFeeLabel, { color: subtitleColor }]}>Full Batch Fee</Text>
+                        <Text style={[styles.sectionFeeLabel, { color: subtitleColor }]}>Batch Fee</Text>
                         <Text style={[styles.sectionFeeValue, { color: textColor }]}>
                           ₹{Math.round(Number(sec.cost) || 0)}
                         </Text>
                       </View>
-                      <View
-                        style={[
-                          styles.selectBatchBtn,
-                          {
-                            backgroundColor: isSelected
-                              ? '#003882'
-                              : isDark
-                              ? 'rgba(255,255,255,0.08)'
-                              : '#F1F5F9',
-                            borderColor: isSelected ? '#003882' : borderColor,
-                          },
-                        ]}
-                      >
-                        <MaterialIcons
-                          name={isSelected ? 'check-circle' : 'radio-button-unchecked'}
-                          size={16}
-                          color={isSelected ? '#FFFFFF' : subtitleColor}
-                          style={{ marginRight: 6 }}
-                        />
-                        <Text
-                          style={[
-                            styles.selectBatchBtnText,
-                            { color: isSelected ? '#FFFFFF' : textColor },
-                          ]}
-                        >
-                          {isSelected ? 'Selected' : 'Select'}
+                      <View style={[styles.viewDetailsBtn, { backgroundColor: isDark ? 'rgba(96,165,250,0.15)' : 'rgba(0,56,130,0.08)' }]}>
+                        <Text style={[styles.viewDetailsBtnText, { color: isDark ? '#93C5FD' : '#003882' }]}>
+                          View Details
                         </Text>
+                        <MaterialIcons name="arrow-forward" size={14} color={isDark ? '#93C5FD' : '#003882'} style={{ marginLeft: 4 }} />
                       </View>
                     </View>
                   </TouchableOpacity>
                 );
               })}
           </ScrollView>
+        </View>
+      )}
 
-          {/* Bottom Bar for Group Classes */}
-          {selectedSection && (
-            <View
-              style={[
-                styles.bottomBar,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(18, 18, 18, 0.88)'
-                    : 'rgba(255, 255, 255, 0.88)',
-                  borderTopColor: isDark
-                    ? 'rgba(255, 255, 255, 0.08)'
-                    : 'rgba(226, 232, 240, 0.8)',
-                },
-              ]}
+      {/* VIEW: GROUP CLASS DETAILS (Next Screen) */}
+      {currentView === 'group_class_detail' && selectedSection && (
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* Class Hero Banner */}
+            <ImageBackground
+              source={{
+                uri: selectedSection.category?.toLowerCase() === 'yoga'
+                  ? 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800&auto=format&fit=crop'
+                  : selectedSection.category?.toLowerCase() === 'zumba'
+                  ? 'https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=800&auto=format&fit=crop'
+                  : 'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?q=80&w=800&auto=format&fit=crop',
+              }}
+              style={styles.detailHeroBanner}
+              imageStyle={{ borderRadius: 20 }}
+              resizeMode="cover"
             >
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.bottomPriceLabel, { color: subtitleColor }]} numberOfLines={1}>
-                  {selectedSection.title}
+              <LinearGradient
+                colors={['rgba(0,0,0,0.85)', 'rgba(0,0,0,0.4)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.detailHeroGradient}
+              >
+                <View style={[styles.sectionCatBadge, { backgroundColor: getCategoryBadgeStyle(selectedSection.category, isDark).bg, alignSelf: 'flex-start' }]}>
+                  <MaterialIcons
+                    name={getCategoryBadgeStyle(selectedSection.category, isDark).icon}
+                    size={14}
+                    color={getCategoryBadgeStyle(selectedSection.category, isDark).text}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={[styles.sectionCatBadgeText, { color: getCategoryBadgeStyle(selectedSection.category, isDark).text }]}>
+                    {(selectedSection.category || 'workout').toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={styles.detailHeroTitle}>{selectedSection.title}</Text>
+                <Text style={styles.detailHeroSubtitle}>
+                  {gym.name || 'GYMEZY Fitness'} • {selectedSection.durationDays || 20} Days Cohort
                 </Text>
-                <Text style={[styles.bottomPriceValue, { color: textColor }]}>
-                  ₹{Math.round(Number(selectedSection.cost) || 0)}
+              </LinearGradient>
+            </ImageBackground>
+
+            {/* Capacity & Availability Box */}
+            <View style={[styles.detailCard, { backgroundColor: cardColor, borderColor: borderColor }]}>
+              <View style={styles.detailCardHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.detailSectionHeading, { color: textColor }]}>Batch Capacity</Text>
+                  <Text style={[styles.detailSubtext, { color: subtitleColor }]}>
+                    {(selectedSection.maxCapacity || 25) - (selectedSection.enrolledCount || 0) <= 3
+                      ? 'Filling fast! Limited seats remaining.'
+                      : 'Open for admissions'}
+                  </Text>
+                </View>
+                <View style={[styles.detailCapacityBadge, { backgroundColor: 'rgba(0,191,98,0.1)' }]}>
+                  <MaterialIcons name="groups" size={16} color="#00BF62" style={{ marginRight: 6 }} />
+                  <Text style={styles.detailCapacityBadgeText}>
+                    {selectedSection.enrolledCount || 0} / {selectedSection.maxCapacity || 25} Enrolled
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Trainer Profile Card */}
+            <View style={[styles.detailCard, { backgroundColor: cardColor, borderColor: borderColor }]}>
+              <Text style={[styles.detailSectionHeading, { color: textColor, marginBottom: 12 }]}>
+                Assigned Trainer
+              </Text>
+              <View style={styles.trainerDetailRow}>
+                {selectedSection.trainerId?.avatar ? (
+                  <Image source={{ uri: selectedSection.trainerId?.avatar }} style={styles.trainerDetailAvatar} />
+                ) : (
+                  <View style={[styles.trainerDetailAvatarFallback, { backgroundColor: isDark ? '#334155' : '#E2E8F0' }]}>
+                    <Text style={[styles.trainerDetailInitials, { color: textColor }]}>
+                      {(selectedSection.trainerId?.name || 'T').charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.trainerDetailName, { color: textColor }]}>
+                    {selectedSection.trainerId?.name || 'Certified Gym Coach'}
+                  </Text>
+                  <Text style={[styles.trainerDetailRole, { color: subtitleColor }]}>
+                    {selectedSection.trainerId?.specialization || 'Head Fitness Instructor'}
+                  </Text>
+                  {selectedSection.trainerId?.employeeId ? (
+                    <Text style={[styles.trainerDetailCode, { color: subtitleColor }]}>
+                      Staff ID: {selectedSection.trainerId?.employeeId}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            </View>
+
+            {/* Schedule & Routine Card */}
+            <View style={[styles.detailCard, { backgroundColor: cardColor, borderColor: borderColor }]}>
+              <Text style={[styles.detailSectionHeading, { color: textColor, marginBottom: 14 }]}>
+                Batch Schedule & Timing
+              </Text>
+
+              {/* Date Range */}
+              <View style={styles.detailScheduleItem}>
+                <View style={[styles.detailIconBox, { backgroundColor: isDark ? 'rgba(96,165,250,0.15)' : 'rgba(0,56,130,0.08)' }]}>
+                  <MaterialIcons name="date-range" size={20} color={isDark ? '#93C5FD' : '#003882'} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.detailScheduleLabel, { color: subtitleColor }]}>Date Range</Text>
+                  <Text style={[styles.detailScheduleValue, { color: textColor }]}>
+                    {formatToDDMMYYYY(selectedSection.startDate)} to {formatToDDMMYYYY(selectedSection.endDate)}
+                  </Text>
+                  <Text style={[styles.detailScheduleNote, { color: subtitleColor }]}>
+                    {selectedSection.durationDays || 20} Active Training Sessions
+                  </Text>
+                </View>
+              </View>
+
+              {/* Daily Timing */}
+              <View style={[styles.detailScheduleItem, { marginTop: 14 }]}>
+                <View style={[styles.detailIconBox, { backgroundColor: isDark ? 'rgba(96,165,250,0.15)' : 'rgba(0,56,130,0.08)' }]}>
+                  <MaterialIcons name="schedule" size={20} color={isDark ? '#93C5FD' : '#003882'} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.detailScheduleLabel, { color: subtitleColor }]}>Daily Time Slot</Text>
+                  <Text style={[styles.detailScheduleValue, { color: textColor }]}>
+                    {selectedSection.startTime} - {selectedSection.endTime}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Weekly Recurring Days */}
+              <View style={[styles.detailScheduleItem, { marginTop: 14, alignItems: 'flex-start' }]}>
+                <View style={[styles.detailIconBox, { backgroundColor: isDark ? 'rgba(96,165,250,0.15)' : 'rgba(0,56,130,0.08)' }]}>
+                  <MaterialIcons name="repeat" size={20} color={isDark ? '#93C5FD' : '#003882'} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.detailScheduleLabel, { color: subtitleColor, marginBottom: 8 }]}>
+                    Weekly Active Days
+                  </Text>
+                  <View style={styles.daysPillRow}>
+                    {ALL_WEEK_DAYS.map((d) => {
+                      const isDayActive = Array.isArray(selectedSection.activeDays) && selectedSection.activeDays.includes(d);
+                      return (
+                        <View
+                          key={d}
+                          style={[
+                            styles.detailDayPill,
+                            {
+                              backgroundColor: isDayActive
+                                ? (isDark ? 'rgba(96,165,250,0.25)' : 'rgba(0,56,130,0.12)')
+                                : (isDark ? 'rgba(255,255,255,0.04)' : '#E2E8F0'),
+                              borderColor: isDayActive ? (isDark ? '#60A5FA' : '#003882') : 'transparent',
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.detailDayPillText,
+                              {
+                                color: isDayActive
+                                  ? (isDark ? '#93C5FD' : '#003882')
+                                  : subtitleColor,
+                                fontWeight: isDayActive ? 'bold' : 'normal',
+                              },
+                            ]}
+                          >
+                            {d}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* About / Description if available */}
+            {selectedSection.description ? (
+              <View style={[styles.detailCard, { backgroundColor: cardColor, borderColor: borderColor }]}>
+                <Text style={[styles.detailSectionHeading, { color: textColor, marginBottom: 8 }]}>
+                  About This Batch
+                </Text>
+                <Text style={[styles.detailAboutText, { color: subtitleColor }]}>
+                  {selectedSection.description}
                 </Text>
               </View>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => goToCheckout(selectedSection)}
-                style={styles.continueBtn}
-              >
-                <Text style={styles.continueBtnText}>Continue to Payment</Text>
-              </TouchableOpacity>
+            ) : null}
+
+            {/* Batch Inclusions */}
+            <View style={[styles.detailCard, { backgroundColor: cardColor, borderColor: borderColor }]}>
+              <Text style={[styles.detailSectionHeading, { color: textColor, marginBottom: 10 }]}>
+                What's Included
+              </Text>
+              {[
+                'Full trainer-guided cohort sessions',
+                'Gym floor & batch equipment reserved',
+                'Attendance & progress tracking',
+                'Locker and shower facility access',
+              ].map((inc, i) => (
+                <View key={i} style={styles.inclusionRow}>
+                  <MaterialIcons name="check-circle" size={16} color="#00BF62" style={{ marginRight: 8 }} />
+                  <Text style={[styles.inclusionText, { color: textColor }]}>{inc}</Text>
+                </View>
+              ))}
             </View>
-          )}
+
+            {/* Notice Banner */}
+            <View style={styles.detailNoticeBanner}>
+              <MaterialIcons name="info-outline" size={16} color="#64748B" style={{ marginRight: 8 }} />
+              <Text style={styles.detailNoticeText}>
+                Please arrive 10 minutes before the scheduled time slot. Cohort schedule is managed by the gym.
+              </Text>
+            </View>
+          </ScrollView>
+
+          {/* Bottom Bar on Detail Screen */}
+          <View
+            style={[
+              styles.bottomBar,
+              {
+                backgroundColor: isDark
+                  ? 'rgba(18, 18, 18, 0.95)'
+                  : 'rgba(255, 255, 255, 0.95)',
+                borderTopColor: isDark
+                  ? 'rgba(255, 255, 255, 0.08)'
+                  : 'rgba(226, 232, 240, 0.8)',
+              },
+            ]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.bottomPriceLabel, { color: subtitleColor }]}>
+                Total Batch Fee
+              </Text>
+              <Text style={[styles.bottomPriceValue, { color: textColor }]}>
+                ₹{Math.round(Number(selectedSection.cost) || 0)}
+              </Text>
+            </View>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => goToCheckout(selectedSection)}
+              style={styles.continueBtn}
+            >
+              <Text style={styles.continueBtnText}>Continue to Payment</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -1847,9 +1983,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: 'bold',
   },
-  sectionCard: {
+  /* Listing Cards */
+  sectionListCard: {
     padding: 16,
     borderRadius: 20,
+    borderWidth: 1,
     marginBottom: 14,
   },
   sectionCardHeader: {
@@ -1884,7 +2022,7 @@ const styles = StyleSheet.create({
   sectionTitleText: {
     fontSize: 17,
     fontWeight: 'bold',
-    marginBottom: 12,
+    marginBottom: 10,
     lineHeight: 22,
   },
   sectionTrainerRow: {
@@ -1893,19 +2031,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   trainerAvatarImg: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
   },
   trainerAvatarFallback: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
   trainerInitials: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
   },
   trainerLabel: {
@@ -1925,55 +2063,25 @@ const styles = StyleSheet.create({
   trainerSpecText: {
     fontSize: 11,
   },
-  sectionScheduleBox: {
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
-  scheduleRow: {
+  listQuickInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  scheduleLabel: {
-    fontSize: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  scheduleValue: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  durationBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  durationBadgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  daysPillRow: {
-    flexDirection: 'row',
-    gap: 4,
-    flexWrap: 'wrap',
-  },
-  smallDayPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  smallDayPillText: {
-    fontSize: 10,
-  },
-  sectionDescText: {
-    fontSize: 12,
-    lineHeight: 16,
+    gap: 8,
     marginBottom: 12,
   },
-  sectionCardFooter: {
+  listInfoChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  listInfoChipText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  listCardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1991,16 +2099,161 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#00BF62',
   },
-  selectBatchBtn: {
+  viewDetailsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
+    borderRadius: 12,
   },
-  selectBatchBtnText: {
+  viewDetailsBtnText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+
+  /* Detail Screen Styles */
+  detailHeroBanner: {
+    height: 140,
+    width: '100%',
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  detailHeroGradient: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  detailHeroTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 8,
+  },
+  detailHeroSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  detailCard: {
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  detailCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  detailSectionHeading: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  detailSubtext: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  detailCapacityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  detailCapacityBadgeText: {
     fontSize: 12,
     fontWeight: 'bold',
+    color: '#00BF62',
+  },
+  trainerDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  trainerDetailAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  trainerDetailAvatarFallback: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trainerDetailInitials: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  trainerDetailName: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  trainerDetailRole: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  trainerDetailCode: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  detailScheduleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailScheduleLabel: {
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  detailScheduleValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  detailScheduleNote: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  daysPillRow: {
+    flexDirection: 'row',
+    gap: 4,
+    flexWrap: 'wrap',
+  },
+  detailDayPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  detailDayPillText: {
+    fontSize: 11,
+  },
+  detailAboutText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  detailNoticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(100,116,139,0.08)',
+    padding: 12,
+    borderRadius: 14,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  detailNoticeText: {
+    fontSize: 11,
+    color: '#64748B',
+    flex: 1,
+    lineHeight: 15,
   },
 });
