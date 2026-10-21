@@ -83,6 +83,7 @@ export const MembersTab = ({ topInset, navigation }) => {
   const [showExtendModal, setShowExtendModal] = useState(false);
   const [selectedCancelRequest, setSelectedCancelRequest] = useState(null);
   const [selectedSwitchRequest, setSelectedSwitchRequest] = useState(null);
+  const [showModeFilterModal, setShowModeFilterModal] = useState(false);
 
   // Extend Membership Form State
   const [extendPlan, setExtendPlan] = useState(DEFAULT_PLANS[1]);
@@ -548,117 +549,7 @@ export const MembersTab = ({ topInset, navigation }) => {
           />
         }
       >
-        {/* 1. TOP SEGMENT SWITCHER (Members / Switches / Cancellations / Bookings) */}
-        <View
-          style={[
-            styles.modeSegmentContainer,
-            {
-              backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
-              borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-            },
-          ]}
-        >
-          <TouchableOpacity
-            style={[
-              styles.modeSegmentBtn,
-              activeMode === 'MEMBERS' && { backgroundColor: AppColors.primaryColor },
-            ]}
-            onPress={() => setActiveMode('MEMBERS')}
-            activeOpacity={0.8}
-          >
-            <MaterialIcons
-              name="people"
-              size={15}
-              color={activeMode === 'MEMBERS' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B'}
-            />
-            <Text
-              style={[
-                styles.modeSegmentText,
-                { color: activeMode === 'MEMBERS' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B' },
-              ]}
-              numberOfLines={1}
-            >
-              Members ({members.length})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.modeSegmentBtn,
-              activeMode === 'SWITCHES' && { backgroundColor: AppColors.primaryColor },
-            ]}
-            onPress={() => setActiveMode('SWITCHES')}
-            activeOpacity={0.8}
-          >
-            <MaterialIcons
-              name="sync"
-              size={15}
-              color={activeMode === 'SWITCHES' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B'}
-            />
-            <Text
-              style={[
-                styles.modeSegmentText,
-                { color: activeMode === 'SWITCHES' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B' },
-              ]}
-              numberOfLines={1}
-            >
-              Switches ({switchRequests.length})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.modeSegmentBtn,
-              activeMode === 'CANCELLATIONS' && { backgroundColor: AppColors.primaryColor },
-            ]}
-            onPress={() => setActiveMode('CANCELLATIONS')}
-            activeOpacity={0.8}
-          >
-            <MaterialIcons
-              name="cancel"
-              size={15}
-              color={activeMode === 'CANCELLATIONS' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B'}
-            />
-            <Text
-              style={[
-                styles.modeSegmentText,
-                {
-                  color:
-                    activeMode === 'CANCELLATIONS' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B',
-                },
-              ]}
-              numberOfLines={1}
-            >
-              Cancel ({cancellations.length})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.modeSegmentBtn,
-              activeMode === 'BOOKINGS' && { backgroundColor: AppColors.primaryColor },
-            ]}
-            onPress={() => setActiveMode('BOOKINGS')}
-            activeOpacity={0.8}
-          >
-            <MaterialIcons
-              name="confirmation-number"
-              size={15}
-              color={activeMode === 'BOOKINGS' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B'}
-            />
-            <Text
-              style={[
-                styles.modeSegmentText,
-                { color: activeMode === 'BOOKINGS' ? '#FFFFFF' : isDark ? '#94A3B8' : '#64748B' },
-              ]}
-              numberOfLines={1}
-            >
-              Bookings ({bookings.length})
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* 2. HEADER BAR */}
+        {/* 1. HEADER BAR */}
         <View style={styles.headerRow}>
           <View>
             <Text style={[styles.pageTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
@@ -774,43 +665,107 @@ export const MembersTab = ({ topInset, navigation }) => {
           </View>
         )}
 
-        {/* 4. SEARCH BAR */}
-        <View
-          style={[
-            styles.searchContainer,
-            {
-              backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
-              borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-            },
-          ]}
-        >
-          <MaterialIcons
-            name="search"
-            size={20}
-            color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'}
-            style={styles.searchIcon}
-          />
-          <TextInput
-            placeholder={
-              activeMode === 'MEMBERS'
-                ? 'Search by name, phone, or Member ID...'
-                : activeMode === 'SWITCHES'
-                ? 'Search member name, phone, or Request ID...'
-                : activeMode === 'BOOKINGS'
-                ? 'Search customer name or booking ID...'
-                : 'Search member or Request ID...'
-            }
-            placeholderTextColor={isDark ? 'rgba(255,255,255,0.45)' : '#94A3B8'}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            style={[styles.searchInput, { color: isDark ? '#FFFFFF' : '#0F172A' }]}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtn}>
-              <MaterialIcons name="close" size={16} color={isDark ? '#94A3B8' : '#64748B'} />
-            </TouchableOpacity>
-          )}
+        {/* 4. SEARCH & FILTER ROW */}
+        <View style={styles.searchFilterRow}>
+          <View
+            style={[
+              styles.searchContainer,
+              {
+                flex: 1,
+                marginBottom: 0,
+                backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
+                borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+              },
+            ]}
+          >
+            <MaterialIcons
+              name="search"
+              size={20}
+              color={isDark ? 'rgba(255,255,255,0.6)' : '#64748B'}
+              style={styles.searchIcon}
+            />
+            <TextInput
+              placeholder={
+                activeMode === 'MEMBERS'
+                  ? 'Search by name, phone, or Member ID...'
+                  : activeMode === 'SWITCHES'
+                  ? 'Search member name, phone, or Request ID...'
+                  : activeMode === 'BOOKINGS'
+                  ? 'Search customer name or booking ID...'
+                  : 'Search member or Request ID...'
+              }
+              placeholderTextColor={isDark ? 'rgba(255,255,255,0.45)' : '#94A3B8'}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={[styles.searchInput, { color: isDark ? '#FFFFFF' : '#0F172A' }]}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtn}>
+                <MaterialIcons name="close" size={16} color={isDark ? '#94A3B8' : '#64748B'} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Filter Icon Button (Opens Mode & Section Picker) */}
+          <TouchableOpacity
+            style={[
+              styles.filterIconBtn,
+              {
+                backgroundColor: activeMode !== 'MEMBERS' ? AppColors.primaryColor : isDark ? AppColors.darkCard : '#FFFFFF',
+                borderColor: activeMode !== 'MEMBERS' ? AppColors.primaryColor : isDark ? AppColors.darkBorder : '#E2E8F0',
+              },
+            ]}
+            onPress={() => setShowModeFilterModal(true)}
+            activeOpacity={0.8}
+          >
+            <MaterialIcons
+              name="tune"
+              size={22}
+              color={activeMode !== 'MEMBERS' ? '#FFFFFF' : isDark ? '#FFFFFF' : '#0F172A'}
+            />
+            {activeMode !== 'MEMBERS' && (
+              <View style={styles.filterActiveDot} />
+            )}
+          </TouchableOpacity>
         </View>
+
+        {/* ACTIVE SECTION PILL INDICATOR */}
+        {activeMode !== 'MEMBERS' && (
+          <View style={styles.activeModeIndicatorRow}>
+            <View
+              style={[
+                styles.activeModeIndicatorPill,
+                { backgroundColor: isDark ? 'rgba(37, 99, 235, 0.2)' : '#EFF6FF', borderColor: '#2563EB', borderWidth: 1 },
+              ]}
+            >
+              <MaterialIcons
+                name={
+                  activeMode === 'SWITCHES'
+                    ? 'sync'
+                    : activeMode === 'BOOKINGS'
+                    ? 'confirmation-number'
+                    : 'cancel'
+                }
+                size={14}
+                color="#2563EB"
+              />
+              <Text style={[styles.activeModeIndicatorText, { color: '#2563EB' }]}>
+                Viewing:{' '}
+                {activeMode === 'SWITCHES'
+                  ? `Plan Switches (${switchRequests.length})`
+                  : activeMode === 'BOOKINGS'
+                  ? `Day Passes (${bookings.length})`
+                  : `Cancellations (${cancellations.length})`}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setActiveMode('MEMBERS')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <MaterialIcons name="close" size={14} color="#2563EB" style={{ marginLeft: 4 }} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* 5. FILTER CHIPS */}
         <ScrollView
@@ -2572,6 +2527,175 @@ export const MembersTab = ({ topInset, navigation }) => {
         </View>
       </Modal>
 
+      {/* 5. FILTER & SECTION PICKER MODAL */}
+      <Modal
+        visible={showModeFilterModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowModeFilterModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowModeFilterModal(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[
+              styles.filterModalContent,
+              {
+                backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
+                borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+              },
+            ]}
+          >
+            <View style={styles.filterModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <MaterialIcons name="tune" size={20} color={AppColors.primaryColor} />
+                <Text style={[styles.filterModalTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                  Select Section
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowModeFilterModal(false)}>
+                <MaterialIcons name="close" size={22} color={isDark ? '#94A3B8' : '#64748B'} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.filterModalSubtitle, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+              Switch between member roster, plan switches, cancellations, and bookings
+            </Text>
+
+            <View style={{ gap: 10, marginTop: 14 }}>
+              {[
+                {
+                  id: 'MEMBERS',
+                  title: 'Members Management',
+                  count: members.length,
+                  icon: 'people',
+                  color: '#2563EB',
+                  bgLight: '#EFF6FF',
+                  desc: 'Registered gym roster and member records',
+                },
+                {
+                  id: 'SWITCHES',
+                  title: 'Plan Switch Requests',
+                  count: switchRequests.length,
+                  icon: 'sync',
+                  color: '#D97706',
+                  bgLight: '#FEF3C7',
+                  desc: 'Membership tier upgrades and plan transitions',
+                },
+                {
+                  id: 'CANCELLATIONS',
+                  title: 'Cancellation Requests',
+                  count: cancellations.length,
+                  icon: 'cancel',
+                  color: '#EF4444',
+                  bgLight: '#FEE2E2',
+                  desc: 'Member cancellation and refund review',
+                },
+                {
+                  id: 'BOOKINGS',
+                  title: 'Day Pass Bookings',
+                  count: bookings.length,
+                  icon: 'confirmation-number',
+                  color: '#10B981',
+                  bgLight: '#ECFDF5',
+                  desc: 'Walk-in day passes and slot check-in records',
+                },
+              ].map((item) => {
+                const isSelected = activeMode === item.id;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.filterModuleOption,
+                      {
+                        backgroundColor: isSelected
+                          ? isDark
+                            ? 'rgba(0, 56, 130, 0.25)'
+                            : '#F0F7FF'
+                          : isDark
+                          ? 'rgba(255,255,255,0.03)'
+                          : '#F8FAFC',
+                        borderColor: isSelected
+                          ? AppColors.primaryColor
+                          : isDark
+                          ? AppColors.darkBorder
+                          : '#E2E8F0',
+                      },
+                    ]}
+                    onPress={() => {
+                      setActiveMode(item.id);
+                      setShowModeFilterModal(false);
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <View
+                      style={[
+                        styles.filterModuleIconCircle,
+                        {
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : item.bgLight,
+                        },
+                      ]}
+                    >
+                      <MaterialIcons name={item.icon} size={20} color={item.color} />
+                    </View>
+
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text
+                          style={[
+                            styles.filterModuleTitle,
+                            {
+                              color: isDark ? '#FFFFFF' : '#0F172A',
+                              fontWeight: isSelected ? '800' : '600',
+                            },
+                          ]}
+                        >
+                          {item.title}
+                        </Text>
+                        <View
+                          style={[
+                            styles.filterModuleBadge,
+                            {
+                              backgroundColor: isSelected
+                                ? AppColors.primaryColor
+                                : isDark
+                                ? 'rgba(255,255,255,0.1)'
+                                : '#E2E8F0',
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.filterModuleBadgeText,
+                              { color: isSelected ? '#FFFFFF' : isDark ? '#CBD5E1' : '#475569' },
+                            ]}
+                          >
+                            {item.count}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.filterModuleDesc, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                        {item.desc}
+                      </Text>
+                    </View>
+
+                    <MaterialIcons
+                      name={isSelected ? 'radio-button-checked' : 'radio-button-unchecked'}
+                      size={20}
+                      color={isSelected ? AppColors.primaryColor : isDark ? '#64748B' : '#94A3B8'}
+                      style={{ marginLeft: 8 }}
+                    />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
     </View>
   );
 };
@@ -2582,26 +2706,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-  },
-  modeSegmentContainer: {
-    flexDirection: 'row',
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 4,
-    marginBottom: 16,
-  },
-  modeSegmentBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 9,
-    borderRadius: 10,
-  },
-  modeSegmentText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    marginLeft: 6,
   },
   headerRow: {
     flexDirection: 'row',
@@ -2617,6 +2721,98 @@ const styles = StyleSheet.create({
   pageSubtitle: {
     fontSize: 12.5,
     marginTop: 2,
+  },
+  searchFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  filterIconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  filterActiveDot: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#FFFFFF',
+  },
+  activeModeIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  activeModeIndicatorPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  activeModeIndicatorText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  filterModalContent: {
+    width: '92%',
+    maxHeight: '82%',
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 20,
+  },
+  filterModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  filterModalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  filterModalSubtitle: {
+    fontSize: 12.5,
+    lineHeight: 17,
+  },
+  filterModuleOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  filterModuleIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterModuleTitle: {
+    fontSize: 13.5,
+  },
+  filterModuleDesc: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  filterModuleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  filterModuleBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   searchContainer: {
     flexDirection: 'row',
