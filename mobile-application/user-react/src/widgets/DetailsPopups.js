@@ -392,11 +392,11 @@ export const TrainerReviewsPopup = ({ visible, onClose, trainer, reviews = [], o
             },
           ]}
         >
-          <Image source={{ uri: trainer.imageUrl }} style={styles.largeTrainerAvatar} />
+          <Image source={{ uri: trainer.imageUrl || trainer.avatar }} style={styles.largeTrainerAvatar} />
           <View style={styles.largeTrainerInfo}>
             <Text style={[styles.largeTrainerName, { color: colors.text }]}>{trainer.name}</Text>
             <Text style={[styles.trainerSpecText, { color: colors.subtitle }]}>
-              {trainer.specialty} Specialist
+              {trainer.specialty || trainer.specialization || 'Trainer'} Specialist
             </Text>
             <Text style={[styles.trainerExpText, { color: colors.subtitle }]}>
               {experienceText} Experience

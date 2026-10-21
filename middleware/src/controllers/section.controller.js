@@ -128,7 +128,7 @@ export const createSection = asyncHandler(async (req, res) => {
   // Populate trainer details for response
   const populatedSection = await Section.findById(section._id).populate(
     'trainerId',
-    'name employeeId phone avatar specialization'
+    'name employeeId phone avatar specialization specialty experienceYears experience description aboutMe servicesOffered certifications languages rating reviewsCount'
   );
 
   return res
@@ -164,7 +164,7 @@ export const getSections = asyncHandler(async (req, res) => {
   }
 
   const sections = await Section.find(query)
-    .populate('trainerId', 'name employeeId phone avatar specialization')
+    .populate('trainerId', 'name employeeId phone avatar specialization specialty experienceYears experience description aboutMe servicesOffered certifications languages rating reviewsCount')
     .sort({ createdAt: -1 })
     .lean();
 
@@ -187,7 +187,7 @@ export const getSectionById = asyncHandler(async (req, res) => {
 
   const section = await Section.findById(id).populate(
     'trainerId',
-    'name employeeId phone avatar specialization'
+    'name employeeId phone avatar specialization specialty experienceYears experience description aboutMe servicesOffered certifications languages rating reviewsCount'
   );
 
   if (!section) {

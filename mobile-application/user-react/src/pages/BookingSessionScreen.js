@@ -17,6 +17,7 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors, AppTheme } from '../theme/appTheme';
 import { MonthlyGridCalendar } from '../widgets/CustomCalendar';
+import { TrainerReviewsPopup } from '../widgets/DetailsPopups';
 import apiService from '../services/apiService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -150,6 +151,9 @@ export const BookingSessionScreen = ({ route, navigation }) => {
   const [sectionsError, setSectionsError] = useState(null);
   const [selectedSection, setSelectedSection] = useState(null);
   const [selectedGroupCategory, setSelectedGroupCategory] = useState('all');
+  const [showTrainerModal, setShowTrainerModal] = useState(false);
+  const [selectedTrainerData, setSelectedTrainerData] = useState(null);
+  const [trainerReviewsList, setTrainerReviewsList] = useState([]);
 
   // Gym Booking State
   const [gymBookingType, setGymBookingType] = useState('Per Session'); // 'Per Session', 'Weekly Plan', 'Custom Dates'
@@ -225,6 +229,39 @@ export const BookingSessionScreen = ({ route, navigation }) => {
     setSelectedClassType(defaultType);
     setSelectedClassPrice(price);
     setCurrentView('class_booking');
+  };
+
+  const handleOpenTrainerProfile = () => {
+    const tr = selectedSection?.trainerId;
+    if (!tr) return;
+
+    const trainerData = {
+      ...tr,
+      name: tr.name || 'Trainer',
+      imageUrl: tr.avatar || tr.imageUrl,
+      avatar: tr.avatar || tr.imageUrl,
+      specialty: tr.specialty || tr.specialization || 'Trainer',
+      specialization: tr.specialization || tr.specialty || 'Head Fitness Instructor',
+      experience: tr.experience || (tr.experienceYears ? `${tr.experienceYears}+ Years` : '1+ Years'),
+      rating: tr.rating !== undefined ? tr.rating : 4,
+      reviewsCount: tr.reviewsCount !== undefined ? tr.reviewsCount : 2,
+      aboutMe: tr.aboutMe || tr.description,
+    };
+    setSelectedTrainerData(trainerData);
+    setTrainerReviewsList(tr.ratings || tr.reviews || []);
+    setShowTrainerModal(true);
+
+    const targetGymId = gym?._id || gym?.id || gym?.partnerId || selectedSection?.gymId;
+    if (targetGymId && tr.name) {
+      apiService
+        .getTrainerRatings(targetGymId, tr.name)
+        .then((data) => {
+          if (data && (Array.isArray(data.ratings) || Array.isArray(data.reviews))) {
+            setTrainerReviewsList(data.ratings || data.reviews || []);
+          }
+        })
+        .catch(() => {});
+    }
   };
 
   const formatDate = (dt) => {
@@ -1333,10 +1370,32 @@ export const BookingSessionScreen = ({ route, navigation }) => {
 
             {/* Trainer Profile Card */}
             <View style={[styles.detailCard, { backgroundColor: cardColor, borderColor: borderColor }]}>
-              <Text style={[styles.detailSectionHeading, { color: textColor, marginBottom: 12 }]}>
-                Assigned Trainer
-              </Text>
-              <View style={styles.trainerDetailRow}>
+              <View style={styles.detailCardHeader}>
+                <Text style={[styles.detailSectionHeading, { color: textColor }]}>
+                  Assigned Trainer
+                </Text>
+                {selectedSection.trainerId ? (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={handleOpenTrainerProfile}
+                    style={styles.trainerDetailActionBtn}
+                  >
+                    <Text style={[styles.trainerDetailActionText, { color: isDark ? '#93C5FD' : '#003882' }]}>
+                      View Details
+                    </Text>
+                    <MaterialIcons
+                      name="chevron-right"
+                      size={16}
+                      color={isDark ? '#93C5FD' : '#003882'}
+                    />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              <TouchableOpacity
+                activeOpacity={selectedSection.trainerId ? 0.7 : 1}
+                onPress={handleOpenTrainerProfile}
+                style={[styles.trainerDetailRow, { marginTop: 12 }]}
+              >
                 {selectedSection.trainerId?.avatar ? (
                   <Image source={{ uri: selectedSection.trainerId?.avatar }} style={styles.trainerDetailAvatar} />
                 ) : (
@@ -1359,7 +1418,13 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                     </Text>
                   ) : null}
                 </View>
-              </View>
+                <MaterialIcons
+                  name="chevron-right"
+                  size={20}
+                  color={subtitleColor}
+                  style={{ opacity: 0.6 }}
+                />
+              </TouchableOpacity>
             </View>
 
             {/* Schedule & Routine Card */}
@@ -1554,6 +1619,15 @@ export const BookingSessionScreen = ({ route, navigation }) => {
           </View>
         </ScrollView>
       )}
+
+      {/* Trainer Profile / Reviews Modal */}
+      <TrainerReviewsPopup
+        visible={showTrainerModal}
+        onClose={() => setShowTrainerModal(false)}
+        trainer={selectedTrainerData}
+        reviews={trainerReviewsList}
+        onBack={() => setShowTrainerModal(false)}
+      />
     </View>
   );
 };
@@ -2180,6 +2254,16 @@ const styles = StyleSheet.create({
   trainerDetailCode: {
     fontSize: 11,
     marginTop: 2,
+  },
+  trainerDetailActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+  },
+  trainerDetailActionText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   detailScheduleItem: {
     flexDirection: 'row',
