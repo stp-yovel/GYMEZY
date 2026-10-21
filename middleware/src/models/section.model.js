@@ -120,6 +120,15 @@ const sectionSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    inclusions: {
+      type: [{ type: String, trim: true }],
+      default: [],
+    },
+    instructions: {
+      type: String,
+      trim: true,
+      default: '',
+    },
 
     // Status
     isActive: {

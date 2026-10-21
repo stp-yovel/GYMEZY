@@ -228,6 +228,8 @@ export const SectionsManagement = () => {
           activeDays: section.activeDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
           maxCapacity: section.maxCapacity || 25,
           description: section.description || '',
+          inclusions: Array.isArray(section.inclusions) ? section.inclusions.join('\n') : (section.inclusions || ''),
+          instructions: section.instructions || '',
           isActive: section.isActive !== undefined ? section.isActive : true,
         });
       } else {
@@ -276,6 +278,12 @@ export const SectionsManagement = () => {
         activeDays: values.activeDays,
         maxCapacity: Number(values.maxCapacity) || 25,
         description: values.description || '',
+        inclusions: values.inclusions
+          ? (typeof values.inclusions === 'string'
+              ? values.inclusions.split('\n').map((s) => s.trim()).filter(Boolean)
+              : values.inclusions)
+          : [],
+        instructions: values.instructions ? values.instructions.trim() : '',
         isActive: values.isActive !== undefined ? values.isActive : true,
       };
 
@@ -889,6 +897,24 @@ export const SectionsManagement = () => {
             <Input.TextArea
               rows={2}
               placeholder="e.g. 20-day progressive yoga program covering Asanas, Pranayama and Surya Namaskar."
+              style={{ borderRadius: 'var(--radius-base)' }}
+            />
+          </Form.Item>
+
+          {/* Inclusions */}
+          <Form.Item name="inclusions" label="What's Included (One item per line)">
+            <Input.TextArea
+              rows={3}
+              placeholder="e.g.&#10;Full trainer-guided batch sessions&#10;Dedicated studio mats & equipment&#10;Locker and shower facility access"
+              style={{ borderRadius: 'var(--radius-base)' }}
+            />
+          </Form.Item>
+
+          {/* Guidelines / Notice */}
+          <Form.Item name="instructions" label="Special Guidelines / Notice">
+            <Input.TextArea
+              rows={2}
+              placeholder="e.g. Please arrive 10 minutes before the scheduled time slot."
               style={{ borderRadius: 'var(--radius-base)' }}
             />
           </Form.Item>

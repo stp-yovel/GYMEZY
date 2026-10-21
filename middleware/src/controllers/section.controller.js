@@ -52,6 +52,8 @@ export const createSection = asyncHandler(async (req, res) => {
     activeDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
     maxCapacity = 25,
     description = '',
+    inclusions = [],
+    instructions = '',
     isActive = true,
   } = req.body;
 
@@ -106,6 +108,12 @@ export const createSection = asyncHandler(async (req, res) => {
   const parsedDuration = Math.max(1, Number(durationDays) || 20);
   const calculatedEndDate = calculateScheduleEndDate(parsedStartDate, parsedDuration, activeDays);
 
+  const formattedInclusions = Array.isArray(inclusions)
+    ? inclusions.map((i) => String(i).trim()).filter(Boolean)
+    : typeof inclusions === 'string' && inclusions.trim()
+    ? inclusions.split(/[\n,]/).map((i) => i.trim()).filter(Boolean)
+    : [];
+
   const section = await Section.create({
     gymId: resolvedGymId,
     trainerId: new mongoose.Types.ObjectId(trainerId),
@@ -122,6 +130,8 @@ export const createSection = asyncHandler(async (req, res) => {
     maxCapacity: Math.max(1, Number(maxCapacity) || 25),
     enrolledCount: 0,
     description: description.trim(),
+    inclusions: formattedInclusions,
+    instructions: typeof instructions === 'string' ? instructions.trim() : '',
     isActive: Boolean(isActive),
   });
 

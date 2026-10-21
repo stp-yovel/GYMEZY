@@ -264,6 +264,86 @@ export const BookingSessionScreen = ({ route, navigation }) => {
     }
   };
 
+  const getBatchInclusions = (sec, gymData) => {
+    if (Array.isArray(sec?.inclusions) && sec.inclusions.length > 0) {
+      return sec.inclusions.filter((x) => typeof x === 'string' && x.trim());
+    }
+    if (typeof sec?.inclusions === 'string' && sec.inclusions.trim()) {
+      return sec.inclusions.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+    }
+
+    const cat = (sec?.category || 'workout').toLowerCase();
+    const coachName = sec?.trainerId?.name ? `Coach ${sec.trainerId.name}` : 'Certified Coach';
+    const duration = sec?.durationDays || 20;
+
+    const categoryFeatures = {
+      yoga: [
+        `Guided yoga postures, pranayama & meditation led by ${coachName}`,
+        'Dedicated studio space with yoga mats & stretching props provided',
+        `Structured ${duration}-session flexibility & posture progression roadmap`,
+      ],
+      zumba: [
+        `High-energy cardio dance & group choreography led by ${coachName}`,
+        'Studio sound system access with curated dance playlist',
+        `Progressive endurance & calorie-burn routine across ${duration} active sessions`,
+      ],
+      boxing: [
+        `Heavy bags, focus pads & striking drills coached by ${coachName}`,
+        'Footwork, endurance & combat conditioning circuits',
+        `Complete ${duration}-session agility, speed & strength training`,
+      ],
+      crossfit: [
+        `Functional fitness, kettlebells & Olympic weight training led by ${coachName}`,
+        'Reserved functional training turf & pull-up rig zone',
+        `Daily WOD programming tailored for ${duration} structured sessions`,
+      ],
+      hiit: [
+        `High-intensity interval training & circuit intervals led by ${coachName}`,
+        'Metabolic conditioning & heart-rate stamina drills',
+        `Progressive stamina roadmap spanning ${duration} training sessions`,
+      ],
+      pilates: [
+        `Core stability, spinal alignment & reformer/mat work led by ${coachName}`,
+        'Low-impact resistance equipment & stability props reserved',
+        `Structured ${duration}-session posture & tone development`,
+      ],
+      gym: [
+        `Personalized workout guidance & form correction by ${coachName}`,
+        'Dedicated access to gym machines, free weights & dumbbells',
+        `Comprehensive ${duration}-session structured strength roadmap`,
+      ],
+    };
+
+    const specificList = categoryFeatures[cat] || [
+      `Full trainer-guided batch training led by ${coachName}`,
+      'Reserved equipment & dedicated workout area',
+      `${duration} structured training sessions included`,
+    ];
+
+    return [
+      ...specificList,
+      'Full access to locker rooms & shower facilities',
+      'Daily batch attendance & personal progress tracking',
+    ];
+  };
+
+  const getBatchNotice = (sec, gymData) => {
+    if (sec?.instructions && typeof sec.instructions === 'string' && sec.instructions.trim()) {
+      return sec.instructions.trim();
+    }
+    if (sec?.notice && typeof sec.notice === 'string' && sec.notice.trim()) {
+      return sec.notice.trim();
+    }
+
+    const gymTitle = gymData?.name || gym?.name || 'the gym';
+    const timeSlot = sec?.startTime ? sec.startTime : 'the batch time';
+    const activeDays = Array.isArray(sec?.activeDays) && sec.activeDays.length > 0
+      ? sec.activeDays.join(', ')
+      : 'all scheduled days';
+
+    return `Please arrive 10 minutes before ${timeSlot} on active days (${activeDays}). Batch schedule & attendance is managed by ${gymTitle}.`;
+  };
+
   const formatDate = (dt) => {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -1569,24 +1649,19 @@ export const BookingSessionScreen = ({ route, navigation }) => {
               <Text style={[styles.detailSectionHeading, { color: textColor, marginBottom: 10 }]}>
                 What's Included
               </Text>
-              {[
-                'Full trainer-guided batch sessions',
-                'Gym floor & batch equipment reserved',
-                'Attendance & progress tracking',
-                'Locker and shower facility access',
-              ].map((inc, i) => (
+              {getBatchInclusions(selectedSection, gym).map((inc, i) => (
                 <View key={i} style={styles.inclusionRow}>
-                  <MaterialIcons name="check-circle" size={16} color="#00BF62" style={{ marginRight: 8 }} />
-                  <Text style={[styles.inclusionText, { color: textColor }]}>{inc}</Text>
+                  <MaterialIcons name="check-circle" size={16} color="#00BF62" style={{ marginRight: 8, marginTop: 2 }} />
+                  <Text style={[styles.inclusionText, { color: textColor, flex: 1 }]}>{inc}</Text>
                 </View>
               ))}
             </View>
 
             {/* Notice Banner */}
             <View style={styles.detailNoticeBanner}>
-              <MaterialIcons name="info-outline" size={16} color="#64748B" style={{ marginRight: 8 }} />
-              <Text style={styles.detailNoticeText}>
-                Please arrive 10 minutes before the scheduled time slot. Batch schedule is managed by the gym.
+              <MaterialIcons name="info-outline" size={16} color="#64748B" style={{ marginRight: 8, marginTop: 2 }} />
+              <Text style={[styles.detailNoticeText, { flex: 1 }]}>
+                {getBatchNotice(selectedSection, gym)}
               </Text>
             </View>
           </ScrollView>

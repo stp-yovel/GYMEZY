@@ -149,6 +149,12 @@ export const CreateSectionModal = ({
     initialSection?.maxCapacity ? String(initialSection.maxCapacity) : '25'
   );
   const [description, setDescription] = useState(initialSection?.description || '');
+  const [inclusions, setInclusions] = useState(
+    Array.isArray(initialSection?.inclusions)
+      ? initialSection.inclusions.join('\n')
+      : initialSection?.inclusions || ''
+  );
+  const [instructions, setInstructions] = useState(initialSection?.instructions || '');
 
   // Sub-Pickers State
   const [showTrainerPicker, setShowTrainerPicker] = useState(false);
@@ -265,6 +271,8 @@ export const CreateSectionModal = ({
       activeDays,
       maxCapacity: Math.max(1, Number(maxCapacity) || 25),
       description: description.trim(),
+      inclusions: inclusions ? inclusions.split('\n').map((s) => s.trim()).filter(Boolean) : [],
+      instructions: instructions.trim(),
       isActive: true,
     };
 
@@ -533,6 +541,42 @@ export const CreateSectionModal = ({
                 numberOfLines={3}
                 value={description}
                 onChangeText={setDescription}
+              />
+            </View>
+
+            {/* Inclusions Field */}
+            <View style={styles.formGroup}>
+              <Text style={[styles.label, { color: textCol }]}>What's Included (One item per line)</Text>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  styles.textArea,
+                  { backgroundColor: inputBg, borderColor: borderCol, color: textCol },
+                ]}
+                placeholder={'e.g.\nFull trainer-guided batch sessions\nDedicated yoga studio mats\nLocker and shower facility access'}
+                placeholderTextColor={subTextCol}
+                multiline
+                numberOfLines={3}
+                value={inclusions}
+                onChangeText={setInclusions}
+              />
+            </View>
+
+            {/* Guidelines / Instructions */}
+            <View style={styles.formGroup}>
+              <Text style={[styles.label, { color: textCol }]}>Special Guidelines / Notice</Text>
+              <TextInput
+                style={[
+                  styles.textInput,
+                  styles.textArea,
+                  { backgroundColor: inputBg, borderColor: borderCol, color: textCol },
+                ]}
+                placeholder="e.g. Please arrive 10 minutes before the scheduled time slot."
+                placeholderTextColor={subTextCol}
+                multiline
+                numberOfLines={2}
+                value={instructions}
+                onChangeText={setInstructions}
               />
             </View>
           </ScrollView>
