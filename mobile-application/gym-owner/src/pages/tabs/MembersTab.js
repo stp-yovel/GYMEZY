@@ -1001,9 +1001,9 @@ export const MembersTab = ({ topInset, navigation }) => {
                       </View>
                       <View
                         style={{
-                          height: 22,
-                          width: 58,
-                          borderRadius: 12,
+                          height: 14,
+                          width: 48,
+                          borderRadius: 4,
                           backgroundColor: isDark ? '#334155' : '#E2E8F0',
                         }}
                       />
@@ -1092,13 +1092,6 @@ export const MembersTab = ({ topInset, navigation }) => {
                 const isInactive = member.status === 'Inactive';
                 const isCancelPending = member.status === 'Cancellation Requested';
 
-                const badgeBg = isCancelPending
-                  ? 'rgba(239, 68, 68, 0.12)'
-                  : isInactive
-                  ? 'rgba(148, 163, 184, 0.15)'
-                  : isExpiring
-                  ? 'rgba(245, 158, 11, 0.12)'
-                  : 'rgba(0, 191, 98, 0.12)';
 
                 const badgeColor = isCancelPending
                   ? AppColors.dangerRed
@@ -1163,7 +1156,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                         </View>
                       </View>
 
-                      <View style={[styles.statusBadge, { backgroundColor: badgeBg }]}>
+                      <View style={styles.statusBadge}>
                         <Text style={[styles.statusBadgeText, { color: badgeColor }]}>
                           {member.status}
                         </Text>
@@ -1331,20 +1324,16 @@ export const MembersTab = ({ topInset, navigation }) => {
                 const isApproved = ['APPROVED', 'APPROVED_AND_EXECUTED', 'COMPLETED'].includes(req.status);
                 const isRejected = ['REJECTED_BY_GYM', 'REJECTED_BY_SUPER_ADMIN', 'REJECTED'].includes(req.status);
 
-                let statusBadgeBg = isDark ? 'rgba(217, 119, 6, 0.15)' : '#FEF3C7';
                 let statusBadgeText = '#D97706';
                 let statusLabel = 'Pending Gym Review';
 
                 if (isSentAdmin) {
-                  statusBadgeBg = isDark ? 'rgba(99, 102, 241, 0.15)' : '#EEF2FF';
                   statusBadgeText = '#6366F1';
                   statusLabel = 'Sent to Super Admin';
                 } else if (isApproved) {
-                  statusBadgeBg = isDark ? 'rgba(22, 163, 74, 0.15)' : '#DCFCE7';
                   statusBadgeText = '#16A34A';
                   statusLabel = 'Approved & Executed';
                 } else if (isRejected) {
-                  statusBadgeBg = isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2';
                   statusBadgeText = '#EF4444';
                   statusLabel = req.status === 'REJECTED_BY_GYM' ? 'Rejected by Gym' : 'Rejected by Admin';
                 }
@@ -1425,7 +1414,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                       </View>
 
                       {/* Status Tag */}
-                      <View style={[styles.switchStatusTag, { backgroundColor: statusBadgeBg }]}>
+                      <View style={styles.switchStatusTag}>
                         <Text style={[styles.switchStatusText, { color: statusBadgeText }]}>
                           {statusLabel}
                         </Text>
@@ -1622,11 +1611,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                 const isCheckedIn = b.status === 'Checked-in';
                 const isUpcoming = b.status === 'Upcoming';
 
-                const statusBg = isCheckedIn
-                  ? 'rgba(0, 191, 98, 0.12)'
-                  : isUpcoming
-                  ? 'rgba(59, 130, 246, 0.12)'
-                  : 'rgba(148, 163, 184, 0.12)';
+
                 const statusColor = isCheckedIn
                   ? AppColors.secondaryColor
                   : isUpcoming
@@ -1681,7 +1666,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                         </Text>
                       </View>
 
-                      <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
+                      <View style={styles.statusBadge}>
                         <Text style={[styles.statusBadgeText, { color: statusColor }]}>
                           {b.status}
                         </Text>
@@ -1779,11 +1764,6 @@ export const MembersTab = ({ topInset, navigation }) => {
                 const isSentToAdmin = req.status === 'Sent to Admin';
                 const isRejected = req.status === 'Rejected';
 
-                const statusBg = isRejected
-                  ? 'rgba(239, 68, 68, 0.12)'
-                  : isSentToAdmin
-                  ? 'rgba(59, 130, 246, 0.12)'
-                  : 'rgba(0, 191, 98, 0.12)';
 
                 const statusColor = isRejected
                   ? AppColors.dangerRed
@@ -1840,7 +1820,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                         </View>
                       </View>
 
-                      <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
+                      <View style={styles.statusBadge}>
                         <Text style={[styles.statusBadgeText, { color: statusColor }]}>
                           {req.status}
                         </Text>
@@ -3184,25 +3164,20 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   memberIdText: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '700',
     color: AppColors.primaryColor,
-    backgroundColor: 'rgba(0, 56, 130, 0.08)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
   },
   memberPlan: {
     fontSize: 12,
     marginTop: 3,
   },
   statusBadge: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   statusBadgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   cardDivider: {
@@ -3795,12 +3770,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   switchStatusTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   switchStatusText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   switchPlanBox: {
