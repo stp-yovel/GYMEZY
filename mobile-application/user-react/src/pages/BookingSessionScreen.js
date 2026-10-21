@@ -1083,7 +1083,7 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                   <Text style={styles.heroBannerTitle}>Group Classes & Batches</Text>
                 </View>
                 <Text style={styles.heroBannerSubtitle}>
-                  Structured training cohorts scheduled & led by gym trainers
+                  Structured training batches scheduled & led by gym trainers
                 </Text>
               </LinearGradient>
             </ImageBackground>
@@ -1366,7 +1366,8 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                 </View>
                 <Text style={styles.detailHeroTitle}>{selectedSection.title}</Text>
                 <Text style={styles.detailHeroSubtitle}>
-                  {gym.name || 'GYMEZY Fitness'} • {selectedSection.durationDays || 20} Days Cohort
+                  {gym.name || 'GYMEZY Fitness'} • {selectedSection.durationDays || 20} Days Batch
+                  {selectedSection.startTime ? ` • ${selectedSection.startTime} - ${selectedSection.endTime}` : ''}
                 </Text>
               </LinearGradient>
             </ImageBackground>
@@ -1569,7 +1570,7 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                 What's Included
               </Text>
               {[
-                'Full trainer-guided cohort sessions',
+                'Full trainer-guided batch sessions',
                 'Gym floor & batch equipment reserved',
                 'Attendance & progress tracking',
                 'Locker and shower facility access',
@@ -1585,7 +1586,7 @@ export const BookingSessionScreen = ({ route, navigation }) => {
             <View style={styles.detailNoticeBanner}>
               <MaterialIcons name="info-outline" size={16} color="#64748B" style={{ marginRight: 8 }} />
               <Text style={styles.detailNoticeText}>
-                Please arrive 10 minutes before the scheduled time slot. Cohort schedule is managed by the gym.
+                Please arrive 10 minutes before the scheduled time slot. Batch schedule is managed by the gym.
               </Text>
             </View>
           </ScrollView>
