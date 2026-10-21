@@ -1915,14 +1915,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   empIdTag: {
-    backgroundColor: 'rgba(0, 102, 204, 0.1)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    marginLeft: 4,
   },
   empIdTagText: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '700',
     color: AppColors.primaryColor,
   },
   empRole: {

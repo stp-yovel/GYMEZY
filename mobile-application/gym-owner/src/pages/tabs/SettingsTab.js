@@ -4480,14 +4480,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   empIdTag: {
-    backgroundColor: '#722ED1',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
+    marginLeft: 4,
   },
   empIdTagText: {
-    color: '#FFF',
-    fontSize: 9.5,
+    color: '#722ED1',
+    fontSize: 10,
     fontWeight: '800',
   },
   trainerSpecText: {
