@@ -1176,26 +1176,16 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                   >
                     {/* Top: Category Pill & Capacity */}
                     <View style={styles.sectionCardHeader}>
-                      <View style={[styles.sectionCatBadge, { backgroundColor: catStyle.bg }]}>
-                        <MaterialIcons name={catStyle.icon} size={14} color={catStyle.text} style={{ marginRight: 4 }} />
+                      <View style={styles.sectionCatBadge}>
+                        <MaterialIcons name={catStyle.icon} size={15} color={catStyle.text} style={{ marginRight: 4 }} />
                         <Text style={[styles.sectionCatBadgeText, { color: catStyle.text }]}>
                           {(sec.category || 'workout').toUpperCase()}
                         </Text>
                       </View>
-                      <View
-                        style={[
-                          styles.sectionCapacityPill,
-                          {
-                            backgroundColor:
-                              remaining <= 3
-                                ? 'rgba(239,68,68,0.1)'
-                                : 'rgba(0,191,98,0.1)',
-                          },
-                        ]}
-                      >
+                      <View style={styles.sectionCapacityPill}>
                         <MaterialIcons
                           name="person"
-                          size={12}
+                          size={13}
                           color={remaining <= 3 ? '#EF4444' : '#00BF62'}
                           style={{ marginRight: 3 }}
                         />
@@ -1303,7 +1293,7 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                 end={{ x: 1, y: 0 }}
                 style={styles.detailHeroGradient}
               >
-                <View style={[styles.sectionCatBadge, { backgroundColor: getCategoryBadgeStyle(selectedSection.category, isDark).bg, alignSelf: 'flex-start' }]}>
+                <View style={[styles.sectionCatBadge, { alignSelf: 'flex-start' }]}>
                   <MaterialIcons
                     name={getCategoryBadgeStyle(selectedSection.category, isDark).icon}
                     size={14}
@@ -1332,7 +1322,7 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                       : 'Open for admissions'}
                   </Text>
                 </View>
-                <View style={[styles.detailCapacityBadge, { backgroundColor: 'rgba(0,191,98,0.1)' }]}>
+                <View style={styles.detailCapacityBadge}>
                   <MaterialIcons name="groups" size={16} color="#00BF62" style={{ marginRight: 6 }} />
                   <Text style={styles.detailCapacityBadgeText}>
                     {selectedSection.enrolledCount || 0} / {selectedSection.maxCapacity || 25} Enrolled
@@ -1999,24 +1989,18 @@ const styles = StyleSheet.create({
   sectionCatBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
   },
   sectionCatBadgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
   sectionCapacityPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
   },
   sectionCapacityText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
   },
   sectionTitleText: {
@@ -2157,9 +2141,6 @@ const styles = StyleSheet.create({
   detailCapacityBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
   },
   detailCapacityBadgeText: {
     fontSize: 12,
