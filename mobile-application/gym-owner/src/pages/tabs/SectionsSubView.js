@@ -206,13 +206,22 @@ export const SectionsSubView = ({ topInset, onBack, gymId }) => {
             const catObj = SECTION_CATEGORIES.find((c) => c.key === section.category);
             const catColor = catObj ? catObj.color : '#003882';
 
-            const formattedStartDate = section.startDate
-              ? new Date(section.startDate).toLocaleDateString('en-IN', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                })
-              : '—';
+            const formatDDMMYYYY = (dateVal) => {
+              if (!dateVal) return '—';
+              const d = new Date(dateVal);
+              if (Number.isNaN(d.getTime())) return '—';
+              return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+            };
+
+            const formattedStartDate = formatDDMMYYYY(section.startDate);
+            let formattedEndDate = '—';
+            if (section.endDate) {
+              formattedEndDate = formatDDMMYYYY(section.endDate);
+            } else if (section.startDate && section.durationDays) {
+              const d = new Date(section.startDate);
+              d.setDate(d.getDate() + Number(section.durationDays));
+              formattedEndDate = formatDDMMYYYY(d);
+            }
 
             return (
               <View
@@ -281,7 +290,7 @@ export const SectionsSubView = ({ topInset, onBack, gymId }) => {
                   <View style={styles.detailItem}>
                     <MaterialIcons name="calendar-today" size={15} color="#003882" style={{ marginRight: 4 }} />
                     <Text style={[styles.detailText, { color: textCol }]}>
-                      Starts {formattedStartDate}
+                      {formattedStartDate} → {formattedEndDate}
                     </Text>
                   </View>
 

@@ -46,6 +46,40 @@ export const ALL_DAYS = [
   { id: 'Sun', label: 'S', full: 'Sunday' },
 ];
 
+// Date format helpers for DD-MM-YYYY
+export const formatToDDMMYYYY = (dateInput) => {
+  if (!dateInput) return '';
+  if (typeof dateInput === 'string' && /^\d{2}-\d{2}-\d{4}$/.test(dateInput)) return dateInput;
+  const d = new Date(dateInput);
+  if (Number.isNaN(d.getTime())) return String(dateInput);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
+export const parseDDMMYYYYtoStandard = (dateStr) => {
+  if (!dateStr) return null;
+  const clean = String(dateStr).trim();
+  const parts = clean.split(/[-/]/);
+  if (parts.length === 3) {
+    if (parts[0].length === 2 && parts[2].length === 4) {
+      // DD-MM-YYYY -> YYYY-MM-DD
+      const [dd, mm, yyyy] = parts;
+      return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+    }
+    if (parts[0].length === 4 && parts[2].length <= 2) {
+      // YYYY-MM-DD
+      return clean;
+    }
+  }
+  const d = new Date(clean);
+  if (!Number.isNaN(d.getTime())) {
+    return d.toISOString().split('T')[0];
+  }
+  return null;
+};
+
 export const CreateSectionModal = ({
   visible,
   onClose,
@@ -64,8 +98,8 @@ export const CreateSectionModal = ({
   const [cost, setCost] = useState(initialSection?.cost ? String(initialSection.cost) : '1500');
   const [startDate, setStartDate] = useState(
     initialSection?.startDate
-      ? initialSection.startDate.split('T')[0]
-      : new Date().toISOString().split('T')[0]
+      ? formatToDDMMYYYY(initialSection.startDate)
+      : formatToDDMMYYYY(new Date())
   );
   const [durationDays, setDurationDays] = useState(
     initialSection?.durationDays ? String(initialSection.durationDays) : '20'
@@ -132,6 +166,18 @@ export const CreateSectionModal = ({
     return trainers.find((t) => (t._id || t.id) === trainerId) || null;
   }, [trainers, trainerId]);
 
+  // Estimated End Date calculation in DD-MM-YYYY
+  const estimatedEndDate = useMemo(() => {
+    if (!startDate) return '—';
+    const standardDateStr = parseDDMMYYYYtoStandard(startDate);
+    if (!standardDateStr) return '—';
+    const d = new Date(standardDateStr);
+    if (Number.isNaN(d.getTime())) return '—';
+    const days = Number(durationDays) || 20;
+    d.setDate(d.getDate() + days);
+    return formatToDDMMYYYY(d);
+  }, [startDate, durationDays]);
+
   // Toggle Day Selection
   const toggleDay = useCallback((dayId) => {
     setActiveDays((prev) => {
@@ -164,10 +210,15 @@ export const CreateSectionModal = ({
       return;
     }
 
-    if (!startDate.trim()) {
-      Alert.alert('Validation Error', 'Please enter a valid starting date (YYYY-MM-DD).');
+    const standardStartDate = parseDDMMYYYYtoStandard(startDate);
+    if (!standardStartDate) {
+      Alert.alert('Validation Error', 'Please enter a valid starting date in DD-MM-YYYY format (e.g. 21-10-2026).');
       return;
     }
+
+    const daysCount = Math.max(1, Number(durationDays) || 20);
+    const calculatedEnd = new Date(standardStartDate);
+    calculatedEnd.setDate(calculatedEnd.getDate() + daysCount);
 
     const payload = {
       gymId,
@@ -175,8 +226,9 @@ export const CreateSectionModal = ({
       title: title.trim(),
       category,
       cost: parsedCost,
-      startDate: startDate.trim(),
-      durationDays: Math.max(1, Number(durationDays) || 20),
+      startDate: standardStartDate,
+      endDate: calculatedEnd.toISOString(),
+      durationDays: daysCount,
       startTime,
       endTime,
       activeDays,
@@ -340,11 +392,11 @@ export const CreateSectionModal = ({
             <View style={styles.rowTwoCols}>
               <View style={[styles.formGroup, { flex: 1.2, marginRight: 8 }]}>
                 <Text style={[styles.inputLabel, { color: textCol }]}>
-                  Start Date (YYYY-MM-DD) <Text style={styles.requiredStar}>*</Text>
+                  Start Date (DD-MM-YYYY) <Text style={styles.requiredStar}>*</Text>
                 </Text>
                 <TextInput
                   style={[styles.textInput, { backgroundColor: inputBg, borderColor: borderCol, color: textCol }]}
-                  placeholder="2026-11-01"
+                  placeholder="21-10-2026"
                   placeholderTextColor={subTextCol}
                   value={startDate}
                   onChangeText={setStartDate}
@@ -362,6 +414,20 @@ export const CreateSectionModal = ({
                   onChangeText={setDurationDays}
                 />
               </View>
+            </View>
+
+            {/* Estimated End Date Banner */}
+            <View
+              style={[
+                styles.estEndDateBanner,
+                { backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderColor: borderCol },
+              ]}
+            >
+              <MaterialIcons name="event" size={18} color="#003882" style={{ marginRight: 8 }} />
+              <Text style={[styles.estEndDateLabel, { color: subTextCol }]}>Estimated End Date: </Text>
+              <Text style={[styles.estEndDateVal, { color: isDark ? '#93C5FD' : '#003882' }]}>
+                {estimatedEndDate}
+              </Text>
             </View>
 
             {/* Start Time & End Time */}
@@ -779,6 +845,23 @@ const styles = StyleSheet.create({
   pickerItemSub: {
     fontSize: 11,
     marginTop: 2,
+  },
+  estEndDateBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  estEndDateLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  estEndDateVal: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
 

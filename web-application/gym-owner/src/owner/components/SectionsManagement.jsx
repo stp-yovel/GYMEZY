@@ -95,6 +95,24 @@ export const SectionsManagement = () => {
   const [editingSection, setEditingSection] = useState(null);
   const [form] = Form.useForm();
 
+  // Dynamic Watch for Estimated End Date calculation
+  const watchedStartDate = Form.useWatch('startDate', form);
+  const watchedDurationDays = Form.useWatch('durationDays', form);
+
+  const estimatedEndDate = React.useMemo(() => {
+    const rawStart = watchedStartDate || form.getFieldValue('startDate');
+    const rawDays = watchedDurationDays || form.getFieldValue('durationDays');
+    if (!rawStart) return '—';
+    const d = new Date(rawStart);
+    if (Number.isNaN(d.getTime())) return '—';
+    const days = Number(rawDays) || 20;
+    d.setDate(d.getDate() + days);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  }, [watchedStartDate, watchedDurationDays, form]);
+
   // Fetch sections from live API
   const fetchSections = useCallback(async () => {
     setIsLoading(true);
@@ -210,12 +228,20 @@ export const SectionsManagement = () => {
   const handleSaveSection = async (values) => {
     setIsSubmitting(true);
     try {
+      let calculatedEndDate = null;
+      if (values.startDate && values.durationDays) {
+        const d = new Date(values.startDate);
+        d.setDate(d.getDate() + (Number(values.durationDays) || 20));
+        calculatedEndDate = d.toISOString();
+      }
+
       const payload = {
         title: values.title.trim(),
         category: values.category,
         trainerId: values.trainerId, // Connected strictly by ID
         cost: Number(values.cost),
         startDate: values.startDate,
+        endDate: calculatedEndDate,
         durationDays: Number(values.durationDays) || 20,
         startTime: values.startTime,
         endTime: values.endTime,
@@ -392,25 +418,35 @@ export const SectionsManagement = () => {
       ),
     },
     {
-      title: 'Start Date & Duration',
+      title: 'Schedule & Duration',
       key: 'schedule',
-      width: 200,
+      width: 220,
       render: (_, record) => {
-        const dateStr = record.startDate
-          ? new Date(record.startDate).toLocaleDateString('en-IN', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })
-          : '—';
+        const formatDDMMYYYY = (dateVal) => {
+          if (!dateVal) return '—';
+          const d = new Date(dateVal);
+          if (Number.isNaN(d.getTime())) return '—';
+          return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+        };
+        const dateStr = formatDDMMYYYY(record.startDate);
+        let endDateStr = '—';
+        if (record.endDate) {
+          endDateStr = formatDDMMYYYY(record.endDate);
+        } else if (record.startDate && record.durationDays) {
+          const d = new Date(record.startDate);
+          d.setDate(d.getDate() + Number(record.durationDays));
+          endDateStr = formatDDMMYYYY(d);
+        }
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <CalendarOutlined style={{ color: '#003882', fontSize: 13 }} />
-              <Text style={{ fontSize: 12 }}>{dateStr}</Text>
+              <Text style={{ fontSize: 12 }}>
+                {dateStr} → <Text strong style={{ color: '#003882' }}>{endDateStr}</Text>
+              </Text>
             </div>
             <Tag color="blue" style={{ width: 'fit-content', fontSize: 10, margin: 0, borderRadius: 4 }}>
-              {record.durationDays || 20} Days Program
+              {record.durationDays || 20} Days Batch
             </Tag>
           </div>
         );
@@ -705,7 +741,7 @@ export const SectionsManagement = () => {
           </Row>
 
           <Row gutter={16}>
-            <Col span={12}>
+            <Col span={6}>
               <Form.Item
                 name="startDate"
                 label="Starting Date"
@@ -732,6 +768,24 @@ export const SectionsManagement = () => {
                   placeholder="20"
                   addonAfter="Days"
                   style={{ width: '100%', borderRadius: 'var(--radius-base)' }}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item label="Estimated End Date">
+                <Input
+                  size="large"
+                  readOnly
+                  value={estimatedEndDate}
+                  prefix={<CalendarOutlined style={{ color: '#003882' }} />}
+                  style={{
+                    borderRadius: 'var(--radius-base)',
+                    backgroundColor: isDarkMode ? '#161b22' : '#f8fafc',
+                    color: isDarkMode ? '#58a6ff' : '#003882',
+                    fontWeight: 700,
+                    cursor: 'default',
+                  }}
                 />
               </Form.Item>
             </Col>
