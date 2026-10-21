@@ -1231,14 +1231,14 @@ export const BookingSessionScreen = ({ route, navigation }) => {
 
                     {/* Quick Timing & Duration Info */}
                     <View style={styles.listQuickInfoRow}>
-                      <View style={[styles.listInfoChip, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#F8FAFC', borderColor: borderColor }]}>
-                        <MaterialIcons name="schedule" size={13} color={isDark ? '#93C5FD' : '#003882'} style={{ marginRight: 5 }} />
+                      <View style={styles.listInfoChip}>
+                        <MaterialIcons name="schedule" size={14} color={isDark ? '#93C5FD' : '#003882'} style={{ marginRight: 5 }} />
                         <Text style={[styles.listInfoChipText, { color: textColor }]}>
                           {sec.startTime} - {sec.endTime}
                         </Text>
                       </View>
-                      <View style={[styles.listInfoChip, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#F8FAFC', borderColor: borderColor }]}>
-                        <MaterialIcons name="date-range" size={13} color={isDark ? '#93C5FD' : '#003882'} style={{ marginRight: 5 }} />
+                      <View style={styles.listInfoChip}>
+                        <MaterialIcons name="date-range" size={14} color={isDark ? '#93C5FD' : '#003882'} style={{ marginRight: 5 }} />
                         <Text style={[styles.listInfoChipText, { color: textColor }]}>
                           {sec.durationDays || 20} Days Batch
                         </Text>
@@ -2050,16 +2050,12 @@ const styles = StyleSheet.create({
   listQuickInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
     marginBottom: 12,
   },
   listInfoChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: 1,
   },
   listInfoChipText: {
     fontSize: 12,
