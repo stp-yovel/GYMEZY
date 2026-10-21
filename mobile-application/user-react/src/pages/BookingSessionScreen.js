@@ -1370,10 +1370,13 @@ export const BookingSessionScreen = ({ route, navigation }) => {
 
               {/* Date Range */}
               <View style={styles.detailScheduleItem}>
-                <View style={[styles.detailIconBox, { backgroundColor: isDark ? 'rgba(96,165,250,0.15)' : 'rgba(0,56,130,0.08)' }]}>
-                  <MaterialIcons name="date-range" size={20} color={isDark ? '#93C5FD' : '#003882'} />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
+                <MaterialIcons
+                  name="date-range"
+                  size={18}
+                  color={isDark ? '#93C5FD' : '#003882'}
+                  style={{ marginTop: 2, marginRight: 10 }}
+                />
+                <View style={{ flex: 1 }}>
                   <Text style={[styles.detailScheduleLabel, { color: subtitleColor }]}>Date Range</Text>
                   <Text style={[styles.detailScheduleValue, { color: textColor }]}>
                     {formatToDDMMYYYY(selectedSection.startDate)} to {formatToDDMMYYYY(selectedSection.endDate)}
@@ -1386,10 +1389,13 @@ export const BookingSessionScreen = ({ route, navigation }) => {
 
               {/* Daily Timing */}
               <View style={[styles.detailScheduleItem, { marginTop: 14 }]}>
-                <View style={[styles.detailIconBox, { backgroundColor: isDark ? 'rgba(96,165,250,0.15)' : 'rgba(0,56,130,0.08)' }]}>
-                  <MaterialIcons name="schedule" size={20} color={isDark ? '#93C5FD' : '#003882'} />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
+                <MaterialIcons
+                  name="schedule"
+                  size={18}
+                  color={isDark ? '#93C5FD' : '#003882'}
+                  style={{ marginTop: 2, marginRight: 10 }}
+                />
+                <View style={{ flex: 1 }}>
                   <Text style={[styles.detailScheduleLabel, { color: subtitleColor }]}>Daily Time Slot</Text>
                   <Text style={[styles.detailScheduleValue, { color: textColor }]}>
                     {selectedSection.startTime} - {selectedSection.endTime}
@@ -1398,11 +1404,14 @@ export const BookingSessionScreen = ({ route, navigation }) => {
               </View>
 
               {/* Weekly Recurring Days */}
-              <View style={[styles.detailScheduleItem, { marginTop: 14, alignItems: 'flex-start' }]}>
-                <View style={[styles.detailIconBox, { backgroundColor: isDark ? 'rgba(96,165,250,0.15)' : 'rgba(0,56,130,0.08)' }]}>
-                  <MaterialIcons name="repeat" size={20} color={isDark ? '#93C5FD' : '#003882'} />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
+              <View style={[styles.detailScheduleItem, { marginTop: 14 }]}>
+                <MaterialIcons
+                  name="repeat"
+                  size={18}
+                  color={isDark ? '#93C5FD' : '#003882'}
+                  style={{ marginTop: 2, marginRight: 10 }}
+                />
+                <View style={{ flex: 1 }}>
                   <Text style={[styles.detailScheduleLabel, { color: subtitleColor, marginBottom: 8 }]}>
                     Weekly Active Days
                   </Text>
@@ -1414,11 +1423,8 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                           key={d}
                           style={[
                             styles.detailDayPill,
-                            {
-                              backgroundColor: isDayActive
-                                ? (isDark ? 'rgba(96,165,250,0.25)' : 'rgba(0,56,130,0.12)')
-                                : (isDark ? 'rgba(255,255,255,0.04)' : '#E2E8F0'),
-                              borderColor: isDayActive ? (isDark ? '#60A5FA' : '#003882') : 'transparent',
+                            isDayActive && {
+                              backgroundColor: isDark ? 'rgba(96,165,250,0.18)' : 'rgba(0,56,130,0.08)',
                             },
                           ]}
                         >
@@ -1428,7 +1434,7 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                               {
                                 color: isDayActive
                                   ? (isDark ? '#93C5FD' : '#003882')
-                                  : subtitleColor,
+                                  : (isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'),
                                 fontWeight: isDayActive ? 'bold' : 'normal',
                               },
                             ]}
@@ -2177,14 +2183,7 @@ const styles = StyleSheet.create({
   },
   detailScheduleItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-  },
-  detailIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'flex-start',
   },
   detailScheduleLabel: {
     fontSize: 10,
@@ -2202,14 +2201,15 @@ const styles = StyleSheet.create({
   },
   daysPillRow: {
     flexDirection: 'row',
-    gap: 4,
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   detailDayPill: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   detailDayPillText: {
     fontSize: 11,
