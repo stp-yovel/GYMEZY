@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Section, SECTION_CATEGORIES, DAYS_OF_WEEK } from '../models/section.model.js';
+import { Section, SECTION_CATEGORIES, DAYS_OF_WEEK, calculateScheduleEndDate } from '../models/section.model.js';
 import { Employee } from '../models/employee.model.js';
 import { Gym } from '../models/gym.model.js';
 import { ApiError } from '../utils/apiError.js';
@@ -104,8 +104,7 @@ export const createSection = asyncHandler(async (req, res) => {
   // 4. Create Section Document (Strictly by IDs)
   const parsedStartDate = new Date(startDate);
   const parsedDuration = Math.max(1, Number(durationDays) || 20);
-  const calculatedEndDate = new Date(parsedStartDate);
-  calculatedEndDate.setDate(calculatedEndDate.getDate() + parsedDuration);
+  const calculatedEndDate = calculateScheduleEndDate(parsedStartDate, parsedDuration, activeDays);
 
   const section = await Section.create({
     gymId: resolvedGymId,
@@ -228,17 +227,16 @@ export const updateSection = asyncHandler(async (req, res) => {
     updateData.trainerId = new mongoose.Types.ObjectId(updateData.trainerId);
   }
 
-  // Recalculate end date if start date or duration is updated
-  if (updateData.startDate || updateData.durationDays) {
+  // Recalculate end date if start date, duration, or activeDays is updated
+  if (updateData.startDate || updateData.durationDays || updateData.activeDays) {
     const existing = await Section.findById(id);
     if (!existing) {
       throw new ApiError(404, 'Section not found.');
     }
     const start = updateData.startDate ? new Date(updateData.startDate) : existing.startDate;
     const duration = updateData.durationDays ? Number(updateData.durationDays) : existing.durationDays;
-    const end = new Date(start);
-    end.setDate(end.getDate() + duration);
-    updateData.endDate = end;
+    const days = updateData.activeDays || existing.activeDays;
+    updateData.endDate = calculateScheduleEndDate(start, duration, days);
   }
 
   const updatedSection = await Section.findByIdAndUpdate(id, updateData, {

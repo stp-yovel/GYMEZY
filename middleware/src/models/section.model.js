@@ -133,12 +133,45 @@ const sectionSchema = new mongoose.Schema(
   }
 );
 
-// Pre-save hook: auto-calculate endDate if not provided
+/**
+ * Calculates the exact end date based on active days of the week in schedule.
+ * If 20 sessions are specified on [Mon, Wed, Fri, Sat], it counts 20 occurrences of those days.
+ */
+export const calculateScheduleEndDate = (startDateInput, durationDaysInput, activeDaysInput) => {
+  if (!startDateInput) return null;
+  const d = new Date(startDateInput);
+  if (Number.isNaN(d.getTime())) return null;
+
+  const targetSessions = Math.max(1, Number(durationDaysInput) || 1);
+  const activeDaysSet = new Set(
+    Array.isArray(activeDaysInput) && activeDaysInput.length > 0
+      ? activeDaysInput
+      : DAYS_OF_WEEK
+  );
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  let current = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  let sessionsCounted = 0;
+  let safetyLimit = 365 * 5;
+
+  while (safetyLimit > 0) {
+    const dayName = dayNames[current.getDay()];
+    if (activeDaysSet.has(dayName)) {
+      sessionsCounted += 1;
+      if (sessionsCounted >= targetSessions) {
+        return current;
+      }
+    }
+    current.setDate(current.getDate() + 1);
+    safetyLimit -= 1;
+  }
+  return current;
+};
+
+// Pre-save hook: auto-calculate endDate based on Weekly Schedule if not provided
 sectionSchema.pre('save', function () {
   if (this.startDate && this.durationDays && !this.endDate) {
-    const end = new Date(this.startDate);
-    end.setDate(end.getDate() + Number(this.durationDays));
-    this.endDate = end;
+    this.endDate = calculateScheduleEndDate(this.startDate, this.durationDays, this.activeDays);
   }
 });
 

@@ -14,7 +14,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../../theme/ThemeContext';
 import { AppColors } from '../../theme/appTheme';
 import { apiService } from '../../services/apiService';
-import { CreateSectionModal, SECTION_CATEGORIES } from '../../widgets/CreateSectionModal';
+import { CreateSectionModal, SECTION_CATEGORIES, calculateScheduleEndDate } from '../../widgets/CreateSectionModal';
 
 export const SectionsSubView = ({ topInset, onBack, gymId }) => {
   const { isDark } = useTheme();
@@ -218,9 +218,8 @@ export const SectionsSubView = ({ topInset, onBack, gymId }) => {
             if (section.endDate) {
               formattedEndDate = formatDDMMYYYY(section.endDate);
             } else if (section.startDate && section.durationDays) {
-              const d = new Date(section.startDate);
-              d.setDate(d.getDate() + Number(section.durationDays));
-              formattedEndDate = formatDDMMYYYY(d);
+              const end = calculateScheduleEndDate(section.startDate, section.durationDays, section.activeDays);
+              if (end) formattedEndDate = formatDDMMYYYY(end);
             }
 
             return (

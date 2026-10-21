@@ -6,6 +6,7 @@ import {
   ALL_DAYS,
   formatToDDMMYYYY,
   parseDDMMYYYYtoStandard,
+  calculateScheduleEndDate,
 } from '../src/widgets/CreateSectionModal';
 
 // Mock dependencies
@@ -60,5 +61,11 @@ describe('CreateSectionModal Constants & Utilities', () => {
   test('parseDDMMYYYYtoStandard parses DD-MM-YYYY to YYYY-MM-DD', () => {
     expect(parseDDMMYYYYtoStandard('21-10-2026')).toBe('2026-10-21');
     expect(parseDDMMYYYYtoStandard('2026-10-21')).toBe('2026-10-21');
+  });
+
+  test('calculateScheduleEndDate correctly calculates end date considering weekly schedule', () => {
+    // 20 sessions on [Mon, Wed, Fri, Sat] starting Wed 21-10-2026 ends on Mon 23-11-2026
+    const end = calculateScheduleEndDate('21-10-2026', 20, ['Mon', 'Wed', 'Fri', 'Sat']);
+    expect(formatToDDMMYYYY(end)).toBe('23-11-2026');
   });
 });

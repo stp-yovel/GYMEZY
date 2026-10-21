@@ -98,20 +98,49 @@ export const SectionsManagement = () => {
   // Dynamic Watch for Estimated End Date calculation
   const watchedStartDate = Form.useWatch('startDate', form);
   const watchedDurationDays = Form.useWatch('durationDays', form);
+  const watchedActiveDays = Form.useWatch('activeDays', form);
+
+  // Calculates exact completion date by counting occurrences of active weekly days
+  const calculateScheduleEndDate = useCallback((startDateInput, durationDaysInput, activeDaysInput) => {
+    if (!startDateInput) return null;
+    const d = new Date(startDateInput);
+    if (Number.isNaN(d.getTime())) return null;
+
+    const targetSessions = Math.max(1, Number(durationDaysInput) || 1);
+    const activeDaysSet = new Set(
+      Array.isArray(activeDaysInput) && activeDaysInput.length > 0
+        ? activeDaysInput
+        : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    );
+
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    let current = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    let sessionsCounted = 0;
+    let safetyLimit = 365 * 5;
+
+    while (safetyLimit > 0) {
+      const dayName = dayNames[current.getDay()];
+      if (activeDaysSet.has(dayName)) {
+        sessionsCounted += 1;
+        if (sessionsCounted >= targetSessions) {
+          return current;
+        }
+      }
+      current.setDate(current.getDate() + 1);
+      safetyLimit -= 1;
+    }
+    return current;
+  }, []);
 
   const estimatedEndDate = React.useMemo(() => {
     const rawStart = watchedStartDate || form.getFieldValue('startDate');
     const rawDays = watchedDurationDays || form.getFieldValue('durationDays');
+    const rawActive = watchedActiveDays || form.getFieldValue('activeDays') || ['Mon', 'Wed', 'Fri'];
     if (!rawStart) return '—';
-    const d = new Date(rawStart);
-    if (Number.isNaN(d.getTime())) return '—';
-    const days = Number(rawDays) || 20;
-    d.setDate(d.getDate() + days);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}-${month}-${year}`;
-  }, [watchedStartDate, watchedDurationDays, form]);
+    const end = calculateScheduleEndDate(rawStart, rawDays, rawActive);
+    if (!end) return '—';
+    return end.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }, [watchedStartDate, watchedDurationDays, watchedActiveDays, form, calculateScheduleEndDate]);
 
   // Fetch sections from live API
   const fetchSections = useCallback(async () => {
@@ -230,9 +259,8 @@ export const SectionsManagement = () => {
     try {
       let calculatedEndDate = null;
       if (values.startDate && values.durationDays) {
-        const d = new Date(values.startDate);
-        d.setDate(d.getDate() + (Number(values.durationDays) || 20));
-        calculatedEndDate = d.toISOString();
+        const end = calculateScheduleEndDate(values.startDate, values.durationDays, values.activeDays);
+        if (end) calculatedEndDate = end.toISOString();
       }
 
       const payload = {
@@ -433,9 +461,8 @@ export const SectionsManagement = () => {
         if (record.endDate) {
           endDateStr = formatDDMMYYYY(record.endDate);
         } else if (record.startDate && record.durationDays) {
-          const d = new Date(record.startDate);
-          d.setDate(d.getDate() + Number(record.durationDays));
-          endDateStr = formatDDMMYYYY(d);
+          const end = calculateScheduleEndDate(record.startDate, record.durationDays, record.activeDays);
+          if (end) endDateStr = formatDDMMYYYY(end);
         }
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

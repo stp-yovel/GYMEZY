@@ -80,6 +80,42 @@ export const parseDDMMYYYYtoStandard = (dateStr) => {
   return null;
 };
 
+/**
+ * Calculates exact completion date by counting occurrences of active weekly days
+ */
+export const calculateScheduleEndDate = (startDateInput, durationDaysInput, activeDaysInput) => {
+  if (!startDateInput) return null;
+  const standardDateStr = parseDDMMYYYYtoStandard(startDateInput);
+  if (!standardDateStr) return null;
+  const d = new Date(standardDateStr);
+  if (Number.isNaN(d.getTime())) return null;
+
+  const targetSessions = Math.max(1, Number(durationDaysInput) || 1);
+  const activeDaysSet = new Set(
+    Array.isArray(activeDaysInput) && activeDaysInput.length > 0
+      ? activeDaysInput
+      : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  );
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  let current = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  let sessionsCounted = 0;
+  let safetyLimit = 365 * 5;
+
+  while (safetyLimit > 0) {
+    const dayName = dayNames[current.getDay()];
+    if (activeDaysSet.has(dayName)) {
+      sessionsCounted += 1;
+      if (sessionsCounted >= targetSessions) {
+        return current;
+      }
+    }
+    current.setDate(current.getDate() + 1);
+    safetyLimit -= 1;
+  }
+  return current;
+};
+
 export const CreateSectionModal = ({
   visible,
   onClose,
@@ -166,17 +202,13 @@ export const CreateSectionModal = ({
     return trainers.find((t) => (t._id || t.id) === trainerId) || null;
   }, [trainers, trainerId]);
 
-  // Estimated End Date calculation in DD-MM-YYYY
+  // Estimated End Date calculation in DD-MM-YYYY taking weekly active days into account
   const estimatedEndDate = useMemo(() => {
     if (!startDate) return '—';
-    const standardDateStr = parseDDMMYYYYtoStandard(startDate);
-    if (!standardDateStr) return '—';
-    const d = new Date(standardDateStr);
-    if (Number.isNaN(d.getTime())) return '—';
-    const days = Number(durationDays) || 20;
-    d.setDate(d.getDate() + days);
-    return formatToDDMMYYYY(d);
-  }, [startDate, durationDays]);
+    const end = calculateScheduleEndDate(startDate, durationDays, activeDays);
+    if (!end) return '—';
+    return formatToDDMMYYYY(end);
+  }, [startDate, durationDays, activeDays]);
 
   // Toggle Day Selection
   const toggleDay = useCallback((dayId) => {
@@ -217,8 +249,7 @@ export const CreateSectionModal = ({
     }
 
     const daysCount = Math.max(1, Number(durationDays) || 20);
-    const calculatedEnd = new Date(standardStartDate);
-    calculatedEnd.setDate(calculatedEnd.getDate() + daysCount);
+    const calculatedEnd = calculateScheduleEndDate(standardStartDate, daysCount, activeDays) || new Date(standardStartDate);
 
     const payload = {
       gymId,
