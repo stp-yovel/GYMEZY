@@ -7,7 +7,11 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "set-env:dev": "node scripts/set-env.js development",
+    "set-env:prod": "node scripts/set-env.js production",
+    "build:dev:android": "node scripts/set-env.js development && cd android && ./gradlew assembleRelease",
+    "build:prod:android": "node scripts/set-env.js production && cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^3.1.1",

@@ -1,7 +1,21 @@
 import axios from 'axios';
 
 const getApiBaseUrl = () => {
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/v1';
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    const { hostname } = window.location;
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.')
+    ) {
+      return import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/v1';
+    }
+    if (hostname.includes('dev')) {
+      return import.meta.env.VITE_API_BASE_URL || 'https://dev.api.gymezy.com/api/v1';
+    }
+  }
+  return import.meta.env.VITE_API_BASE_URL || 'https://api.gymezy.com/api/v1';
 };
 
 export const apiClient = axios.create({

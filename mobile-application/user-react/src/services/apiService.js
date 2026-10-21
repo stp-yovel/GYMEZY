@@ -1,6 +1,8 @@
 import { NativeModules } from 'react-native';
+import { getCloudApiUrl } from '../config/envConfig';
 
 const BACKEND_PORT = 5001;
+const CURRENT_MAC_IP = '10.117.236.244';
 const LOCAL_WIFI_IP = '192.168.0.102';
 
 const getMetroHost = () => {
@@ -96,16 +98,22 @@ class ApiService {
 
   async executeFetch(endpoint, options = {}, timeoutMs = 15000) {
     const metroHost = getMetroHost();
+    const cloudUrl = getCloudApiUrl();
 
-    // Priority candidates: Verified base, ADB reverse localhost (USB), Metro host IP, WiFi LAN IP, Android emulator 10.0.2.2
-    const candidateBases = [
-      this.verifiedBase,
-      `http://localhost:${BACKEND_PORT}/api/v1`,
-      metroHost ? `http://${metroHost}:${BACKEND_PORT}/api/v1` : null,
-      `http://${LOCAL_WIFI_IP}:${BACKEND_PORT}/api/v1`,
-      `http://10.0.2.2:${BACKEND_PORT}/api/v1`,
-      `http://127.0.0.1:${BACKEND_PORT}/api/v1`,
-    ];
+    // Priority candidates: In development mode (__DEV__ === true), prioritize localhost, Metro host, and LAN IP.
+    // In production/release builds, connect directly to the targeted cloud API.
+    const candidateBases = __DEV__
+      ? [
+          this.verifiedBase,
+          `http://localhost:${BACKEND_PORT}/api/v1`,
+          metroHost ? `http://${metroHost}:${BACKEND_PORT}/api/v1` : null,
+          `http://${CURRENT_MAC_IP}:${BACKEND_PORT}/api/v1`,
+          `http://${LOCAL_WIFI_IP}:${BACKEND_PORT}/api/v1`,
+          `http://10.0.2.2:${BACKEND_PORT}/api/v1`,
+          `http://127.0.0.1:${BACKEND_PORT}/api/v1`,
+          cloudUrl,
+        ]
+      : [cloudUrl];
 
     const uniqueBases = Array.from(new Set(candidateBases.filter(Boolean)));
     let lastError = null;
