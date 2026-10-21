@@ -98,8 +98,9 @@ export const CreateSectionModal = ({
     const fetchTrainersList = async () => {
       setIsLoadingTrainers(true);
       try {
-        const staff = await apiService.getEmployees().catch(() => []);
-        if (isMounted && Array.isArray(staff)) {
+        const staffRes = await apiService.getEmployees({ limit: 'all' }).catch(() => []);
+        const staff = Array.isArray(staffRes) ? staffRes : (staffRes?.employees || []);
+        if (isMounted && staff.length > 0) {
           const gymTrainers = staff.filter(
             (emp) =>
               emp.status !== 'Deactivated' &&

@@ -116,10 +116,12 @@ export const SectionsManagement = () => {
   // Fetch gym trainers (strictly referencing them by ID)
   const fetchTrainers = useCallback(async () => {
     try {
-      const response = await apiClient.get('/employees');
-      if (response.data?.success && Array.isArray(response.data.data)) {
-        // Filter active employees whose role is Trainer or show all if role is flexible
-        const allEmployees = response.data.data;
+      const response = await apiClient.get('/employees', { params: { limit: 'all' } });
+      const rawData = response.data?.data;
+      const allEmployees = Array.isArray(rawData) ? rawData : rawData?.employees || [];
+
+      if (allEmployees.length > 0) {
+        // Filter active employees whose role is Trainer or coach
         const gymTrainers = allEmployees.filter(
           (emp) =>
             emp.status !== 'Deactivated' &&
