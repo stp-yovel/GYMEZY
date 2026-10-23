@@ -1,42 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   Platform,
+  RefreshControl,
+  Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../theme/ThemeContext';
-import { AppColors, AppTheme } from '../theme/appTheme';
+import { AppColors } from '../theme/appTheme';
 import { useBookingRepository } from '../data/BookingContext';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const TABS = ['Upcoming', 'Completed', 'Cancelled'];
 
-export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
+export const MyBookingsScreen = ({ navigation }) => {
   const { isDark, colors } = useTheme();
-  const { bookings, memberships } = useBookingRepository();
+  const { bookings, refreshBookings } = useBookingRepository();
 
-  const [showHub, setShowHub] = useState(initialShowHub);
   const [selectedTab, setSelectedTab] = useState('Upcoming');
+  const [refreshing, setRefreshing] = useState(false);
+  const [failedLogos, setFailedLogos] = useState({});
 
-  const upcomingCount = bookings.filter((b) => b.status === 'Upcoming').length;
+  useFocusEffect(
+    useCallback(() => {
+      refreshBookings?.();
+    }, [refreshBookings])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshBookings?.();
+    setRefreshing(false);
+  };
+
+  const upcomingCount = bookings.filter(
+    (b) => b.status === 'Upcoming' || b.status === 'Active' || b.status === 'Confirmed'
+  ).length;
   const completedCount = bookings.filter((b) => b.status === 'Completed').length;
   const cancelledCount = bookings.filter((b) => b.status === 'Cancelled').length;
 
-  const filteredBookings = bookings.filter((b) => b.status === selectedTab);
+  const filteredBookings = bookings.filter((b) => {
+    if (selectedTab === 'Upcoming') {
+      return b.status === 'Upcoming' || b.status === 'Active' || b.status === 'Confirmed';
+    }
+    return b.status === selectedTab;
+  });
 
   const bookNewSession = (_category = 'Gym') => {
-    navigation.navigate('HomeTabs');
-  };
-
-  const buyMembership = () => {
     navigation.navigate('HomeTabs');
   };
 
@@ -73,138 +88,18 @@ export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
       <View style={styles.appBar}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.appBarTitle, { color: colors.text }]}>
-            {showHub ? 'Booking Hub' : 'My Bookings'}
+            My Bookings
           </Text>
-          {!showHub && (
-            <Text style={styles.activePassesSub}>
-              {upcomingCount} active {upcomingCount === 1 ? 'pass' : 'passes'}
-            </Text>
-          )}
+          <Text style={styles.activePassesSub}>
+            {upcomingCount} active {upcomingCount === 1 ? 'pass' : 'passes'}
+          </Text>
         </View>
-
-        {/* Top Right Action: "+ Book" Gradient Pill */}
-        <TouchableOpacity
-          onPress={() => bookNewSession('Gym')}
-          style={styles.bookCtaPillWrapper}
-          activeOpacity={0.85}
-        >
-          <LinearGradient
-            colors={[AppColors.primaryColor, '#0D47A1']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.bookCtaPill}
-          >
-            <MaterialIcons name="add" size={16} color="#FFFFFF" />
-            <Text style={styles.bookCtaText}>Book</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* Hub View / List View Toggle Button */}
-        <TouchableOpacity
-          onPress={() => setShowHub(!showHub)}
-          style={styles.hubToggleBtn}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons
-            name={showHub ? 'view-agenda' : 'grid-view'}
-            size={22}
-            color={isDark ? '#E2E8F0' : '#01327E'}
-          />
-        </TouchableOpacity>
       </View>
 
-      {showHub ? (
-        /* ========================================== */
-        /* PANEL 1: CHOOSE WHAT YOU WANT TO DO (HUB)  */
-        /* ========================================== */
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.hubScrollContent}
-        >
-          <Text style={[styles.hubSectionHeading, { color: colors.text }]}>
-            Choose What You Want to Do
-          </Text>
-
-          {/* 1. Buy Membership Hub Card */}
-          <TouchableOpacity
-            onPress={buyMembership}
-            style={[
-              styles.hubCard,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-            activeOpacity={0.88}
-          >
-            <View style={[styles.hubIconCircle, { backgroundColor: 'rgba(139, 92, 246, 0.12)' }]}>
-              <MaterialIcons name="workspace-premium" size={28} color="#8B5CF6" />
-            </View>
-            <View style={{ flex: 1, marginLeft: 16 }}>
-              <Text style={[styles.hubCardTitle, { color: colors.text }]}>Buy Membership</Text>
-              <Text style={[styles.hubCardSub, { color: colors.subtitle }]}>
-                Unlimited all-access gym passes & trainer plans
-              </Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={22} color={colors.subtitle} />
-          </TouchableOpacity>
-
-          {/* 2. Session Bookings Hub Card */}
-          <TouchableOpacity
-            onPress={() => bookNewSession('Gym')}
-            style={[
-              styles.hubCard,
-              { backgroundColor: colors.card, borderColor: colors.border, marginTop: 14 },
-            ]}
-            activeOpacity={0.88}
-          >
-            <View
-              style={[
-                styles.hubIconCircle,
-                { backgroundColor: 'rgba(0, 56, 130, 0.12)' },
-              ]}
-            >
-              <MaterialIcons name="fitness-center" size={28} color={AppColors.primaryColor} />
-            </View>
-            <View style={{ flex: 1, marginLeft: 16 }}>
-              <Text style={[styles.hubCardTitle, { color: colors.text }]}>Book Workout Session</Text>
-              <Text style={[styles.hubCardSub, { color: colors.subtitle }]}>
-                Single day passes, Yoga, Zumba & HIIT classes
-              </Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={22} color={colors.subtitle} />
-          </TouchableOpacity>
-
-          {/* 3. Quick Workout Categories Grid */}
-          <Text style={[styles.hubSubheading, { color: colors.text }]}>
-            Quick Session Categories
-          </Text>
-          <View style={styles.categoryGrid}>
-            {[
-              { label: 'Gym Access', icon: 'fitness-center', color: '#003882' },
-              { label: 'Yoga Class', icon: 'self-improvement', color: '#8B5CF6' },
-              { label: 'Zumba Class', icon: 'music-note', color: '#EC4899' },
-              { label: 'HIIT / Cardio', icon: 'bolt', color: '#EF4444' },
-            ].map((cat) => (
-              <TouchableOpacity
-                key={cat.label}
-                onPress={() => bookNewSession(cat.label.split(' ')[0])}
-                style={[
-                  styles.categoryCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                ]}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.catIconBox, { backgroundColor: `${cat.color}18` }]}>
-                  <MaterialIcons name={cat.icon} size={22} color={cat.color} />
-                </View>
-                <Text style={[styles.catCardTitle, { color: colors.text }]}>{cat.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-      ) : (
-        /* ========================================== */
-        /* PANEL 2: MY SESSION BOOKINGS (TICKETS LIST)*/
-        /* ========================================== */
-        <View style={{ flex: 1 }}>
+      {/* ========================================== */}
+      {/* MY SESSION BOOKINGS (TICKETS LIST)         */}
+      {/* ========================================== */}
+      <View style={{ flex: 1 }}>
           {/* Modern Floating Pill Tab Selector */}
           <View style={styles.tabsOuterWrapper}>
             <View
@@ -267,6 +162,14 @@ export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.passesScrollContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={isDark ? '#93C5FD' : AppColors.primaryColor}
+                colors={[AppColors.primaryColor]}
+              />
+            }
           >
             {filteredBookings.length === 0 ? (
               <View style={styles.emptyStateContainer}>
@@ -280,8 +183,21 @@ export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
               </View>
             ) : (
               filteredBookings.map((booking) => {
-                const isUpcoming = booking.status === 'Upcoming';
+                const isUpcoming =
+                  booking.status === 'Upcoming' ||
+                  booking.status === 'Active' ||
+                  booking.status === 'Confirmed';
                 const catMeta = getCategoryIcon(booking.type, booking.iconName);
+                const gymLogoUri =
+                  !failedLogos[booking.id] &&
+                  (booking.gymLogo ||
+                    (typeof booking.gymId?.logo === 'string' && booking.gymId.logo.trim()) ||
+                    booking.gymId?.logo?.fileData ||
+                    booking.gymId?.logoUrl ||
+                    booking.gymImageUrl ||
+                    booking.gymId?.imageUrl ||
+                    booking.gymId?.images?.[0] ||
+                    null);
 
                 return (
                   <TouchableOpacity
@@ -298,8 +214,30 @@ export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
                   >
                     {/* Top Header Row */}
                     <View style={styles.ticketHeaderRow}>
-                      <View style={[styles.categoryIconCapsule, { backgroundColor: catMeta.bg }]}>
-                        <MaterialIcons name={catMeta.name} size={22} color={catMeta.color} />
+                      <View
+                        style={[
+                          styles.categoryIconCapsule,
+                          {
+                            backgroundColor: gymLogoUri
+                              ? (isDark ? '#1E293B' : '#F1F5F9')
+                              : catMeta.bg,
+                            borderWidth: gymLogoUri ? 1 : 0,
+                            borderColor: colors.border,
+                          },
+                        ]}
+                      >
+                        {gymLogoUri ? (
+                          <Image
+                            source={{ uri: gymLogoUri }}
+                            style={styles.gymLogoImg}
+                            resizeMode="cover"
+                            onError={() =>
+                              setFailedLogos((prev) => ({ ...prev, [booking.id]: true }))
+                            }
+                          />
+                        ) : (
+                          <MaterialIcons name={catMeta.name} size={22} color={catMeta.color} />
+                        )}
                       </View>
 
                       <View style={{ flex: 1, marginLeft: 12 }}>
@@ -311,23 +249,46 @@ export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
                         </Text>
                       </View>
 
-                      {/* Pass ID Tag Badge on Top Right */}
-                      <View
-                        style={[
-                          styles.passIdTag,
-                          {
-                            backgroundColor: isDark ? '#2A2A2A' : '#F1F5F9',
-                          },
-                        ]}
-                      >
-                        <Text
+                      {/* Pass ID Tag & Status Badge on Top Right */}
+                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                        <View
                           style={[
-                            styles.passIdText,
-                            { color: isDark ? '#93C5FD' : AppColors.primaryColor },
+                            styles.passIdTag,
+                            {
+                              backgroundColor: isDark ? '#2A2A2A' : '#F1F5F9',
+                            },
                           ]}
                         >
-                          {booking.id}
-                        </Text>
+                          <Text
+                            style={[
+                              styles.passIdText,
+                              { color: isDark ? '#93C5FD' : AppColors.primaryColor },
+                            ]}
+                          >
+                            {booking.id}
+                          </Text>
+                        </View>
+                        {booking.status === 'Active' && (
+                          <View
+                            style={{
+                              backgroundColor: 'rgba(0, 191, 98, 0.12)',
+                              paddingHorizontal: 7,
+                              paddingVertical: 2,
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: '#00BF62',
+                                fontSize: 10,
+                                fontWeight: '800',
+                                letterSpacing: 0.5,
+                              }}
+                            >
+                              ACTIVE
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
 
@@ -412,11 +373,6 @@ export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
                         >
                           {isUpcoming ? 'View Pass & OTP' : 'View Receipt'}
                         </Text>
-                        <MaterialIcons
-                          name="chevron-right"
-                          size={16}
-                          color={isDark ? '#93C5FD' : AppColors.primaryColor}
-                        />
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -451,10 +407,26 @@ export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
 
               {/* Quick Action Chips Row */}
               <View style={styles.quickChipsRow}>
-                {['Gym', 'Yoga', 'Zumba'].map((cat) => (
+                {[
+                  {
+                    label: 'Gym',
+                    icon: 'fitness-center',
+                    color: isDark ? '#93C5FD' : AppColors.primaryColor,
+                  },
+                  {
+                    label: 'Yoga',
+                    icon: 'self-improvement',
+                    color: isDark ? '#A78BFA' : '#8B5CF6',
+                  },
+                  {
+                    label: 'Zumba',
+                    icon: 'music-note',
+                    color: isDark ? '#F472B6' : '#EC4899',
+                  },
+                ].map((item) => (
                   <TouchableOpacity
-                    key={cat}
-                    onPress={() => bookNewSession(cat)}
+                    key={item.label}
+                    onPress={() => bookNewSession(item.label)}
                     style={[
                       styles.quickChipBtn,
                       {
@@ -464,8 +436,14 @@ export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
                     ]}
                     activeOpacity={0.8}
                   >
+                    <MaterialIcons
+                      name={item.icon}
+                      size={16}
+                      color={item.color}
+                      style={styles.quickChipIcon}
+                    />
                     <Text style={[styles.quickChipText, { color: colors.text }]}>
-                      {cat} →
+                      {item.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -473,10 +451,9 @@ export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
             </LinearGradient>
           </ScrollView>
         </View>
-      )}
-    </View>
-  );
-};
+      </View>
+    );
+  };
 
 const styles = StyleSheet.create({
   container: {
@@ -500,7 +477,6 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   bookCtaPillWrapper: {
-    marginRight: 8,
     borderRadius: 20,
     ...Platform.select({
       ios: {
@@ -526,12 +502,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     marginLeft: 4,
-  },
-  hubToggleBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 
   /* Tabs */
@@ -602,11 +572,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   categoryIconCapsule: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  gymLogoImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 14,
   },
   ticketGymName: {
     fontSize: 16,
@@ -733,78 +709,18 @@ const styles = StyleSheet.create({
   },
   quickChipBtn: {
     flex: 1,
+    flexDirection: 'row',
     paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  quickChipIcon: {
+    marginRight: 6,
+  },
   quickChipText: {
     fontSize: 12,
     fontWeight: '700',
-  },
-
-  /* Hub Styles */
-  hubScrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 120,
-  },
-  hubSectionHeading: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  hubCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
-    borderRadius: 22,
-    borderWidth: 1,
-  },
-  hubIconCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  hubCardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  hubCardSub: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  hubSubheading: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginTop: 22,
-    marginBottom: 12,
-  },
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  categoryCard: {
-    width: (SCREEN_WIDTH - 42) / 2,
-    padding: 16,
-    borderRadius: 18,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  catIconBox: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  catCardTitle: {
-    fontSize: 13,
-    fontWeight: 'bold',
   },
 });

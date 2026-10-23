@@ -433,6 +433,162 @@ class ApiService {
     }
     return json.data;
   }
+
+  /**
+   * Fetch Active Workout Sections / Group Classes for a Gym
+   */
+  async getGymSections(gymId, params = {}) {
+    let url = `/sections?gymId=${gymId}&isActive=true`;
+    if (params.category && params.category !== 'all') {
+      url += `&category=${encodeURIComponent(params.category)}`;
+    }
+    if (params.search) {
+      url += `&search=${encodeURIComponent(params.search)}`;
+    }
+    const response = await this.executeFetch(url, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to fetch gym sections.');
+    }
+    return json.data || [];
+  }
+
+  /**
+   * Create a new Section / Group Class / Session Booking
+   */
+  async createBooking(bookingData) {
+    const response = await this.executeFetch('/bookings', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(bookingData),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to complete booking.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Get all Bookings for the Logged-In User
+   */
+  async getMyBookings() {
+    const response = await this.executeFetch('/bookings/my', {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to fetch bookings.');
+    }
+    return json.data || [];
+  }
+
+  /**
+   * Get Single Booking Details by ID
+   */
+  async getBookingById(bookingId) {
+    const response = await this.executeFetch(`/bookings/${bookingId}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to fetch booking details.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Cancel an active Booking
+   */
+  async cancelBooking(bookingId, reason = 'Cancelled by member') {
+    const response = await this.executeFetch(`/bookings/${bookingId}/cancel`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ reason }),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to cancel booking.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Request to reschedule a session in custom dates booking
+   */
+  async requestBookingReschedule(bookingId, { sessionIndex, sessionDate, requestedDate, reason }) {
+    const response = await this.executeFetch(`/bookings/${bookingId}/request-reschedule`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ sessionIndex, sessionDate, requestedDate, reason }),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to submit reschedule request.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Gym owner review reschedule (Approve, Propose date, or Reject)
+   */
+  async reviewBookingReschedule(bookingId, { sessionIndex, sessionDate, action, proposedDate, ownerNotes }) {
+    const response = await this.executeFetch(`/bookings/${bookingId}/review-reschedule`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ sessionIndex, sessionDate, action, proposedDate, ownerNotes }),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to review reschedule request.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Member responds to gym owner's proposed date (Accept or Decline)
+   */
+  async respondRescheduleProposal(bookingId, { sessionIndex, sessionDate, decision }) {
+    const response = await this.executeFetch(`/bookings/${bookingId}/respond-proposal`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ sessionIndex, sessionDate, decision }),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to respond to proposal.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Fetch location-aware & priority-sorted promotional banners
+   */
+  async getPromotionalBanners(lat, lng) {
+    try {
+      let query = '';
+      if (lat != null && lng != null) {
+        query = `?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`;
+      }
+      const response = await this.executeFetch(`/banners${query}`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+      const json = await response.json();
+      if (response.ok && json.success && Array.isArray(json.data)) {
+        return json.data;
+      }
+      return [];
+    } catch (error) {
+      console.warn('[API SERVICE] getPromotionalBanners warning:', error?.message);
+      return [];
+    }
+  }
 }
 
 export const apiService = new ApiService();

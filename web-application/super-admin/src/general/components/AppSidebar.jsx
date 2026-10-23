@@ -17,6 +17,7 @@ import {
   CalendarOutlined,
   CreditCardOutlined,
   IdcardOutlined,
+  PictureOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../../theme/ThemeContext';
 import { employeeService } from '../../services/employeeService';
@@ -215,6 +216,11 @@ export const AppSidebar = ({
           ),
         },
       ],
+    },
+    {
+      key: '/admin/banners',
+      icon: <PictureOutlined />,
+      label: 'Banners & Ads',
     },
     {
       key: '/admin/customers',

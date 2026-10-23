@@ -18,6 +18,8 @@ import { AppColors } from '../theme/appTheme';
 import { useToast } from '../widgets/CustomScaffoldMessage';
 import { gymService } from '../services/gymService';
 import { apiService } from '../services/apiService';
+import { getGymTimingStatus, normalizeOpeningHours, TIMING_MODES } from '../utils/gymTimingHelper';
+import { formatTimeAgo } from '../utils/dateUtils';
 import {
   FacilitiesPopup,
   AmenitiesPopup,
@@ -32,14 +34,27 @@ import {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const GymDetailsScreen = ({ route, navigation }) => {
-  const initialGym = route?.params?.gym || {};
-  const [gym, setGym] = useState(initialGym);
+  const rawGym = route?.params?.gym || {};
+  const canonicalId =
+    rawGym._id ||
+    rawGym.id ||
+    rawGym.mongoId ||
+    rawGym.partnerId ||
+    route?.params?.gymId ||
+    '';
+
+  const [gym, setGym] = useState({
+    ...rawGym,
+    _id: canonicalId,
+    id: canonicalId,
+    mongoId: canonicalId,
+  });
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
 
   const { isDark, colors } = useTheme();
   const { showToast } = useToast();
 
-  const [isBookmarked, setIsBookmarked] = useState(initialGym.isBookmarked || false);
+  const [isBookmarked, setIsBookmarked] = useState(rawGym.isBookmarked || false);
 
   // Popups state
   const [showFacilities, setShowFacilities] = useState(false);
@@ -57,13 +72,38 @@ export const GymDetailsScreen = ({ route, navigation }) => {
   // Fetch full live document and dedicated reviews from DB on mount
   useEffect(() => {
     let isMounted = true;
-    const gymId = gym.id || gym.partnerId || gym.mongoId;
+    const gymId =
+      gym._id ||
+      gym.id ||
+      gym.mongoId ||
+      gym.partnerId ||
+      canonicalId;
+
     if (gymId) {
       gymService
         .fetchGymById(gymId)
         .then((freshGym) => {
           if (isMounted && freshGym) {
-            setGym((prev) => ({ ...prev, ...freshGym }));
+            setGym((prev) => ({
+              ...prev,
+              ...freshGym,
+              workouts:
+                Array.isArray(freshGym.workouts) && freshGym.workouts.length > 0
+                  ? freshGym.workouts
+                  : prev.workouts || [],
+              facilities:
+                Array.isArray(freshGym.facilities) && freshGym.facilities.length > 0
+                  ? freshGym.facilities
+                  : prev.facilities || [],
+              amenities:
+                Array.isArray(freshGym.amenities) && freshGym.amenities.length > 0
+                  ? freshGym.amenities
+                  : prev.amenities || [],
+              trainers:
+                Array.isArray(freshGym.trainers) && freshGym.trainers.length > 0
+                  ? freshGym.trainers
+                  : prev.trainers || [],
+            }));
           }
         })
         .catch((err) => {
@@ -80,8 +120,8 @@ export const GymDetailsScreen = ({ route, navigation }) => {
               ...prev,
               ratings: list,
               reviews: list,
-              rating: revData.rating,
-              reviewsCount: revData.reviewsCount,
+              rating: revData.rating != null ? revData.rating : prev.rating,
+              reviewsCount: revData.reviewsCount != null ? revData.reviewsCount : prev.reviewsCount,
             }));
           }
         })
@@ -97,7 +137,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
       setTrainerReviewsList([]);
       setSelectedTrainer(null);
     };
-  }, []);
+  }, [canonicalId]);
 
   const handleOpenTrainerReviews = (trainer) => {
     if (!trainer) return;
@@ -105,7 +145,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
     setTrainerReviewsList(trainer.ratings || trainer.reviews || []);
     setShowTrainerReviews(true);
 
-    const gymId = gym.id || gym.partnerId || gym.mongoId;
+    const gymId = gym._id || gym.id || gym.partnerId || gym.mongoId;
     if (gymId && trainer.name) {
       apiService
         .getTrainerRatings(gymId, trainer.name)
@@ -224,12 +264,15 @@ export const GymDetailsScreen = ({ route, navigation }) => {
       ? `${gym.area}, ${gym.city || 'Chennai'}`
       : gym.city || 'Chennai, Tamil Nadu';
 
-  const openingHoursText =
-    typeof gym.openingHours === 'object' && gym.openingHours?.displayText
-      ? gym.openingHours.displayText
-      : typeof gym.openingHours === 'string' && gym.openingHours
-      ? gym.openingHours
-      : '05:30 AM - 10:30 PM';
+  const timingStatus = useMemo(() => {
+    return getGymTimingStatus(gym.openingHours);
+  }, [gym.openingHours]);
+
+  const normalizedHours = useMemo(() => {
+    return normalizeOpeningHours(gym.openingHours);
+  }, [gym.openingHours]);
+
+  const openingHoursText = normalizedHours.displayText || '05:30 AM - 10:30 PM';
 
   const fullAddressText =
     typeof gym.fullAddress === 'string' && gym.fullAddress.trim().length > 0
@@ -238,6 +281,7 @@ export const GymDetailsScreen = ({ route, navigation }) => {
       ? gym.address
       : locationDisplayText;
 
+  const isSingleSessionEnabled = gym?.singleSessionBookingEnabled !== false;
   const sessionPrice = Math.round(gym.singleSessionPrice || gym.pricePerSession || 199);
   const gymDistance = gym.distance !== undefined && gym.distance !== null ? `${gym.distance} km` : 'Near You';
   const badgeText = typeof gym.badgeText === 'string' && gym.badgeText.trim().length > 0 ? gym.badgeText : 'Verified Gym';
@@ -494,11 +538,18 @@ export const GymDetailsScreen = ({ route, navigation }) => {
           >
             {/* Price Badge */}
             <View style={[styles.metricBadge, { backgroundColor: cardColor, borderColor: borderColor }]}>
-              <MaterialIcons name="bolt" size={16} color="#00BF62" style={{ marginRight: 4 }} />
+              <MaterialIcons
+                name={isSingleSessionEnabled ? 'bolt' : 'card-membership'}
+                size={16}
+                color={isSingleSessionEnabled ? '#00BF62' : '#3B82F6'}
+                style={{ marginRight: 4 }}
+              />
               <Text style={[styles.metricBadgeBold, { color: textColor }]}>
-                ₹{sessionPrice}
+                {isSingleSessionEnabled ? `₹${sessionPrice}` : 'Plans'}
               </Text>
-              <Text style={[styles.metricBadgeSub, { color: subtitleColor }]}> /session</Text>
+              <Text style={[styles.metricBadgeSub, { color: subtitleColor }]}>
+                {isSingleSessionEnabled ? ' /session' : ' available'}
+              </Text>
             </View>
 
             {/* Rating Badge */}
@@ -535,17 +586,8 @@ export const GymDetailsScreen = ({ route, navigation }) => {
           >
             {/* Address Row */}
             <View style={styles.locationCardRow}>
-              <View
-                style={[
-                  styles.locationIconBox,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(30, 58, 138, 0.35)'
-                      : 'rgba(0, 56, 130, 0.08)',
-                  },
-                ]}
-              >
-                <MaterialIcons name="location-on" size={20} color={accentIconColor} />
+              <View style={styles.locationIconBox}>
+                <MaterialIcons name="location-on" size={24} color={accentIconColor} />
               </View>
               <View style={styles.locationDetailsCol}>
                 <Text style={[styles.locationLabel, { color: subtitleColor }]}>Address</Text>
@@ -565,20 +607,57 @@ export const GymDetailsScreen = ({ route, navigation }) => {
             <View style={[styles.cardDivider, { backgroundColor: borderColor }]} />
 
             {/* Operating Hours Row */}
-            <View style={styles.locationCardRow}>
-              <View
-                style={[
-                  styles.locationIconBox,
-                  { backgroundColor: 'rgba(0, 191, 98, 0.12)' },
-                ]}
-              >
-                <MaterialIcons name="access-time-filled" size={20} color="#00BF62" />
+            <View style={[styles.locationCardRow, { alignItems: 'flex-start' }]}>
+              <View style={[styles.locationIconBox, { marginTop: 2 }]}>
+                <MaterialIcons
+                  name="access-time-filled"
+                  size={24}
+                  color={timingStatus.isOpen ? '#00BF62' : '#EF4444'}
+                />
               </View>
-              <View style={styles.locationDetailsCol}>
-                <Text style={[styles.locationLabel, { color: subtitleColor }]}>Operating Hours</Text>
-                <Text style={[styles.locationAddressText, { color: textColor, fontWeight: '600' }]}>
-                  {openingHoursText}
+              <View style={[styles.locationDetailsCol, { flex: 1 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                  <Text style={[styles.locationLabel, { color: subtitleColor }]}>Operating Hours</Text>
+                  <View style={styles.operatingHoursBadge}>
+                    <Text
+                      style={{
+                        color: timingStatus.badgeColor || '#00BF62',
+                        fontSize: 12,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {timingStatus.badgeText}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={[styles.locationAddressText, { color: textColor, fontWeight: '700', marginTop: 3 }]}>
+                  {timingStatus.statusText}
                 </Text>
+
+                {normalizedHours.mode === TIMING_MODES.SPLIT_SHIFT ? (
+                  <View style={{ marginTop: 4 }}>
+                    <Text style={{ color: subtitleColor, fontSize: 12 }}>
+                      Morning: {normalizedHours.morningOpen} - {normalizedHours.morningClose}
+                    </Text>
+                    <Text style={{ color: subtitleColor, fontSize: 12, marginTop: 2 }}>
+                      Evening: {normalizedHours.eveningOpen} - {normalizedHours.eveningClose}
+                    </Text>
+                  </View>
+                ) : normalizedHours.mode === TIMING_MODES.TWENTY_FOUR_HOURS ? (
+                  <Text style={{ color: subtitleColor, fontSize: 12, marginTop: 4 }}>
+                    24 Hours Facility • Round the clock member access
+                  </Text>
+                ) : (
+                  <View style={{ marginTop: 4 }}>
+                    <Text style={{ color: subtitleColor, fontSize: 12 }}>
+                      Weekday: {normalizedHours.weekdayOpen} - {normalizedHours.weekdayClose}
+                    </Text>
+                    <Text style={{ color: subtitleColor, fontSize: 12, marginTop: 2 }}>
+                      Weekend: {normalizedHours.weekendOpen} - {normalizedHours.weekendClose}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -902,7 +981,14 @@ export const GymDetailsScreen = ({ route, navigation }) => {
                           ))}
                         </View>
                       </View>
-                      <Text style={[styles.reviewDate, { color: subtitleColor }]}>{rev.date || 'Recent'}</Text>
+                      <View style={styles.reviewTypeCol}>
+                        <View style={styles.bookingTypeBadge}>
+                          <Text style={styles.bookingTypeText}>{rev.bookingType || 'Member'}</Text>
+                        </View>
+                        <Text style={[styles.reviewDate, { color: subtitleColor }]}>
+                          {formatTimeAgo(rev.createdAt || rev.date)}
+                        </Text>
+                      </View>
                     </View>
                     <Text style={[styles.reviewComment, { color: textColor }]}>{rev.comment}</Text>
                   </View>
@@ -1253,12 +1339,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   locationIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 10,
+    backgroundColor: 'transparent',
+  },
+  operatingHoursBadge: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    paddingVertical: 2,
   },
   locationDetailsCol: {
     flex: 1,
@@ -1474,9 +1565,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 2,
   },
+  reviewTypeCol: {
+    alignItems: 'flex-end',
+  },
+  bookingTypeBadge: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  bookingTypeText: {
+    color: AppColors.accentColor,
+    fontSize: 8.5,
+    fontWeight: '700',
+  },
   reviewDate: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
+    marginTop: 3,
   },
   reviewComment: {
     fontSize: 12.5,

@@ -7,12 +7,14 @@ import {
   ScrollView,
   StyleSheet,
   Image,
+  ImageBackground,
   Dimensions,
   Modal,
   Platform,
   ActivityIndicator,
   KeyboardAvoidingView,
   Keyboard,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +23,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors, AppTheme } from '../theme/appTheme';
 import { CustomFloatingNavBar } from '../widgets/CustomFloatingNavBar';
+import { BrandWatermarkFooter } from '../widgets/BrandWatermarkFooter';
 import { MyBookingsScreen } from './MyBookingsScreen';
 import { MyMembershipsScreen } from './MyMembershipsScreen';
 import { ProfileScreen } from './ProfileScreen';
@@ -32,6 +35,7 @@ import {
   CHENNAI_LOCATIONS,
 } from '../services/locationService';
 import { gymService } from '../services/gymService';
+import { apiService } from '../services/apiService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -161,8 +165,93 @@ export const HomeScreen = ({ navigation }) => {
   const [selectedFacility, setSelectedFacility] = useState(null);
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
-
   const [bookmarkedGymNames, setBookmarkedGymNames] = useState(new Set());
+
+  // Promotional Banners State (Location-aware, Priority-sorted & Auto-scrolling)
+  const [promotionalBanners, setPromotionalBanners] = useState([]);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const bannerScrollRef = React.useRef(null);
+  const bannerScrollX = React.useRef(new Animated.Value(0)).current;
+  const isUserTouchingRef = React.useRef(false);
+  const activeBannerIndexRef = React.useRef(0);
+  activeBannerIndexRef.current = activeBannerIndex;
+
+  // Separate Animated.Value for dot animation — spring-driven with useNativeDriver:true
+  const activeDotAnim = React.useRef(new Animated.Value(0)).current;
+  const springDot = React.useCallback((idx) => {
+    Animated.spring(activeDotAnim, {
+      toValue: idx,
+      useNativeDriver: true,
+      tension: 280,
+      friction: 26,
+    }).start();
+  }, [activeDotAnim]);
+
+  const fetchPromotionalBanners = React.useCallback(async () => {
+    try {
+      const bannerList = await apiService.getPromotionalBanners(
+        userLocation?.latitude,
+        userLocation?.longitude
+      );
+      if (Array.isArray(bannerList)) {
+        setPromotionalBanners(bannerList);
+      }
+    } catch (err) {
+      console.warn('[HOME] Error fetching promotional banners:', err?.message);
+    }
+  }, [userLocation?.latitude, userLocation?.longitude]);
+
+  useEffect(() => {
+    void fetchPromotionalBanners();
+  }, [fetchPromotionalBanners]);
+
+  const bannersToDisplay = useMemo(() => {
+    if (promotionalBanners.length > 0) return promotionalBanners;
+    return [
+      {
+        _id: 'default_banner_1',
+        title: gyms[0]?.name || 'GYMEZY Partner Gym',
+        subtitle: gyms[0]?.location || 'Exclusive Membership Deal',
+        badgeText: '30% OFF PASS',
+        image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=800&auto=format&fit=crop',
+        gymName: gyms[0]?.name || 'GYMEZY Partner Gym',
+        gymArea: gyms[0]?.area || 'Near You',
+        gym: gyms[0] || null,
+        isPriority: false,
+      },
+    ];
+  }, [promotionalBanners, gyms]);
+
+  const handleBannerChange = React.useCallback(
+    (index) => {
+      const total = bannersToDisplay?.length || 0;
+      if (total > 0 && index >= 0 && index < total && index !== activeBannerIndexRef.current) {
+        activeBannerIndexRef.current = index;
+        setActiveBannerIndex(index);
+        springDot(index);
+      }
+    },
+    [bannersToDisplay, springDot]
+  );
+
+  // Smooth Auto-scroll Timer: advances to next banner every 3.8 seconds
+  useEffect(() => {
+    if (bannersToDisplay.length <= 1) return;
+
+    const interval = setInterval(() => {
+      if (isUserTouchingRef.current) return;
+
+      const nextIndex = (activeBannerIndexRef.current + 1) % bannersToDisplay.length;
+      const cardStep = SCREEN_WIDTH - 32 + 12;
+      bannerScrollRef.current?.scrollTo({
+        x: nextIndex * cardStep,
+        animated: true,
+      });
+      handleBannerChange(nextIndex);
+    }, 3800);
+
+    return () => clearInterval(interval);
+  }, [bannersToDisplay.length, handleBannerChange]);
 
   // Check location permission on launch
   useEffect(() => {
@@ -320,9 +409,23 @@ export const HomeScreen = ({ navigation }) => {
     });
   };
 
-  // Top Rated Gyms (Rating >= 4.7) from backend response
+  // Top Rated Gyms: Rating >= 4.5, sorted by highest rating first with nearest distance tiebreaker (top 8)
   const topRatedGyms = useMemo(() => {
-    return gyms.filter((g) => (g.rating || 0) >= 4.7);
+    if (!Array.isArray(gyms) || gyms.length === 0) return [];
+
+    return [...gyms]
+      .filter((g) => Number(g.rating || 0) >= 4.5)
+      .sort((a, b) => {
+        const ratingA = Number(a.rating || 0);
+        const ratingB = Number(b.rating || 0);
+        if (ratingB !== ratingA) {
+          return ratingB - ratingA; // Highest rating first (5.0 -> 4.9 -> 4.8 -> ...)
+        }
+        const distA = a.distance != null ? Number(a.distance) : 9999;
+        const distB = b.distance != null ? Number(b.distance) : 9999;
+        return distA - distB; // Nearest distance tiebreaker
+      })
+      .slice(0, 8);
   }, [gyms]);
 
   // Filtered Gyms are the backend-computed and processed gyms
@@ -369,8 +472,7 @@ export const HomeScreen = ({ navigation }) => {
               <Text style={[styles.greetingText, { color: colors.text }]}>
                 Hello {user?.fullName ? user.fullName.split(' ')[0] : 'Fitness Pro'}
               </Text>
-              <Text style={styles.waveEmoji}> 👋</Text>
-            </View>
+                          </View>
             <TouchableOpacity
               style={styles.locationPillRow}
               activeOpacity={0.7}
@@ -468,62 +570,210 @@ export const HomeScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* 3. High-Impact Promotional Flash Banner */}
+        {/* 3. High-Impact Promotional Flash Banner Carousel (Location-aware & Priority-sorted) */}
         <View style={styles.promoBannerWrapper}>
-          <View style={styles.promoBannerContainer}>
-            <Image
-              source={{
-                uri: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=800&auto=format&fit=crop',
-              }}
-              style={styles.promoBannerImage}
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.85)']}
-              style={styles.promoGradient}
-            />
+          <Animated.ScrollView
+            ref={bannerScrollRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
+            snapToInterval={SCREEN_WIDTH - 32 + 12}
+            snapToAlignment="start"
+            contentContainerStyle={styles.promoCarouselScroll}
+            onScrollBeginDrag={() => {
+              isUserTouchingRef.current = true;
+            }}
+            onScrollEndDrag={() => {
+              setTimeout(() => {
+                isUserTouchingRef.current = false;
+              }, 2500);
+            }}
+            onMomentumScrollEnd={(e) => {
+              isUserTouchingRef.current = false;
+              const offsetX = e.nativeEvent.contentOffset.x;
+              const cardStep = SCREEN_WIDTH - 32 + 12;
+              const index = Math.round(offsetX / cardStep);
+              handleBannerChange(index);
+            }}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: bannerScrollX } } }],
+              {
+                useNativeDriver: false,
+                listener: (e) => {
+                  const offsetX = e.nativeEvent.contentOffset.x;
+                  const cardStep = SCREEN_WIDTH - 32 + 12;
+                  const index = Math.round(offsetX / cardStep);
+                  handleBannerChange(index);
+                },
+              }
+            )}
+            scrollEventThrottle={16}
+          >
+            {bannersToDisplay.map((banner, index) => {
+              let bannerImg = null;
+              if (typeof banner.image === 'string' && banner.image.trim().length > 0) {
+                bannerImg = banner.image.trim();
+              } else if (banner.image?.fileData && banner.image.fileData.trim().length > 50) {
+                bannerImg = banner.image.fileData.trim();
+              } else if (typeof banner.imageUrl === 'string' && banner.imageUrl.trim().length > 0) {
+                bannerImg = banner.imageUrl.trim();
+              } else if (banner.image?.fileUrl && banner.image.fileUrl.trim().length > 0) {
+                bannerImg = banner.image.fileUrl.trim();
+              }
+              if (!bannerImg) {
+                bannerImg = getGymCoverImage(banner.gym);
+              }
+              const isPriority = Boolean(banner.isPriority);
+              const gymName = banner.gymName || banner.gym?.name || 'GYMEZY Partner Gym';
+              const bannerTitle = banner.title || gymName;
+              const gymArea = banner.gymArea || banner.gym?.area || '';
+              const distanceText = banner.distanceKm != null ? `${banner.distanceKm} km away` : (gymArea || 'Near You');
+              const badgeLabel = banner.badgeText || (isPriority ? 'PRIORITY DEAL' : '30% OFF PASS');
 
-            <View style={styles.promoContentOverlay}>
-              {/* Top Row: Flash Badge & Countdown */}
-              <View style={styles.promoTopRow}>
-                <View style={styles.flashBadge}>
-                  <MaterialIcons name="bolt" size={14} color="#FFFFFF" />
-                  <Text style={styles.flashBadgeText}>30% OFF PASS</Text>
-                </View>
-
-                <View style={styles.countdownBadge}>
-                  <MaterialIcons name="timer" size={12} color="rgba(255,255,255,0.7)" />
-                  <Text style={styles.countdownText}>05d : 12h left</Text>
-                </View>
-              </View>
-
-              {/* Bottom Row: Title, Subtitle, Claim Button */}
-              <View style={styles.promoBottomRow}>
-                <View style={{ flex: 1, marginRight: 10 }}>
-                  <Text style={styles.promoGymTitle}>
-                    {gyms[0]?.name || 'GYMEZY Partner Gym'}
-                  </Text>
-                  <Text style={styles.promoGymSubtitle}>
-                    {gyms[0]?.location || 'Exclusive Membership Deal'}
-                  </Text>
-                </View>
-
+              return (
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('GymDetails', { gym: gyms[0] || {} })}
-                  style={styles.claimOfferBtn}
-                  activeOpacity={0.85}
+                  key={banner._id || `banner_${index}`}
+                  activeOpacity={0.92}
+                  onPress={() => {
+                    const rawGymId =
+                      banner.gym?._id ||
+                      banner.gym?.id ||
+                      banner.gym?.mongoId ||
+                      banner.gymId?._id ||
+                      banner.gymId?.id ||
+                      banner.gymId;
+                    const targetIdStr = String(rawGymId || '');
+
+                    const matchedGym = gyms.find(
+                      (g) => String(g._id || g.id || g.mongoId || '') === targetIdStr
+                    );
+
+                    const targetGym = matchedGym
+                      ? { ...(banner.gym || {}), ...matchedGym }
+                      : (banner.gym && typeof banner.gym === 'object'
+                        ? {
+                            ...banner.gym,
+                            _id: banner.gym._id || targetIdStr,
+                            id: banner.gym.id || banner.gym._id || targetIdStr,
+                            mongoId: banner.gym.mongoId || banner.gym._id || targetIdStr,
+                          }
+                        : {
+                            _id: targetIdStr,
+                            id: targetIdStr,
+                            mongoId: targetIdStr,
+                            name: gymName,
+                            slug: banner.gymSlug,
+                            area: gymArea,
+                            location: gymArea,
+                          });
+
+                    navigation.navigate('GymDetails', { gym: targetGym });
+                  }}
+                  style={[styles.promoBannerContainer, { width: SCREEN_WIDTH - 32 }]}
                 >
-                  <Text style={styles.claimOfferText}>Claim Offer</Text>
-                  <MaterialIcons
-                    name="arrow-forward"
-                    size={14}
-                    color={AppColors.primaryColor}
-                    style={{ marginLeft: 4 }}
+                  <ImageBackground
+                    source={{ uri: bannerImg }}
+                    style={styles.promoBannerBackground}
+                    imageStyle={styles.promoBannerImageStyle}
+                    resizeMode="cover"
+                  >
+                    <LinearGradient
+                      colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.85)']}
+                      locations={[0, 0.45, 1]}
+                      style={styles.promoContentOverlay}
+                    >
+                    {/* Top Row: Flash Badge & Priority Tag / Proximity */}
+                    <View style={styles.promoTopRow}>
+                      <View
+                        style={[
+                          styles.flashBadge,
+                          isPriority && { backgroundColor: '#F59E0B' },
+                        ]}
+                      >
+                        <MaterialIcons
+                          name={isPriority ? 'star' : 'bolt'}
+                          size={14}
+                          color="#FFFFFF"
+                        />
+                        <Text style={styles.flashBadgeText}>{badgeLabel}</Text>
+                      </View>
+
+                      <View style={styles.countdownBadge}>
+                        <MaterialIcons
+                          name={banner.distanceKm != null ? 'near-me' : 'place'}
+                          size={12}
+                          color="rgba(255,255,255,0.9)"
+                        />
+                        <Text style={styles.countdownText}>{distanceText}</Text>
+                      </View>
+                    </View>
+
+                    {/* Bottom Row: Title, Subtitle, Claim Button */}
+                    <View style={styles.promoBottomRow}>
+                      <View style={{ flex: 1, marginRight: 10 }}>
+                        <Text style={styles.promoGymTitle} numberOfLines={1}>
+                          {bannerTitle}
+                        </Text>
+                        <Text style={styles.promoGymSubtitle} numberOfLines={1}>
+                          {gymName} {gymArea ? `• ${gymArea}` : ''}
+                        </Text>
+                      </View>
+
+                      <View style={styles.claimOfferBtn}>
+                        <Text style={styles.claimOfferText}>Explore</Text>
+                        <MaterialIcons
+                          name="arrow-forward"
+                          size={14}
+                          color={AppColors.primaryColor}
+                          style={{
+                            marginLeft: 4,
+                            transform: [{ rotate: '-45deg' }],
+                          }}
+                        />
+                      </View>
+                    </View>
+                  </LinearGradient>
+                </ImageBackground>
+              </TouchableOpacity>
+              );
+            })}
+          </Animated.ScrollView>
+
+          {/* Pagination Dots — activeDotAnim spring on UI thread (useNativeDriver:true) */}
+          {bannersToDisplay.length > 1 && (
+            <View style={styles.bannerDotsOverlay} pointerEvents="none">
+              {bannersToDisplay.map((_, dotIdx) => {
+                // inputRange is index-based (not scroll offset), fully decoupled from JS scroll
+                const inputRange = [dotIdx - 1, dotIdx, dotIdx + 1];
+
+                // Uniform scale keeps active dot as a proper circle while highlighting it
+                const dotScale = activeDotAnim.interpolate({
+                  inputRange,
+                  outputRange: [1, 1.35, 1],
+                  extrapolate: 'clamp',
+                });
+
+                const dotOpacity = activeDotAnim.interpolate({
+                  inputRange,
+                  outputRange: [0.4, 1, 0.4],
+                  extrapolate: 'clamp',
+                });
+
+                return (
+                  <Animated.View
+                    key={`banner_dot_${dotIdx}`}
+                    style={[
+                      styles.bannerDot,
+                      {
+                        opacity: dotOpacity,
+                        transform: [{ scale: dotScale }],
+                      },
+                    ]}
                   />
-                </TouchableOpacity>
-              </View>
+                );
+              })}
             </View>
-          </View>
+          )}
         </View>
 
 
@@ -588,7 +838,7 @@ export const HomeScreen = ({ navigation }) => {
         </ScrollView>
 
         {/* 5. Spotlight Section: "⭐ Top Rated Near You" Horizontal Carousel */}
-        {searchQuery.length === 0 && selectedCategory === 'All' && (
+        {searchQuery.length === 0 && selectedCategory === 'All' && topRatedGyms.length > 0 && (
           <View style={styles.spotlightSection}>
             <View style={styles.sectionHeaderRow}>
               <View style={styles.sectionTitleWithIcon}>
@@ -611,7 +861,7 @@ export const HomeScreen = ({ navigation }) => {
                 const isBookmarked = bookmarkedGymNames.has(gym.name);
                 return (
                   <TouchableOpacity
-                    key={gym.name}
+                    key={gym._id || gym.id || gym.name}
                     onPress={() => navigation.navigate('GymDetails', { gym })}
                     activeOpacity={0.88}
                     style={[
@@ -681,19 +931,19 @@ export const HomeScreen = ({ navigation }) => {
                       <View style={styles.spotlightBottomRow}>
                         <Text style={styles.spotlightPriceText}>
                           <Text style={[styles.spotlightPriceVal, { color: colors.text }]}>
-                            ₹{priceDisplayMode === 'membership'
+                            ₹{priceDisplayMode === 'membership' || gym.singleSessionBookingEnabled === false
                               ? (gym.monthlyPrice || gym.membershipPrice || (gym.singleSessionPrice || 199) * 10).toFixed(0)
                               : (gym.singleSessionPrice || gym.pricePerSession || 199).toFixed(0)}
                           </Text>
                           <Text style={[styles.spotlightPriceSub, { color: colors.subtitle }]}>
                             {' '}
-                            {priceDisplayMode === 'membership' ? '/month' : '/session'}
+                            {priceDisplayMode === 'membership' || gym.singleSessionBookingEnabled === false ? '/month' : '/session'}
                           </Text>
                         </Text>
 
                         <View style={styles.spotlightBookSlotPill}>
                           <Text style={styles.spotlightBookSlotText}>
-                            {priceDisplayMode === 'membership' ? 'View Plan' : 'Book Slot'}
+                            {priceDisplayMode === 'membership' || gym.singleSessionBookingEnabled === false ? 'View Plan' : 'Book Slot'}
                           </Text>
                         </View>
                       </View>
@@ -824,11 +1074,11 @@ export const HomeScreen = ({ navigation }) => {
                         {gym.name}
                       </Text>
                       <Text style={[styles.cardPerSessionPrice, { color: colors.text }]}>
-                        ₹{priceDisplayMode === 'membership'
+                        ₹{priceDisplayMode === 'membership' || gym.singleSessionBookingEnabled === false
                           ? (gym.monthlyPrice || gym.membershipPrice || (gym.singleSessionPrice || 199) * 10).toFixed(0)
                           : (gym.singleSessionPrice || gym.pricePerSession || 199).toFixed(0)}
                         <Text style={[styles.cardPerSessionSub, { color: colors.subtitle }]}>
-                          {priceDisplayMode === 'membership' ? ' /mo' : ' /session'}
+                          {priceDisplayMode === 'membership' || gym.singleSessionBookingEnabled === false ? ' /mo' : ' /session'}
                         </Text>
                       </Text>
                     </View>
@@ -864,14 +1114,14 @@ export const HomeScreen = ({ navigation }) => {
                     <View style={styles.gymCardBottomStrip}>
                       <View>
                         <Text style={[styles.pricePrefix, { color: colors.subtitle }]}>
-                          {priceDisplayMode === 'membership' ? 'Monthly Plan from' : 'Pass starts from'}
+                          {priceDisplayMode === 'membership' || gym.singleSessionBookingEnabled === false ? 'Monthly Plan from' : 'Pass starts from'}
                         </Text>
                         <Text style={[styles.cardPriceText, { color: colors.text }]}>
-                          ₹{priceDisplayMode === 'membership'
+                          ₹{priceDisplayMode === 'membership' || gym.singleSessionBookingEnabled === false
                             ? (gym.monthlyPrice || gym.membershipPrice || (gym.singleSessionPrice || 199) * 10).toFixed(0)
                             : (gym.singleSessionPrice || gym.pricePerSession || 199).toFixed(0)}{' '}
                           <Text style={styles.cardPerSession}>
-                            {priceDisplayMode === 'membership' ? '/ month' : '/ day'}
+                            {priceDisplayMode === 'membership' || gym.singleSessionBookingEnabled === false ? '/ month' : '/ day'}
                           </Text>
                         </Text>
                       </View>
@@ -999,32 +1249,7 @@ export const HomeScreen = ({ navigation }) => {
             </View>
 
             {/* Watermark Branding */}
-            <View style={styles.watermarkSection}>
-              <Text
-                style={[
-                  styles.watermarkLogo,
-                  {
-                    color: isDark
-                      ? 'rgba(255, 255, 255, 0.16)'
-                      : 'rgba(1, 50, 126, 0.12)',
-                  },
-                ]}
-              >
-                gymezy
-              </Text>
-              <Text
-                style={[
-                  styles.watermarkTagline,
-                  {
-                    color: isDark
-                      ? 'rgba(255, 255, 255, 0.12)'
-                      : 'rgba(1, 50, 126, 0.10)',
-                  },
-                ]}
-              >
-                for fitness. for you
-              </Text>
-            </View>
+            <BrandWatermarkFooter />
           </View>
         )}
       </ScrollView>
@@ -1634,27 +1859,54 @@ const styles = StyleSheet.create({
     backgroundColor: AppColors.secondaryColor,
   },
 
-  /* High-Impact Promotional Flash Banner */
+  /* High-Impact Promotional Flash Banner Carousel */
   promoBannerWrapper: {
-    paddingHorizontal: 16,
     marginTop: 18,
-  },
-  promoBannerContainer: {
-    height: 180,
-    borderRadius: 24,
-    overflow: 'hidden',
     position: 'relative',
   },
-  promoBannerImage: {
+  promoCarouselScroll: {
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  bannerDotsOverlay: {
+    position: 'absolute',
+    bottom: 12,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    elevation: 6,
+  },
+  // Circular pagination dots with 1:1 aspect ratio
+  bannerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 4,
+  },
+  promoBannerContainer: {
+    height: 185,
+    borderRadius: 22,
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+  },
+  promoBannerBackground: {
     width: '100%',
     height: '100%',
   },
-  promoGradient: {
-    ...StyleSheet.absoluteFillObject,
+  promoBannerImageStyle: {
+    borderRadius: 22,
   },
   promoContentOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    padding: 18,
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 26,
     justifyContent: 'space-between',
   },
   promoTopRow: {

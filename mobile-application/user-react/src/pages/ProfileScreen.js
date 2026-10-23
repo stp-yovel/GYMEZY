@@ -20,6 +20,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { AppColors } from '../theme/appTheme';
 import { useBookingRepository } from '../data/BookingContext';
 import { useToast } from '../widgets/CustomScaffoldMessage';
+import { BrandWatermarkFooter } from '../widgets/BrandWatermarkFooter';
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/apiService';
 
@@ -530,7 +531,7 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
               {user?.streakDays ? `${user.streakDays} Days` : '0 Days'}
             </Text>
             <Text style={[styles.statCardLabel, { color: subtitleColor }]} numberOfLines={1}>
-              Streak 🔥
+              Streak
             </Text>
           </View>
 
@@ -741,20 +742,6 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
           <MaterialIcons name="chevron-right" size={22} color={subtitleColor} />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => showToast({ message: 'Default UPI ID: alex@okaxis' })}
-          style={[styles.menuTile, { backgroundColor: cardColor, borderColor: borderColor }]}
-        >
-          <View style={[styles.menuIconBox, { backgroundColor: isDark ? '#262626' : 'rgba(0, 56, 130, 0.08)' }]}>
-            <MaterialIcons name="account-balance-wallet" size={20} color={isDark ? '#93C5FD' : '#003882'} />
-          </View>
-          <View style={styles.menuTileContent}>
-            <Text style={[styles.menuTileTitle, { color: textColor }]}>Saved Payment Methods</Text>
-            <Text style={[styles.menuTileSubtitle, { color: subtitleColor }]}>UPI, Saved Cards & NetBanking</Text>
-          </View>
-          <MaterialIcons name="chevron-right" size={22} color={subtitleColor} />
-        </TouchableOpacity>
 
         {/* 6. Section: Preferences & Security */}
         <Text style={[styles.sectionHeading, { color: textColor }]}>Preferences & Security</Text>
@@ -867,6 +854,8 @@ export const ProfileScreen = ({ navigation, onNavigateToBookings, onNavigateToMe
           <MaterialIcons name="logout" size={20} color="#EF4444" style={{ marginRight: 8 }} />
           <Text style={styles.logoutBtnText}>Log Out</Text>
         </TouchableOpacity>
+
+        <BrandWatermarkFooter />
 
         <Text style={[styles.versionFooterText, { color: subtitleColor }]}>
           GYMEZY App • Version 2.4.0 (Build 2026)

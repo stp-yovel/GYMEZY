@@ -148,9 +148,22 @@ const employeeSchema = new mongoose.Schema(
     // Professional & Past Employment Details
     specialty: { type: String, trim: true, default: '' },
     experienceYears: { type: Number, default: 1, min: 0 },
+    experience: { type: String, trim: true, default: '' },
+    description: { type: String, trim: true, default: '' },
+    aboutMe: { type: String, trim: true, default: '' },
+    servicesOffered: [{ type: String, trim: true }],
+    certifications: [{ type: String, trim: true }],
+    languages: [{ type: String, trim: true }],
     previousCompany: { type: String, trim: true, default: '' },
     previousDesignation: { type: String, trim: true, default: '' },
     previousExp: { type: String, trim: true, default: '' },
+    previousEmployments: [
+      {
+        companyName: { type: String, trim: true, default: '' },
+        designation: { type: String, trim: true, default: '' },
+        experience: { type: String, trim: true, default: '' },
+      },
+    ],
     rating: { type: Number, default: 4.9, min: 0, max: 5 },
     reviewsCount: { type: Number, default: 0, min: 0 },
     ratings: [
@@ -179,11 +192,18 @@ const employeeSchema = new mongoose.Schema(
       workingTimeStart: { type: String, trim: true, default: '09:00 AM' },
       workingTimeEnd: { type: String, trim: true, default: '06:00 PM' },
       isDifferentDays: { type: Boolean, default: false },
+      dayWiseHours: [
+        {
+          day: { type: String, trim: true },
+          startTime: { type: String, trim: true },
+          endTime: { type: String, trim: true },
+        },
+      ],
       startDate: { type: String, trim: true, default: '' },
       endDate: { type: String, trim: true, default: '' },
     },
     compensation: {
-      payType: { type: String, enum: ['Hourly', 'Session', 'Daily', 'Monthly'], default: 'Monthly' },
+      payType: { type: String, enum: ['Hourly', 'Session', 'Daily', 'Weekly', 'Monthly'], default: 'Monthly' },
       payAmount: { type: Number, default: 0, min: 0 },
       payFreq: { type: String, enum: ['Daily', 'Weekly', 'Monthly', 'Per Session', 'Per Hour'], default: 'Monthly' },
     },

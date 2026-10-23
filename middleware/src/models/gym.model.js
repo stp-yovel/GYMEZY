@@ -11,12 +11,33 @@ const fileAttachmentSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const shiftWindowSchema = new mongoose.Schema(
+  {
+    openTime: { type: String, trim: true, default: '' },
+    closeTime: { type: String, trim: true, default: '' },
+  },
+  { _id: false }
+);
+
 const dayScheduleSchema = new mongoose.Schema(
   {
     day: { type: String, trim: true },
     isOpen: { type: Boolean, default: true },
+    mode: {
+      type: String,
+      enum: ['REGULAR', 'SPLIT_SHIFT', '24_HOURS', 'CLOSED'],
+      default: 'REGULAR',
+    },
     openTime: { type: String, trim: true, default: '05:30 AM' },
     closeTime: { type: String, trim: true, default: '10:30 PM' },
+    morningShift: {
+      type: shiftWindowSchema,
+      default: () => ({ openTime: '05:30 AM', closeTime: '11:30 AM' }),
+    },
+    eveningShift: {
+      type: shiftWindowSchema,
+      default: () => ({ openTime: '04:30 PM', closeTime: '10:30 PM' }),
+    },
   },
   { _id: false }
 );
@@ -35,10 +56,19 @@ const holidaySchema = new mongoose.Schema(
 
 const openingHoursSchema = new mongoose.Schema(
   {
+    mode: {
+      type: String,
+      enum: ['REGULAR', 'SPLIT_SHIFT', '24_HOURS'],
+      default: 'REGULAR',
+    },
     weekdayOpen: { type: String, trim: true, default: '05:30 AM' },
     weekdayClose: { type: String, trim: true, default: '10:30 PM' },
     weekendOpen: { type: String, trim: true, default: '06:00 AM' },
     weekendClose: { type: String, trim: true, default: '09:00 PM' },
+    morningOpen: { type: String, trim: true, default: '05:30 AM' },
+    morningClose: { type: String, trim: true, default: '11:30 AM' },
+    eveningOpen: { type: String, trim: true, default: '04:30 PM' },
+    eveningClose: { type: String, trim: true, default: '10:30 PM' },
     displayText: { type: String, trim: true, default: '05:30 AM - 10:30 PM' },
     isSplitShift: { type: Boolean, default: false },
     isOpenHolidays: { type: Boolean, default: true },
@@ -62,6 +92,7 @@ const customPlanSchema = new mongoose.Schema(
     features: [{ type: String, trim: true }],
     popular: { type: Boolean, default: false },
     savingsText: { type: String, trim: true, default: '' },
+    assignedTrainers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Employee' }],
   },
   { _id: false }
 );
@@ -196,9 +227,14 @@ const reviewSchema = new mongoose.Schema(
 const trainerSchema = new mongoose.Schema(
   {
     employeeId: { type: String, trim: true, default: '' },
-    name: { type: String, required: true, trim: true },
     specialty: { type: String, trim: true, default: 'General Fitness' },
     experienceYears: { type: Number, default: 1, min: 0 },
+    experience: { type: String, trim: true, default: '' },
+    description: { type: String, trim: true, default: '' },
+    aboutMe: { type: String, trim: true, default: '' },
+    servicesOffered: [{ type: String, trim: true }],
+    certifications: [{ type: String, trim: true }],
+    languages: [{ type: String, trim: true }],
     rating: { type: Number, default: 4.9, min: 0, max: 5 },
     reviewsCount: { type: Number, default: 0, min: 0 },
     ratings: { type: [reviewSchema], default: [] },
@@ -353,6 +389,7 @@ const gymSchema = new mongoose.Schema(
 
     // Pricing Plans
     singleSessionPrice: { type: Number, default: 199, min: 0 },
+    singleSessionBookingEnabled: { type: Boolean, default: true },
     pricingPlans: {
       type: pricingPlansSchema,
       default: () => ({}),

@@ -98,7 +98,8 @@ export const MembersTab = ({ topInset, navigation }) => {
   const [memberPage, setMemberPage] = useState(1);
   const [hasMoreMembers, setHasMoreMembers] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [isInitialMembersLoading, setIsInitialMembersLoading] = useState(false);
+  const [isInitialMembersLoading, setIsInitialMembersLoading] = useState(true);
+  const [isSupportLoading, setIsSupportLoading] = useState(true);
   const [totalMembersCount, setTotalMembersCount] = useState(0);
 
   const isFetchingMoreRef = useRef(false);
@@ -192,6 +193,7 @@ export const MembersTab = ({ topInset, navigation }) => {
 
   // Fetch Support Data (Employees, Switch Requests, etc.)
   const fetchSupportData = useCallback(async () => {
+    setIsSupportLoading(true);
     try {
       if (refreshGymProfile) {
         await refreshGymProfile();
@@ -216,6 +218,8 @@ export const MembersTab = ({ topInset, navigation }) => {
       }
     } catch (err) {
       console.warn('Error fetching gym support data:', err.message);
+    } finally {
+      setIsSupportLoading(false);
     }
   }, [gym?._id, gym?.id, gym?.partnerId, refreshGymProfile]);
 
@@ -794,11 +798,17 @@ export const MembersTab = ({ topInset, navigation }) => {
               onChangeText={setSearchQuery}
               style={[styles.searchInput, { color: isDark ? '#FFFFFF' : '#0F172A' }]}
             />
-            {searchQuery.length > 0 && (
+            {isInitialMembersLoading ? (
+              <ActivityIndicator
+                size="small"
+                color={AppColors.primaryColor}
+                style={{ marginRight: 8 }}
+              />
+            ) : searchQuery.length > 0 ? (
               <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearBtn}>
                 <MaterialIcons name="close" size={16} color={isDark ? '#94A3B8' : '#64748B'} />
               </TouchableOpacity>
-            )}
+            ) : null}
           </View>
 
           {/* Filter Icon Button (Opens Mode & Section Picker) */}
@@ -936,17 +946,114 @@ export const MembersTab = ({ topInset, navigation }) => {
         {/* --- 5A. MEMBERS ROSTER VIEW --- */}
         {activeMode === 'MEMBERS' && (
           <>
-            {isInitialMembersLoading && members.length === 0 ? (
+            {isInitialMembersLoading ? (
               <View style={styles.initialLoadingBox}>
-                <ActivityIndicator size="large" color={AppColors.primaryColor} />
-                <Text
-                  style={[
-                    styles.initialLoadingText,
-                    { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' },
-                  ]}
-                >
-                  Loading members roster...
-                </Text>
+                <View style={styles.loadingSpinnerHeader}>
+                  <ActivityIndicator size="large" color={AppColors.primaryColor} />
+                  <Text
+                    style={[
+                      styles.initialLoadingText,
+                      { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' },
+                    ]}
+                  >
+                    Loading members roster...
+                  </Text>
+                </View>
+
+                {[1, 2, 3].map((itemKey) => (
+                  <View
+                    key={`skeleton-member-${itemKey}`}
+                    style={[
+                      styles.memberCard,
+                      {
+                        backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
+                        borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                        opacity: 0.7,
+                      },
+                    ]}
+                  >
+                    <View style={styles.cardTopRow}>
+                      <View style={styles.memberMain}>
+                        <View
+                          style={[
+                            styles.avatarCircle,
+                            { backgroundColor: isDark ? '#334155' : '#E2E8F0' },
+                          ]}
+                        />
+                        <View style={{ flex: 1, marginLeft: 12, gap: 6 }}>
+                          <View
+                            style={{
+                              height: 14,
+                              width: '55%',
+                              borderRadius: 4,
+                              backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                            }}
+                          />
+                          <View
+                            style={{
+                              height: 12,
+                              width: '38%',
+                              borderRadius: 4,
+                              backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                            }}
+                          />
+                        </View>
+                      </View>
+                      <View
+                        style={{
+                          height: 14,
+                          width: 48,
+                          borderRadius: 4,
+                          backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                        }}
+                      />
+                    </View>
+                    <View
+                      style={[
+                        styles.cardDivider,
+                        { backgroundColor: isDark ? AppColors.darkBorder : '#F1F5F9' },
+                      ]}
+                    />
+                    <View style={styles.cardBottomRow}>
+                      <View style={{ gap: 4 }}>
+                        <View
+                          style={{
+                            height: 10,
+                            width: 60,
+                            borderRadius: 3,
+                            backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                          }}
+                        />
+                        <View
+                          style={{
+                            height: 12,
+                            width: 140,
+                            borderRadius: 4,
+                            backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                          }}
+                        />
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <View
+                          style={{
+                            height: 34,
+                            width: 34,
+                            borderRadius: 8,
+                            backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                          }}
+                        />
+                        <View
+                          style={{
+                            height: 34,
+                            width: 34,
+                            borderRadius: 8,
+                            backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                          }}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                ))}
               </View>
             ) : filteredMembers.length === 0 ? (
               <View
@@ -985,13 +1092,6 @@ export const MembersTab = ({ topInset, navigation }) => {
                 const isInactive = member.status === 'Inactive';
                 const isCancelPending = member.status === 'Cancellation Requested';
 
-                const badgeBg = isCancelPending
-                  ? 'rgba(239, 68, 68, 0.12)'
-                  : isInactive
-                  ? 'rgba(148, 163, 184, 0.15)'
-                  : isExpiring
-                  ? 'rgba(245, 158, 11, 0.12)'
-                  : 'rgba(0, 191, 98, 0.12)';
 
                 const badgeColor = isCancelPending
                   ? AppColors.dangerRed
@@ -1056,7 +1156,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                         </View>
                       </View>
 
-                      <View style={[styles.statusBadge, { backgroundColor: badgeBg }]}>
+                      <View style={styles.statusBadge}>
                         <Text style={[styles.statusBadgeText, { color: badgeColor }]}>
                           {member.status}
                         </Text>
@@ -1166,7 +1266,21 @@ export const MembersTab = ({ topInset, navigation }) => {
         {/* --- 5B. PLAN SWITCH REQUESTS VIEW --- */}
         {activeMode === 'SWITCHES' && (
           <>
-            {filteredSwitches.length === 0 ? (
+            {isSupportLoading ? (
+              <View style={styles.initialLoadingBox}>
+                <View style={styles.loadingSpinnerHeader}>
+                  <ActivityIndicator size="large" color={AppColors.primaryColor} />
+                  <Text
+                    style={[
+                      styles.initialLoadingText,
+                      { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' },
+                    ]}
+                  >
+                    Loading switch requests...
+                  </Text>
+                </View>
+              </View>
+            ) : filteredSwitches.length === 0 ? (
               <View
                 style={[
                   styles.emptyState,
@@ -1210,20 +1324,16 @@ export const MembersTab = ({ topInset, navigation }) => {
                 const isApproved = ['APPROVED', 'APPROVED_AND_EXECUTED', 'COMPLETED'].includes(req.status);
                 const isRejected = ['REJECTED_BY_GYM', 'REJECTED_BY_SUPER_ADMIN', 'REJECTED'].includes(req.status);
 
-                let statusBadgeBg = isDark ? 'rgba(217, 119, 6, 0.15)' : '#FEF3C7';
                 let statusBadgeText = '#D97706';
                 let statusLabel = 'Pending Gym Review';
 
                 if (isSentAdmin) {
-                  statusBadgeBg = isDark ? 'rgba(99, 102, 241, 0.15)' : '#EEF2FF';
                   statusBadgeText = '#6366F1';
                   statusLabel = 'Sent to Super Admin';
                 } else if (isApproved) {
-                  statusBadgeBg = isDark ? 'rgba(22, 163, 74, 0.15)' : '#DCFCE7';
                   statusBadgeText = '#16A34A';
                   statusLabel = 'Approved & Executed';
                 } else if (isRejected) {
-                  statusBadgeBg = isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2';
                   statusBadgeText = '#EF4444';
                   statusLabel = req.status === 'REJECTED_BY_GYM' ? 'Rejected by Gym' : 'Rejected by Admin';
                 }
@@ -1304,7 +1414,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                       </View>
 
                       {/* Status Tag */}
-                      <View style={[styles.switchStatusTag, { backgroundColor: statusBadgeBg }]}>
+                      <View style={styles.switchStatusTag}>
                         <Text style={[styles.switchStatusText, { color: statusBadgeText }]}>
                           {statusLabel}
                         </Text>
@@ -1501,11 +1611,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                 const isCheckedIn = b.status === 'Checked-in';
                 const isUpcoming = b.status === 'Upcoming';
 
-                const statusBg = isCheckedIn
-                  ? 'rgba(0, 191, 98, 0.12)'
-                  : isUpcoming
-                  ? 'rgba(59, 130, 246, 0.12)'
-                  : 'rgba(148, 163, 184, 0.12)';
+
                 const statusColor = isCheckedIn
                   ? AppColors.secondaryColor
                   : isUpcoming
@@ -1560,7 +1666,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                         </Text>
                       </View>
 
-                      <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
+                      <View style={styles.statusBadge}>
                         <Text style={[styles.statusBadgeText, { color: statusColor }]}>
                           {b.status}
                         </Text>
@@ -1658,11 +1764,6 @@ export const MembersTab = ({ topInset, navigation }) => {
                 const isSentToAdmin = req.status === 'Sent to Admin';
                 const isRejected = req.status === 'Rejected';
 
-                const statusBg = isRejected
-                  ? 'rgba(239, 68, 68, 0.12)'
-                  : isSentToAdmin
-                  ? 'rgba(59, 130, 246, 0.12)'
-                  : 'rgba(0, 191, 98, 0.12)';
 
                 const statusColor = isRejected
                   ? AppColors.dangerRed
@@ -1719,7 +1820,7 @@ export const MembersTab = ({ topInset, navigation }) => {
                         </View>
                       </View>
 
-                      <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
+                      <View style={styles.statusBadge}>
                         <Text style={[styles.statusBadgeText, { color: statusColor }]}>
                           {req.status}
                         </Text>
@@ -2676,7 +2777,7 @@ export const MembersTab = ({ topInset, navigation }) => {
       <Modal
         visible={showModeFilterModal}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setShowModeFilterModal(false)}
       >
         <TouchableOpacity
@@ -2694,6 +2795,15 @@ export const MembersTab = ({ topInset, navigation }) => {
               },
             ]}
           >
+            <View style={styles.sheetHandleBar}>
+              <View
+                style={[
+                  styles.sheetHandle,
+                  { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : '#CBD5E1' },
+                ]}
+              />
+            </View>
+
             <View style={styles.filterModalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <MaterialIcons name="tune" size={20} color={AppColors.primaryColor} />
@@ -2909,11 +3019,28 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   filterModalContent: {
-    width: '92%',
-    maxHeight: '82%',
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 20,
+    width: '100%',
+    maxHeight: '85%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderTopWidth: 1,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 32,
+  },
+  sheetHandleBar: {
+    alignItems: 'center',
+    paddingBottom: 12,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
   },
   filterModalHeader: {
     flexDirection: 'row',
@@ -3037,25 +3164,20 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   memberIdText: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '700',
     color: AppColors.primaryColor,
-    backgroundColor: 'rgba(0, 56, 130, 0.08)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
   },
   memberPlan: {
     fontSize: 12,
     marginTop: 3,
   },
   statusBadge: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   statusBadgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   cardDivider: {
@@ -3648,12 +3770,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   switchStatusTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   switchStatusText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   switchPlanBox: {
@@ -3776,10 +3897,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   initialLoadingBox: {
+    width: '100%',
+    paddingVertical: 12,
+  },
+  loadingSpinnerHeader: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
-    gap: 12,
+    paddingVertical: 18,
+    gap: 10,
   },
   initialLoadingText: {
     fontSize: 13,

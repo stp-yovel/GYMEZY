@@ -15,6 +15,7 @@ import {
   Checkbox,
   Tag,
   Divider,
+  Radio,
 } from 'antd';
 import {
   SyncOutlined,
@@ -226,10 +227,15 @@ export const ApplicationStatus = () => {
       pincode: gym.pincode || '',
       googleMapsUrl: gym.googleMapsUrl || '',
 
+      timingMode: gym.openingHours?.mode || (gym.openingHours?.is24Hours ? '24_HOURS' : (gym.openingHours?.isSplitShift ? 'SPLIT_SHIFT' : 'REGULAR')),
       weekdayOpen: gym.openingHours?.weekdayOpen || '05:30 AM',
       weekdayClose: gym.openingHours?.weekdayClose || '10:30 PM',
       weekendOpen: gym.openingHours?.weekendOpen || '06:00 AM',
       weekendClose: gym.openingHours?.weekendClose || '09:00 PM',
+      morningOpen: gym.openingHours?.morningOpen || '05:30 AM',
+      morningClose: gym.openingHours?.morningClose || '11:30 AM',
+      eveningOpen: gym.openingHours?.eveningOpen || '04:30 PM',
+      eveningClose: gym.openingHours?.eveningClose || '10:30 PM',
 
       singleSessionPrice: gym.singleSessionPrice || gym.pricingPlans?.singleSession || 199,
       weeklyPassPrice: gym.pricingPlans?.weeklyPass || 799,
@@ -263,6 +269,20 @@ export const ApplicationStatus = () => {
     try {
       const payload = {
         ...values,
+        openingHours: {
+          mode: values.timingMode || gym.openingHours?.mode || 'REGULAR',
+          weekdayOpen: values.weekdayOpen || gym.openingHours?.weekdayOpen || '05:30 AM',
+          weekdayClose: values.weekdayClose || gym.openingHours?.weekdayClose || '10:30 PM',
+          weekendOpen: values.weekendOpen || gym.openingHours?.weekendOpen || '06:00 AM',
+          weekendClose: values.weekendClose || gym.openingHours?.weekendClose || '09:00 PM',
+          morningOpen: values.morningOpen || gym.openingHours?.morningOpen || '05:30 AM',
+          morningClose: values.morningClose || gym.openingHours?.morningClose || '11:30 AM',
+          eveningOpen: values.eveningOpen || gym.openingHours?.eveningOpen || '04:30 PM',
+          eveningClose: values.eveningClose || gym.openingHours?.eveningClose || '10:30 PM',
+          isSplitShift: values.timingMode === 'SPLIT_SHIFT',
+          is24Hours: values.timingMode === '24_HOURS',
+          isOpenHolidays: values.isOpenHolidays !== false,
+        },
         facilities: editFacilities,
         workouts: editWorkouts,
         logo: editLogo,
@@ -940,8 +960,13 @@ export const ApplicationStatus = () => {
               </div>
 
               <div>
-                <div style={{ color: textMuted, fontSize: 11, marginBottom: 2 }}>Opening Hours</div>
-                <div>{gym.openingHours?.displayText || '05:30 AM - 10:30 PM'}</div>
+                <div style={{ color: textMuted, fontSize: 11, marginBottom: 2 }}>Opening Hours & Timing Model</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <Tag color={gym.openingHours?.mode === '24_HOURS' ? 'green' : (gym.openingHours?.mode === 'SPLIT_SHIFT' ? 'purple' : 'blue')}>
+                    {gym.openingHours?.mode === '24_HOURS' ? '24/7 Access' : (gym.openingHours?.mode === 'SPLIT_SHIFT' ? 'Split Shift' : 'Single Shift')}
+                  </Tag>
+                  <span>{gym.openingHours?.displayText || `${gym.openingHours?.weekdayOpen || '05:30 AM'} - ${gym.openingHours?.weekdayClose || '10:30 PM'}`}</span>
+                </div>
               </div>
 
               <div>
@@ -1473,8 +1498,18 @@ export const ApplicationStatus = () => {
                       <Col xs={24}>
                         <Divider style={{ margin: '14px 0 10px 0' }} />
                         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
-                          Operating Hours
+                          Operating Hours & Shift Architecture
                         </div>
+                      </Col>
+
+                      <Col xs={24}>
+                        <Form.Item label="Timing Model" name="timingMode">
+                          <Radio.Group buttonStyle="solid">
+                            <Radio.Button value="REGULAR">Single Shift (Continuous 12h/16h)</Radio.Button>
+                            <Radio.Button value="SPLIT_SHIFT">Split Shift (Morning + Evening)</Radio.Button>
+                            <Radio.Button value="24_HOURS">24 Hours Open (24x7)</Radio.Button>
+                          </Radio.Group>
+                        </Form.Item>
                       </Col>
 
                       <Col xs={12} sm={6}>
@@ -1495,6 +1530,26 @@ export const ApplicationStatus = () => {
                       <Col xs={12} sm={6}>
                         <Form.Item label="Weekend Close" name="weekendClose">
                           <Input placeholder="09:00 PM" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={12} sm={6}>
+                        <Form.Item label="Morning Shift Open" name="morningOpen">
+                          <Input placeholder="05:30 AM" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={12} sm={6}>
+                        <Form.Item label="Morning Shift Close" name="morningClose">
+                          <Input placeholder="11:30 AM" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={12} sm={6}>
+                        <Form.Item label="Evening Shift Open" name="eveningOpen">
+                          <Input placeholder="04:30 PM" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={12} sm={6}>
+                        <Form.Item label="Evening Shift Close" name="eveningClose">
+                          <Input placeholder="10:30 PM" />
                         </Form.Item>
                       </Col>
                     </Row>

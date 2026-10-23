@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import LottieView from 'lottie-react-native';
@@ -17,6 +17,8 @@ const getStatusTheme = (normStatus) => {
     };
   }
   if (
+    normStatus === 'GAP DAY' ||
+    normStatus === 'REST DAY' ||
     normStatus === 'IN REVIEW' ||
     normStatus === 'PENDING_REVIEW' ||
     normStatus === 'UNDER REVIEW' ||
@@ -43,7 +45,26 @@ const getStatusTheme = (normStatus) => {
   };
 };
 
-const getStatusAnimationConfig = (normStatus, primaryDateValue, secondaryDateValue, effectiveAccent, isInReview = false) => {
+const getStatusAnimationConfig = (
+  normStatus,
+  primaryDateValue,
+  secondaryDateValue,
+  effectiveAccent,
+  isInReview = false,
+  isCustomGapDay = false,
+  nextSessionDateFormatted = null
+) => {
+  if (isCustomGapDay) {
+    return {
+      isCustomGapDay: true,
+      icon: 'event-busy',
+      text: 'NO SESSION SCHEDULED TODAY',
+      textColor: '#D97706',
+      helpText: nextSessionDateFormatted
+        ? `Next session: ${nextSessionDateFormatted}. Entry QR & OTP will unlock on that date.`
+        : 'No session booked for today. Please review your custom schedule dates.',
+    };
+  }
   if (
     isInReview ||
     normStatus === 'IN REVIEW' ||
@@ -60,11 +81,15 @@ const getStatusAnimationConfig = (normStatus, primaryDateValue, secondaryDateVal
       helpText: 'QR code & entry OTP are paused while your plan change request is under review.',
     };
   }
+  const cleanStartDate = primaryDateValue?.includes('-')
+    ? primaryDateValue.split('-')[0].trim()
+    : (primaryDateValue || 'START DATE');
+
   if (normStatus === 'UPCOMING') {
     return {
       source: require('../../assets/animations/upcoming-calendar.json'),
       icon: 'event-available',
-      text: `PASS ACTIVATES ON ${primaryDateValue?.toUpperCase() || 'START DATE'}`,
+      text: `PASS ACTIVATES ON ${cleanStartDate.toUpperCase()}`,
       textColor: effectiveAccent,
       helpText: 'QR pass & 6-digit entry OTP will automatically unlock on your start date',
       loop: true,
@@ -133,20 +158,30 @@ export const DigitalQrPassCard = ({
   gymImageUrl,
   accentColor,
   isInReview = false,
+  qrValue,
+  passType = 'BOOKING',
+  isCustomDates = false,
+  isTodayValid = true,
+  nextSessionDateFormatted = null,
 }) => {
   const { isDark, colors } = useTheme();
   const { showToast } = useToast();
+  const [logoFailed, setLogoFailed] = useState(false);
+  const showLogo = gymImageUrl && !logoFailed;
 
   const effectiveAccent = isDark
     ? AppColors.darkAccentColor
     : accentColor || AppColors.primaryNavy;
 
-  const qrData = JSON.stringify({
-    type: 'MEMBERSHIP',
-    id: passId,
-    customerId: customerId,
-    entryOtp: otp || null,
-  });
+  const qrData =
+    qrValue ||
+    JSON.stringify({
+      type: passType,
+      id: passId,
+      bookingId: passId,
+      customerId: customerId,
+      entryOtp: otp || null,
+    });
   const otpDigits = typeof otp === 'string' && otp.trim().length > 0 ? otp.trim().split('') : [];
 
   const copyToClipboard = async (text, label) => {
@@ -157,14 +192,19 @@ export const DigitalQrPassCard = ({
     });
   };
 
-  const normStatus = (isInReview ? 'IN REVIEW' : status || 'ACTIVE').toUpperCase();
+  const isCustomGapDay = isCustomDates && !isTodayValid;
+  const normStatus = isCustomGapDay
+    ? 'GAP DAY'
+    : (isInReview ? 'IN REVIEW' : status || 'ACTIVE').toUpperCase();
   const statusTheme = getStatusTheme(normStatus);
   const animConfig = getStatusAnimationConfig(
     normStatus,
     primaryDateValue,
     secondaryDateValue,
     effectiveAccent,
-    isInReview
+    isInReview,
+    isCustomGapDay,
+    nextSessionDateFormatted
   );
 
   return (
@@ -184,12 +224,29 @@ export const DigitalQrPassCard = ({
             style={[
               styles.iconBadge,
               {
-                backgroundColor: isDark ? 'rgba(147, 197, 253, 0.12)' : 'rgba(0, 56, 130, 0.12)',
-                borderColor: isDark ? 'rgba(147, 197, 253, 0.2)' : 'rgba(0, 56, 130, 0.2)',
+                backgroundColor: showLogo
+                  ? (isDark ? '#1E293B' : '#F1F5F9')
+                  : (isDark ? 'rgba(147, 197, 253, 0.12)' : 'rgba(0, 56, 130, 0.12)'),
+                borderColor: showLogo
+                  ? colors.border
+                  : (isDark ? 'rgba(147, 197, 253, 0.2)' : 'rgba(0, 56, 130, 0.2)'),
+                padding: showLogo ? 0 : 10,
+                overflow: 'hidden',
+                width: 46,
+                height: 46,
               },
             ]}
           >
-            <MaterialIcons name={iconName} size={24} color={effectiveAccent} />
+            {showLogo ? (
+              <Image
+                source={{ uri: gymImageUrl }}
+                style={styles.gymLogoImg}
+                resizeMode="cover"
+                onError={() => setLogoFailed(true)}
+              />
+            ) : (
+              <MaterialIcons name={iconName} size={24} color={effectiveAccent} />
+            )}
           </View>
 
           <View style={styles.titleTextContainer}>
@@ -245,7 +302,7 @@ export const DigitalQrPassCard = ({
             <Text style={[styles.dateLabel, { color: colors.subtitle }]}>
               {primaryDateLabel}
             </Text>
-            <Text style={[styles.dateValue, { color: colors.text }]} numberOfLines={1}>
+            <Text style={[styles.dateValue, { color: colors.text }]} numberOfLines={2}>
               {primaryDateValue}
             </Text>
           </View>
@@ -295,7 +352,68 @@ export const DigitalQrPassCard = ({
       {/* 2. QR Code Canvas or Status Review/Lottie Animation */}
       <View style={styles.bodySection}>
         {animConfig ? (
-          animConfig.isReview ? (
+          animConfig.isCustomGapDay ? (
+            <View style={styles.reviewCanvasWrapper}>
+              <View
+                style={[
+                  styles.reviewIconCircle,
+                  {
+                    width: 76,
+                    height: 76,
+                    borderRadius: 38,
+                    backgroundColor: isDark ? 'rgba(217, 119, 6, 0.15)' : '#FEF3C7',
+                    borderWidth: 1.5,
+                    borderColor: isDark ? 'rgba(217, 119, 6, 0.3)' : '#FDE68A',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 12,
+                  },
+                ]}
+              >
+                <MaterialIcons name="event-busy" size={42} color="#D97706" />
+              </View>
+              <View
+                style={[
+                  styles.reviewBadge,
+                  {
+                    paddingHorizontal: 14,
+                    paddingVertical: 5,
+                    borderRadius: 20,
+                    backgroundColor: isDark ? 'rgba(217, 119, 6, 0.2)' : '#FEF3C7',
+                    borderWidth: 1,
+                    borderColor: isDark ? 'rgba(217, 119, 6, 0.35)' : '#FDE68A',
+                  },
+                ]}
+              >
+                <MaterialIcons
+                  name="calendar-today"
+                  size={15}
+                  color="#D97706"
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={[styles.reviewBadgeText, { color: '#D97706' }]}>
+                  {animConfig.text}
+                </Text>
+              </View>
+              {nextSessionDateFormatted ? (
+                <View
+                  style={{
+                    marginTop: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 6,
+                    borderRadius: 12,
+                    backgroundColor: isDark ? '#262626' : '#F1F5F9',
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+                    Next Session: {nextSessionDateFormatted}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          ) : animConfig.isReview ? (
             <View style={styles.reviewCanvasWrapper}>
               <View style={styles.reviewIconCircle}>
                 <MaterialIcons name="pending-actions" size={52} color="#D97706" />
@@ -522,6 +640,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  gymLogoImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
   },
   titleTextContainer: {
     flex: 1,

@@ -15,33 +15,19 @@ import {
   Linking,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeContext';
 import { AppColors } from '../../theme/appTheme';
 import { useToast } from '../../widgets/CustomScaffoldMessage';
 import { useAuth } from '../../context/AuthContext';
 import { apiService } from '../../services/apiService';
 import { getSafeImageUri } from '../../utils/mediaUtils';
-import { pickImageFromDevice, capturePhotoFromCamera } from '../../utils/filePickerUtils';
+import {
+  AddEmployeeModal,
+  AVAILABLE_SERVICES,
+  getServiceIconName,
+} from '../../widgets/AddEmployeeModal';
 
-const FILTER_TABS = ['All', 'Trainers', 'Floor Staff', 'Pending Approval'];
-
-const ROLE_OPTIONS = [
-  'Certified Fitness Trainer',
-  'Personal Coach',
-  'Cardio & HIIT Coach',
-  'Strength & Conditioning Coach',
-  'Front Desk Executive',
-  'Floor Manager',
-  'Nutritionist / Diet Consultant',
-  'Housekeeping & Maintenance',
-];
-
-const ACCESS_LEVELS = [
-  { value: 'Employee', label: 'Staff / Employee', desc: 'Member check-in & Attendance' },
-  { value: 'Trainer', label: 'Trainer / Coach', desc: 'Assigned Members & Sessions' },
-  { value: 'Manager', label: 'Floor Manager', desc: 'Staff & Facility Operations' },
-];
+const FILTER_TABS = ['All', 'Trainers', 'Floor Staff', 'Part-Time', 'Temporary', 'Pending Approval'];
 
 export const EmployeesTab = ({ topInset, navigation }) => {
   const { isDark } = useTheme();
@@ -59,24 +45,7 @@ export const EmployeesTab = ({ topInset, navigation }) => {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Add Employee Form State
-  const [addName, setAddName] = useState('');
-  const [addRole, setAddRole] = useState(ROLE_OPTIONS[0]);
-  const [addPhone, setAddPhone] = useState('');
-  const [addEmail, setAddEmail] = useState('');
-  const [addGender, setAddGender] = useState('Male');
-  const [addAccessType, setAddAccessType] = useState('Employee');
-  const [addType, setAddType] = useState('Full Time');
-  const [addSalary, setAddSalary] = useState('');
-  const [addShiftStart, setAddShiftStart] = useState('06:00 AM');
-  const [addShiftEnd, setAddShiftEnd] = useState('02:00 PM');
-  const [addSpecialty, setAddSpecialty] = useState('');
-  const [addEmergencyName, setAddEmergencyName] = useState('');
-  const [addEmergencyPhone, setAddEmergencyPhone] = useState('');
-  const [addEmergencyRelation, setAddEmergencyRelation] = useState('Parent');
-  const [addAvatar, setAddAvatar] = useState(null);
 
   // Fetch Employees
   const fetchEmployees = useCallback(async () => {
@@ -133,6 +102,8 @@ export const EmployeesTab = ({ topInset, navigation }) => {
 
       if (activeTab === 'Trainers' && !isTrainer) return false;
       if (activeTab === 'Floor Staff' && isTrainer) return false;
+      if (activeTab === 'Part-Time' && emp.type !== 'Part-Time') return false;
+      if (activeTab === 'Temporary' && emp.type !== 'Temporary') return false;
       if (activeTab === 'Pending Approval' && emp.approvalStatus !== 'Pending Approval') return false;
 
       // Search query
@@ -149,115 +120,7 @@ export const EmployeesTab = ({ topInset, navigation }) => {
     });
   }, [employees, activeTab, searchQuery]);
 
-  // Photo picker
-  const handlePickPhoto = () => {
-    Alert.alert('Employee Profile Photo', 'Choose photo source:', [
-      {
-        text: 'Take Photo',
-        onPress: async () => {
-          try {
-            const result = await capturePhotoFromCamera();
-            if (result?.fileData || result?.uri) {
-              setAddAvatar(result.fileData || result.uri);
-            }
-          } catch (err) {
-            showToast({ message: err.message || 'Camera capture failed', isError: true });
-          }
-        },
-      },
-      {
-        text: 'Choose from Gallery',
-        onPress: async () => {
-          try {
-            const result = await pickImageFromDevice();
-            if (result?.fileData || result?.uri) {
-              setAddAvatar(result.fileData || result.uri);
-            }
-          } catch (err) {
-            showToast({ message: err.message || 'Photo selection failed', isError: true });
-          }
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
 
-  // Reset add form
-  const resetAddForm = () => {
-    setAddName('');
-    setAddRole(ROLE_OPTIONS[0]);
-    setAddPhone('');
-    setAddEmail('');
-    setAddGender('Male');
-    setAddAccessType('Employee');
-    setAddType('Full Time');
-    setAddSalary('');
-    setAddShiftStart('06:00 AM');
-    setAddShiftEnd('02:00 PM');
-    setAddSpecialty('');
-    setAddEmergencyName('');
-    setAddEmergencyPhone('');
-    setAddEmergencyRelation('Parent');
-    setAddAvatar(null);
-  };
-
-  // Submit Add Employee
-  const handleAddSubmit = async () => {
-    if (!addName.trim()) {
-      showToast({ message: 'Employee name is required', isError: true });
-      return;
-    }
-    if (!addPhone.trim()) {
-      showToast({ message: 'Phone number is required', isError: true });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const cleanPhone = addPhone.trim().startsWith('+91')
-        ? addPhone.trim()
-        : `+91 ${addPhone.trim()}`;
-
-      const payload = {
-        name: addName.trim(),
-        role: addRole,
-        phone: cleanPhone,
-        email: addEmail.trim() || undefined,
-        gender: addGender,
-        accessType: addAccessType,
-        type: addType,
-        avatar: addAvatar || undefined,
-        specialty: addSpecialty.trim() || addRole,
-        compensation: addSalary ? { payAmount: Number(addSalary), payCycle: 'Monthly' } : undefined,
-        schedule: {
-          shiftTiming: `${addShiftStart} - ${addShiftEnd}`,
-          workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-        },
-        emergencyContact: addEmergencyName.trim()
-          ? {
-              name: addEmergencyName.trim(),
-              relation: addEmergencyRelation,
-              phone: addEmergencyPhone.trim() || cleanPhone,
-            }
-          : undefined,
-        gymId: gym?._id || gym?.partnerId,
-        gymPartnerId: gym?.partnerId || gym?._id,
-      };
-
-      const res = await apiService.createEmployee(payload);
-      showToast({
-        message: res.message || `${addName} submitted! Pending Super Admin approval.`,
-        isSuccess: true,
-      });
-      setShowAddModal(false);
-      resetAddForm();
-      await fetchEmployees();
-    } catch (err) {
-      showToast({ message: err.message || 'Failed to add employee', isError: true });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   // Status toggle
   const handleToggleStatus = async (emp) => {
@@ -620,58 +483,65 @@ export const EmployeesTab = ({ topInset, navigation }) => {
                       <View
                         style={[
                           styles.typePill,
-                          {
-                            backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
-                          },
+                          emp.type === 'Temporary'
+                            ? { backgroundColor: isDark ? 'rgba(234, 88, 12, 0.18)' : '#FFEDD5' }
+                            : emp.type === 'Part-Time'
+                            ? { backgroundColor: isDark ? 'rgba(8, 145, 178, 0.18)' : '#CFFAFE' }
+                            : { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' },
                         ]}
                       >
-                        <Text style={[styles.typePillText, { color: isDark ? '#94A3B8' : '#475569' }]}>
+                        <Text
+                          style={[
+                            styles.typePillText,
+                            emp.type === 'Temporary'
+                              ? { color: '#EA580C', fontWeight: '700' }
+                              : emp.type === 'Part-Time'
+                              ? { color: '#0891B2', fontWeight: '700' }
+                              : { color: isDark ? '#94A3B8' : '#475569' },
+                          ]}
+                        >
                           {emp.type || 'Full Time'} • {emp.accessType || 'Employee'}
                         </Text>
                       </View>
                     </View>
                   </View>
 
-                  {/* Status Pill */}
-                  <View
-                    style={[
-                      styles.statusPill,
-                      {
-                        backgroundColor: isApproved
-                          ? 'rgba(16, 185, 129, 0.12)'
-                          : isPending
-                          ? 'rgba(245, 158, 11, 0.14)'
-                          : 'rgba(239, 68, 68, 0.12)',
-                      },
-                    ]}
-                  >
+                  {/* Status Pill - Only shown when not approved (e.g. Pending Approval or Rejected) */}
+                  {!isApproved && emp.approvalStatus && emp.approvalStatus !== 'Approved' && (
                     <View
                       style={[
-                        styles.statusDot,
+                        styles.statusPill,
                         {
-                          backgroundColor: isApproved
-                            ? AppColors.successGreen
-                            : isPending
-                            ? AppColors.warningAmber
-                            : AppColors.dangerRed,
-                        },
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.statusPillText,
-                        {
-                          color: isApproved
-                            ? AppColors.successGreen
-                            : isPending
-                            ? AppColors.warningAmber
-                            : AppColors.dangerRed,
+                          backgroundColor: isPending
+                            ? 'rgba(245, 158, 11, 0.14)'
+                            : 'rgba(239, 68, 68, 0.12)',
                         },
                       ]}
                     >
-                      {emp.approvalStatus || 'Approved'}
-                    </Text>
-                  </View>
+                      <View
+                        style={[
+                          styles.statusDot,
+                          {
+                            backgroundColor: isPending
+                              ? AppColors.warningAmber
+                              : AppColors.dangerRed,
+                          },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.statusPillText,
+                          {
+                            color: isPending
+                              ? AppColors.warningAmber
+                              : AppColors.dangerRed,
+                          },
+                        ]}
+                      >
+                        {emp.approvalStatus}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* Info row */}
@@ -975,6 +845,91 @@ export const EmployeesTab = ({ topInset, navigation }) => {
                   </View>
                 )}
 
+                {/* Trainer Profile & Showcase (Shown in User App) */}
+                <View style={styles.sectionBlock}>
+                  <Text style={[styles.sectionTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                    Trainer Profile & Showcase (User App)
+                  </Text>
+                  <Text style={[styles.detailKey, { color: isDark ? '#94A3B8' : '#64748B', marginBottom: 4 }]}>
+                    About Me
+                  </Text>
+                  <Text style={[styles.detailVal, { color: isDark ? '#FFFFFF' : '#0F172A', marginBottom: 12, lineHeight: 20 }]}>
+                    {selectedEmployee.aboutMe || selectedEmployee.description || 'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.'}
+                  </Text>
+
+                  <Text style={[styles.detailKey, { color: isDark ? '#94A3B8' : '#64748B', marginBottom: 6 }]}>
+                    Services Offered
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                    {(Array.isArray(selectedEmployee.servicesOffered) && selectedEmployee.servicesOffered.length > 0
+                      ? selectedEmployee.servicesOffered
+                      : AVAILABLE_SERVICES
+                    ).map((s, idx) => (
+                      <View
+                        key={idx}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <MaterialIcons
+                          name={getServiceIconName(s)}
+                          size={13}
+                          color={AppColors.primaryColor}
+                          style={{ marginRight: 4 }}
+                        />
+                        <Text style={{ fontSize: 11, color: isDark ? '#FFFFFF' : '#0F172A', fontWeight: '600' }}>
+                          {s}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailKey, { color: isDark ? '#94A3B8' : '#64748B' }]}>Experience</Text>
+                    <Text style={[styles.detailVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                      {selectedEmployee.experience || '8+ Years'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailKey, { color: isDark ? '#94A3B8' : '#64748B' }]}>Languages</Text>
+                    <Text style={[styles.detailVal, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                      {Array.isArray(selectedEmployee.languages)
+                        ? selectedEmployee.languages.join(', ')
+                        : selectedEmployee.languages || 'English, Hindi'}
+                    </Text>
+                  </View>
+
+                  <Text style={[styles.detailKey, { color: isDark ? '#94A3B8' : '#64748B', marginTop: 8, marginBottom: 4 }]}>
+                    Certifications
+                  </Text>
+                  {(Array.isArray(selectedEmployee.certifications) && selectedEmployee.certifications.length > 0
+                    ? selectedEmployee.certifications
+                    : [
+                        'ACE Certified Personal Trainer',
+                        'Certified Strength & Conditioning Specialist (CSCS)',
+                        'Nutrition & Weight Management Certification',
+                      ]
+                  ).map((c, idx) => (
+                    <Text
+                      key={idx}
+                      style={{
+                        fontSize: 12,
+                        color: isDark ? '#94A3B8' : '#64748B',
+                        marginBottom: 3,
+                        lineHeight: 18,
+                      }}
+                    >
+                      • {c}
+                    </Text>
+                  ))}
+                </View>
+
                 {/* Action Buttons in Modal */}
                 <View style={{ flexDirection: 'row', gap: 12, marginTop: 20, marginBottom: 24 }}>
                   <TouchableOpacity
@@ -1005,389 +960,11 @@ export const EmployeesTab = ({ topInset, navigation }) => {
       </Modal>
 
       {/* 8. Add Employee Modal */}
-      <Modal
+      <AddEmployeeModal
         visible={showAddModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowAddModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.modalSheet,
-              { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', maxHeight: '92%' },
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={[styles.modalTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                  Add New Team Member
-                </Text>
-                <Text style={[styles.modalSub, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-                  Add trainer, coach, or operational gym employee
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                <MaterialIcons name="close" size={24} color={isDark ? '#FFFFFF' : '#0F172A'} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Photo Upload */}
-              <View style={styles.addPhotoRow}>
-                <TouchableOpacity onPress={handlePickPhoto} activeOpacity={0.8}>
-                  {addAvatar ? (
-                    <Image source={{ uri: addAvatar }} style={styles.addPhotoPreview} />
-                  ) : (
-                    <View
-                      style={[
-                        styles.addPhotoPlaceholder,
-                        { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F1F5F9' },
-                      ]}
-                    >
-                      <MaterialIcons name="add-a-photo" size={26} color={AppColors.primaryColor} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-                <View style={{ marginLeft: 14, flex: 1 }}>
-                  <Text style={[styles.photoHelpTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                    Employee Photo
-                  </Text>
-                  <Text style={[styles.photoHelpSub, { color: isDark ? 'rgba(255,255,255,0.5)' : '#64748B' }]}>
-                    {addAvatar ? 'Photo attached. Tap to change.' : 'Tap icon to take photo or pick from gallery'}
-                  </Text>
-                  <TouchableOpacity onPress={handlePickPhoto} style={{ marginTop: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: AppColors.primaryColor }}>
-                      {addAvatar ? 'Change Photo' : 'Upload Photo'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Full Name */}
-              <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                Full Name *
-              </Text>
-              <TextInput
-                style={[
-                  styles.formInput,
-                  {
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F8FAFC',
-                    borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                    color: isDark ? '#FFFFFF' : '#0F172A',
-                  },
-                ]}
-                placeholder="e.g. Ramesh Kumar"
-                placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
-                value={addName}
-                onChangeText={setAddName}
-              />
-
-              {/* Role Picker */}
-              <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                Designation / Role *
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-                {ROLE_OPTIONS.map((r) => {
-                  const isSel = addRole === r;
-                  return (
-                    <TouchableOpacity
-                      key={r}
-                      style={[
-                        styles.chipBtn,
-                        isSel && { backgroundColor: AppColors.primaryColor, borderColor: AppColors.primaryColor },
-                        {
-                          backgroundColor: isSel
-                            ? AppColors.primaryColor
-                            : isDark
-                            ? 'rgba(255,255,255,0.05)'
-                            : '#F8FAFC',
-                          borderColor: isSel
-                            ? AppColors.primaryColor
-                            : isDark
-                            ? AppColors.darkBorder
-                            : '#E2E8F0',
-                        },
-                      ]}
-                      onPress={() => setAddRole(r)}
-                    >
-                      <Text
-                        style={[
-                          styles.chipBtnText,
-                          { color: isSel ? '#FFFFFF' : isDark ? '#FFFFFF' : '#0F172A' },
-                        ]}
-                      >
-                        {r}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-
-              {/* Access Level */}
-              <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                Access Level
-              </Text>
-              <View style={styles.accessLevelRow}>
-                {ACCESS_LEVELS.map((al) => {
-                  const isSel = addAccessType === al.value;
-                  return (
-                    <TouchableOpacity
-                      key={al.value}
-                      style={[
-                        styles.accessLevelCard,
-                        isSel && {
-                          borderColor: AppColors.primaryColor,
-                          backgroundColor: isDark ? 'rgba(0,102,204,0.12)' : '#EFF6FF',
-                        },
-                        {
-                          borderColor: isSel
-                            ? AppColors.primaryColor
-                            : isDark
-                            ? AppColors.darkBorder
-                            : '#E2E8F0',
-                          backgroundColor: isSel
-                            ? isDark
-                              ? 'rgba(0,102,204,0.12)'
-                              : '#EFF6FF'
-                            : isDark
-                            ? 'rgba(255,255,255,0.04)'
-                            : '#F8FAFC',
-                        },
-                      ]}
-                      onPress={() => setAddAccessType(al.value)}
-                    >
-                      <Text
-                        style={[
-                          styles.accessLevelTitle,
-                          { color: isSel ? AppColors.primaryColor : isDark ? '#FFFFFF' : '#0F172A' },
-                        ]}
-                      >
-                        {al.label}
-                      </Text>
-                      <Text style={[styles.accessLevelDesc, { color: isDark ? '#94A3B8' : '#64748B' }]}>
-                        {al.desc}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Phone & Email */}
-              <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                Phone Number *
-              </Text>
-              <TextInput
-                style={[
-                  styles.formInput,
-                  {
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F8FAFC',
-                    borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                    color: isDark ? '#FFFFFF' : '#0F172A',
-                  },
-                ]}
-                placeholder="+91 98400 12345"
-                placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
-                keyboardType="phone-pad"
-                value={addPhone}
-                onChangeText={setAddPhone}
-              />
-
-              <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                Email Address
-              </Text>
-              <TextInput
-                style={[
-                  styles.formInput,
-                  {
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F8FAFC',
-                    borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                    color: isDark ? '#FFFFFF' : '#0F172A',
-                  },
-                ]}
-                placeholder="staff@gymezy.com"
-                placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={addEmail}
-                onChangeText={setAddEmail}
-              />
-
-              {/* Employment Type & Gender */}
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                    Type
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: 6 }}>
-                    {['Full Time', 'Part Time'].map((t) => (
-                      <TouchableOpacity
-                        key={t}
-                        style={[
-                          styles.smallChip,
-                          addType === t && { backgroundColor: AppColors.primaryColor, borderColor: AppColors.primaryColor },
-                          {
-                            backgroundColor: addType === t ? AppColors.primaryColor : isDark ? 'rgba(255,255,255,0.05)' : '#F8FAFC',
-                            borderColor: addType === t ? AppColors.primaryColor : isDark ? AppColors.darkBorder : '#E2E8F0',
-                          },
-                        ]}
-                        onPress={() => setAddType(t)}
-                      >
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: addType === t ? '#FFFFFF' : isDark ? '#FFFFFF' : '#0F172A' }}>
-                          {t}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                    Gender
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: 6 }}>
-                    {['Male', 'Female'].map((g) => (
-                      <TouchableOpacity
-                        key={g}
-                        style={[
-                          styles.smallChip,
-                          addGender === g && { backgroundColor: AppColors.primaryColor, borderColor: AppColors.primaryColor },
-                          {
-                            backgroundColor: addGender === g ? AppColors.primaryColor : isDark ? 'rgba(255,255,255,0.05)' : '#F8FAFC',
-                            borderColor: addGender === g ? AppColors.primaryColor : isDark ? AppColors.darkBorder : '#E2E8F0',
-                          },
-                        ]}
-                        onPress={() => setAddGender(g)}
-                      >
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: addGender === g ? '#FFFFFF' : isDark ? '#FFFFFF' : '#0F172A' }}>
-                          {g}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              </View>
-
-              {/* Monthly Salary */}
-              <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 12 }]}>
-                Monthly Compensation (₹)
-              </Text>
-              <TextInput
-                style={[
-                  styles.formInput,
-                  {
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F8FAFC',
-                    borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                    color: isDark ? '#FFFFFF' : '#0F172A',
-                  },
-                ]}
-                placeholder="25000"
-                placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
-                keyboardType="numeric"
-                value={addSalary}
-                onChangeText={setAddSalary}
-              />
-
-              {/* Shift Hours */}
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                    Shift Start
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.formInput,
-                      {
-                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F8FAFC',
-                        borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                        color: isDark ? '#FFFFFF' : '#0F172A',
-                      },
-                    ]}
-                    value={addShiftStart}
-                    onChangeText={setAddShiftStart}
-                    placeholder="06:00 AM"
-                    placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
-                  />
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                    Shift End
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.formInput,
-                      {
-                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F8FAFC',
-                        borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                        color: isDark ? '#FFFFFF' : '#0F172A',
-                      },
-                    ]}
-                    value={addShiftEnd}
-                    onChangeText={setAddShiftEnd}
-                    placeholder="02:00 PM"
-                    placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
-                  />
-                </View>
-              </View>
-
-              {/* Emergency Contact */}
-              <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-                Emergency Contact (Optional)
-              </Text>
-              <TextInput
-                style={[
-                  styles.formInput,
-                  {
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F8FAFC',
-                    borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                    color: isDark ? '#FFFFFF' : '#0F172A',
-                  },
-                ]}
-                placeholder="Guardian / Emergency Name"
-                placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
-                value={addEmergencyName}
-                onChangeText={setAddEmergencyName}
-              />
-              <TextInput
-                style={[
-                  styles.formInput,
-                  {
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F8FAFC',
-                    borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                    color: isDark ? '#FFFFFF' : '#0F172A',
-                  },
-                ]}
-                placeholder="Emergency Contact Phone"
-                placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
-                keyboardType="phone-pad"
-                value={addEmergencyPhone}
-                onChangeText={setAddEmergencyPhone}
-              />
-
-              {/* Submit Button */}
-              <TouchableOpacity
-                style={[
-                  styles.submitBtn,
-                  { backgroundColor: AppColors.primaryColor, opacity: isSubmitting ? 0.7 : 1 },
-                ]}
-                onPress={handleAddSubmit}
-                disabled={isSubmitting}
-                activeOpacity={0.85}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <>
-                    <MaterialIcons name="person-add" size={20} color="#FFFFFF" />
-                    <Text style={styles.submitBtnText}>Submit Employee to Super Admin</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowAddModal(false)}
+        onSuccess={() => fetchEmployees()}
+      />
     </View>
   );
 };
@@ -1598,14 +1175,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   empIdTag: {
-    backgroundColor: 'rgba(0, 102, 204, 0.1)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    marginLeft: 4,
   },
   empIdTagText: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '700',
     color: AppColors.primaryColor,
   },
   empRole: {
@@ -1878,5 +1452,146 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 13.5,
+  },
+  trainerShowcaseBox: {
+    marginTop: 18,
+    marginBottom: 8,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  showcaseHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  showcaseHeaderTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  showcaseHeaderSub: {
+    fontSize: 11,
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  textAreaInput: {
+    minHeight: 70,
+    textAlignVertical: 'top',
+    paddingTop: 10,
+  },
+  servicesChipContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  serviceChipBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  serviceChipText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  subSectionBox: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 14,
+  },
+  subSectionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  attachBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(114, 46, 209, 0.1)',
+  },
+  attachBtnText: {
+    color: '#722ED1',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  docListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 6,
+  },
+  docListTitle: {
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  backStepBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectionChipSmall: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  selectionChipTextSmall: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  selectionChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  selectionChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  pickerModalCard: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 18,
+  },
+  pickerModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  pickerModalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 13,
+  },
+  fileUploadBox: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

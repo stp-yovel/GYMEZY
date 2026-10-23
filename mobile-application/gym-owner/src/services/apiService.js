@@ -481,6 +481,93 @@ class ApiService {
     }
     return result.data;
   }
+
+  // --- SECTIONS & PROGRAMS METHODS (Industry Standard) ---
+  async getSections(params = {}) {
+    const queryParts = [];
+    Object.entries(params).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && val !== '') {
+        queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(val)}`);
+      }
+    });
+    const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+    const response = await this.executeFetch(`/sections${queryString}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to fetch sections.');
+    }
+    return result.data;
+  }
+
+  async createSection(payload) {
+    const response = await this.executeFetch('/sections', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to create section.');
+    }
+    return result.data;
+  }
+
+  async updateSection(sectionId, payload) {
+    if (!sectionId) throw new Error('Section ID is required.');
+    const response = await this.executeFetch(`/sections/${sectionId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to update section.');
+    }
+    return result.data;
+  }
+
+  async toggleSectionStatus(sectionId, isActive) {
+    if (!sectionId) throw new Error('Section ID is required.');
+    const response = await this.executeFetch(`/sections/${sectionId}/status`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ isActive }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to update section status.');
+    }
+    return result.data;
+  }
+
+  async deleteSection(sectionId) {
+    if (!sectionId) throw new Error('Section ID is required.');
+    const response = await this.executeFetch(`/sections/${sectionId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to delete section.');
+    }
+    return result.data;
+  }
+
+  async getSectionEnrollments(sectionId) {
+    if (!sectionId) throw new Error('Section ID is required.');
+    const response = await this.executeFetch(`/bookings/section/${sectionId}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to fetch section enrollments.');
+    }
+    return result.data;
+  }
 }
 
 export const apiService = new ApiService();

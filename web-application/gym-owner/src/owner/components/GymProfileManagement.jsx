@@ -31,6 +31,7 @@ import {
   Empty,
   Popconfirm,
   Alert,
+  Radio,
 } from 'antd';
 import {
   EditOutlined,
@@ -200,13 +201,13 @@ const TIME_SLOTS = [
 ];
 
 const DEFAULT_DAYS = [
-  { day: 'Monday', isOpen: true, openTime: '05:30 AM', closeTime: '10:30 PM' },
-  { day: 'Tuesday', isOpen: true, openTime: '05:30 AM', closeTime: '10:30 PM' },
-  { day: 'Wednesday', isOpen: true, openTime: '05:30 AM', closeTime: '10:30 PM' },
-  { day: 'Thursday', isOpen: true, openTime: '05:30 AM', closeTime: '10:30 PM' },
-  { day: 'Friday', isOpen: true, openTime: '05:30 AM', closeTime: '10:30 PM' },
-  { day: 'Saturday', isOpen: true, openTime: '06:00 AM', closeTime: '09:00 PM' },
-  { day: 'Sunday', isOpen: true, openTime: '06:00 AM', closeTime: '01:00 PM' },
+  { day: 'Monday', isOpen: true, mode: 'REGULAR', openTime: '05:30 AM', closeTime: '10:30 PM', morningShift: { openTime: '05:30 AM', closeTime: '11:30 AM' }, eveningShift: { openTime: '04:30 PM', closeTime: '10:30 PM' } },
+  { day: 'Tuesday', isOpen: true, mode: 'REGULAR', openTime: '05:30 AM', closeTime: '10:30 PM', morningShift: { openTime: '05:30 AM', closeTime: '11:30 AM' }, eveningShift: { openTime: '04:30 PM', closeTime: '10:30 PM' } },
+  { day: 'Wednesday', isOpen: true, mode: 'REGULAR', openTime: '05:30 AM', closeTime: '10:30 PM', morningShift: { openTime: '05:30 AM', closeTime: '11:30 AM' }, eveningShift: { openTime: '04:30 PM', closeTime: '10:30 PM' } },
+  { day: 'Thursday', isOpen: true, mode: 'REGULAR', openTime: '05:30 AM', closeTime: '10:30 PM', morningShift: { openTime: '05:30 AM', closeTime: '11:30 AM' }, eveningShift: { openTime: '04:30 PM', closeTime: '10:30 PM' } },
+  { day: 'Friday', isOpen: true, mode: 'REGULAR', openTime: '05:30 AM', closeTime: '10:30 PM', morningShift: { openTime: '05:30 AM', closeTime: '11:30 AM' }, eveningShift: { openTime: '04:30 PM', closeTime: '10:30 PM' } },
+  { day: 'Saturday', isOpen: true, mode: 'REGULAR', openTime: '06:00 AM', closeTime: '09:00 PM', morningShift: { openTime: '06:00 AM', closeTime: '12:00 PM' }, eveningShift: { openTime: '04:00 PM', closeTime: '09:00 PM' } },
+  { day: 'Sunday', isOpen: true, mode: 'REGULAR', openTime: '06:00 AM', closeTime: '01:00 PM', morningShift: { openTime: '06:00 AM', closeTime: '01:00 PM' }, eveningShift: { openTime: '04:00 PM', closeTime: '08:00 PM' } },
 ];
 
 const getCategoryIcon = (category) => {
@@ -274,6 +275,7 @@ const normalizeGymStandardPlans = (customPlans = [], flatPricing = {}) => {
         ],
       popular: Boolean(planMap.monthly?.popular),
       savingsText: '',
+      assignedTrainers: Array.isArray(planMap.monthly?.assignedTrainers) ? planMap.monthly.assignedTrainers : [],
     },
     {
       id: 'plan-quarterly',
@@ -295,6 +297,7 @@ const normalizeGymStandardPlans = (customPlans = [], flatPricing = {}) => {
         ],
       popular: Boolean(planMap.quarterly?.popular),
       savingsText: calcSavings(qPrice, 3),
+      assignedTrainers: Array.isArray(planMap.quarterly?.assignedTrainers) ? planMap.quarterly.assignedTrainers : [],
     },
     {
       id: 'plan-half-yearly',
@@ -317,6 +320,9 @@ const normalizeGymStandardPlans = (customPlans = [], flatPricing = {}) => {
         ],
       popular: Boolean(planMap.half_yearly?.popular || planMap.halfYearly?.popular),
       savingsText: calcSavings(hPrice, 6),
+      assignedTrainers: Array.isArray(planMap.half_yearly?.assignedTrainers || planMap.halfYearly?.assignedTrainers)
+        ? (planMap.half_yearly?.assignedTrainers || planMap.halfYearly?.assignedTrainers)
+        : [],
     },
     {
       id: 'plan-annual',
@@ -340,6 +346,7 @@ const normalizeGymStandardPlans = (customPlans = [], flatPricing = {}) => {
         ],
       popular: planMap.annual?.popular !== undefined ? Boolean(planMap.annual.popular) : true,
       savingsText: calcSavings(aPrice, 12),
+      assignedTrainers: Array.isArray(planMap.annual?.assignedTrainers) ? planMap.annual.assignedTrainers : [],
     },
   ];
 };
@@ -508,11 +515,15 @@ export const GymProfileManagement = () => {
   const [pricingPlans, setPricingPlans] = useState([]);
   const [gymTrainersPricing, setGymTrainersPricing] = useState([]);
   const [isSavingTrainerPricing, setIsSavingTrainerPricing] = useState(false);
+  const [singleSessionEnabled, setSingleSessionEnabled] = useState(true);
+  const [singleSessionPrice, setSingleSessionPrice] = useState(199);
+  const [isSavingSessionConfig, setIsSavingSessionConfig] = useState(false);
   const [operatingHours, setOperatingHours] = useState(DEFAULT_DAYS);
   const [holidayExceptions, setHolidayExceptions] = useState([]);
   const [is24HoursOpen, setIs24HoursOpen] = useState(false);
   const [isOpenHolidays, setIsOpenHolidays] = useState(true);
   const [isSplitShift, setIsSplitShift] = useState(false);
+  const [timingMode, setTimingMode] = useState('REGULAR');
   const [bankDetails, setBankDetails] = useState({
     accountHolder: '',
     bankName: '',
@@ -680,6 +691,17 @@ export const GymProfileManagement = () => {
     // Standardized 4-Tier Pricing Plans
     setPricingPlans(normalizeGymStandardPlans(effectiveCustomPricingPlans, effectivePricingPlans));
 
+    setSingleSessionEnabled(
+      pending.singleSessionBookingEnabled !== undefined
+        ? Boolean(pending.singleSessionBookingEnabled)
+        : (data.singleSessionBookingEnabled !== undefined ? Boolean(data.singleSessionBookingEnabled) : true)
+    );
+    setSingleSessionPrice(
+      pending.singleSessionPrice !== undefined
+        ? Number(pending.singleSessionPrice)
+        : Number(data.singleSessionPrice || data.pricingPlans?.singleSession || 199)
+    );
+
     // Active Trainers Tier Pricing Mapping
     if (Array.isArray(data.trainers) && data.trainers.length > 0) {
       setGymTrainersPricing(
@@ -700,21 +722,45 @@ export const GymProfileManagement = () => {
     }
 
     // Operating Hours
+    const resolvedMode = effectiveOpeningHours?.mode || (effectiveOpeningHours?.is24Hours ? '24_HOURS' : (effectiveOpeningHours?.isSplitShift ? 'SPLIT_SHIFT' : 'REGULAR'));
+    setTimingMode(resolvedMode);
+    setIs24HoursOpen(resolvedMode === '24_HOURS');
+    setIsSplitShift(resolvedMode === 'SPLIT_SHIFT');
+    setIsOpenHolidays(effectiveOpeningHours?.isOpenHolidays !== undefined ? Boolean(effectiveOpeningHours.isOpenHolidays) : true);
+
+    const morningDefOpen = effectiveOpeningHours?.morningOpen || '05:30 AM';
+    const morningDefClose = effectiveOpeningHours?.morningClose || '11:30 AM';
+    const eveningDefOpen = effectiveOpeningHours?.eveningOpen || '04:30 PM';
+    const eveningDefClose = effectiveOpeningHours?.eveningClose || '10:30 PM';
+
     if (effectiveOpeningHours?.schedule && Array.isArray(effectiveOpeningHours.schedule) && effectiveOpeningHours.schedule.length > 0) {
-      setOperatingHours(effectiveOpeningHours.schedule);
+      setOperatingHours(
+        effectiveOpeningHours.schedule.map((d) => ({
+          ...d,
+          mode: d.mode || resolvedMode,
+          morningShift: {
+            openTime: d.morningShift?.openTime || morningDefOpen,
+            closeTime: d.morningShift?.closeTime || morningDefClose,
+          },
+          eveningShift: {
+            openTime: d.eveningShift?.openTime || eveningDefOpen,
+            closeTime: d.eveningShift?.closeTime || eveningDefClose,
+          },
+        }))
+      );
     } else {
       const openW = effectiveOpeningHours?.weekdayOpen || '05:30 AM';
       const closeW = effectiveOpeningHours?.weekdayClose || '10:30 PM';
       const openWe = effectiveOpeningHours?.weekendOpen || '06:00 AM';
       const closeWe = effectiveOpeningHours?.weekendClose || '09:00 PM';
       setOperatingHours([
-        { day: 'Monday', isOpen: true, openTime: openW, closeTime: closeW },
-        { day: 'Tuesday', isOpen: true, openTime: openW, closeTime: closeW },
-        { day: 'Wednesday', isOpen: true, openTime: openW, closeTime: closeW },
-        { day: 'Thursday', isOpen: true, openTime: openW, closeTime: closeW },
-        { day: 'Friday', isOpen: true, openTime: openW, closeTime: closeW },
-        { day: 'Saturday', isOpen: true, openTime: openWe, closeTime: closeWe },
-        { day: 'Sunday', isOpen: true, openTime: openWe, closeTime: closeWe },
+        { day: 'Monday', isOpen: true, mode: resolvedMode, openTime: openW, closeTime: closeW, morningShift: { openTime: morningDefOpen, closeTime: morningDefClose }, eveningShift: { openTime: eveningDefOpen, closeTime: eveningDefClose } },
+        { day: 'Tuesday', isOpen: true, mode: resolvedMode, openTime: openW, closeTime: closeW, morningShift: { openTime: morningDefOpen, closeTime: morningDefClose }, eveningShift: { openTime: eveningDefOpen, closeTime: eveningDefClose } },
+        { day: 'Wednesday', isOpen: true, mode: resolvedMode, openTime: openW, closeTime: closeW, morningShift: { openTime: morningDefOpen, closeTime: morningDefClose }, eveningShift: { openTime: eveningDefOpen, closeTime: eveningDefClose } },
+        { day: 'Thursday', isOpen: true, mode: resolvedMode, openTime: openW, closeTime: closeW, morningShift: { openTime: morningDefOpen, closeTime: morningDefClose }, eveningShift: { openTime: eveningDefOpen, closeTime: eveningDefClose } },
+        { day: 'Friday', isOpen: true, mode: resolvedMode, openTime: openW, closeTime: closeW, morningShift: { openTime: morningDefOpen, closeTime: morningDefClose }, eveningShift: { openTime: eveningDefOpen, closeTime: eveningDefClose } },
+        { day: 'Saturday', isOpen: true, mode: resolvedMode, openTime: openWe, closeTime: closeWe, morningShift: { openTime: '06:00 AM', closeTime: '12:00 PM' }, eveningShift: { openTime: '04:00 PM', closeTime: '09:00 PM' } },
+        { day: 'Sunday', isOpen: true, mode: resolvedMode, openTime: openWe, closeTime: '01:00 PM', morningShift: { openTime: '06:00 AM', closeTime: '01:00 PM' }, eveningShift: { openTime: '04:00 PM', closeTime: '08:00 PM' } },
       ]);
     }
 
@@ -723,10 +769,6 @@ export const GymProfileManagement = () => {
     } else {
       setHolidayExceptions([]);
     }
-
-    setIs24HoursOpen(Boolean(effectiveOpeningHours?.is24Hours));
-    setIsOpenHolidays(effectiveOpeningHours?.isOpenHolidays !== undefined ? Boolean(effectiveOpeningHours.isOpenHolidays) : true);
-    setIsSplitShift(Boolean(effectiveOpeningHours?.isSplitShift));
 
     // Bank Details
     if (effectiveBankDetails) {
@@ -1021,17 +1063,26 @@ export const GymProfileManagement = () => {
   const handleSaveOperatingHours = async () => {
     setIsSavingHours(true);
     try {
+      const is24h = timingMode === '24_HOURS';
+      const isSplit = timingMode === 'SPLIT_SHIFT';
       const payload = {
+        mode: timingMode,
+        is24Hours: is24h,
+        isSplitShift: isSplit,
+        isOpenHolidays: isOpenHolidays,
         weekdayOpen: operatingHours[0]?.openTime || '05:30 AM',
         weekdayClose: operatingHours[0]?.closeTime || '10:30 PM',
         weekendOpen: operatingHours[5]?.openTime || '06:00 AM',
         weekendClose: operatingHours[5]?.closeTime || '09:00 PM',
-        displayText: `${operatingHours[0]?.openTime || '05:30 AM'} - ${operatingHours[0]?.closeTime || '10:30 PM'}`,
-        schedule: operatingHours,
+        morningOpen: operatingHours[0]?.morningShift?.openTime || '05:30 AM',
+        morningClose: operatingHours[0]?.morningShift?.closeTime || '11:30 AM',
+        eveningOpen: operatingHours[0]?.eveningShift?.openTime || '04:30 PM',
+        eveningClose: operatingHours[0]?.eveningShift?.closeTime || '10:30 PM',
+        schedule: operatingHours.map((d) => ({
+          ...d,
+          mode: timingMode,
+        })),
         holidays: holidayExceptions,
-        is24Hours: is24HoursOpen,
-        isOpenHolidays: isOpenHolidays,
-        isSplitShift: isSplitShift,
       };
       await saveGymToBackend({ openingHours: payload }, 'Operating hours and weekly schedule saved!');
       try {
@@ -1167,6 +1218,7 @@ export const GymProfileManagement = () => {
             description: vals.description,
             features: updatedFeatures,
             popular: Boolean(vals.popular),
+            assignedTrainers: Array.isArray(vals.assignedTrainers) ? vals.assignedTrainers : [],
           }
           : p
       );
@@ -1195,6 +1247,22 @@ export const GymProfileManagement = () => {
       },
       'Membership plan removed.'
     );
+  };
+
+  // Save per-session / day pass pricing & status
+  const handleSaveSessionPricing = async () => {
+    setIsSavingSessionConfig(true);
+    try {
+      await saveGymToBackend(
+        {
+          singleSessionBookingEnabled: singleSessionEnabled,
+          singleSessionPrice: Number(singleSessionPrice) || 199,
+        },
+        'Per-session booking settings updated successfully!'
+      );
+    } finally {
+      setIsSavingSessionConfig(false);
+    }
   };
 
   // Save all trainer tier pricing mappings
@@ -2460,6 +2528,85 @@ export const GymProfileManagement = () => {
           {/* ========================================================================= */}
           {activeTab === 'pricing' && (
             <div>
+              {/* Per-Session / Day Pass Booking Section */}
+              <Card
+                style={{
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  borderRadius: 'var(--radius-base)',
+                  borderColor: isDarkMode ? '#222222' : '#e2e8f0',
+                  marginBottom: 24,
+                }}
+                styles={{ body: { padding: '20px 24px' } }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                        Per-Session / Day Pass Booking
+                      </Title>
+                      <Tag color={singleSessionEnabled ? 'green' : 'default'} style={{ fontWeight: 600 }}>
+                        {singleSessionEnabled ? 'Enabled' : 'Disabled'}
+                      </Tag>
+                    </div>
+                    <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13, marginTop: 4, display: 'block' }}>
+                      Allow users to book 1-day visits or custom date ranges with or without a personal trainer.
+                    </Text>
+                  </div>
+                  <Button
+                    type="primary"
+                    icon={<SaveOutlined />}
+                    loading={isSavingSessionConfig}
+                    onClick={handleSaveSessionPricing}
+                    style={{ borderRadius: 'var(--radius-base)', fontWeight: 600 }}
+                  >
+                    Save Session Settings
+                  </Button>
+                </div>
+
+                <Divider style={{ margin: '16px 0', borderColor: isDarkMode ? '#222222' : '#e2e8f0' }} />
+
+                <Row gutter={[24, 16]} align="middle">
+                  <Col xs={24} sm={12} md={8}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: isDarkMode ? '#1a1a1a' : '#f8fafc', borderRadius: 8, border: `1px solid ${isDarkMode ? '#2a2a2a' : '#e2e8f0'}` }}>
+                      <div>
+                        <div style={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', fontSize: 13.5 }}>
+                          Enable Per-Session Booking
+                        </div>
+                        <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
+                          Accept single-day and custom visit passes
+                        </div>
+                      </div>
+                      <Switch
+                        checked={singleSessionEnabled}
+                        onChange={(checked) => setSingleSessionEnabled(checked)}
+                      />
+                    </div>
+                  </Col>
+                  <Col xs={24} sm={12} md={8}>
+                    <div style={{ padding: '12px 16px', background: isDarkMode ? '#1a1a1a' : '#f8fafc', borderRadius: 8, border: `1px solid ${isDarkMode ? '#2a2a2a' : '#e2e8f0'}` }}>
+                      <div style={{ fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', fontSize: 13.5, marginBottom: 6 }}>
+                        Day Pass Base Price (₹ / day)
+                      </div>
+                      <InputNumber
+                        prefix="₹"
+                        min={0}
+                        disabled={!singleSessionEnabled}
+                        value={singleSessionPrice}
+                        onChange={(val) => setSingleSessionPrice(Number(val) || 0)}
+                        style={{ width: '100%', borderRadius: 'var(--radius-base)' }}
+                      />
+                    </div>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <div style={{ padding: '12px 16px', background: isDarkMode ? 'rgba(56,189,248,0.06)' : '#f0f9ff', borderRadius: 8, border: `1px solid ${isDarkMode ? 'rgba(56,189,248,0.2)' : '#bae6fd'}` }}>
+                      <div style={{ fontSize: 12.5, color: isDarkMode ? '#38bdf8' : '#0284c7', lineHeight: 1.5 }}>
+                        <strong>Trainer Session Fee:</strong> When a user chooses a personal trainer with their day pass, the trainer single session rate configured below is automatically added.
+                      </div>
+                    </div>
+                  </Col>
+                </Row>
+              </Card>
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
                 <div>
                   <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
@@ -2523,9 +2670,19 @@ export const GymProfileManagement = () => {
                           )}
                         </div>
 
-                        <Text style={{ fontSize: 12, color: isDarkMode ? '#aaaaaa' : '#64748b', lineHeight: 1.4, marginBottom: 16 }}>
+                        <Text style={{ fontSize: 12, color: isDarkMode ? '#aaaaaa' : '#64748b', lineHeight: 1.4, marginBottom: 12 }}>
                           {plan.description || 'Full gym access membership.'}
                         </Text>
+
+                        {Array.isArray(plan.assignedTrainers) && plan.assignedTrainers.length > 0 ? (
+                          <div style={{ marginBottom: 12, fontSize: 12, color: 'var(--color-primary)', fontWeight: 600 }}>
+                            {plan.assignedTrainers.length} Personal Trainer{plan.assignedTrainers.length > 1 ? 's' : ''} Assigned
+                          </div>
+                        ) : (
+                          <div style={{ marginBottom: 12, fontSize: 12, color: isDarkMode ? '#888888' : '#94a3b8' }}>
+                            All Gym Trainers Available
+                          </div>
+                        )}
 
                         <Divider style={{ margin: '10px 0' }} />
 
@@ -2550,6 +2707,7 @@ export const GymProfileManagement = () => {
                               description: plan.description,
                               features: Array.isArray(plan.features) ? plan.features.join('\n') : '',
                               popular: plan.popular || false,
+                              assignedTrainers: (plan.assignedTrainers || []).map((t) => (typeof t === 'object' && t !== null ? (t._id || t.id || t.employeeId) : t)),
                             });
                             setIsEditPlanModalOpen(true);
                           }}
@@ -2870,10 +3028,10 @@ export const GymProfileManagement = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
                 <div>
                   <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                    Gym Operating Hours & Schedule
+                    Gym Operating Hours & Shift Architecture
                   </Title>
                   <Text style={{ color: isDarkMode ? '#888888' : '#64748b', fontSize: 13 }}>
-                    Configure opening and closing timings for each day of the week.
+                    Configure timing model, morning/evening shifts, and custom daily schedules.
                   </Text>
                 </div>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -2890,6 +3048,8 @@ export const GymProfileManagement = () => {
                               isOpen: mon.isOpen,
                               openTime: mon.openTime,
                               closeTime: mon.closeTime,
+                              morningShift: { ...(mon.morningShift || {}) },
+                              eveningShift: { ...(mon.eveningShift || {}) },
                             };
                           }
                           return item;
@@ -2903,6 +3063,43 @@ export const GymProfileManagement = () => {
                   </Button>
 
                   <Button
+                    onClick={() => {
+                      setOperatingHours((prev) =>
+                        prev.map((item) =>
+                          item.day === 'Sunday'
+                            ? {
+                                ...item,
+                                isOpen: true,
+                                openTime: '06:00 AM',
+                                closeTime: '01:00 PM',
+                                morningShift: { openTime: '06:00 AM', closeTime: '01:00 PM' },
+                              }
+                            : item
+                        )
+                      );
+                      message.success('Sunday configured as Morning-only (06:00 AM - 01:00 PM)!');
+                    }}
+                    style={{ borderRadius: 'var(--radius-base)' }}
+                  >
+                    Sunday Half-Day
+                  </Button>
+
+                  <Button
+                    danger
+                    onClick={() => {
+                      setOperatingHours((prev) =>
+                        prev.map((item) =>
+                          item.day === 'Sunday' ? { ...item, isOpen: false } : item
+                        )
+                      );
+                      message.success('Sunday set to Closed!');
+                    }}
+                    style={{ borderRadius: 'var(--radius-base)' }}
+                  >
+                    Sunday Closed
+                  </Button>
+
+                  <Button
                     type="primary"
                     icon={<SaveOutlined />}
                     loading={isSavingHours}
@@ -2913,6 +3110,54 @@ export const GymProfileManagement = () => {
                   </Button>
                 </div>
               </div>
+
+              {/* Timing Model Selector Card */}
+              <Card
+                style={{
+                  backgroundColor: 'var(--bg-surface-elevated)',
+                  borderColor: 'var(--border-color)',
+                  borderRadius: 'var(--radius-base)',
+                }}
+                styles={{ body: { padding: '16px 20px' } }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 4 }}>
+                      Operational Timing Model
+                    </div>
+                    <Text style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b' }}>
+                      Choose how your facility operates: round-the-clock 24/7, continuous single shift, or split shifts with afternoon break.
+                    </Text>
+                  </div>
+                  <Radio.Group
+                    value={timingMode}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTimingMode(val);
+                      setIs24HoursOpen(val === '24_HOURS');
+                      setIsSplitShift(val === 'SPLIT_SHIFT');
+                    }}
+                    buttonStyle="solid"
+                  >
+                    <Radio.Button value="REGULAR">Single Shift (Continuous 12h/16h)</Radio.Button>
+                    <Radio.Button value="SPLIT_SHIFT">Split Shift (Morning + Evening)</Radio.Button>
+                    <Radio.Button value="24_HOURS">24 Hours Open (24x7)</Radio.Button>
+                  </Radio.Group>
+                </div>
+              </Card>
+
+              {/* Informational Alerts */}
+              {timingMode === '24_HOURS' && (
+                <div style={{ padding: '14px 18px', borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? 'rgba(16,185,129,0.1)' : '#ecfdf5', border: '1px solid #6ee7b7', fontSize: 13, color: isDarkMode ? '#6ee7b7' : '#065f46' }}>
+                  <strong>24/7 Facility Access Active:</strong> All open days allow round-the-clock check-ins. Customer booking slots will be generated continuously across all 24 hours.
+                </div>
+              )}
+
+              {timingMode === 'SPLIT_SHIFT' && (
+                <div style={{ padding: '14px 18px', borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? 'rgba(168,85,247,0.1)' : '#faf5ff', border: '1px solid #d8b4fe', fontSize: 13, color: isDarkMode ? '#e9d5ff' : '#6b21a8' }}>
+                  <strong>Split Shift Model Active:</strong> Your gym operates separate Morning and Evening sessions. Afternoon break is reserved for sanitization and staff rest; customer booking slots are generated strictly during active shifts.
+                </div>
+              )}
 
               {/* Day-by-Day Operating Hours Card */}
               <Card
@@ -2970,40 +3215,134 @@ export const GymProfileManagement = () => {
                         </span>
                       </div>
 
-                      {/* Timing Pickers */}
+                      {/* Timing Pickers based on active mode */}
                       {item.isOpen ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                          <Text style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>From</Text>
-                          <Select
-                            value={item.openTime || '05:30 AM'}
-                            onChange={(val) => {
-                              setOperatingHours((prev) =>
-                                prev.map((d, i) => (i === idx ? { ...d, openTime: val } : d))
-                              );
-                            }}
-                            style={{ width: 130 }}
-                            size="middle"
-                          >
-                            {TIME_SLOTS.map((t) => (
-                              <Option key={t} value={t}>{t}</Option>
-                            ))}
-                          </Select>
-                          <Text style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>to</Text>
-                          <Select
-                            value={item.closeTime || '10:30 PM'}
-                            onChange={(val) => {
-                              setOperatingHours((prev) =>
-                                prev.map((d, i) => (i === idx ? { ...d, closeTime: val } : d))
-                              );
-                            }}
-                            style={{ width: 130 }}
-                            size="middle"
-                          >
-                            {TIME_SLOTS.map((t) => (
-                              <Option key={t} value={t}>{t}</Option>
-                            ))}
-                          </Select>
-                        </div>
+                        timingMode === '24_HOURS' ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Tag color="green" style={{ fontSize: 13, padding: '4px 10px' }}>
+                              Open 24 Hours
+                            </Tag>
+                          </div>
+                        ) : timingMode === 'SPLIT_SHIFT' ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                            {/* Morning Shift */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <Tag color="gold">Morning</Tag>
+                              <Select
+                                value={item.morningShift?.openTime || '05:30 AM'}
+                                onChange={(val) => {
+                                  setOperatingHours((prev) =>
+                                    prev.map((d, i) =>
+                                      i === idx
+                                        ? { ...d, morningShift: { ...(d.morningShift || {}), openTime: val } }
+                                        : d
+                                    )
+                                  );
+                                }}
+                                style={{ width: 115 }}
+                                size="middle"
+                              >
+                                {TIME_SLOTS.map((t) => (
+                                  <Option key={t} value={t}>{t}</Option>
+                                ))}
+                              </Select>
+                              <span style={{ fontSize: 12, color: '#64748b' }}>to</span>
+                              <Select
+                                value={item.morningShift?.closeTime || '11:30 AM'}
+                                onChange={(val) => {
+                                  setOperatingHours((prev) =>
+                                    prev.map((d, i) =>
+                                      i === idx
+                                        ? { ...d, morningShift: { ...(d.morningShift || {}), closeTime: val } }
+                                        : d
+                                    )
+                                  );
+                                }}
+                                style={{ width: 115 }}
+                                size="middle"
+                              >
+                                {TIME_SLOTS.map((t) => (
+                                  <Option key={t} value={t}>{t}</Option>
+                                ))}
+                              </Select>
+                            </div>
+
+                            {/* Evening Shift */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <Tag color="purple">Evening</Tag>
+                              <Select
+                                value={item.eveningShift?.openTime || '04:30 PM'}
+                                onChange={(val) => {
+                                  setOperatingHours((prev) =>
+                                    prev.map((d, i) =>
+                                      i === idx
+                                        ? { ...d, eveningShift: { ...(d.eveningShift || {}), openTime: val } }
+                                        : d
+                                    )
+                                  );
+                                }}
+                                style={{ width: 115 }}
+                                size="middle"
+                              >
+                                {TIME_SLOTS.map((t) => (
+                                  <Option key={t} value={t}>{t}</Option>
+                                ))}
+                              </Select>
+                              <span style={{ fontSize: 12, color: '#64748b' }}>to</span>
+                              <Select
+                                value={item.eveningShift?.closeTime || '10:30 PM'}
+                                onChange={(val) => {
+                                  setOperatingHours((prev) =>
+                                    prev.map((d, i) =>
+                                      i === idx
+                                        ? { ...d, eveningShift: { ...(d.eveningShift || {}), closeTime: val } }
+                                        : d
+                                    )
+                                  );
+                                }}
+                                style={{ width: 115 }}
+                                size="middle"
+                              >
+                                {TIME_SLOTS.map((t) => (
+                                  <Option key={t} value={t}>{t}</Option>
+                                ))}
+                              </Select>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                            <Text style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>From</Text>
+                            <Select
+                              value={item.openTime || '05:30 AM'}
+                              onChange={(val) => {
+                                setOperatingHours((prev) =>
+                                  prev.map((d, i) => (i === idx ? { ...d, openTime: val } : d))
+                                );
+                              }}
+                              style={{ width: 130 }}
+                              size="middle"
+                            >
+                              {TIME_SLOTS.map((t) => (
+                                <Option key={t} value={t}>{t}</Option>
+                              ))}
+                            </Select>
+                            <Text style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#64748b' }}>to</Text>
+                            <Select
+                              value={item.closeTime || '10:30 PM'}
+                              onChange={(val) => {
+                                setOperatingHours((prev) =>
+                                  prev.map((d, i) => (i === idx ? { ...d, closeTime: val } : d))
+                                );
+                              }}
+                              style={{ width: 130 }}
+                              size="middle"
+                            >
+                              {TIME_SLOTS.map((t) => (
+                                <Option key={t} value={t}>{t}</Option>
+                              ))}
+                            </Select>
+                          </div>
+                        )
                       ) : (
                         <Text style={{ fontSize: 13, color: isDarkMode ? '#888888' : '#94a3b8', fontStyle: 'italic' }}>
                           Gym Closed on {item.day}
@@ -3933,6 +4272,22 @@ export const GymProfileManagement = () => {
           </Form.Item>
           <Form.Item name="popular" valuePropName="checked">
             <Checkbox>Mark as "Most Popular" Plan</Checkbox>
+          </Form.Item>
+          <Form.Item
+            name="assignedTrainers"
+            label="Assigned Personal Trainers (Optional)"
+            tooltip="Select specific trainers eligible for this plan. If left empty, all trainers at this facility are available."
+          >
+            <Select
+              mode="multiple"
+              placeholder="Select eligible trainers (default: all trainers)"
+              allowClear
+              optionFilterProp="label"
+              options={gymTrainersPricing.map((t) => ({
+                label: `${t.name}${t.specialty ? ` (${t.specialty})` : ''}`,
+                value: t.employeeId || t.id || t._id,
+              }))}
+            />
           </Form.Item>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
             <Button onClick={() => setIsEditPlanModalOpen(false)}>Cancel</Button>

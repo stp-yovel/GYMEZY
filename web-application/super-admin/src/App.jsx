@@ -10,6 +10,7 @@ import TransactionsManagement from './admin/TransactionsManagement';
 import SubscriptionsManagement from './admin/SubscriptionsManagement';
 import GymOnboarding from './admin/GymOnboarding';
 import ReportsManagement from './admin/ReportsManagement';
+import BannerManagement from './admin/BannerManagement';
 
 export function App() {
   return (
@@ -22,6 +23,8 @@ export function App() {
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="banners" element={<BannerManagement />} />
+        <Route path="ads" element={<BannerManagement />} />
         <Route path="gyms" element={<GymsManagement />} />
         <Route path="onboarding" element={<GymOnboarding />} />
         <Route path="customers" element={<CustomersManagement />} />
@@ -40,6 +43,8 @@ export function App() {
 
       {/* Direct Route Aliases */}
       <Route path="/dashboard" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/banners" element={<Navigate to="/admin/banners" replace />} />
+      <Route path="/ads" element={<Navigate to="/admin/banners" replace />} />
       <Route path="/gyms" element={<Navigate to="/admin/gyms" replace />} />
       <Route path="/onboarding" element={<Navigate to="/admin/onboarding" replace />} />
       <Route path="/customers" element={<Navigate to="/admin/customers" replace />} />

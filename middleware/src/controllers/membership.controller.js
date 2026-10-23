@@ -37,7 +37,7 @@ const getGymBasePrice = (gym, tier) => {
 };
 
 /**
- * Helper to calculate trainer fee for a given tier
+ * Helper to calculate trainer fee for a given tier (0 means not available)
  */
 const getTrainerTierFee = (trainer, tier) => {
   if (!trainer) return 0;
@@ -46,14 +46,7 @@ const getTrainerTierFee = (trainer, tier) => {
   if (typeof tierFee === 'number' && tierFee > 0) {
     return tierFee;
   }
-  const baseMonthly = Number(trainer.trainerPricing?.monthly) || 0;
-  const multiplier = {
-    Monthly: 1,
-    Quarterly: 3,
-    'Half Yearly': 6,
-    Annual: 12,
-  }[tier] || 1;
-  return baseMonthly * multiplier;
+  return 0;
 };
 
 /**
@@ -113,6 +106,14 @@ export const createMembership = async (req, res, next) => {
       }
     }
 
+    if (resolvedUserId && mongoose.Types.ObjectId.isValid(resolvedUserId)) {
+      const userDoc = await User.findById(resolvedUserId);
+      if (userDoc && !userDoc.customerId) {
+        userDoc.customerId = await User.generateCustomerId();
+        await userDoc.save();
+      }
+    }
+
     // 3. Validate Gym
     const isObjectId = mongoose.Types.ObjectId.isValid(gymId);
     const gym = await Gym.findOne(
@@ -138,7 +139,22 @@ export const createMembership = async (req, res, next) => {
       if (trainer.status !== 'Active') {
         throw ApiError.badRequest('Selected trainer is currently inactive.');
       }
+
+      // If the plan has restricted assigned trainers, ensure this trainer is allowed
+      const matchingPlan = gym.customPricingPlans?.find(
+        (p) => (p.tierId || '').toLowerCase() === membershipTier.toLowerCase()
+      );
+      if (matchingPlan && Array.isArray(matchingPlan.assignedTrainers) && matchingPlan.assignedTrainers.length > 0) {
+        const allowedTrainerIds = matchingPlan.assignedTrainers.map((t) => String(t._id || t));
+        if (!allowedTrainerIds.includes(String(trainer._id))) {
+          throw ApiError.badRequest('Selected trainer is not assigned to this membership plan.');
+        }
+      }
+
       trainerFee = getTrainerTierFee(trainer, membershipTier);
+      if (trainerFee <= 0) {
+        throw ApiError.badRequest('Selected personal trainer is not available for this membership plan tier.');
+      }
     }
 
     // 5. Calculate Pricing & Dates
@@ -153,6 +169,18 @@ export const createMembership = async (req, res, next) => {
     parsedStart.setHours(0, 0, 0, 0);
 
     const parsedEnd = new Date(parsedStart.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+    // Contract Duration Safeguard for Temporary Trainers
+    if (trainer && trainer.type === 'Temporary' && trainer.schedule?.endDate) {
+      const contractEnd = new Date(trainer.schedule.endDate);
+      contractEnd.setHours(23, 59, 59, 999);
+      if (parsedEnd > contractEnd) {
+        const contractEndFormatted = contractEnd.toISOString().split('T')[0];
+        throw ApiError.badRequest(
+          `Selected trainer is on a temporary contract ending on ${contractEndFormatted}. The ${durationDays}-day membership plan extends beyond their available period.`
+        );
+      }
+    }
 
     const now = new Date();
     const status = parsedStart > now ? 'Upcoming' : 'Active';

@@ -424,17 +424,61 @@ export const QrCheckIn = () => {
       if (res.data?.success && res.data?.data) {
         const verified = res.data.data;
         const memberInfo = verified.member || {};
+
+        if (verified.action === 'CHECK_OUT') {
+          const verifiedItem = {
+            key: verified.attendanceId,
+            attendanceId: verified.attendanceId,
+            action: 'CHECK_OUT',
+            passId: memberInfo.membershipId || memberInfo.bookingId || lookupCode,
+            userId: memberInfo.id || 'N/A',
+            customerId: memberInfo.id || 'N/A',
+            membershipId: memberInfo.membershipId || null,
+            bookingId: memberInfo.bookingId || null,
+            memberName: memberInfo.name || 'Gym Member',
+            avatar: memberInfo.avatar || null,
+            plan: memberInfo.tier ? `${memberInfo.tier} Pass` : (memberInfo.title || 'Gym Pass'),
+            checkInTime: verified.checkInTime
+              ? new Date(verified.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : null,
+            checkOutTime: verified.checkOutTime
+              ? new Date(verified.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            time: new Date(verified.checkOutTime || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            durationStr: verified.durationStr || 'Completed',
+            area: verified.area || 'General Workout',
+            status: 'CHECKED_OUT',
+            attendanceStatus: 'Completed',
+            method: verified.method === 'OTP' ? 'OTP Passcode' : 'QR Code',
+          };
+
+          setLastVerified(verifiedItem);
+          message.success(`Check-Out Recorded: ${verifiedItem.memberName} (Time spent: ${verified.durationStr})`);
+          setOtpInput('');
+          setManualInput('');
+          setSearchQuery('');
+          await fetchTodayAttendance();
+          return;
+        }
+
         const verifiedItem = {
           key: verified.attendanceId,
           attendanceId: verified.attendanceId,
-          passId: memberInfo.membershipId || lookupCode,
+          action: 'CHECK_IN',
+          passId: memberInfo.membershipId || memberInfo.bookingId || lookupCode,
           userId: memberInfo.id || 'N/A',
           customerId: memberInfo.id || 'N/A',
-          membershipId: memberInfo.membershipId || lookupCode,
+          membershipId: memberInfo.membershipId || null,
           bookingId: memberInfo.bookingId || null,
+          bookingType: memberInfo.bookingType || null,
+          attendedSessionsCount: memberInfo.attendedSessionsCount,
+          durationDays: memberInfo.durationDays,
           memberName: memberInfo.name || 'Gym Member',
           avatar: memberInfo.avatar || null,
-          plan: memberInfo.tier ? `${memberInfo.tier} Pass` : 'Membership Pass',
+          plan: memberInfo.tier
+            ? `${memberInfo.tier} Pass`
+            : (memberInfo.title ? `${memberInfo.title}${memberInfo.bookingType === 'SECTION' ? ' (Section Batch)' : ''}` : 'Membership Pass'),
+          area: verified.area || memberInfo.title || 'General Workout',
           time: new Date(verified.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           otp: memberInfo.entryOtp || otpInput || '------',
           status: 'GRANTED',
@@ -520,7 +564,7 @@ export const QrCheckIn = () => {
       case 'phone':
         return 'Enter 10-digit mobile number (e.g. 9876543210)...';
       case 'userId':
-        return 'Enter User ID (e.g. USR-1029, CUST789012)...';
+        return 'Enter Customer ID (e.g. GYZ0001)...';
       case 'membershipId':
         return 'Enter Membership ID (e.g. MBR-2024-089)...';
       case 'bookingId':
@@ -1145,7 +1189,14 @@ export const QrCheckIn = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700 }}>
                 <SafetyCertificateFilled
                   style={{
-                    color: lastVerified?.status === 'GRANTED' ? '#52c41a' : lastVerified ? '#ff4d4f' : '#1677ff',
+                    color:
+                      lastVerified?.status === 'GRANTED'
+                        ? '#52c41a'
+                        : lastVerified?.status === 'CHECKED_OUT'
+                        ? '#fa8c16'
+                        : lastVerified
+                        ? '#ff4d4f'
+                        : '#1677ff',
                   }}
                 />
                 <span>Verification Result</span>
@@ -1179,12 +1230,39 @@ export const QrCheckIn = () => {
                       <span style={{ fontWeight: 700, fontSize: 16, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
                         {lastVerified.memberName}
                       </span>
-                      <Tag
-                        color={lastVerified.status === 'GRANTED' ? 'success' : 'error'}
-                        style={{ fontWeight: 700, borderRadius: 4, margin: 0 }}
-                      >
-                        {lastVerified.status === 'GRANTED' ? 'ACCESS GRANTED' : 'ACCESS DENIED'}
-                      </Tag>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {lastVerified.status === 'GRANTED' && (
+                          <Tag color="success" style={{ fontWeight: 700, borderRadius: 4, margin: 0 }}>
+                            ACCESS GRANTED
+                          </Tag>
+                        )}
+                        {lastVerified.status === 'CHECKED_OUT' && (
+                          <Tag color="warning" style={{ fontWeight: 700, borderRadius: 4, margin: 0 }}>
+                            CHECK-OUT RECORDED
+                          </Tag>
+                        )}
+                        {lastVerified.status === 'DENIED' && (
+                          <Tag color="error" style={{ fontWeight: 700, borderRadius: 4, margin: 0 }}>
+                            ACCESS DENIED
+                          </Tag>
+                        )}
+                        {lastVerified.durationStr && lastVerified.status === 'CHECKED_OUT' && (
+                          <Tag color="processing" style={{ fontWeight: 600, borderRadius: 4, margin: 0 }}>
+                            Duration: {lastVerified.durationStr}
+                          </Tag>
+                        )}
+                        {lastVerified.bookingType === 'SECTION' && (
+                          <Tag color="purple" style={{ fontWeight: 600, borderRadius: 4, margin: 0 }}>
+                            Section Batch
+                          </Tag>
+                        )}
+                        {typeof lastVerified.attendedSessionsCount === 'number' && (
+                          <Tag color="cyan" style={{ fontWeight: 600, borderRadius: 4, margin: 0 }}>
+                            Session {lastVerified.attendedSessionsCount}
+                            {lastVerified.durationDays ? ` of ${lastVerified.durationDays}` : ''}
+                          </Tag>
+                        )}
+                      </div>
                     </div>
                     <div style={{ fontSize: 12.5, color: isDarkMode ? '#888888' : '#64748b', marginTop: 3 }}>
                       {lastVerified.plan}
@@ -1204,9 +1282,15 @@ export const QrCheckIn = () => {
                         )}
                       </span>
                     </div>
-                    <div style={{ fontSize: 11.5, color: isDarkMode ? '#aaaaaa' : '#94a3b8', marginTop: 4 }}>
-                      {lastVerified.time} • Via {lastVerified.method}
-                    </div>
+                    {lastVerified.status === 'CHECKED_OUT' ? (
+                      <div style={{ fontSize: 11.5, color: isDarkMode ? '#aaaaaa' : '#94a3b8', marginTop: 4 }}>
+                        Checked Out: {lastVerified.checkOutTime} {lastVerified.checkInTime ? `(In: ${lastVerified.checkInTime})` : ''} • Via {lastVerified.method} • {lastVerified.area}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 11.5, color: isDarkMode ? '#aaaaaa' : '#94a3b8', marginTop: 4 }}>
+                        {lastVerified.time} • Via {lastVerified.method} • {lastVerified.area}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

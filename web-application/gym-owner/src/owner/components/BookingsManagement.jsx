@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import {
   Card,
   Table,
@@ -21,6 +22,7 @@ import {
   message,
   Tooltip,
 } from 'antd';
+import { apiClient } from '../../services/apiClient';
 import {
   PlusOutlined,
   SearchOutlined,
@@ -60,8 +62,11 @@ export const BookingsManagement = ({
 }) => {
   const { isDarkMode } = useTheme();
   const [form] = Form.useForm();
+  const { user } = useSelector((state) => state.auth);
+  const gymId = user?.gymId?._id || user?.gymId || user?._id;
 
   const [bookings, setBookings] = useState(initialData);
+  const [isLoadingBookings, setIsLoadingBookings] = useState(false);
   const [nameSearch, setNameSearch] = useState('');
   const [bookingIdSearch, setBookingIdSearch] = useState('');
   const [customerIdSearch, setCustomerIdSearch] = useState('');
@@ -75,6 +80,101 @@ export const BookingsManagement = ({
   const [isDateRangeModalOpen, setIsDateRangeModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [tempDateRange, setTempDateRange] = useState(null);
+
+  // Reschedule Review States
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState(null); // { booking, sessionIndex, session }
+  const [proposedDate, setProposedDate] = useState(null);
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  const loadBookings = async () => {
+    if (!gymId) return;
+    try {
+      setIsLoadingBookings(true);
+      const res = await apiClient.get(`/bookings/gym/${gymId}`);
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        const mapped = res.data.data.map((b) => {
+          const startDateStr = b.startDate
+            ? new Date(b.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+            : (b.date || 'Today');
+          return {
+            key: String(b._id || b.bookingId),
+            _id: b._id,
+            bookingId: b.bookingId || b._id,
+            customerId: b.userId?.customerId || b.customerId || 'CID0001',
+            customerName: b.userId?.name || b.customerName || 'Customer',
+            phone: b.userId?.phone || b.phone || '-',
+            avatar: b.userId?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop',
+            type: b.bookingType === 'WALK_IN' ? 'Walk-in' : 'App Booking',
+            date: startDateStr,
+            time: b.timeSlot || b.time || '07:00 AM',
+            amount: `₹${b.pricing?.totalAmount ?? b.amountPaid ?? 0}`,
+            status: b.status === 'Attended' ? 'Checked-in' : (b.status || 'Active'),
+            payment: b.payment?.method || 'Online',
+            isCustomDates: b.isCustomDates,
+            customDates: b.customDates || [],
+            raw: b,
+          };
+        });
+        setBookings(mapped);
+      }
+    } catch (err) {
+      console.warn('[BOOKINGS] Failed to fetch gym bookings:', err?.message);
+    } finally {
+      setIsLoadingBookings(false);
+    }
+  };
+
+  useEffect(() => {
+    if (gymId) {
+      loadBookings();
+    }
+  }, [gymId]);
+
+  const handleReviewReschedule = async (action) => {
+    if (!reviewTarget) return;
+    if (action === 'PROPOSE' && !proposedDate) {
+      message.error('Please select a proposed date for the member.');
+      return;
+    }
+
+    try {
+      setIsSubmittingReview(true);
+      const bookingId = reviewTarget.booking._id || reviewTarget.booking.bookingId || reviewTarget.booking.key;
+      const res = await apiClient.post(`/bookings/${bookingId}/review-reschedule`, {
+        sessionIndex: reviewTarget.sessionIndex,
+        sessionDate: reviewTarget.session.date,
+        action,
+        proposedDate: proposedDate ? proposedDate.format('YYYY-MM-DD') : undefined,
+        ownerNotes: reviewNotes,
+      });
+
+      message.success(
+        action === 'APPROVE'
+          ? 'Reschedule approved successfully!'
+          : action === 'PROPOSE'
+          ? 'Proposed date sent to member for acceptance.'
+          : 'Reschedule request rejected.'
+      );
+      setReviewModalVisible(false);
+      setReviewTarget(null);
+      setProposedDate(null);
+      setReviewNotes('');
+
+      await loadBookings();
+      if (res.data?.data) {
+        setSelectedBooking((prev) => (prev ? {
+          ...prev,
+          customDates: res.data.data.customDates || prev.customDates,
+        } : null));
+      }
+    } catch (err) {
+      message.error(err.message || 'Failed to submit reschedule decision.');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -1026,6 +1126,97 @@ export const BookingsManagement = ({
                   {selectedBooking.date}, 09:00 AM
                 </div>
               </div>
+
+              {/* Custom Dates Schedule Section */}
+              {selectedBooking.isCustomDates && Array.isArray(selectedBooking.customDates) && selectedBooking.customDates.length > 0 && (
+                <div style={{ marginTop: 12, padding: '12px', borderRadius: 8, backgroundColor: isDarkMode ? '#1a1a1a' : '#f8fafc', border: `1px solid ${isDarkMode ? '#333' : '#e2e8f0'}` }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 10 }}>
+                    Custom Dates Schedule ({selectedBooking.customDates.length} Days)
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {selectedBooking.customDates.map((item, idx) => {
+                      const dateFormatted = item.date ? new Date(item.date).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : '';
+                      const isRequested = item.status === 'Reschedule_Requested';
+                      const isProposed = item.status === 'Reschedule_Proposed';
+                      const isAttended = item.status === 'Attended';
+                      const isMissed = item.status === 'Missed';
+                      const isRescheduled = item.status === 'Rescheduled';
+
+                      let tagColor = 'blue';
+                      if (isAttended) tagColor = 'success';
+                      else if (isMissed) tagColor = 'error';
+                      else if (isRequested) tagColor = 'warning';
+                      else if (isProposed) tagColor = 'purple';
+                      else if (isRescheduled) tagColor = 'cyan';
+
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: 6,
+                            backgroundColor: isDarkMode ? '#222' : '#ffffff',
+                            border: `1px solid ${isDarkMode ? '#333' : '#e2e8f0'}`,
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <span style={{ fontWeight: 700, fontSize: 12.5, color: isDarkMode ? '#fff' : '#0f172a' }}>
+                                Day {idx + 1}:
+                              </span>{' '}
+                              <span style={{ fontSize: 12.5, color: isDarkMode ? '#ccc' : '#475569' }}>
+                                {dateFormatted}
+                              </span>
+                              {item.dailyOtp && (
+                                <div style={{ fontSize: 11, color: isDarkMode ? '#888' : '#64748b', marginTop: 2 }}>
+                                  Daily OTP: <strong style={{ color: 'var(--color-primary)' }}>{item.dailyOtp}</strong>
+                                </div>
+                              )}
+                            </div>
+                            <Tag color={tagColor} style={{ fontWeight: 600 }}>
+                              {item.status}
+                            </Tag>
+                          </div>
+
+                          {isRequested && (
+                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px dashed ${isDarkMode ? '#333' : '#e2e8f0'}` }}>
+                              <div style={{ fontSize: 12, color: '#d97706', marginBottom: 6 }}>
+                                <strong>Requested Date:</strong> {item.requestedDate ? new Date(item.requestedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                                {item.reason ? ` (${item.reason})` : ''}
+                              </div>
+                              <Button
+                                size="small"
+                                type="primary"
+                                style={{ fontSize: 12, borderRadius: 6, backgroundColor: '#003882' }}
+                                onClick={() => {
+                                  setReviewTarget({ booking: selectedBooking, sessionIndex: idx, session: item });
+                                  setProposedDate(null);
+                                  setReviewNotes('');
+                                  setReviewModalVisible(true);
+                                }}
+                              >
+                                Review Reschedule Request
+                              </Button>
+                            </div>
+                          )}
+
+                          {isProposed && item.proposedDate && (
+                            <div style={{ fontSize: 11.5, color: '#722ed1', marginTop: 6 }}>
+                              Proposed new date: {new Date(item.proposedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} (Awaiting member confirmation)
+                            </div>
+                          )}
+
+                          {isRescheduled && item.rescheduledTo && (
+                            <div style={{ fontSize: 11.5, color: '#0891b2', marginTop: 6 }}>
+                              Rescheduled to: {new Date(item.rescheduledTo).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Expiry Warning Notice Box */}
@@ -1147,6 +1338,95 @@ export const BookingsManagement = ({
             onChange={(dates) => setTempDateRange(dates)}
           />
         </div>
+      </Modal>
+
+      {/* REVIEW RESCHEDULE MODAL */}
+      <Modal
+        title="Review Reschedule Request"
+        open={reviewModalVisible}
+        onCancel={() => {
+          setReviewModalVisible(false);
+          setReviewTarget(null);
+        }}
+        footer={null}
+        destroyOnClose
+        width={480}
+      >
+        {reviewTarget && (
+          <div style={{ padding: '8px 0' }}>
+            <div style={{ marginBottom: 16 }}>
+              <Text strong style={{ display: 'block', fontSize: 14 }}>
+                Member: {reviewTarget.booking.customerName}
+              </Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Booking ID: {reviewTarget.booking.bookingId}
+              </Text>
+            </div>
+
+            <div style={{ padding: 12, borderRadius: 8, backgroundColor: isDarkMode ? '#1e1e1e' : '#f1f5f9', marginBottom: 16 }}>
+              <div style={{ fontSize: 13, marginBottom: 4 }}>
+                <strong>Original Date:</strong> {new Date(reviewTarget.session.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </div>
+              <div style={{ fontSize: 13, color: '#d97706', marginBottom: 4 }}>
+                <strong>Member Requested:</strong> {reviewTarget.session.requestedDate ? new Date(reviewTarget.session.requestedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'None'}
+              </div>
+              {reviewTarget.session.reason && (
+                <div style={{ fontSize: 12, color: isDarkMode ? '#aaa' : '#64748b' }}>
+                  <strong>Reason:</strong> {reviewTarget.session.reason}
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
+                Or Propose a Different Date:
+              </label>
+              <DatePicker
+                style={{ width: '100%', height: 40 }}
+                placeholder="Pick proposed date"
+                onChange={(d) => setProposedDate(d)}
+              />
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
+                Notes / Message to Member (Optional):
+              </label>
+              <Input.TextArea
+                rows={2}
+                value={reviewNotes}
+                onChange={(e) => setReviewNotes(e.target.value)}
+                placeholder="e.g. Approved as per your request."
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <Button
+                danger
+                loading={isSubmittingReview}
+                onClick={() => handleReviewReschedule('REJECT')}
+              >
+                Reject Request
+              </Button>
+              <Button
+                style={{ borderColor: '#722ed1', color: '#722ed1' }}
+                disabled={!proposedDate}
+                loading={isSubmittingReview}
+                onClick={() => handleReviewReschedule('PROPOSE')}
+              >
+                Propose Different Date
+              </Button>
+              <Button
+                type="primary"
+                style={{ backgroundColor: '#003882' }}
+                loading={isSubmittingReview}
+                onClick={() => handleReviewReschedule('APPROVE')}
+              >
+                Approve Requested Date
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

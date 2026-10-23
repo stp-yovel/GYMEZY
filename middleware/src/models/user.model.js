@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import Counter from './counter.model.js';
 import { generateToken } from '../utils/jwtHelper.js';
 
 export const USER_ROLES = {
@@ -81,6 +82,13 @@ const userSchema = new mongoose.Schema(
       default: USER_ROLES.CUSTOMER,
       index: true,
     },
+    customerId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+      index: true,
+    },
     avatar: {
       type: String,
       default: '',
@@ -141,8 +149,18 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Pre-save hook: Hash password securely if modified
+// Static method to generate next sequential customer ID
+userSchema.statics.generateCustomerId = async function () {
+  const seq = await Counter.getNextSequence('customer_id', 1);
+  return `GYZ${String(seq).padStart(4, '0')}`;
+};
+
+// Pre-save hook: Hash password securely if modified, and assign customerId if needed
 userSchema.pre('save', async function () {
+  if (!this.customerId && this.role === USER_ROLES.CUSTOMER) {
+    this.customerId = await mongoose.model('User').generateCustomerId();
+  }
+
   if (!this.isModified('password')) {
     return;
   }

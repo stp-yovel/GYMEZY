@@ -13,6 +13,7 @@ import {
 import { MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors } from '../theme/appTheme';
+import { formatTimeAgo } from '../utils/dateUtils';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -314,20 +315,74 @@ export const TrainersPopup = ({ visible, onClose, trainers = [], onTrainerTap })
   );
 };
 
-// 5. Trainer Reviews Popup
+const getServiceIconName = (service) => {
+  const s = (service || '').toLowerCase().trim();
+  if (s.includes('weight loss')) return 'local-mall';
+  if (s.includes('muscle')) return 'fitness-center';
+  if (s.includes('strength')) return 'ad-units';
+  if (s.includes('fat')) return 'local-fire-department';
+  if (s.includes('hiit') || s.includes('cardio') || s.includes('run')) return 'directions-run';
+  if (s.includes('diet') || s.includes('nutrition') || s.includes('meal')) return 'restaurant';
+  if (s.includes('transformation') || s.includes('body')) return 'accessibility-new';
+  if (s.includes('yoga')) return 'self-improvement';
+  if (s.includes('crossfit')) return 'flash-on';
+  return 'fitness-center';
+};
+
+// 5. Trainer Reviews & Profile Showcase Popup
 export const TrainerReviewsPopup = ({ visible, onClose, trainer, reviews = [], onBack }) => {
   const { colors, isDark } = useTheme();
   if (!trainer) return null;
+
+  const aboutMeText =
+    trainer.aboutMe ||
+    trainer.description ||
+    'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.';
+
+  const services =
+    Array.isArray(trainer.servicesOffered) && trainer.servicesOffered.length > 0
+      ? trainer.servicesOffered
+      : [
+          'Weight Loss Program',
+          'Muscle Gain',
+          'Strength Training',
+          'Fat Loss',
+          'HIIT Workouts',
+          'Diet & Nutrition',
+          'Body Transformation',
+        ];
+
+  const experienceText =
+    trainer.experience ||
+    (trainer.experienceYears ? `${trainer.experienceYears}+ Years` : '8+ Years');
+
+  const certifications =
+    Array.isArray(trainer.certifications) && trainer.certifications.length > 0
+      ? trainer.certifications
+      : typeof trainer.certifications === 'string' && trainer.certifications.trim()
+      ? trainer.certifications.split('\n').filter(Boolean)
+      : [
+          'ACE Certified Personal Trainer',
+          'Certified Strength & Conditioning Specialist (CSCS)',
+          'Nutrition & Weight Management Certification',
+        ];
+
+  const languagesText =
+    Array.isArray(trainer.languages) && trainer.languages.length > 0
+      ? trainer.languages.join(', ')
+      : typeof trainer.languages === 'string' && trainer.languages.trim()
+      ? trainer.languages
+      : 'English, Hindi';
 
   return (
     <BasePopupModal
       visible={visible}
       onClose={onClose}
-      title="All Trainer Reviews"
+      title={trainer.name ? `${trainer.name}` : 'Trainer Profile'}
       showBack={true}
       onBack={onBack}
     >
-      <ScrollView contentContainerStyle={styles.listContainer}>
+      <ScrollView contentContainerStyle={styles.listContainer} showsVerticalScrollIndicator={false}>
         {/* Trainer Header Card */}
         <View
           style={[
@@ -338,14 +393,14 @@ export const TrainerReviewsPopup = ({ visible, onClose, trainer, reviews = [], o
             },
           ]}
         >
-          <Image source={{ uri: trainer.imageUrl }} style={styles.largeTrainerAvatar} />
+          <Image source={{ uri: trainer.imageUrl || trainer.avatar }} style={styles.largeTrainerAvatar} />
           <View style={styles.largeTrainerInfo}>
             <Text style={[styles.largeTrainerName, { color: colors.text }]}>{trainer.name}</Text>
             <Text style={[styles.trainerSpecText, { color: colors.subtitle }]}>
-              {trainer.specialty} Specialist
+              {trainer.specialty || trainer.specialization || 'Trainer'} Specialist
             </Text>
             <Text style={[styles.trainerExpText, { color: colors.subtitle }]}>
-              {trainer.experienceYears} Years Experience
+              {experienceText} Experience
             </Text>
             <View style={styles.ratingRow}>
               {trainer.rating !== undefined && trainer.rating !== null && Number(trainer.rating) > 0 ? (
@@ -365,49 +420,131 @@ export const TrainerReviewsPopup = ({ visible, onClose, trainer, reviews = [], o
           </View>
         </View>
 
-        {/* Reviews List */}
-        {reviews.map((rev, idx) => (
-          <View
-            key={idx}
-            style={[
-              styles.reviewItemCard,
-              {
-                backgroundColor: colors.card,
-                borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.border,
-              },
-            ]}
-          >
-            <View style={styles.revHeaderRow}>
-              <View style={styles.revUserRow}>
-                <Image source={{ uri: rev.userImageUrl }} style={styles.revUserAvatar} />
-                <View style={styles.revUserNameCol}>
-                  <Text style={[styles.revUserName, { color: colors.text }]}>
-                    {rev.userName}
-                  </Text>
-                  <View style={styles.starsRow}>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <MaterialIcons
-                        key={i}
-                        name={i < Math.floor(rev.rating) ? 'star' : 'star-border'}
-                        size={10}
-                        color="#F59E0B"
-                      />
-                    ))}
+        {/* About Me */}
+        <View style={styles.trainerShowcaseSection}>
+          <Text style={[styles.showcaseSecTitle, { color: colors.text }]}>About Me</Text>
+          <Text style={[styles.showcaseSecBody, { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' }]}>
+            {aboutMeText}
+          </Text>
+        </View>
+
+        <View style={[styles.showcaseDivider, { borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0' }]} />
+
+        {/* Services Offered */}
+        <View style={styles.trainerShowcaseSection}>
+          <Text style={[styles.showcaseSecTitle, { color: colors.text, marginBottom: 14 }]}>
+            Services Offered
+          </Text>
+          <View style={styles.showcaseServicesGrid}>
+            {services.map((srv, idx) => (
+              <View key={idx} style={styles.showcaseServiceCol}>
+                <MaterialIcons
+                  name={getServiceIconName(srv)}
+                  size={19}
+                  color={isDark ? 'rgba(255,255,255,0.85)' : '#334155'}
+                  style={{ marginRight: 10 }}
+                />
+                <Text
+                  style={[styles.showcaseServiceText, { color: colors.text }]}
+                  numberOfLines={2}
+                >
+                  {srv}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={[styles.showcaseDivider, { borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0' }]} />
+
+        {/* Experience */}
+        <View style={styles.showcaseRowBetween}>
+          <Text style={[styles.showcaseSecTitle, { color: colors.text }]}>Experience</Text>
+          <Text style={[styles.showcaseRowVal, { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' }]}>
+            {experienceText}
+          </Text>
+        </View>
+
+        <View style={[styles.showcaseDivider, { borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0' }]} />
+
+        {/* Certifications */}
+        <View style={styles.trainerShowcaseSection}>
+          <Text style={[styles.showcaseSecTitle, { color: colors.text, marginBottom: 10 }]}>
+            Certifications
+          </Text>
+          {certifications.map((cert, idx) => (
+            <Text
+              key={idx}
+              style={[styles.showcaseBulletText, { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' }]}
+            >
+              • {cert.replace(/^[•\-*]\s*/, '')}
+            </Text>
+          ))}
+        </View>
+
+        <View style={[styles.showcaseDivider, { borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0' }]} />
+
+        {/* Languages */}
+        <View style={styles.showcaseRowBetween}>
+          <Text style={[styles.showcaseSecTitle, { color: colors.text }]}>Languages</Text>
+          <Text style={[styles.showcaseRowVal, { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' }]}>
+            {languagesText}
+          </Text>
+        </View>
+
+        {/* Client Reviews Section (if any exist) */}
+        {reviews.length > 0 && (
+          <>
+            <View style={[styles.showcaseDivider, { borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0', marginTop: 24 }]} />
+            <Text style={[styles.showcaseSecTitle, { color: colors.text, marginBottom: 14 }]}>
+              Client Reviews ({reviews.length})
+            </Text>
+            {reviews.map((rev, idx) => (
+              <View
+                key={idx}
+                style={[
+                  styles.reviewItemCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: isDark ? 'rgba(255,255,255,0.1)' : colors.border,
+                  },
+                ]}
+              >
+                <View style={styles.revHeaderRow}>
+                  <View style={styles.revUserRow}>
+                    <Image source={{ uri: rev.userImageUrl }} style={styles.revUserAvatar} />
+                    <View style={styles.revUserNameCol}>
+                      <Text style={[styles.revUserName, { color: colors.text }]}>
+                        {rev.userName}
+                      </Text>
+                      <View style={styles.starsRow}>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <MaterialIcons
+                            key={i}
+                            name={i < Math.floor(rev.rating) ? 'star' : 'star-border'}
+                            size={10}
+                            color="#F59E0B"
+                          />
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.revTypeCol}>
+                    <View style={styles.bookingTypeBadge}>
+                      <Text style={styles.bookingTypeText}>{rev.bookingType}</Text>
+                    </View>
+                    <Text style={[styles.revDate, { color: colors.subtitle }]}>
+                      {formatTimeAgo(rev.createdAt || rev.date)}
+                    </Text>
                   </View>
                 </View>
-              </View>
 
-              <View style={styles.revTypeCol}>
-                <View style={styles.bookingTypeBadge}>
-                  <Text style={styles.bookingTypeText}>{rev.bookingType}</Text>
-                </View>
-                <Text style={[styles.revDate, { color: colors.subtitle }]}>{rev.date}</Text>
+                <Text style={[styles.revComment, { color: colors.text }]}>{rev.comment}</Text>
               </View>
-            </View>
-
-            <Text style={[styles.revComment, { color: colors.text }]}>{rev.comment}</Text>
-          </View>
-        ))}
+            ))}
+          </>
+        )}
       </ScrollView>
     </BasePopupModal>
   );
@@ -529,7 +666,9 @@ export const AllReviewsPopup = ({
                     <View style={styles.bookingTypeBadge}>
                       <Text style={styles.bookingTypeText}>{rev.bookingType || 'Member'}</Text>
                     </View>
-                    <Text style={[styles.revDate, { color: colors.subtitle }]}>{rev.date || 'Recent'}</Text>
+                    <Text style={[styles.revDate, { color: colors.subtitle }]}>
+                      {formatTimeAgo(rev.createdAt || rev.date)}
+                    </Text>
                   </View>
                 </View>
 
@@ -873,5 +1012,57 @@ const styles = StyleSheet.create({
   persistentCloseBtnText: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  trainerShowcaseSection: {
+    marginVertical: 4,
+  },
+  showcaseSecTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Outfit' : 'Outfit-Bold',
+  },
+  showcaseSecBody: {
+    fontSize: 13.5,
+    lineHeight: 21,
+    marginTop: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Outfit' : 'Outfit-Regular',
+  },
+  showcaseDivider: {
+    borderBottomWidth: 1,
+    marginVertical: 18,
+  },
+  showcaseServicesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  showcaseServiceCol: {
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  showcaseServiceText: {
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
+    fontFamily: Platform.OS === 'ios' ? 'Outfit' : 'Outfit-Medium',
+  },
+  showcaseRowBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  showcaseRowVal: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Outfit' : 'Outfit-Medium',
+  },
+  showcaseBulletText: {
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: 6,
+    fontFamily: Platform.OS === 'ios' ? 'Outfit' : 'Outfit-Regular',
   },
 });
