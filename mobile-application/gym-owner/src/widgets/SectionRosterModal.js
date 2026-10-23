@@ -137,7 +137,7 @@ export const SectionRosterModal = ({ visible, onClose, section }) => {
                   const user = item.userId;
                   const name = user?.fullName || user?.name || 'Member';
                   const phone = user?.phone || user?.email || item.customerId || '—';
-                  const bookingId = item.bookingId || item.id || `BK-${idx + 1}`;
+                  const bookingId = item.bookingId || item.id || `BK${idx + 100}`;
                   const enrolledDate = item.createdAt
                     ? new Date(item.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
                     : '—';

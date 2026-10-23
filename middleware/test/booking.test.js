@@ -35,7 +35,7 @@ describe('Booking Model Schema & Validation Tests', () => {
     const fakeSectionId = new mongoose.Types.ObjectId();
 
     const validBooking = new Booking({
-      bookingId: 'BK-123456-789',
+      bookingId: 'BK100',
       userId: fakeUserId,
       gymId: fakeGymId,
       sectionId: fakeSectionId,

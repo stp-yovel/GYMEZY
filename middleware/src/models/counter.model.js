@@ -20,19 +20,40 @@ const counterSchema = new mongoose.Schema(
 /**
  * Atomically increment and return the next integer sequence number
  * @param {string} sequenceName - Identifier for the counter (e.g. 'gym_partner_id')
+ * @param {number} [startAt=1] - Starting number if the counter does not yet exist
  * @returns {Promise<number>} Next sequence integer
  */
-counterSchema.statics.getNextSequence = async function (sequenceName) {
+counterSchema.statics.getNextSequence = async function (sequenceName, startAt = 1) {
   try {
-    const counter = await this.findByIdAndUpdate(
-      sequenceName,
-      { $inc: { seq: 1 } },
-      { returnDocument: 'after', new: true, upsert: true, setDefaultsOnInsert: true }
+    const res = await this.collection.findOneAndUpdate(
+      { _id: sequenceName },
+      [
+        {
+          $set: {
+            seq: {
+              $cond: {
+                if: { $or: [{ $eq: ['$seq', null] }, { $not: ['$seq'] }] },
+                then: startAt,
+                else: { $add: ['$seq', 1] },
+              },
+            },
+            updatedAt: '$$NOW',
+            createdAt: {
+              $cond: {
+                if: { $or: [{ $eq: ['$createdAt', null] }, { $not: ['$createdAt'] }] },
+                then: '$$NOW',
+                else: '$createdAt',
+              },
+            },
+          },
+        },
+      ],
+      { returnDocument: 'after', upsert: true }
     );
-    return counter?.seq || 1;
+    return res?.seq ?? (res?.value?.seq || startAt);
   } catch (error) {
     console.warn('[COUNTER] getNextSequence fallback:', error.message);
-    return Math.floor(100 + Math.random() * 900);
+    return startAt;
   }
 };
 

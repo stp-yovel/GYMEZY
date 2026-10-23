@@ -4,6 +4,7 @@ import Booking from '../models/booking.model.js';
 import { Section } from '../models/section.model.js';
 import Gym from '../models/gym.model.js';
 import User from '../models/user.model.js';
+import Counter from '../models/counter.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -54,6 +55,16 @@ const resolveGym = async (gymId) => {
     throw ApiError.notFound('Gym not found.');
   }
   return gym;
+};
+
+/**
+ * Generate sequential booking ID formatted as BK{counter} scoped to the gym, starting from 100
+ * e.g. BK100, BK101, BK102
+ */
+const generateGymBookingId = async (gym) => {
+  const gymSeqKey = `bkg_${gym.partnerId || gym._id}`;
+  const seq = await Counter.getNextSequence(gymSeqKey, 100);
+  return `BK${seq}`;
 };
 
 /**
@@ -136,8 +147,8 @@ export const createBooking = asyncHandler(async (req, res) => {
     }
   }
 
-  // Generate unique human-friendly Booking ID and 6-digit entry OTP
-  const bookingId = `BK-${Date.now().toString().slice(-6)}-${crypto.randomInt(100, 999)}`;
+  // Generate gymwise auto-increment Booking ID (BK100, BK101, ...) and 6-digit entry OTP
+  const bookingId = await generateGymBookingId(gym);
   const entryOtp = crypto.randomInt(100000, 1000000).toString();
 
   const resolvedStartDate = startDate ? new Date(startDate) : (section?.startDate || new Date());
