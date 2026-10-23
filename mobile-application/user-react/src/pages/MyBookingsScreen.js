@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,12 @@ import {
   StyleSheet,
   Dimensions,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors, AppTheme } from '../theme/appTheme';
 import { useBookingRepository } from '../data/BookingContext';
@@ -21,16 +23,36 @@ const TABS = ['Upcoming', 'Completed', 'Cancelled'];
 
 export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
   const { isDark, colors } = useTheme();
-  const { bookings, memberships } = useBookingRepository();
+  const { bookings, memberships, refreshBookings } = useBookingRepository();
 
   const [showHub, setShowHub] = useState(initialShowHub);
   const [selectedTab, setSelectedTab] = useState('Upcoming');
+  const [refreshing, setRefreshing] = useState(false);
 
-  const upcomingCount = bookings.filter((b) => b.status === 'Upcoming').length;
+  useFocusEffect(
+    useCallback(() => {
+      refreshBookings?.();
+    }, [refreshBookings])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshBookings?.();
+    setRefreshing(false);
+  };
+
+  const upcomingCount = bookings.filter(
+    (b) => b.status === 'Upcoming' || b.status === 'Active' || b.status === 'Confirmed'
+  ).length;
   const completedCount = bookings.filter((b) => b.status === 'Completed').length;
   const cancelledCount = bookings.filter((b) => b.status === 'Cancelled').length;
 
-  const filteredBookings = bookings.filter((b) => b.status === selectedTab);
+  const filteredBookings = bookings.filter((b) => {
+    if (selectedTab === 'Upcoming') {
+      return b.status === 'Upcoming' || b.status === 'Active' || b.status === 'Confirmed';
+    }
+    return b.status === selectedTab;
+  });
 
   const bookNewSession = (_category = 'Gym') => {
     navigation.navigate('HomeTabs');
@@ -267,6 +289,14 @@ export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.passesScrollContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={isDark ? '#93C5FD' : AppColors.primaryColor}
+                colors={[AppColors.primaryColor]}
+              />
+            }
           >
             {filteredBookings.length === 0 ? (
               <View style={styles.emptyStateContainer}>
@@ -280,7 +310,10 @@ export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
               </View>
             ) : (
               filteredBookings.map((booking) => {
-                const isUpcoming = booking.status === 'Upcoming';
+                const isUpcoming =
+                  booking.status === 'Upcoming' ||
+                  booking.status === 'Active' ||
+                  booking.status === 'Confirmed';
                 const catMeta = getCategoryIcon(booking.type, booking.iconName);
 
                 return (
@@ -311,23 +344,46 @@ export const MyBookingsScreen = ({ navigation, initialShowHub = false }) => {
                         </Text>
                       </View>
 
-                      {/* Pass ID Tag Badge on Top Right */}
-                      <View
-                        style={[
-                          styles.passIdTag,
-                          {
-                            backgroundColor: isDark ? '#2A2A2A' : '#F1F5F9',
-                          },
-                        ]}
-                      >
-                        <Text
+                      {/* Pass ID Tag & Status Badge on Top Right */}
+                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                        <View
                           style={[
-                            styles.passIdText,
-                            { color: isDark ? '#93C5FD' : AppColors.primaryColor },
+                            styles.passIdTag,
+                            {
+                              backgroundColor: isDark ? '#2A2A2A' : '#F1F5F9',
+                            },
                           ]}
                         >
-                          {booking.id}
-                        </Text>
+                          <Text
+                            style={[
+                              styles.passIdText,
+                              { color: isDark ? '#93C5FD' : AppColors.primaryColor },
+                            ]}
+                          >
+                            {booking.id}
+                          </Text>
+                        </View>
+                        {booking.status === 'Active' && (
+                          <View
+                            style={{
+                              backgroundColor: 'rgba(0, 191, 98, 0.12)',
+                              paddingHorizontal: 7,
+                              paddingVertical: 2,
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: '#00BF62',
+                                fontSize: 10,
+                                fontWeight: '800',
+                                letterSpacing: 0.5,
+                              }}
+                            >
+                              ACTIVE
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
 
