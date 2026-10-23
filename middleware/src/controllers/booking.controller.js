@@ -12,7 +12,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
  * Resolve User ID from token or request body
  */
 const resolveUserId = async (req) => {
-  const rawUserId = req.user?._id || req.user?.userId || req.body?.userId || req.query?.userId;
+  const rawUserId = req.user?._id || req.user?.userId || req.user?.id || req.body?.userId || req.query?.userId || req.headers?.['x-user-id'];
   if (rawUserId && mongoose.Types.ObjectId.isValid(rawUserId)) {
     return new mongoose.Types.ObjectId(rawUserId);
   }
@@ -23,11 +23,11 @@ const resolveUserId = async (req) => {
         { email: req.user?.email || req.body?.email },
         { phone: req.user?.phone || req.body?.phone || '' },
       ],
-    });
+    }).lean().maxTimeMS(4000);
     if (foundUser) return foundUser._id;
   }
 
-  const anyUser = await User.findOne();
+  const anyUser = await User.findOne().lean().maxTimeMS(4000);
   return anyUser ? anyUser._id : new mongoose.Types.ObjectId();
 };
 
@@ -190,7 +190,7 @@ export const createBooking = asyncHandler(async (req, res) => {
     .populate('trainerId', 'name specialization avatar employeeId phone')
     .populate('userId', 'fullName name phone email customerId customerProfile');
 
-  return ApiResponse.created(res, 'Booking created successfully', populated);
+  return res.status(201).json(ApiResponse.created(populated, 'Booking created successfully'));
 });
 
 /**
@@ -198,9 +198,16 @@ export const createBooking = asyncHandler(async (req, res) => {
  * GET /api/v1/bookings/my
  */
 export const getMyBookings = asyncHandler(async (req, res) => {
-  const userId = await resolveUserId(req);
+  const rawUserId = req.user?.userId || req.user?.id || req.user?._id || req.query?.userId || req.headers?.['x-user-id'];
+  if (!rawUserId) {
+    return res.status(200).json(ApiResponse.success([], 'My bookings retrieved successfully'));
+  }
 
-  const bookings = await Booking.find({ userId })
+  const filter = mongoose.Types.ObjectId.isValid(rawUserId)
+    ? { userId: new mongoose.Types.ObjectId(rawUserId) }
+    : { userId: rawUserId };
+
+  const bookings = await Booking.find(filter)
     .populate('gymId', 'name partnerId address images imageUrl logo contactPhone location')
     .populate({
       path: 'sectionId',
@@ -211,9 +218,11 @@ export const getMyBookings = asyncHandler(async (req, res) => {
       },
     })
     .populate('trainerId', 'name specialization avatar employeeId phone')
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean()
+    .maxTimeMS(8000);
 
-  return ApiResponse.success(res, 'My bookings retrieved successfully', bookings);
+  return res.status(200).json(ApiResponse.success(bookings || [], 'My bookings retrieved successfully'));
 });
 
 /**
@@ -236,7 +245,7 @@ export const getBookingById = asyncHandler(async (req, res) => {
     throw ApiError.notFound('Booking not found.');
   }
 
-  return ApiResponse.success(res, 'Booking retrieved successfully', booking);
+  return res.status(200).json(ApiResponse.success(booking, 'Booking retrieved successfully'));
 });
 
 /**
@@ -281,7 +290,7 @@ export const cancelBooking = asyncHandler(async (req, res) => {
     .populate('sectionId', 'title category startTime endTime durationDays activeDays trainerId maxCapacity enrolledCount')
     .populate('trainerId', 'name specialization avatar employeeId phone');
 
-  return ApiResponse.success(res, 'Booking cancelled successfully', updatedBooking);
+  return res.status(200).json(ApiResponse.success(updatedBooking, 'Booking cancelled successfully'));
 });
 
 /**
@@ -310,7 +319,7 @@ export const getSectionEnrollments = asyncHandler(async (req, res) => {
   const activeCount = enrollments.filter((b) => b.status === 'Upcoming' || b.status === 'Active').length;
   const cancelledCount = enrollments.filter((b) => b.status === 'Cancelled').length;
 
-  return ApiResponse.success(res, 'Section enrollments retrieved successfully', {
+  return res.status(200).json(ApiResponse.success({
     section,
     summary: {
       maxCapacity: section.maxCapacity || 25,
@@ -320,5 +329,5 @@ export const getSectionEnrollments = asyncHandler(async (req, res) => {
       availableSlots: Math.max(0, (section.maxCapacity || 25) - (section.enrolledCount || 0)),
     },
     enrollments,
-  });
+  }, 'Section enrollments retrieved successfully'));
 });
