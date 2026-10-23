@@ -50,7 +50,11 @@ export const BookingDetailsScreen = ({ route, navigation }) => {
   const { showToast } = useToast();
 
   const booking = bookings.find((b) => b.id === initialBooking.id) || initialBooking;
-  const isUpcoming = booking.status === 'Upcoming' || booking.status === 'Confirmed';
+  const isPassVisible =
+    booking.status === 'Active' ||
+    booking.status === 'Upcoming' ||
+    booking.status === 'Confirmed';
+  const isActionable = isPassVisible;
 
   // Modals state
   const [showFullscreenQr, setShowFullscreenQr] = useState(false);
@@ -102,8 +106,10 @@ export const BookingDetailsScreen = ({ route, navigation }) => {
   };
 
   const getStatusColors = (status) => {
-    if (status === 'Confirmed' || status === 'Upcoming') {
-      return { text: AppColors.secondaryColor, bg: 'rgba(0, 191, 98, 0.12)' };
+    if (status === 'Active') {
+      return { text: '#00BF62', bg: 'rgba(0, 191, 98, 0.12)' };
+    } else if (status === 'Confirmed' || status === 'Upcoming') {
+      return { text: '#D97706', bg: 'rgba(217, 119, 6, 0.12)' };
     } else if (status === 'Completed') {
       return { text: '#60A5FA', bg: 'rgba(96, 165, 250, 0.12)' };
     } else {
@@ -147,7 +153,7 @@ export const BookingDetailsScreen = ({ route, navigation }) => {
         contentContainerStyle={styles.scrollContent}
       >
         {/* 1. Digital Entry Pass Card */}
-        {isUpcoming && (
+        {isPassVisible && (
           <View style={{ marginBottom: 18 }}>
             <DigitalQrPassCard
               passId={booking.id}
@@ -155,13 +161,15 @@ export const BookingDetailsScreen = ({ route, navigation }) => {
               otp={booking.otp}
               gymName={booking.gymName}
               subtitle={booking.sessionSubtitle}
-              primaryDateLabel="DATE"
+              primaryDateLabel="BATCH DATES"
               primaryDateValue={booking.date}
               secondaryDateLabel="TIME SLOT"
               secondaryDateValue={booking.time}
               status={booking.status}
               iconName="fitness-center"
               accentColor={isDark ? '#93C5FD' : AppColors.primaryColor}
+              qrValue={booking.qrCodeData || booking.rawBackendBooking?.qrCodeData}
+              passType="BOOKING"
             />
           </View>
         )}
@@ -320,7 +328,7 @@ export const BookingDetailsScreen = ({ route, navigation }) => {
         </View>
 
         {/* 3. Action Buttons (Modify & Cancel) */}
-        {isUpcoming && (
+        {isActionable && (
           <View style={styles.actionsRow}>
             {/* Modify Booking Button */}
             <TouchableOpacity
@@ -401,7 +409,17 @@ export const BookingDetailsScreen = ({ route, navigation }) => {
             {/* Dot-matrix style large QR Canvas */}
             <View style={styles.largeQrWrapper}>
               <QRCode
-                value={`gymezy://checkin?id=${booking.id}&cust=${booking.customerId}&otp=${booking.otp}`}
+                value={
+                  booking.qrCodeData ||
+                  booking.rawBackendBooking?.qrCodeData ||
+                  JSON.stringify({
+                    type: 'BOOKING',
+                    id: booking.id,
+                    bookingId: booking.id,
+                    customerId: booking.customerId,
+                    entryOtp: booking.otp,
+                  })
+                }
                 size={230}
                 color="#0F172A"
                 backgroundColor="#FFFFFF"

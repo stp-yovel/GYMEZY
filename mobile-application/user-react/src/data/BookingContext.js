@@ -15,6 +15,21 @@ export const mapBackendBookingToClient = (b) => {
 
   const durDays = b.durationDays || b.sessionsCount || 1;
 
+  const now = new Date();
+  let resolvedStatus = b.status || 'Upcoming';
+  if (resolvedStatus !== 'Cancelled' && resolvedStatus !== 'Completed') {
+    const sDate = b.startDate ? new Date(b.startDate) : null;
+    if (sDate) sDate.setHours(0, 0, 0, 0);
+    const eDate = b.endDate ? new Date(b.endDate) : null;
+    if (eDate) eDate.setHours(23, 59, 59, 999);
+
+    if (sDate && sDate <= now && (!eDate || eDate >= now)) {
+      resolvedStatus = 'Active';
+    } else if (eDate && eDate < now) {
+      resolvedStatus = 'Completed';
+    }
+  }
+
   return {
     ...b,
     id: b.bookingId || b.id || b._id,
@@ -29,12 +44,14 @@ export const mapBackendBookingToClient = (b) => {
       : (b.bookingType === 'SECTION' ? 'Section Batch' : (b.type || 'Gym Access')),
     sessionSubtitle: b.title || b.sessionSubtitle || 'Workout Session',
     date: dateSummary,
+    startDateStr: startStr,
+    endDateStr: endStr,
     time: b.timeSlot || b.time || 'Scheduled Time',
     daysBooked: `${durDays} ${durDays > 1 ? 'Days' : 'Day'} Batch`,
     amountPaid: b.pricing?.totalAmount ?? b.amountPaid ?? 0,
     paymentMode: b.payment?.method || b.paymentMode || 'UPI',
     otp: b.entryOtp || b.otp || '',
-    status: b.status || 'Upcoming',
+    status: resolvedStatus,
     iconName: b.category === 'yoga' ? 'self-improvement' : (b.category === 'zumba' ? 'music-note' : 'fitness-center'),
     accentColor: '#003882',
     sectionId: b.sectionId?._id || b.sectionId,

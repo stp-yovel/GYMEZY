@@ -156,6 +156,19 @@ export const createBooking = asyncHandler(async (req, res) => {
     resolvedBookingType = bookingType === 'GROUP_CLASS' ? 'GROUP_CLASS' : 'SECTION';
   }
 
+  const now = new Date();
+  const startDay = new Date(resolvedStartDate);
+  startDay.setHours(0, 0, 0, 0);
+  const endDay = resolvedEndDate ? new Date(resolvedEndDate) : null;
+  if (endDay) endDay.setHours(23, 59, 59, 999);
+
+  let initialStatus = 'Upcoming';
+  if (startDay <= now && (!endDay || endDay >= now)) {
+    initialStatus = 'Active';
+  } else if (endDay && endDay < now) {
+    initialStatus = 'Completed';
+  }
+
   const newBooking = new Booking({
     bookingId,
     userId: resolvedUser,
@@ -183,7 +196,7 @@ export const createBooking = asyncHandler(async (req, res) => {
       paidAt: payment?.paidAt ? new Date(payment.paidAt) : new Date(),
     },
     entryOtp,
-    status: 'Upcoming',
+    status: initialStatus,
   });
 
   try {
@@ -235,7 +248,21 @@ export const getMyBookings = asyncHandler(async (req, res) => {
     .lean()
     .maxTimeMS(8000);
 
-  return res.status(200).json(ApiResponse.success(bookings || [], 'My bookings retrieved successfully'));
+  const now = new Date();
+  const resolvedBookings = (bookings || []).map((b) => {
+    if (b.status === 'Upcoming' && b.startDate) {
+      const sDay = new Date(b.startDate);
+      sDay.setHours(0, 0, 0, 0);
+      const eDay = b.endDate ? new Date(b.endDate) : null;
+      if (eDay) eDay.setHours(23, 59, 59, 999);
+      if (sDay <= now && (!eDay || eDay >= now)) {
+        return { ...b, status: 'Active' };
+      }
+    }
+    return b;
+  });
+
+  return res.status(200).json(ApiResponse.success(resolvedBookings, 'My bookings retrieved successfully'));
 });
 
 /**
@@ -258,7 +285,19 @@ export const getBookingById = asyncHandler(async (req, res) => {
     throw ApiError.notFound('Booking not found.');
   }
 
-  return res.status(200).json(ApiResponse.success(booking, 'Booking retrieved successfully'));
+  const bObj = booking.toObject ? booking.toObject() : booking;
+  const now = new Date();
+  if (bObj.status === 'Upcoming' && bObj.startDate) {
+    const sDay = new Date(bObj.startDate);
+    sDay.setHours(0, 0, 0, 0);
+    const eDay = bObj.endDate ? new Date(bObj.endDate) : null;
+    if (eDay) eDay.setHours(23, 59, 59, 999);
+    if (sDay <= now && (!eDay || eDay >= now)) {
+      bObj.status = 'Active';
+    }
+  }
+
+  return res.status(200).json(ApiResponse.success(bObj, 'Booking retrieved successfully'));
 });
 
 /**

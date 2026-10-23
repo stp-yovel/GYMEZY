@@ -60,11 +60,15 @@ const getStatusAnimationConfig = (normStatus, primaryDateValue, secondaryDateVal
       helpText: 'QR code & entry OTP are paused while your plan change request is under review.',
     };
   }
+  const cleanStartDate = primaryDateValue?.includes('-')
+    ? primaryDateValue.split('-')[0].trim()
+    : (primaryDateValue || 'START DATE');
+
   if (normStatus === 'UPCOMING') {
     return {
       source: require('../../assets/animations/upcoming-calendar.json'),
       icon: 'event-available',
-      text: `PASS ACTIVATES ON ${primaryDateValue?.toUpperCase() || 'START DATE'}`,
+      text: `PASS ACTIVATES ON ${cleanStartDate.toUpperCase()}`,
       textColor: effectiveAccent,
       helpText: 'QR pass & 6-digit entry OTP will automatically unlock on your start date',
       loop: true,
@@ -133,6 +137,8 @@ export const DigitalQrPassCard = ({
   gymImageUrl,
   accentColor,
   isInReview = false,
+  qrValue,
+  passType = 'BOOKING',
 }) => {
   const { isDark, colors } = useTheme();
   const { showToast } = useToast();
@@ -141,12 +147,15 @@ export const DigitalQrPassCard = ({
     ? AppColors.darkAccentColor
     : accentColor || AppColors.primaryNavy;
 
-  const qrData = JSON.stringify({
-    type: 'MEMBERSHIP',
-    id: passId,
-    customerId: customerId,
-    entryOtp: otp || null,
-  });
+  const qrData =
+    qrValue ||
+    JSON.stringify({
+      type: passType,
+      id: passId,
+      bookingId: passId,
+      customerId: customerId,
+      entryOtp: otp || null,
+    });
   const otpDigits = typeof otp === 'string' && otp.trim().length > 0 ? otp.trim().split('') : [];
 
   const copyToClipboard = async (text, label) => {
@@ -245,7 +254,7 @@ export const DigitalQrPassCard = ({
             <Text style={[styles.dateLabel, { color: colors.subtitle }]}>
               {primaryDateLabel}
             </Text>
-            <Text style={[styles.dateValue, { color: colors.text }]} numberOfLines={1}>
+            <Text style={[styles.dateValue, { color: colors.text }]} numberOfLines={2}>
               {primaryDateValue}
             </Text>
           </View>
