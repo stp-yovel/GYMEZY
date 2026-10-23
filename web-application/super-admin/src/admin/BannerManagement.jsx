@@ -76,12 +76,16 @@ export const BannerManagement = () => {
     try {
       setLoading(true);
       const res = await bannerService.getAllBanners();
-      if (res && res.data) {
-        setBanners(res.data);
-      }
+      const bannerList = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res)
+        ? res
+        : [];
+      setBanners(bannerList);
     } catch (err) {
       console.error('Failed to load banners:', err);
       message.error(err.message || 'Failed to load promotional banners');
+      setBanners([]);
     } finally {
       setLoading(false);
     }
@@ -92,10 +96,21 @@ export const BannerManagement = () => {
     try {
       setGymsLoading(true);
       const res = await apiClient.get('/gyms');
-      const gymList = res.data?.data || res.data?.gyms || [];
+      const rawData = res.data;
+      let gymList = [];
+      if (Array.isArray(rawData)) {
+        gymList = rawData;
+      } else if (Array.isArray(rawData?.data?.gyms)) {
+        gymList = rawData.data.gyms;
+      } else if (Array.isArray(rawData?.data)) {
+        gymList = rawData.data;
+      } else if (Array.isArray(rawData?.gyms)) {
+        gymList = rawData.gyms;
+      }
       setGyms(gymList);
     } catch (err) {
       console.error('Failed to load gyms for banner mapping:', err);
+      setGyms([]);
     } finally {
       setGymsLoading(false);
     }
@@ -108,7 +123,8 @@ export const BannerManagement = () => {
 
   // Filtered Banners
   const filteredBanners = useMemo(() => {
-    return banners.filter((b) => {
+    const list = Array.isArray(banners) ? banners : [];
+    return list.filter((b) => {
       const matchSearch =
         searchQuery === '' ||
         b.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -125,9 +141,10 @@ export const BannerManagement = () => {
   }, [banners, searchQuery, priorityFilter]);
 
   // Statistics
-  const totalBanners = banners.length;
-  const priorityCount = banners.filter((b) => b.isPriority).length;
-  const activeCount = banners.filter((b) => b.isActive).length;
+  const bannerListSafe = Array.isArray(banners) ? banners : [];
+  const totalBanners = bannerListSafe.length;
+  const priorityCount = bannerListSafe.filter((b) => b.isPriority).length;
+  const activeCount = bannerListSafe.filter((b) => b.isActive).length;
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
@@ -700,7 +717,7 @@ export const BannerManagement = () => {
               }
               style={{ borderRadius: 8 }}
             >
-              {gyms.map((g) => (
+              {(Array.isArray(gyms) ? gyms : []).map((g) => (
                 <Option key={g._id || g.id} value={g._id || g.id}>
                   {g.name} — {g.area || g.city || 'Chennai'} {g.slug ? `(/${g.slug})` : ''}
                 </Option>
