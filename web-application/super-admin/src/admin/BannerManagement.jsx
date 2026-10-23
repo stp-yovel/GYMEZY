@@ -30,7 +30,6 @@ import {
   EnvironmentOutlined,
   ShopOutlined,
   UploadOutlined,
-  CheckCircleOutlined,
   StopOutlined,
   ThunderboltFilled,
   ReloadOutlined,
@@ -143,8 +142,6 @@ export const BannerManagement = () => {
   // Statistics
   const bannerListSafe = Array.isArray(banners) ? banners : [];
   const totalBanners = bannerListSafe.length;
-  const priorityCount = bannerListSafe.filter((b) => b.isPriority).length;
-  const activeCount = bannerListSafe.filter((b) => b.isActive).length;
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
@@ -508,119 +505,6 @@ export const BannerManagement = () => {
         </Space>
       </div>
 
-      {/* Metric Cards */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={8}>
-          <Card
-            bordered={false}
-            style={{
-              borderRadius: 12,
-              backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 13 }}>
-                  Total Banners
-                </Text>
-                <Title level={2} style={{ margin: '4px 0 0 0', color: isDarkMode ? '#f8fafc' : '#0f172a' }}>
-                  {totalBanners}
-                </Title>
-              </div>
-              <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 12,
-                  backgroundColor: isDarkMode ? 'rgba(99,102,241,0.15)' : '#e0e7ff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6366f1',
-                  fontSize: 22,
-                }}
-              >
-                <PictureOutlined />
-              </div>
-            </div>
-          </Card>
-        </Col>
-
-        <Col xs={24} sm={8}>
-          <Card
-            bordered={false}
-            style={{
-              borderRadius: 12,
-              backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 13 }}>
-                  Priority Banners (Top of Queue)
-                </Text>
-                <Title level={2} style={{ margin: '4px 0 0 0', color: '#f59e0b' }}>
-                  {priorityCount}
-                </Title>
-              </div>
-              <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 12,
-                  backgroundColor: isDarkMode ? 'rgba(245,158,11,0.15)' : '#fef3c7',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#f59e0b',
-                  fontSize: 22,
-                }}
-              >
-                <StarFilled />
-              </div>
-            </div>
-          </Card>
-        </Col>
-
-        <Col xs={24} sm={8}>
-          <Card
-            bordered={false}
-            style={{
-              borderRadius: 12,
-              backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 13 }}>
-                  Active On Mobile App
-                </Text>
-                <Title level={2} style={{ margin: '4px 0 0 0', color: '#10b981' }}>
-                  {activeCount}
-                </Title>
-              </div>
-              <div
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 12,
-                  backgroundColor: isDarkMode ? 'rgba(16,185,129,0.15)' : '#d1fae5',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#10b981',
-                  fontSize: 22,
-                }}
-              >
-                <CheckCircleOutlined />
-              </div>
-            </div>
-          </Card>
-        </Col>
-      </Row>
 
       {/* Filter Toolbar */}
       <Card
