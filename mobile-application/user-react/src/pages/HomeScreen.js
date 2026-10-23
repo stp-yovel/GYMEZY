@@ -32,6 +32,7 @@ import {
   CHENNAI_LOCATIONS,
 } from '../services/locationService';
 import { gymService } from '../services/gymService';
+import { apiService } from '../services/apiService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -160,9 +161,46 @@ export const HomeScreen = ({ navigation }) => {
   const [selectedType, setSelectedType] = useState(null);
   const [selectedFacility, setSelectedFacility] = useState(null);
   const [selectedWorkout, setSelectedWorkout] = useState(null);
-  const [showFilterModal, setShowFilterModal] = useState(false);
-
   const [bookmarkedGymNames, setBookmarkedGymNames] = useState(new Set());
+
+  // Promotional Banners State (Location-aware & Priority-sorted)
+  const [promotionalBanners, setPromotionalBanners] = useState([]);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+
+  const fetchPromotionalBanners = React.useCallback(async () => {
+    try {
+      const bannerList = await apiService.getPromotionalBanners(
+        userLocation?.latitude,
+        userLocation?.longitude
+      );
+      if (Array.isArray(bannerList)) {
+        setPromotionalBanners(bannerList);
+      }
+    } catch (err) {
+      console.warn('[HOME] Error fetching promotional banners:', err?.message);
+    }
+  }, [userLocation?.latitude, userLocation?.longitude]);
+
+  useEffect(() => {
+    void fetchPromotionalBanners();
+  }, [fetchPromotionalBanners]);
+
+  const bannersToDisplay = useMemo(() => {
+    if (promotionalBanners.length > 0) return promotionalBanners;
+    return [
+      {
+        _id: 'default_banner_1',
+        title: gyms[0]?.name || 'GYMEZY Partner Gym',
+        subtitle: gyms[0]?.location || 'Exclusive Membership Deal',
+        badgeText: '30% OFF PASS',
+        image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=800&auto=format&fit=crop',
+        gymName: gyms[0]?.name || 'GYMEZY Partner Gym',
+        gymArea: gyms[0]?.area || 'Near You',
+        gym: gyms[0] || null,
+        isPriority: false,
+      },
+    ];
+  }, [promotionalBanners, gyms]);
 
   // Check location permission on launch
   useEffect(() => {
@@ -468,62 +506,136 @@ export const HomeScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* 3. High-Impact Promotional Flash Banner */}
+        {/* 3. High-Impact Promotional Flash Banner Carousel (Location-aware & Priority-sorted) */}
         <View style={styles.promoBannerWrapper}>
-          <View style={styles.promoBannerContainer}>
-            <Image
-              source={{
-                uri: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=800&auto=format&fit=crop',
-              }}
-              style={styles.promoBannerImage}
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.85)']}
-              style={styles.promoGradient}
-            />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
+            snapToInterval={SCREEN_WIDTH - 32 + 12}
+            snapToAlignment="start"
+            contentContainerStyle={styles.promoCarouselScroll}
+            onScroll={(e) => {
+              const offsetX = e.nativeEvent.contentOffset.x;
+              const cardStep = SCREEN_WIDTH - 32 + 12;
+              const index = Math.round(offsetX / cardStep);
+              if (index >= 0 && index < bannersToDisplay.length && index !== activeBannerIndex) {
+                setActiveBannerIndex(index);
+              }
+            }}
+            scrollEventThrottle={16}
+          >
+            {bannersToDisplay.map((banner, index) => {
+              const bannerImg = banner.image || banner.imageUrl;
+              const isPriority = Boolean(banner.isPriority);
+              const gymName = banner.gymName || banner.gym?.name || 'GYMEZY Partner Gym';
+              const bannerTitle = banner.title || gymName;
+              const gymArea = banner.gymArea || banner.gym?.area || '';
+              const distanceText = banner.distanceKm != null ? `${banner.distanceKm} km away` : (gymArea || 'Near You');
+              const badgeLabel = banner.badgeText || (isPriority ? 'PRIORITY DEAL' : '30% OFF PASS');
 
-            <View style={styles.promoContentOverlay}>
-              {/* Top Row: Flash Badge & Countdown */}
-              <View style={styles.promoTopRow}>
-                <View style={styles.flashBadge}>
-                  <MaterialIcons name="bolt" size={14} color="#FFFFFF" />
-                  <Text style={styles.flashBadgeText}>30% OFF PASS</Text>
-                </View>
-
-                <View style={styles.countdownBadge}>
-                  <MaterialIcons name="timer" size={12} color="rgba(255,255,255,0.7)" />
-                  <Text style={styles.countdownText}>05d : 12h left</Text>
-                </View>
-              </View>
-
-              {/* Bottom Row: Title, Subtitle, Claim Button */}
-              <View style={styles.promoBottomRow}>
-                <View style={{ flex: 1, marginRight: 10 }}>
-                  <Text style={styles.promoGymTitle}>
-                    {gyms[0]?.name || 'GYMEZY Partner Gym'}
-                  </Text>
-                  <Text style={styles.promoGymSubtitle}>
-                    {gyms[0]?.location || 'Exclusive Membership Deal'}
-                  </Text>
-                </View>
-
+              return (
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('GymDetails', { gym: gyms[0] || {} })}
-                  style={styles.claimOfferBtn}
-                  activeOpacity={0.85}
+                  key={banner._id || `banner_${index}`}
+                  activeOpacity={0.92}
+                  onPress={() => {
+                    if (banner.gym) {
+                      navigation.navigate('GymDetails', { gym: banner.gym });
+                    } else if (banner.gymId) {
+                      const matchedGym = gyms.find(
+                        (g) => (g._id || g.id) === (banner.gymId?._id || banner.gymId)
+                      );
+                      navigation.navigate('GymDetails', {
+                        gym: matchedGym || {
+                          _id: banner.gymId?._id || banner.gymId,
+                          name: gymName,
+                          slug: banner.gymSlug,
+                          area: gymArea,
+                          location: gymArea,
+                        },
+                      });
+                    }
+                  }}
+                  style={[styles.promoBannerContainer, { width: SCREEN_WIDTH - 32 }]}
                 >
-                  <Text style={styles.claimOfferText}>Claim Offer</Text>
-                  <MaterialIcons
-                    name="arrow-forward"
-                    size={14}
-                    color={AppColors.primaryColor}
-                    style={{ marginLeft: 4 }}
+                  <Image
+                    source={{ uri: bannerImg }}
+                    style={styles.promoBannerImage}
+                    resizeMode="cover"
                   />
+                  <LinearGradient
+                    colors={['rgba(0,0,0,0.25)', 'rgba(0,0,0,0.85)']}
+                    style={styles.promoGradient}
+                  />
+
+                  <View style={styles.promoContentOverlay}>
+                    {/* Top Row: Flash Badge & Priority Tag / Proximity */}
+                    <View style={styles.promoTopRow}>
+                      <View
+                        style={[
+                          styles.flashBadge,
+                          isPriority && { backgroundColor: '#F59E0B' },
+                        ]}
+                      >
+                        <MaterialIcons
+                          name={isPriority ? 'star' : 'bolt'}
+                          size={14}
+                          color="#FFFFFF"
+                        />
+                        <Text style={styles.flashBadgeText}>{badgeLabel}</Text>
+                      </View>
+
+                      <View style={styles.countdownBadge}>
+                        <MaterialIcons
+                          name={banner.distanceKm != null ? 'near-me' : 'place'}
+                          size={12}
+                          color="rgba(255,255,255,0.85)"
+                        />
+                        <Text style={styles.countdownText}>{distanceText}</Text>
+                      </View>
+                    </View>
+
+                    {/* Bottom Row: Title, Subtitle, Claim Button */}
+                    <View style={styles.promoBottomRow}>
+                      <View style={{ flex: 1, marginRight: 10 }}>
+                        <Text style={styles.promoGymTitle} numberOfLines={1}>
+                          {bannerTitle}
+                        </Text>
+                        <Text style={styles.promoGymSubtitle} numberOfLines={1}>
+                          {gymName} {gymArea ? `• ${gymArea}` : ''}
+                        </Text>
+                      </View>
+
+                      <View style={styles.claimOfferBtn}>
+                        <Text style={styles.claimOfferText}>Explore</Text>
+                        <MaterialIcons
+                          name="arrow-forward"
+                          size={14}
+                          color={AppColors.primaryColor}
+                          style={{ marginLeft: 4 }}
+                        />
+                      </View>
+                    </View>
+                  </View>
                 </TouchableOpacity>
-              </View>
+              );
+            })}
+          </ScrollView>
+
+          {/* Pagination Indicators */}
+          {bannersToDisplay.length > 1 && (
+            <View style={styles.bannerDotsRow}>
+              {bannersToDisplay.map((_, dotIdx) => (
+                <View
+                  key={`banner_dot_${dotIdx}`}
+                  style={[
+                    styles.bannerDot,
+                    dotIdx === activeBannerIndex && styles.bannerDotActive,
+                  ]}
+                />
+              ))}
             </View>
-          </View>
+          )}
         </View>
 
 
@@ -1634,10 +1746,32 @@ const styles = StyleSheet.create({
     backgroundColor: AppColors.secondaryColor,
   },
 
-  /* High-Impact Promotional Flash Banner */
+  /* High-Impact Promotional Flash Banner Carousel */
   promoBannerWrapper: {
-    paddingHorizontal: 16,
     marginTop: 18,
+  },
+  promoCarouselScroll: {
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  bannerDotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 6,
+  },
+  bannerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(156, 163, 175, 0.35)',
+  },
+  bannerDotActive: {
+    width: 20,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: AppColors.primaryColor,
   },
   promoBannerContainer: {
     height: 180,

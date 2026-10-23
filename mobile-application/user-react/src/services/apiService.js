@@ -517,6 +517,30 @@ class ApiService {
     }
     return json.data;
   }
+
+  /**
+   * Fetch location-aware & priority-sorted promotional banners
+   */
+  async getPromotionalBanners(lat, lng) {
+    try {
+      let query = '';
+      if (lat != null && lng != null) {
+        query = `?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`;
+      }
+      const response = await this.executeFetch(`/banners${query}`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+      const json = await response.json();
+      if (response.ok && json.success && Array.isArray(json.data)) {
+        return json.data;
+      }
+      return [];
+    } catch (error) {
+      console.warn('[API SERVICE] getPromotionalBanners warning:', error?.message);
+      return [];
+    }
+  }
 }
 
 export const apiService = new ApiService();

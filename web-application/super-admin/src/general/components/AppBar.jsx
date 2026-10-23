@@ -17,6 +17,7 @@ const { Header } = Layout;
 
 const ROUTE_NAMES = {
   '/admin/dashboard': 'Dashboard',
+  '/admin/banners': 'Promotional Banners & Ads',
   '/admin/gyms': 'Gyms & Tenants',
   '/admin/onboarding': 'Gym Onboarding Wizard',
   '/admin/customers': 'Customers & Users',
