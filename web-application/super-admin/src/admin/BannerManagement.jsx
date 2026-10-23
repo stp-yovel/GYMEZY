@@ -32,7 +32,6 @@ import {
   UploadOutlined,
   StopOutlined,
   ThunderboltFilled,
-  ReloadOutlined,
   FireOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../theme/ThemeContext';
@@ -461,11 +460,10 @@ export const BannerManagement = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: 24,
-          flexWrap: 'wrap',
           gap: 16,
         }}
       >
-        <div>
+        <div style={{ flex: 1, minWidth: 0, marginRight: 16 }}>
           <Title
             level={3}
             style={{ margin: 0, color: isDarkMode ? '#f8fafc' : '#0f172a', fontWeight: 800 }}
@@ -484,25 +482,21 @@ export const BannerManagement = () => {
           </Paragraph>
         </div>
 
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={fetchBanners} loading={loading}>
-            Refresh
-          </Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleOpenCreateModal}
-            style={{
-              backgroundColor: '#6366f1',
-              borderColor: '#6366f1',
-              fontWeight: 600,
-              height: 40,
-              borderRadius: 8,
-            }}
-          >
-            Create New Banner
-          </Button>
-        </Space>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={handleOpenCreateModal}
+          style={{
+            backgroundColor: '#6366f1',
+            borderColor: '#6366f1',
+            fontWeight: 600,
+            height: 40,
+            borderRadius: 8,
+            flexShrink: 0,
+          }}
+        >
+          Create New Banner
+        </Button>
       </div>
 
 
@@ -727,7 +721,7 @@ export const BannerManagement = () => {
                       fontWeight: 600,
                     }}
                   >
-                    Size: ~{imageSizeKb} KB (Sharp WebP compression active)
+                    Size: ~{imageSizeKb} KB
                   </div>
                 </div>
               ) : null}
