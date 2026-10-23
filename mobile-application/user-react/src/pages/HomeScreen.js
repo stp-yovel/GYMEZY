@@ -164,9 +164,13 @@ export const HomeScreen = ({ navigation }) => {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [bookmarkedGymNames, setBookmarkedGymNames] = useState(new Set());
 
-  // Promotional Banners State (Location-aware & Priority-sorted)
+  // Promotional Banners State (Location-aware, Priority-sorted & Auto-scrolling)
   const [promotionalBanners, setPromotionalBanners] = useState([]);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const bannerScrollRef = React.useRef(null);
+  const isUserTouchingRef = React.useRef(false);
+  const activeBannerIndexRef = React.useRef(0);
+  activeBannerIndexRef.current = activeBannerIndex;
 
   const fetchPromotionalBanners = React.useCallback(async () => {
     try {
@@ -202,6 +206,25 @@ export const HomeScreen = ({ navigation }) => {
       },
     ];
   }, [promotionalBanners, gyms]);
+
+  // Smooth Auto-scroll Timer: advances to next banner every 3.8 seconds
+  useEffect(() => {
+    if (bannersToDisplay.length <= 1) return;
+
+    const interval = setInterval(() => {
+      if (isUserTouchingRef.current) return;
+
+      const nextIndex = (activeBannerIndexRef.current + 1) % bannersToDisplay.length;
+      const cardStep = SCREEN_WIDTH - 32 + 12;
+      bannerScrollRef.current?.scrollTo({
+        x: nextIndex * cardStep,
+        animated: true,
+      });
+      setActiveBannerIndex(nextIndex);
+    }, 3800);
+
+    return () => clearInterval(interval);
+  }, [bannersToDisplay.length]);
 
   // Check location permission on launch
   useEffect(() => {
@@ -510,24 +533,44 @@ export const HomeScreen = ({ navigation }) => {
         {/* 3. High-Impact Promotional Flash Banner Carousel (Location-aware & Priority-sorted) */}
         <View style={styles.promoBannerWrapper}>
           <ScrollView
+            ref={bannerScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             decelerationRate="fast"
             snapToInterval={SCREEN_WIDTH - 32 + 12}
             snapToAlignment="start"
             contentContainerStyle={styles.promoCarouselScroll}
+            onScrollBeginDrag={() => {
+              isUserTouchingRef.current = true;
+            }}
+            onScrollEndDrag={() => {
+              setTimeout(() => {
+                isUserTouchingRef.current = false;
+              }, 2500);
+            }}
+            onMomentumScrollEnd={(e) => {
+              isUserTouchingRef.current = false;
+              const offsetX = e.nativeEvent.contentOffset.x;
+              const cardStep = SCREEN_WIDTH - 32 + 12;
+              const index = Math.round(offsetX / cardStep);
+              if (index >= 0 && index < bannersToDisplay.length && index !== activeBannerIndexRef.current) {
+                setActiveBannerIndex(index);
+              }
+            }}
             onScroll={(e) => {
               const offsetX = e.nativeEvent.contentOffset.x;
               const cardStep = SCREEN_WIDTH - 32 + 12;
               const index = Math.round(offsetX / cardStep);
-              if (index >= 0 && index < bannersToDisplay.length && index !== activeBannerIndex) {
+              if (index >= 0 && index < bannersToDisplay.length && index !== activeBannerIndexRef.current) {
                 setActiveBannerIndex(index);
               }
             }}
             scrollEventThrottle={16}
           >
             {bannersToDisplay.map((banner, index) => {
-              const bannerImg = banner.image || banner.imageUrl;
+              const bannerImg = typeof banner.image === 'string'
+                ? banner.image
+                : (banner.image?.fileData || banner.imageUrl || banner.image?.fileUrl || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=800&auto=format&fit=crop');
               const isPriority = Boolean(banner.isPriority);
               const gymName = banner.gymName || banner.gym?.name || 'GYMEZY Partner Gym';
               const bannerTitle = banner.title || gymName;
@@ -565,11 +608,13 @@ export const HomeScreen = ({ navigation }) => {
                     resizeMode="cover"
                   />
                   <LinearGradient
-                    colors={['rgba(0,0,0,0.25)', 'rgba(0,0,0,0.85)']}
+                    colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']}
+                    locations={[0, 0.45, 1]}
                     style={styles.promoGradient}
+                    pointerEvents="none"
                   />
 
-                  <View style={styles.promoContentOverlay}>
+                  <View style={styles.promoContentOverlay} pointerEvents="box-none">
                     {/* Top Row: Flash Badge & Priority Tag / Proximity */}
                     <View style={styles.promoTopRow}>
                       <View
@@ -590,7 +635,7 @@ export const HomeScreen = ({ navigation }) => {
                         <MaterialIcons
                           name={banner.distanceKm != null ? 'near-me' : 'place'}
                           size={12}
-                          color="rgba(255,255,255,0.85)"
+                          color="rgba(255,255,255,0.9)"
                         />
                         <Text style={styles.countdownText}>{distanceText}</Text>
                       </View>
@@ -623,9 +668,9 @@ export const HomeScreen = ({ navigation }) => {
             })}
           </ScrollView>
 
-          {/* Pagination Indicators */}
+          {/* Pagination Indicators Placed INSIDE Banner Container at Bottom Center */}
           {bannersToDisplay.length > 1 && (
-            <View style={styles.bannerDotsRow}>
+            <View style={styles.bannerDotsOverlay} pointerEvents="none">
               {bannersToDisplay.map((_, dotIdx) => (
                 <View
                   key={`banner_dot_${dotIdx}`}
@@ -1750,46 +1795,60 @@ const styles = StyleSheet.create({
   /* High-Impact Promotional Flash Banner Carousel */
   promoBannerWrapper: {
     marginTop: 18,
+    position: 'relative',
   },
   promoCarouselScroll: {
     paddingHorizontal: 16,
     gap: 12,
   },
-  bannerDotsRow: {
+  bannerDotsOverlay: {
+    position: 'absolute',
+    bottom: 10,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
     gap: 6,
+    zIndex: 10,
+    elevation: 6,
   },
   bannerDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(156, 163, 175, 0.35)',
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
   },
   bannerDotActive: {
-    width: 20,
+    width: 22,
     height: 6,
     borderRadius: 3,
-    backgroundColor: AppColors.primaryColor,
+    backgroundColor: '#FFFFFF',
+    elevation: 3,
   },
   promoBannerContainer: {
-    height: 180,
-    borderRadius: 24,
+    height: 185,
+    borderRadius: 22,
     overflow: 'hidden',
     position: 'relative',
+    backgroundColor: '#0F172A',
   },
   promoBannerImage: {
+    ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
   },
   promoGradient: {
     ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
   promoContentOverlay: {
     ...StyleSheet.absoluteFillObject,
-    padding: 18,
+    zIndex: 2,
+    elevation: 4,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 26,
     justifyContent: 'space-between',
   },
   promoTopRow: {

@@ -79,8 +79,8 @@ export const BannerManagement = () => {
       const bannerList = Array.isArray(res?.data)
         ? res.data
         : Array.isArray(res)
-        ? res
-        : [];
+          ? res
+          : [];
       setBanners(bannerList);
     } catch (err) {
       console.error('Failed to load banners:', err);
@@ -798,7 +798,7 @@ export const BannerManagement = () => {
 
           {/* Image Upload Zone */}
           <Form.Item
-            label="Banner Graphic Image (Auto-Compressed to WebP via Sharp)"
+            label="Banner Graphic Image"
             required={!editingBanner}
             extra="Recommended size: 800x450 or 1200x600. File is automatically optimized to ultra-fast WebP."
           >
