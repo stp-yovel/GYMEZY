@@ -712,17 +712,18 @@ export const BannerManagement = () => {
               showSearch
               placeholder="Search and select gym..."
               loading={gymsLoading}
+              optionFilterProp="label"
               filterOption={(input, option) =>
-                option.children.toLowerCase().includes(input.toLowerCase())
+                String(option?.label || '')
+                  .toLowerCase()
+                  .includes(String(input || '').trim().toLowerCase())
               }
+              options={(Array.isArray(gyms) ? gyms : []).map((g) => ({
+                value: g._id || g.id,
+                label: `${g.name || 'Gym'} — ${g.area || g.city || 'Chennai'}${g.slug ? ` (/${g.slug})` : ''}`,
+              }))}
               style={{ borderRadius: 8 }}
-            >
-              {(Array.isArray(gyms) ? gyms : []).map((g) => (
-                <Option key={g._id || g.id} value={g._id || g.id}>
-                  {g.name} — {g.area || g.city || 'Chennai'} {g.slug ? `(/${g.slug})` : ''}
-                </Option>
-              ))}
-            </Select>
+            />
           </Form.Item>
 
           {/* Banner Title */}
