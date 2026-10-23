@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Keyboard,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -171,6 +172,7 @@ export const HomeScreen = ({ navigation }) => {
   const isUserTouchingRef = React.useRef(false);
   const activeBannerIndexRef = React.useRef(0);
   activeBannerIndexRef.current = activeBannerIndex;
+  const bannerScrollX = React.useRef(new Animated.Value(0)).current;
 
   const fetchPromotionalBanners = React.useCallback(async () => {
     try {
@@ -532,7 +534,7 @@ export const HomeScreen = ({ navigation }) => {
 
         {/* 3. High-Impact Promotional Flash Banner Carousel (Location-aware & Priority-sorted) */}
         <View style={styles.promoBannerWrapper}>
-          <ScrollView
+          <Animated.ScrollView
             ref={bannerScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -557,14 +559,20 @@ export const HomeScreen = ({ navigation }) => {
                 setActiveBannerIndex(index);
               }
             }}
-            onScroll={(e) => {
-              const offsetX = e.nativeEvent.contentOffset.x;
-              const cardStep = SCREEN_WIDTH - 32 + 12;
-              const index = Math.round(offsetX / cardStep);
-              if (index >= 0 && index < bannersToDisplay.length && index !== activeBannerIndexRef.current) {
-                setActiveBannerIndex(index);
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: bannerScrollX } } }],
+              {
+                useNativeDriver: false,
+                listener: (e) => {
+                  const offsetX = e.nativeEvent.contentOffset.x;
+                  const cardStep = SCREEN_WIDTH - 32 + 12;
+                  const index = Math.round(offsetX / cardStep);
+                  if (index >= 0 && index < bannersToDisplay.length && index !== activeBannerIndexRef.current) {
+                    setActiveBannerIndex(index);
+                  }
+                },
               }
-            }}
+            )}
             scrollEventThrottle={16}
           >
             {bannersToDisplay.map((banner, index) => {
@@ -666,20 +674,44 @@ export const HomeScreen = ({ navigation }) => {
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
+          </Animated.ScrollView>
 
-          {/* Pagination Indicators Placed INSIDE Banner Container at Bottom Center */}
+          {/* Pagination Indicators Placed INSIDE Banner Container with Smooth Morphing Animation */}
           {bannersToDisplay.length > 1 && (
             <View style={styles.bannerDotsOverlay} pointerEvents="none">
-              {bannersToDisplay.map((_, dotIdx) => (
-                <View
-                  key={`banner_dot_${dotIdx}`}
-                  style={[
-                    styles.bannerDot,
-                    dotIdx === activeBannerIndex && styles.bannerDotActive,
-                  ]}
-                />
-              ))}
+              {bannersToDisplay.map((_, dotIdx) => {
+                const cardStep = SCREEN_WIDTH - 32 + 12;
+                const inputRange = [
+                  (dotIdx - 1) * cardStep,
+                  dotIdx * cardStep,
+                  (dotIdx + 1) * cardStep,
+                ];
+
+                const dotWidth = bannerScrollX.interpolate({
+                  inputRange,
+                  outputRange: [6, 22, 6],
+                  extrapolate: 'clamp',
+                });
+
+                const dotOpacity = bannerScrollX.interpolate({
+                  inputRange,
+                  outputRange: [0.4, 1, 0.4],
+                  extrapolate: 'clamp',
+                });
+
+                return (
+                  <Animated.View
+                    key={`banner_dot_${dotIdx}`}
+                    style={[
+                      styles.bannerDot,
+                      {
+                        width: dotWidth,
+                        opacity: dotOpacity,
+                      },
+                    ]}
+                  />
+                );
+              })}
             </View>
           )}
         </View>
@@ -1814,17 +1846,10 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   bannerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.45)',
-  },
-  bannerDotActive: {
-    width: 22,
     height: 6,
     borderRadius: 3,
     backgroundColor: '#FFFFFF',
-    elevation: 3,
+    elevation: 2,
   },
   promoBannerContainer: {
     height: 185,
