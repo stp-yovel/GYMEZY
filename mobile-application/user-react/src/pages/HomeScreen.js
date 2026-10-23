@@ -161,6 +161,7 @@ export const HomeScreen = ({ navigation }) => {
   const [selectedType, setSelectedType] = useState(null);
   const [selectedFacility, setSelectedFacility] = useState(null);
   const [selectedWorkout, setSelectedWorkout] = useState(null);
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const [bookmarkedGymNames, setBookmarkedGymNames] = useState(new Set());
 
   // Promotional Banners State (Location-aware & Priority-sorted)
