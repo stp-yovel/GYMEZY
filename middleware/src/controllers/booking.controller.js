@@ -13,23 +13,34 @@ import { asyncHandler } from '../utils/asyncHandler.js';
  * Resolve User ID from token or request body
  */
 const resolveUserId = async (req) => {
+  let userId = null;
   const rawUserId = req.user?._id || req.user?.userId || req.user?.id || req.body?.userId || req.query?.userId || req.headers?.['x-user-id'];
   if (rawUserId && mongoose.Types.ObjectId.isValid(rawUserId)) {
-    return new mongoose.Types.ObjectId(rawUserId);
-  }
-
-  if (req.user?.email || req.body?.email) {
+    userId = new mongoose.Types.ObjectId(rawUserId);
+  } else if (req.user?.email || req.body?.email) {
     const foundUser = await User.findOne({
       $or: [
         { email: req.user?.email || req.body?.email },
         { phone: req.user?.phone || req.body?.phone || '' },
       ],
-    }).lean().maxTimeMS(4000);
-    if (foundUser) return foundUser._id;
+    }).maxTimeMS(4000);
+    if (foundUser) userId = foundUser._id;
   }
 
-  const anyUser = await User.findOne().lean().maxTimeMS(4000);
-  return anyUser ? anyUser._id : new mongoose.Types.ObjectId();
+  if (!userId) {
+    const anyUser = await User.findOne().maxTimeMS(4000);
+    userId = anyUser ? anyUser._id : new mongoose.Types.ObjectId();
+  }
+
+  if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+    const userDoc = await User.findById(userId);
+    if (userDoc && !userDoc.customerId) {
+      userDoc.customerId = await User.generateCustomerId();
+      await userDoc.save();
+    }
+  }
+
+  return userId;
 };
 
 /**

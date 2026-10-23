@@ -520,7 +520,7 @@ export const QrCheckIn = () => {
       case 'phone':
         return 'Enter 10-digit mobile number (e.g. 9876543210)...';
       case 'userId':
-        return 'Enter User ID (e.g. USR-1029, CUST789012)...';
+        return 'Enter Customer ID (e.g. GYZ0001)...';
       case 'membershipId':
         return 'Enter Membership ID (e.g. MBR-2024-089)...';
       case 'bookingId':

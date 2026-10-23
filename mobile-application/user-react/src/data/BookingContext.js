@@ -35,7 +35,7 @@ export const mapBackendBookingToClient = (b) => {
     id: b.bookingId || b.id || b._id,
     _id: b._id,
     bookingId: b.bookingId || b.id,
-    customerId: b.userId?.customerId || b.customerId || 'CUST789012',
+    customerId: b.userId?.customerId || b.customerId || 'GYZ0001',
     gymName: b.gymId?.name || b.gymName || 'GYMEZY Partner Gym',
     gymLocation: b.gymId?.location || b.gymId?.address?.city || b.gymLocation || '',
     gymImageUrl: b.gymId?.imageUrl || b.gymId?.images?.[0] || b.gymImageUrl || '',

@@ -113,6 +113,14 @@ export const createMembership = async (req, res, next) => {
       }
     }
 
+    if (resolvedUserId && mongoose.Types.ObjectId.isValid(resolvedUserId)) {
+      const userDoc = await User.findById(resolvedUserId);
+      if (userDoc && !userDoc.customerId) {
+        userDoc.customerId = await User.generateCustomerId();
+        await userDoc.save();
+      }
+    }
+
     // 3. Validate Gym
     const isObjectId = mongoose.Types.ObjectId.isValid(gymId);
     const gym = await Gym.findOne(
