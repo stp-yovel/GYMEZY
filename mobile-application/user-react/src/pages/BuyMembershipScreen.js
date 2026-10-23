@@ -591,7 +591,7 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
 
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => navigation.navigate('HomeTab')}
+            onPress={() => navigation.navigate('HomeTabs')}
             style={{ marginTop: 14 }}
           >
             <Text style={[styles.backHomeText, { color: subtitleColor }]}>Back to Home</Text>

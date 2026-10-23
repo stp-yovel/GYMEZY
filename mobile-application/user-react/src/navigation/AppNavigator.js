@@ -27,6 +27,7 @@ export const AppNavigator = () => {
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="HomeTabs" component={HomeScreen} />
+      <Stack.Screen name="HomeTab" component={HomeScreen} />
       <Stack.Screen
         name="Wallet"
         component={WalletScreen}

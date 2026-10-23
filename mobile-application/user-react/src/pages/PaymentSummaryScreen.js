@@ -101,7 +101,7 @@ export const PaymentSummaryScreen = ({ route, navigation }) => {
 
   const handleBackToHome = () => {
     setShowConfirmModal(false);
-    navigation.navigate('HomeTab');
+    navigation.navigate('HomeTabs');
   };
 
   return (
