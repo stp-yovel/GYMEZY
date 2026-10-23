@@ -61,3 +61,71 @@ export const calculateMembershipProgress = (membership) => {
     totalDays: totalDurationDays,
   };
 };
+
+/**
+ * Calculate dynamic relative time ago from a date or timestamp.
+ *
+ * Intervals:
+ *  - < 1 min: "Just now"
+ *  - 1 min to 59 mins: "1 min ago", "2 mins ago"...
+ *  - 1 hr to 23 hrs: "1 hr ago", "2 hrs ago"...
+ *  - 1 day to 30 days: "1 day ago", "2 days ago"...
+ *  - 1 month to 11 months: "1 month ago", "2 months ago"...
+ *  - >= 1 year: "1 year ago", "2 years ago"...
+ *
+ * @param {Date|string|number} dateInput - The timestamp or date string to format
+ * @returns {string} Human-friendly relative time string
+ */
+export const formatTimeAgo = (dateInput) => {
+  if (!dateInput) return 'Just now';
+
+  // If already formatted like "2 weeks ago" (and not "Just now")
+  if (
+    typeof dateInput === 'string' &&
+    dateInput.includes('ago') &&
+    !dateInput.toLowerCase().includes('just now')
+  ) {
+    return dateInput;
+  }
+
+  const date = parseDate(dateInput);
+  if (!date) {
+    if (typeof dateInput === 'string' && dateInput.trim() && dateInput !== 'Just now') {
+      return dateInput;
+    }
+    return 'Just now';
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+
+  // Less than 60 seconds or future/slight client clock skew
+  if (diffMs < 60 * 1000) {
+    return 'Just now';
+  }
+
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  const diffMonths = Math.floor(diffDays / 30);
+  const diffYears = Math.floor(diffDays / 365);
+
+  if (diffMins < 60) {
+    return `${diffMins} ${diffMins === 1 ? 'min' : 'mins'} ago`;
+  }
+  if (diffHours < 24) {
+    return `${diffHours} ${diffHours === 1 ? 'hr' : 'hrs'} ago`;
+  }
+  if (diffDays < 30) {
+    return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+  }
+  if (diffMonths < 12) {
+    return `${diffMonths} ${diffMonths === 1 ? 'month' : 'months'} ago`;
+  }
+  return `${diffYears} ${diffYears === 1 ? 'year' : 'years'} ago`;
+};
+
+export const getTimeAgo = formatTimeAgo;
+export const getRelativeTime = formatTimeAgo;
+

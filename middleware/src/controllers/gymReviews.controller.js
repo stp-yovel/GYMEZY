@@ -71,10 +71,41 @@ const calculateReviewMetrics = (reviews = []) => {
 };
 
 /**
+ * Helper to compute relative time string
+ */
+const computeTimeAgo = (dateInput) => {
+  if (!dateInput) return 'Just now';
+  if (typeof dateInput === 'string' && dateInput.includes('ago') && !dateInput.toLowerCase().includes('just now')) {
+    return dateInput;
+  }
+  const date = new Date(dateInput);
+  if (Number.isNaN(date.getTime())) {
+    return typeof dateInput === 'string' && dateInput.trim() ? dateInput : 'Just now';
+  }
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  if (diffMs < 60 * 1000) return 'Just now';
+
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  const diffMonths = Math.floor(diffDays / 30);
+  const diffYears = Math.floor(diffDays / 365);
+
+  if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'min' : 'mins'} ago`;
+  if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hr' : 'hrs'} ago`;
+  if (diffDays < 30) return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+  if (diffMonths < 12) return `${diffMonths} ${diffMonths === 1 ? 'month' : 'months'} ago`;
+  return `${diffYears} ${diffYears === 1 ? 'year' : 'years'} ago`;
+};
+
+/**
  * Helper to format review item with populated user details
  */
 const formatReviewItem = (rev) => {
   const userObj = rev.userId && typeof rev.userId === 'object' ? rev.userId : null;
+  const rawDate = rev.createdAt || rev.date;
   return {
     userId: userObj?._id || userObj?.id || rev.userId || null,
     userName: userObj?.fullName || rev.userName || 'Verified Member',
@@ -83,7 +114,7 @@ const formatReviewItem = (rev) => {
     rating: typeof rev.rating === 'number' ? rev.rating : 5,
     comment: rev.comment || '',
     bookingType: rev.bookingType || 'Member',
-    date: rev.date || 'Recent',
+    date: computeTimeAgo(rawDate),
     createdAt: rev.createdAt || new Date(),
   };
 };

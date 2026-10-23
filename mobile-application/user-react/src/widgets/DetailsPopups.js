@@ -13,6 +13,7 @@ import {
 import { MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors } from '../theme/appTheme';
+import { formatTimeAgo } from '../utils/dateUtils';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -533,7 +534,9 @@ export const TrainerReviewsPopup = ({ visible, onClose, trainer, reviews = [], o
                     <View style={styles.bookingTypeBadge}>
                       <Text style={styles.bookingTypeText}>{rev.bookingType}</Text>
                     </View>
-                    <Text style={[styles.revDate, { color: colors.subtitle }]}>{rev.date}</Text>
+                    <Text style={[styles.revDate, { color: colors.subtitle }]}>
+                      {formatTimeAgo(rev.createdAt || rev.date)}
+                    </Text>
                   </View>
                 </View>
 
@@ -663,7 +666,9 @@ export const AllReviewsPopup = ({
                     <View style={styles.bookingTypeBadge}>
                       <Text style={styles.bookingTypeText}>{rev.bookingType || 'Member'}</Text>
                     </View>
-                    <Text style={[styles.revDate, { color: colors.subtitle }]}>{rev.date || 'Recent'}</Text>
+                    <Text style={[styles.revDate, { color: colors.subtitle }]}>
+                      {formatTimeAgo(rev.createdAt || rev.date)}
+                    </Text>
                   </View>
                 </View>
 
