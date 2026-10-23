@@ -169,10 +169,10 @@ export const HomeScreen = ({ navigation }) => {
   const [promotionalBanners, setPromotionalBanners] = useState([]);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const bannerScrollRef = React.useRef(null);
+  const bannerScrollX = React.useRef(new Animated.Value(0)).current;
   const isUserTouchingRef = React.useRef(false);
   const activeBannerIndexRef = React.useRef(0);
   activeBannerIndexRef.current = activeBannerIndex;
-  const bannerScrollX = React.useRef(new Animated.Value(0)).current;
 
   const fetchPromotionalBanners = React.useCallback(async () => {
     try {
@@ -676,7 +676,7 @@ export const HomeScreen = ({ navigation }) => {
             })}
           </Animated.ScrollView>
 
-          {/* Pagination Indicators Placed INSIDE Banner Container with Smooth Morphing Animation */}
+          {/* Pagination Indicators Placed INSIDE Banner Container at Bottom Center */}
           {bannersToDisplay.length > 1 && (
             <View style={styles.bannerDotsOverlay} pointerEvents="none">
               {bannersToDisplay.map((_, dotIdx) => {
@@ -1849,7 +1849,13 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: '#FFFFFF',
-    elevation: 2,
+  },
+  bannerDotActive: {
+    width: 22,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFFFFF',
+    elevation: 3,
   },
   promoBannerContainer: {
     height: 185,
