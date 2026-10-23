@@ -125,6 +125,46 @@ const bookingSchema = new mongoose.Schema(
       cancelledAt: { type: Date, default: null },
       reason: { type: String, trim: true, default: '' },
     },
+    isCustomDates: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    attendedSessionsCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    attendanceHistory: [
+      {
+        attendedAt: { type: Date, default: Date.now },
+        method: { type: String, default: 'QR' },
+        area: { type: String, default: '' },
+      },
+    ],
+    customDates: [
+      {
+        date: { type: Date, required: true },
+        status: {
+          type: String,
+          enum: [
+            'Scheduled',
+            'Attended',
+            'Missed',
+            'Reschedule_Requested',
+            'Reschedule_Proposed',
+            'Rescheduled',
+          ],
+          default: 'Scheduled',
+        },
+        attendedAt: { type: Date, default: null },
+        dailyOtp: { type: String, default: null },
+        requestedDate: { type: Date, default: null },
+        proposedDate: { type: Date, default: null },
+        rescheduledTo: { type: Date, default: null },
+        reason: { type: String, default: '', trim: true },
+      },
+    ],
   },
   {
     timestamps: true,
@@ -133,18 +173,32 @@ const bookingSchema = new mongoose.Schema(
 
 // Pre-save hook: auto-assign 6-digit entry OTP & qrCodeData if not provided
 bookingSchema.pre('save', function () {
-  if (!this.entryOtp) {
+  if (this.isCustomDates && Array.isArray(this.customDates) && this.customDates.length > 0) {
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const todaySession = this.customDates.find((item) => {
+      if (!item.date) return false;
+      const dStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(item.date));
+      return dStr === todayStr && item.status === 'Scheduled';
+    });
+    if (todaySession) {
+      if (!todaySession.dailyOtp) {
+        todaySession.dailyOtp = crypto.randomInt(100000, 1000000).toString();
+      }
+      this.entryOtp = todaySession.dailyOtp;
+    } else {
+      this.entryOtp = null;
+    }
+  } else if (!this.entryOtp && this.status !== 'Cancelled') {
     this.entryOtp = crypto.randomInt(100000, 1000000).toString();
   }
-  if (!this.qrCodeData) {
-    this.qrCodeData = JSON.stringify({
-      bookingId: this.bookingId,
-      entryOtp: this.entryOtp,
-      gymId: this.gymId,
-      sectionId: this.sectionId,
-      userId: this.userId,
-    });
-  }
+
+  this.qrCodeData = JSON.stringify({
+    bookingId: this.bookingId,
+    entryOtp: this.entryOtp,
+    gymId: this.gymId,
+    sectionId: this.sectionId,
+    userId: this.userId,
+  });
 });
 
 // Compound partial index to prevent duplicate active bookings for the same section

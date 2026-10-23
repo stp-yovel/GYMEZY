@@ -276,7 +276,9 @@ export const createEmployee = asyncHandler(async (req, res) => {
   const generatedEmpId = await generateSequentialEmpId(gymId, gymPartnerId, role);
 
   const isSuperAdmin = req.user?.role === USER_ROLES.SUPER_ADMIN;
-  const initialApprovalStatus = isSuperAdmin ? 'Approved' : 'Pending Approval';
+  const isPartTimeOrTemp = type === 'Part-Time' || type === 'Temporary';
+  const initialApprovalStatus = isSuperAdmin || isPartTimeOrTemp ? 'Approved' : 'Pending Approval';
+  const initialPendingAction = isSuperAdmin || isPartTimeOrTemp ? 'NONE' : 'NEW_EMPLOYEE';
 
   const newEmployeeData = {
     gymId,
@@ -295,7 +297,7 @@ export const createEmployee = asyncHandler(async (req, res) => {
     status: status || 'Active',
     attendance: attendance || 'Present',
     approvalStatus: initialApprovalStatus,
-    pendingAction: isSuperAdmin ? 'NONE' : 'NEW_EMPLOYEE',
+    pendingAction: initialPendingAction,
     specialty: specialty || '',
     experienceYears: Number(experienceYears) || 1,
     experience: experience || (experienceYears ? `${experienceYears}+ Years` : ''),
@@ -371,6 +373,7 @@ export const getEmployees = asyncHandler(async (req, res) => {
     role,
     approvalStatus,
     status,
+    type,
     search,
     page = 1,
     limit = 8,
@@ -425,6 +428,7 @@ export const getEmployees = asyncHandler(async (req, res) => {
   if (role && role !== 'ALL') andConditions.push({ role });
   if (approvalStatus && approvalStatus !== 'ALL') andConditions.push({ approvalStatus });
   if (status && status !== 'ALL') andConditions.push({ status });
+  if (type && type !== 'ALL') andConditions.push({ type });
 
   if (search) {
     const regex = new RegExp(search.trim(), 'i');

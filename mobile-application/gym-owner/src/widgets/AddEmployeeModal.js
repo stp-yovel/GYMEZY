@@ -135,6 +135,9 @@ export const AddEmployeeModal = ({
   const [prevCompany, setPrevCompany] = useState('');
   const [prevDesignation, setPrevDesignation] = useState('');
   const [prevExp, setPrevExp] = useState('1-2 Years');
+  const [prevEmployments, setPrevEmployments] = useState([
+    { id: 1, companyName: '', designation: '', experience: '1-2 Years' },
+  ]);
   const [empDocs, setEmpDocs] = useState([]);
 
   // Family Details
@@ -182,12 +185,35 @@ export const AddEmployeeModal = ({
     setPrevCompany('');
     setPrevDesignation('');
     setPrevExp('1-2 Years');
+    setPrevEmployments([{ id: 1, companyName: '', designation: '', experience: '1-2 Years' }]);
     setEmpDocs([]);
     setEmergencyName('');
     setEmergencyPhone('');
     setEmergencyRelation('Spouse');
     setPersonalDocs([]);
     setTrainerCerts([]);
+  };
+
+  const handleAddPrevEmployment = () => {
+    setPrevEmployments((prev) => [
+      ...prev,
+      { id: Date.now(), companyName: '', designation: '', experience: '1-2 Years' },
+    ]);
+  };
+
+  const handleRemovePrevEmployment = (index) => {
+    setPrevEmployments((prev) => {
+      const updated = prev.filter((_, idx) => idx !== index);
+      return updated.length > 0
+        ? updated
+        : [{ id: Date.now(), companyName: '', designation: '', experience: '1-2 Years' }];
+    });
+  };
+
+  const handleUpdatePrevEmployment = (index, field, value) => {
+    setPrevEmployments((prev) =>
+      prev.map((item, idx) => (idx === index ? { ...item, [field]: value } : item))
+    );
   };
 
   const handleClose = () => {
@@ -326,9 +352,12 @@ export const AddEmployeeModal = ({
         attendance: 'Present',
         accessType,
         approvalStatus: 'Pending Approval',
-        previousCompany: prevCompany.trim(),
-        previousDesignation: prevDesignation.trim(),
-        previousExp: prevExp,
+        previousEmployments: prevEmployments.filter(
+          (p) => p.companyName?.trim() || p.designation?.trim()
+        ),
+        previousCompany: prevEmployments[0]?.companyName?.trim() || prevCompany.trim(),
+        previousDesignation: prevEmployments[0]?.designation?.trim() || prevDesignation.trim(),
+        previousExp: prevEmployments[0]?.experience || prevExp,
         description:
           aboutMe.trim() ||
           'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.',
@@ -794,88 +823,142 @@ export const AddEmployeeModal = ({
                   },
                 ]}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                  <MaterialIcons name="business-center" size={18} color={AppColors.primaryColor} />
-                  <Text style={[styles.subSectionTitle, { color: isDark ? '#FFFFFF' : '#0F172A', marginBottom: 0 }]}>
-                    Previous Employment Details
-                  </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <MaterialIcons name="business-center" size={18} color={AppColors.primaryColor} />
+                    <Text style={[styles.subSectionTitle, { color: isDark ? '#FFFFFF' : '#0F172A', marginBottom: 0 }]}>
+                      Previous Employment Details
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={handleAddPrevEmployment}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      paddingVertical: 4,
+                      paddingHorizontal: 8,
+                      borderRadius: 6,
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9',
+                    }}
+                  >
+                    <MaterialIcons name="add" size={16} color={AppColors.primaryColor} />
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: AppColors.primaryColor }}>
+                      Add Another
+                    </Text>
+                  </TouchableOpacity>
                 </View>
 
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Company Name</Text>
-                    <TextInput
-                      value={prevCompany}
-                      onChangeText={setPrevCompany}
-                      placeholder="e.g. Gold's Gym"
-                      placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
-                      style={[
-                        styles.formInput,
-                        {
-                          color: isDark ? '#FFFFFF' : '#0F172A',
-                          borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF',
-                        },
-                      ]}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>Designation</Text>
-                    <TextInput
-                      value={prevDesignation}
-                      onChangeText={setPrevDesignation}
-                      placeholder="e.g. Senior Trainer"
-                      placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
-                      style={[
-                        styles.formInput,
-                        {
-                          color: isDark ? '#FFFFFF' : '#0F172A',
-                          borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF',
-                        },
-                      ]}
-                    />
-                  </View>
-                </View>
-
-                <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 4 }]}>
-                  Years of Experience
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                  {PREV_EXP_OPTIONS.map((exp) => {
-                    const isSel = prevExp === exp;
-                    return (
-                      <TouchableOpacity
-                        key={exp}
-                        style={[
-                          styles.selectionChip,
-                          {
-                            backgroundColor: isSel
-                              ? AppColors.primaryColor
-                              : isDark
-                              ? 'rgba(255,255,255,0.05)'
-                              : '#FFFFFF',
-                            borderColor: isSel
-                              ? AppColors.primaryColor
-                              : isDark
-                              ? AppColors.darkBorder
-                              : '#E2E8F0',
-                          },
-                        ]}
-                        onPress={() => setPrevExp(exp)}
-                      >
-                        <Text
-                          style={[
-                            styles.selectionChipText,
-                            { color: isSel ? '#FFFFFF' : isDark ? '#FFFFFF' : '#0F172A' },
-                          ]}
+                {prevEmployments.map((emp, index) => (
+                  <View
+                    key={emp.id || index}
+                    style={{
+                      marginBottom: index < prevEmployments.length - 1 ? 14 : 6,
+                      padding: 10,
+                      borderRadius: 8,
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: isDark ? '#94A3B8' : '#64748B' }}>
+                        Experience #{index + 1}
+                      </Text>
+                      {prevEmployments.length > 1 && (
+                        <TouchableOpacity
+                          onPress={() => handleRemovePrevEmployment(index)}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
                         >
-                          {exp}
+                          <MaterialIcons name="delete-outline" size={16} color="#EF4444" />
+                          <Text style={{ fontSize: 11, color: '#EF4444', fontWeight: '500' }}>Remove</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A', fontSize: 12 }]}>
+                          Company Name
                         </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                        <TextInput
+                          value={emp.companyName}
+                          onChangeText={(val) => handleUpdatePrevEmployment(index, 'companyName', val)}
+                          placeholder="e.g. Golds Gym"
+                          placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
+                          style={[
+                            styles.formInput,
+                            {
+                              color: isDark ? '#FFFFFF' : '#0F172A',
+                              borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                              backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF',
+                            },
+                          ]}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A', fontSize: 12 }]}>
+                          Designation
+                        </Text>
+                        <TextInput
+                          value={emp.designation}
+                          onChangeText={(val) => handleUpdatePrevEmployment(index, 'designation', val)}
+                          placeholder="e.g. Senior Trainer"
+                          placeholderTextColor={isDark ? 'rgba(255,255,255,0.3)' : '#94A3B8'}
+                          style={[
+                            styles.formInput,
+                            {
+                              color: isDark ? '#FFFFFF' : '#0F172A',
+                              borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
+                              backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF',
+                            },
+                          ]}
+                        />
+                      </View>
+                    </View>
+
+                    <Text style={[styles.formLabel, { color: isDark ? '#FFFFFF' : '#0F172A', marginTop: 8, fontSize: 12 }]}>
+                      Years of Experience
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                      {PREV_EXP_OPTIONS.map((expOption) => {
+                        const isSel = emp.experience === expOption;
+                        return (
+                          <TouchableOpacity
+                            key={expOption}
+                            style={[
+                              styles.selectionChip,
+                              {
+                                paddingVertical: 4,
+                                paddingHorizontal: 10,
+                                backgroundColor: isSel
+                                  ? AppColors.primaryColor
+                                  : isDark
+                                  ? 'rgba(255,255,255,0.05)'
+                                  : '#FFFFFF',
+                                borderColor: isSel
+                                  ? AppColors.primaryColor
+                                  : isDark
+                                  ? AppColors.darkBorder
+                                  : '#E2E8F0',
+                              },
+                            ]}
+                            onPress={() => handleUpdatePrevEmployment(index, 'experience', expOption)}
+                          >
+                            <Text
+                              style={[
+                                styles.selectionChipText,
+                                { fontSize: 11, color: isSel ? '#FFFFFF' : isDark ? '#FFFFFF' : '#0F172A' },
+                              ]}
+                            >
+                              {expOption}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))}
 
                 {/* Employment Documents */}
                 <View style={{ marginTop: 12 }}>

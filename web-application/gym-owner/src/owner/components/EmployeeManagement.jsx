@@ -24,6 +24,7 @@ import {
   Space,
   Spin,
   Alert,
+  Switch,
 } from 'antd';
 import {
   DollarOutlined,
@@ -233,7 +234,10 @@ export const EmployeeManagement = ({
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [attendanceFilter, setAttendanceFilter] = useState('ALL');
+  const [staffTypeFilter, setStaffTypeFilter] = useState('ALL');
   const [selectedDateRange, setSelectedDateRange] = useState(`${todayFormatted} - ${oneYearLaterFormatted}`);
+  const [isDifferentDays, setIsDifferentDays] = useState(false);
+  const [dayWiseHours, setDayWiseHours] = useState({});
 
   // Fetch live employees from server with pagination & filters
   const loadEmployees = async (page = currentPage, limit = pageSize) => {
@@ -248,6 +252,7 @@ export const EmployeeManagement = ({
       if (namePhoneSearch) params.search = namePhoneSearch;
       if (roleFilter && roleFilter !== 'ALL') params.role = roleFilter;
       if (statusFilter && statusFilter !== 'ALL') params.status = statusFilter;
+      if (staffTypeFilter && staffTypeFilter !== 'ALL') params.type = staffTypeFilter;
 
       const response = await apiClient.get('/employees', { params });
       const rawData = response.data?.data;
@@ -265,7 +270,7 @@ export const EmployeeManagement = ({
 
       if (normalized.length > 0) {
         setEmployeesList(normalized);
-      } else if (mappedGymStaff.length > 0 && !namePhoneSearch && roleFilter === 'ALL' && statusFilter === 'ALL') {
+      } else if (mappedGymStaff.length > 0 && !namePhoneSearch && roleFilter === 'ALL' && statusFilter === 'ALL' && staffTypeFilter === 'ALL') {
         setEmployeesList(mappedGymStaff);
         setTotalServerEmployees(mappedGymStaff.length);
       } else {
@@ -285,7 +290,7 @@ export const EmployeeManagement = ({
 
   useEffect(() => {
     loadEmployees(currentPage, pageSize);
-  }, [gymId, gymPartnerId, currentPage, pageSize, namePhoneSearch, roleFilter, statusFilter]);
+  }, [gymId, gymPartnerId, currentPage, pageSize, namePhoneSearch, roleFilter, statusFilter, staffTypeFilter]);
 
   const currentMonthName = useMemo(() => {
     return new Date().toLocaleDateString('en-GB', { month: 'long' });
@@ -320,6 +325,12 @@ export const EmployeeManagement = ({
   const [empDocs, setEmpDocs] = useState([]);
   const [personalDocs, setPersonalDocs] = useState([]);
   const [trainerCerts, setTrainerCerts] = useState([]);
+  const [addPrevEmployments, setAddPrevEmployments] = useState([
+    { id: 1, companyName: '', designation: '', experience: '1-2 Years' },
+  ]);
+  const [editPrevEmployments, setEditPrevEmployments] = useState([
+    { id: 1, companyName: '', designation: '', experience: '1-2 Years' },
+  ]);
 
   // Document Attachment Handlers
   const openAttachDocModal = (section = 'personal') => {
@@ -400,10 +411,12 @@ export const EmployeeManagement = ({
   // Employee Details / Full Edit States
   const [detailAccessType, setDetailAccessType] = useState('Employee');
   const [detailRole, setDetailRole] = useState('Trainer');
+  const [detailEmpType, setDetailEmpType] = useState('Full-Time');
   const [editPhoto, setEditPhoto] = useState(null);
   const [editEmpDocs, setEditEmpDocs] = useState([]);
   const [editWorkingDays, setEditWorkingDays] = useState(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
   const [editActiveTab, setEditActiveTab] = useState('personal');
+  const [showTrainerShowcaseTab, setShowTrainerShowcaseTab] = useState(true);
 
   // Filter Logic
   const filteredEmployees = employeesList.filter((item) => {
@@ -415,13 +428,14 @@ export const EmployeeManagement = ({
       item.employeeId?.toLowerCase().includes(searchLower);
 
     const matchRole = roleFilter === 'ALL' || item.role === roleFilter;
+    const matchType = staffTypeFilter === 'ALL' || (item.type || 'Full-Time') === staffTypeFilter;
     const matchStatus =
       statusFilter === 'ALL' ||
       item.status === statusFilter ||
       item.approvalStatus === statusFilter;
     const matchAttendance = attendanceFilter === 'ALL' || item.attendance === attendanceFilter;
 
-    return matchSearch && matchRole && matchStatus && matchAttendance;
+    return matchSearch && matchRole && matchType && matchStatus && matchAttendance;
   });
 
   const clearFilters = () => {
@@ -429,6 +443,7 @@ export const EmployeeManagement = ({
     setRoleFilter('ALL');
     setStatusFilter('ALL');
     setAttendanceFilter('ALL');
+    setStaffTypeFilter('ALL');
     setSelectedDateRange(`${todayFormatted} - ${oneYearLaterFormatted}`);
     message.info('Filters cleared');
   };
@@ -437,6 +452,7 @@ export const EmployeeManagement = ({
     setSelectedEmployee(record);
     setDetailAccessType(record.accessType || 'Employee');
     setDetailRole(record.role || 'Trainer');
+    setDetailEmpType(record.type || 'Full-Time');
     setEditPhoto(record.avatar || null);
     setEditEmpDocs(Array.isArray(record.documents) ? record.documents : []);
     setEditWorkingDays(
@@ -445,6 +461,28 @@ export const EmployeeManagement = ({
         : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
     );
     setEditActiveTab('personal');
+
+    if (Array.isArray(record.previousEmployments) && record.previousEmployments.length > 0) {
+      setEditPrevEmployments(
+        record.previousEmployments.map((pe, idx) => ({
+          id: pe.id || pe._id || idx + 1,
+          companyName: pe.companyName || '',
+          designation: pe.designation || '',
+          experience: pe.experience || '1-2 Years',
+        }))
+      );
+    } else if (record.previousCompany || record.previousDesignation || record.prevCompany) {
+      setEditPrevEmployments([
+        {
+          id: 1,
+          companyName: record.previousCompany || record.prevCompany || '',
+          designation: record.previousDesignation || record.prevDesignation || '',
+          experience: record.previousExp || record.prevExp || '1-2 Years',
+        },
+      ]);
+    } else {
+      setEditPrevEmployments([{ id: 1, companyName: '', designation: '', experience: '1-2 Years' }]);
+    }
 
     const rawPhone = String(record.phone || '');
     const cleanPhone = rawPhone.replace(/^\+91\s*/, '').replace(/^\+\d+\s*/, '');
@@ -479,16 +517,23 @@ export const EmployeeManagement = ({
       emergencyRel: record.emergencyContact?.relationship || '',
       emergencyPhone: record.emergencyContact?.phone || '',
       notes: record.notes || '',
-      description: record.description || record.aboutMe || 'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.',
-      servicesOffered: Array.isArray(record.servicesOffered) && record.servicesOffered.length > 0
-        ? record.servicesOffered
-        : ['Weight Loss Program', 'Muscle Gain', 'Strength Training', 'Fat Loss', 'HIIT Workouts', 'Diet & Nutrition', 'Body Transformation'],
-      experience: record.experience || (record.experienceYears ? `${record.experienceYears}+ Years` : '8+ Years'),
-      certifications: Array.isArray(record.certifications) && record.certifications.length > 0
-        ? record.certifications
-        : ['ACE Certified Personal Trainer', 'Certified Strength & Conditioning Specialist (CSCS)', 'Nutrition & Weight Management Certification'],
-      languages: Array.isArray(record.languages) && record.languages.length > 0 ? record.languages : ['English', 'Hindi'],
+      description: record.description || record.aboutMe || '',
+      servicesOffered: Array.isArray(record.servicesOffered) ? record.servicesOffered : [],
+      experience: record.experience || (record.experienceYears ? `${record.experienceYears}+ Years` : ''),
+      certifications: Array.isArray(record.certifications) ? record.certifications : [],
+      languages: Array.isArray(record.languages) ? record.languages : [],
     });
+
+    const empType = (record.type || '').toLowerCase();
+    const isTempOrPart = empType === 'temporary' || empType === 'part-time' || empType === 'parttime';
+    const hasShowcaseData = Boolean(
+      record.description?.trim() ||
+      record.aboutMe?.trim() ||
+      (Array.isArray(record.servicesOffered) && record.servicesOffered.length > 0) ||
+      (Array.isArray(record.certifications) && record.certifications.length > 0)
+    );
+    setShowTrainerShowcaseTab(!isTempOrPart || hasShowcaseData);
+
     setIsDetailsModalOpen(true);
   };
 
@@ -518,15 +563,22 @@ export const EmployeeManagement = ({
       description: values.description || values.aboutMe || selectedEmployee.description || '',
       aboutMe: values.aboutMe || values.description || selectedEmployee.aboutMe || '',
       servicesOffered: Array.isArray(values.servicesOffered) ? values.servicesOffered : (selectedEmployee.servicesOffered || []),
-      experience: values.experience || (values.experienceYears ? `${values.experienceYears}+ Years` : (selectedEmployee.experience || '8+ Years')),
+      experience: values.experience || (values.experienceYears ? `${values.experienceYears}+ Years` : (selectedEmployee.experience || '')),
       certifications: Array.isArray(values.certifications) ? values.certifications : (selectedEmployee.certifications || []),
-      languages: Array.isArray(values.languages) ? values.languages : (selectedEmployee.languages || ['English', 'Hindi']),
+      languages: Array.isArray(values.languages) ? values.languages : (selectedEmployee.languages || []),
       experienceYears: values.experienceYears !== undefined
         ? (Number(values.experienceYears) || 0)
         : (Number(selectedEmployee.experienceYears) || 1),
-      previousCompany: values.prevCompany !== undefined ? values.prevCompany.trim() : (selectedEmployee.previousCompany || ''),
-      previousDesignation: values.prevDesignation !== undefined ? values.prevDesignation.trim() : (selectedEmployee.previousDesignation || ''),
-      previousExp: values.prevExp !== undefined ? values.prevExp.trim() : (selectedEmployee.previousExp || ''),
+      previousEmployments: editPrevEmployments
+        .filter((pe) => pe.companyName?.trim() || pe.designation?.trim())
+        .map((pe) => ({
+          companyName: pe.companyName?.trim() || '',
+          designation: pe.designation?.trim() || '',
+          experience: pe.experience || '1-2 Years',
+        })),
+      previousCompany: editPrevEmployments[0]?.companyName?.trim() || (values.prevCompany !== undefined ? values.prevCompany.trim() : (selectedEmployee.previousCompany || '')),
+      previousDesignation: editPrevEmployments[0]?.designation?.trim() || (values.prevDesignation !== undefined ? values.prevDesignation.trim() : (selectedEmployee.previousDesignation || '')),
+      previousExp: editPrevEmployments[0]?.experience || (values.prevExp !== undefined ? values.prevExp.trim() : (selectedEmployee.previousExp || '')),
       schedule: {
         workingDays: editWorkingDays && editWorkingDays.length > 0
           ? editWorkingDays
@@ -672,21 +724,22 @@ export const EmployeeManagement = ({
       attendance: 'Present',
       accessType: allFormValues.accessLevel || 'Admin',
       approvalStatus: 'Pending Approval',
-      previousCompany: allFormValues.prevCompany || '',
-      previousDesignation: allFormValues.prevDesignation || '',
-      previousExp: allFormValues.prevExp || '',
-      description: allFormValues.description || allFormValues.aboutMe || 'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.',
-      aboutMe: allFormValues.description || allFormValues.aboutMe || 'Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance.',
-      servicesOffered: Array.isArray(allFormValues.servicesOffered) && allFormValues.servicesOffered.length > 0
-        ? allFormValues.servicesOffered
-        : ['Weight Loss Program', 'Muscle Gain', 'Strength Training', 'Fat Loss', 'HIIT Workouts', 'Diet & Nutrition', 'Body Transformation'],
-      experience: allFormValues.experience || allFormValues.prevExp || '8+ Years',
-      certifications: Array.isArray(allFormValues.certifications) && allFormValues.certifications.length > 0
-        ? allFormValues.certifications
-        : ['ACE Certified Personal Trainer', 'Certified Strength & Conditioning Specialist (CSCS)', 'Nutrition & Weight Management Certification'],
-      languages: Array.isArray(allFormValues.languages) && allFormValues.languages.length > 0
-        ? allFormValues.languages
-        : ['English', 'Hindi'],
+      previousEmployments: addPrevEmployments
+        .filter((pe) => pe.companyName?.trim() || pe.designation?.trim())
+        .map((pe) => ({
+          companyName: pe.companyName?.trim() || '',
+          designation: pe.designation?.trim() || '',
+          experience: pe.experience || '1-2 Years',
+        })),
+      previousCompany: addPrevEmployments[0]?.companyName?.trim() || allFormValues.prevCompany || '',
+      previousDesignation: addPrevEmployments[0]?.designation?.trim() || allFormValues.prevDesignation || '',
+      previousExp: addPrevEmployments[0]?.experience || allFormValues.prevExp || '',
+      description: allFormValues.description || allFormValues.aboutMe || '',
+      aboutMe: allFormValues.description || allFormValues.aboutMe || '',
+      servicesOffered: Array.isArray(allFormValues.servicesOffered) ? allFormValues.servicesOffered : [],
+      experience: allFormValues.experience || allFormValues.prevExp || '',
+      certifications: Array.isArray(allFormValues.certifications) ? allFormValues.certifications : [],
+      languages: Array.isArray(allFormValues.languages) ? allFormValues.languages : [],
       emergencyContact: {
         name: allFormValues.emergencyName || '',
         relationship: allFormValues.emergencyRel || '',
@@ -711,6 +764,7 @@ export const EmployeeManagement = ({
       setPersonalDocs([]);
       setEmpDocs([]);
       setTrainerCerts([]);
+      setAddPrevEmployments([{ id: 1, companyName: '', designation: '', experience: '1-2 Years' }]);
 
       // Trigger Success Confirmation Modal & Canvas Confetti
       setIsSuccessModalOpen(true);
@@ -731,6 +785,14 @@ export const EmployeeManagement = ({
     const activeGymPartnerId = gymPartnerId || user?.gym?.partnerId || user?.partnerId || 'GYM1';
     const activeGymName = gymName || user?.gym?.name || 'Main Facility';
 
+    const dayWiseArray = isDifferentDays
+      ? workingDays.map((d) => ({
+          day: d,
+          startTime: dayWiseHours[d]?.startTime ? dayWiseHours[d].startTime.format('hh:mm A') : '09:00 AM',
+          endTime: dayWiseHours[d]?.endTime ? dayWiseHours[d].endTime.format('hh:mm A') : '06:00 PM',
+        }))
+      : [];
+
     const newStaffPayload = {
       gymId: activeGymId,
       gymPartnerId: activeGymPartnerId,
@@ -746,14 +808,17 @@ export const EmployeeManagement = ({
       status: 'Active',
       attendance: 'Present',
       accessType: 'Employee',
-      approvalStatus: 'Pending Approval',
+      approvalStatus: 'Approved',
+      pendingAction: 'NONE',
       type: tempEmploymentType || 'Temporary',
       schedule: {
         workingDays,
-        workingTimeStart: '09:00 AM',
-        workingTimeEnd: '06:00 PM',
-        startDate: values.startDate ? values.startDate.format('DD MMM YYYY') : '',
-        endDate: values.endDate ? values.endDate.format('DD MMM YYYY') : '',
+        workingTimeStart: values.workingTimeStart ? values.workingTimeStart.format('hh:mm A') : '09:00 AM',
+        workingTimeEnd: values.workingTimeEnd ? values.workingTimeEnd.format('hh:mm A') : '06:00 PM',
+        isDifferentDays,
+        dayWiseHours: dayWiseArray,
+        startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : '',
+        endDate: values.endDate ? values.endDate.format('YYYY-MM-DD') : '',
       },
       compensation: {
         payType: values.payType || 'Hourly',
@@ -769,18 +834,20 @@ export const EmployeeManagement = ({
       const updated = [savedStaff, ...employeesList.filter((e) => (e.id || e._id) !== (savedStaff.id || savedStaff._id))];
       setEmployeesList(updated);
       setAddedEmployeeData(savedStaff);
-      message.success(`Temporary staff "${savedStaff.name}" submitted for Super Admin approval!`);
+      message.success(`Staff "${savedStaff.name}" added successfully.`);
 
       setIsTempStaffModalOpen(false);
       tempStaffForm.resetFields();
       setTempStaffPhoto(null);
+      setIsDifferentDays(false);
+      setDayWiseHours({});
 
       setIsSuccessModalOpen(true);
       triggerConfettiPopper();
 
       if (onAddEmployee) onAddEmployee(newStaffPayload);
     } catch (err) {
-      console.error('Failed to create temp staff:', err);
+      console.error('Failed to create staff:', err);
       message.error(err?.response?.data?.message || err.message || 'Failed to save staff to database.');
     } finally {
       setIsSubmittingTemp(false);
@@ -865,6 +932,77 @@ export const EmployeeManagement = ({
             }}
           >
             {role}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: 'Employment Type',
+      dataIndex: 'type',
+      key: 'type',
+      render: (type, record) => {
+        const empType = type || 'Full-Time';
+        if (empType === 'Temporary') {
+          return (
+            <div>
+              <Tag
+                style={{
+                  backgroundColor: isDarkMode ? 'rgba(250, 140, 22, 0.2)' : '#fff7e6',
+                  color: '#d46b08',
+                  border: '1px solid #ffd591',
+                  borderRadius: 'var(--radius-base)',
+                  fontWeight: 650,
+                  fontSize: 11,
+                  padding: '2px 8px',
+                }}
+              >
+                Temporary
+              </Tag>
+              {record.schedule?.endDate && (
+                <div style={{ fontSize: 10.5, color: isDarkMode ? '#888888' : '#8c8c8c', marginTop: 2 }}>
+                  Until {record.schedule.endDate}
+                </div>
+              )}
+            </div>
+          );
+        }
+        if (empType === 'Part-Time') {
+          return (
+            <div>
+              <Tag
+                style={{
+                  backgroundColor: isDarkMode ? 'rgba(19, 194, 194, 0.2)' : '#e6fffb',
+                  color: '#08979c',
+                  border: '1px solid #87e8de',
+                  borderRadius: 'var(--radius-base)',
+                  fontWeight: 650,
+                  fontSize: 11,
+                  padding: '2px 8px',
+                }}
+              >
+                Part-Time
+              </Tag>
+              {Array.isArray(record.schedule?.workingDays) && record.schedule.workingDays.length > 0 && (
+                <div style={{ fontSize: 10.5, color: isDarkMode ? '#888888' : '#8c8c8c', marginTop: 2 }}>
+                  {record.schedule.workingDays.slice(0, 3).join(', ')}{record.schedule.workingDays.length > 3 ? '...' : ''}
+                </div>
+              )}
+            </div>
+          );
+        }
+        return (
+          <Tag
+            style={{
+              backgroundColor: isDarkMode ? 'rgba(22, 119, 255, 0.15)' : '#e6f4ff',
+              color: '#0958d9',
+              border: '1px solid #91caff',
+              borderRadius: 'var(--radius-base)',
+              fontWeight: 650,
+              fontSize: 11,
+              padding: '2px 8px',
+            }}
+          >
+            Full-Time
           </Tag>
         );
       },
@@ -1532,8 +1670,41 @@ export const EmployeeManagement = ({
       {/* EMPLOYEES TABLE CARD */}
       <Card
         title={
-          <div style={{ fontSize: 16, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-            Employees
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+              Employees
+            </div>
+            {/* Filter Segment Tabs */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[
+                { key: 'ALL', label: 'All Staff' },
+                { key: 'Full-Time', label: 'Full-Time' },
+                { key: 'Part-Time', label: 'Part-Time' },
+                { key: 'Temporary', label: 'Temporary' },
+              ].map((tab) => {
+                const count = tab.key === 'ALL'
+                  ? employeesList.length
+                  : employeesList.filter((e) => (e.type || 'Full-Time') === tab.key).length;
+                const isSelected = staffTypeFilter === tab.key;
+                return (
+                  <Button
+                    key={tab.key}
+                    size="small"
+                    onClick={() => setStaffTypeFilter(tab.key)}
+                    type={isSelected ? 'primary' : 'default'}
+                    style={{
+                      borderRadius: 16,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      height: 30,
+                      padding: '0 12px',
+                    }}
+                  >
+                    {tab.label} ({count})
+                  </Button>
+                );
+              })}
+            </div>
           </div>
         }
         style={{
@@ -1800,7 +1971,15 @@ export const EmployeeManagement = ({
                         </Col>
                         <Col xs={24} sm={6}>
                           <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Employment Type</span>} name="type" initialValue="Full-Time" style={{ marginBottom: 14 }}>
-                            <Select style={{ height: 40 }}>
+                            <Select
+                              style={{ height: 40 }}
+                              onChange={(val) => {
+                                setDetailEmpType(val);
+                                const vLower = (val || '').toLowerCase();
+                                const isTemp = vLower === 'temporary' || vLower === 'part-time' || vLower === 'parttime';
+                                setShowTrainerShowcaseTab(!isTemp);
+                              }}
+                            >
                               <Option value="Full-Time">Full-Time</Option>
                               <Option value="Part-Time">Part-Time</Option>
                               <Option value="Temporary">Temporary</Option>
@@ -1808,6 +1987,38 @@ export const EmployeeManagement = ({
                           </Form.Item>
                         </Col>
                       </Row>
+
+                      {((detailEmpType || '').toLowerCase() === 'temporary' ||
+                        (detailEmpType || '').toLowerCase() === 'part-time' ||
+                        (detailEmpType || '').toLowerCase() === 'parttime') && (
+                        <div
+                          style={{
+                            marginTop: 4,
+                            marginBottom: 16,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 14px',
+                            borderRadius: 'var(--radius-base)',
+                            backgroundColor: isDarkMode ? '#1e1e1e' : '#f8fafc',
+                            border: `1px dashed ${isDarkMode ? '#333333' : '#cbd5e1'}`,
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 12.5, color: isDarkMode ? '#e2e8f0' : '#1e293b' }}>
+                              <CrownOutlined style={{ color: '#722ed1', marginRight: 6 }} />
+                              Showcase Trainer Profile in User App
+                            </div>
+                            <div style={{ fontSize: 11.5, color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+                              By default, temporary/part-time staff profiles are hidden from the user app. Toggle on to customize their showcase card.
+                            </div>
+                          </div>
+                          <Switch
+                            checked={showTrainerShowcaseTab}
+                            onChange={(checked) => setShowTrainerShowcaseTab(checked)}
+                          />
+                        </div>
+                      )}
 
                       <Row gutter={16}>
                         <Col xs={24} sm={12}>
@@ -1913,100 +2124,213 @@ export const EmployeeManagement = ({
                         </Col>
                       </Row>
 
-                      <Row gutter={16}>
-                        <Col xs={24} sm={12}>
-                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Previous Company / Gym</span>} name="prevCompany" style={{ marginBottom: 14 }}>
-                            <Input placeholder="e.g. Gold's Gym" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} sm={12}>
-                          <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Previous Designation</span>} name="prevDesignation" style={{ marginBottom: 14 }}>
-                            <Input placeholder="e.g. Senior Floor Trainer" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
-                          </Form.Item>
-                        </Col>
-                      </Row>
+                      <div style={{ marginTop: 16, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700, fontSize: 13, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <CalendarOutlined /> Previous Employment Details
+                        </span>
+                        <Button
+                          size="small"
+                          type="dashed"
+                          icon={<PlusOutlined />}
+                          onClick={() =>
+                            setEditPrevEmployments((prev) => [
+                              ...prev,
+                              { id: Date.now(), companyName: '', designation: '', experience: '1-2 Years' },
+                            ])
+                          }
+                          style={{
+                            borderRadius: 'var(--radius-base)',
+                            fontWeight: 600,
+                            fontSize: 11.5,
+                            color: '#722ed1',
+                            borderColor: '#722ed1',
+                          }}
+                        >
+                          Add Another
+                        </Button>
+                      </div>
 
-                      <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Previous Experience Summary</span>} name="prevExp" style={{ marginBottom: 14 }}>
-                        <Input placeholder="e.g. 3 years as Head Strength Coach handling 50+ clients" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
-                      </Form.Item>
+                      {editPrevEmployments.map((emp, index) => (
+                        <div
+                          key={emp.id}
+                          style={{
+                            position: 'relative',
+                            backgroundColor: isDarkMode ? '#1a1a1a' : '#f8fafc',
+                            border: `1px solid ${isDarkMode ? '#2d2d2d' : '#e2e8f0'}`,
+                            borderRadius: 8,
+                            padding: '10px 12px 2px',
+                            marginBottom: 10,
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#722ed1' }}>
+                              Employment #{index + 1}
+                            </span>
+                            {editPrevEmployments.length > 1 && (
+                              <Button
+                                type="text"
+                                danger
+                                size="small"
+                                icon={<DeleteOutlined />}
+                                onClick={() => setEditPrevEmployments((prev) => prev.filter((e) => e.id !== emp.id))}
+                                style={{ height: 22, padding: '0 6px', fontSize: 11 }}
+                              >
+                                Remove
+                              </Button>
+                            )}
+                          </div>
+
+                          <Row gutter={12}>
+                            <Col xs={24} sm={8}>
+                              <div style={{ marginBottom: 8 }}>
+                                <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4, color: isDarkMode ? '#e2e8f0' : '#334155' }}>
+                                  Company Name
+                                </div>
+                                <Input
+                                  placeholder="e.g. Gold's Gym"
+                                  value={emp.companyName}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setEditPrevEmployments((prev) =>
+                                      prev.map((item) => (item.id === emp.id ? { ...item, companyName: val } : item))
+                                    );
+                                  }}
+                                  style={{
+                                    height: 38,
+                                    borderRadius: 'var(--radius-base)',
+                                    backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff',
+                                  }}
+                                />
+                              </div>
+                            </Col>
+                            <Col xs={24} sm={8}>
+                              <div style={{ marginBottom: 8 }}>
+                                <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4, color: isDarkMode ? '#e2e8f0' : '#334155' }}>
+                                  Designation
+                                </div>
+                                <Input
+                                  placeholder="e.g. Senior Trainer"
+                                  value={emp.designation}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setEditPrevEmployments((prev) =>
+                                      prev.map((item) => (item.id === emp.id ? { ...item, designation: val } : item))
+                                    );
+                                  }}
+                                  style={{
+                                    height: 38,
+                                    borderRadius: 'var(--radius-base)',
+                                    backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff',
+                                  }}
+                                />
+                              </div>
+                            </Col>
+                            <Col xs={24} sm={8}>
+                              <div style={{ marginBottom: 8 }}>
+                                <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4, color: isDarkMode ? '#e2e8f0' : '#334155' }}>
+                                  Years of Experience
+                                </div>
+                                <Select
+                                  placeholder="Select experience"
+                                  value={emp.experience || '1-2 Years'}
+                                  onChange={(val) => {
+                                    setEditPrevEmployments((prev) =>
+                                      prev.map((item) => (item.id === emp.id ? { ...item, experience: val } : item))
+                                    );
+                                  }}
+                                  style={{ width: '100%', height: 38 }}
+                                >
+                                  <Option value="1-2 Years">1-2 Years</Option>
+                                  <Option value="3-5 Years">3-5 Years</Option>
+                                  <Option value="5+ Years">5+ Years</Option>
+                                </Select>
+                              </div>
+                            </Col>
+                          </Row>
+                        </div>
+                      ))}
                     </div>
                   ),
                 },
-                {
-                  key: 'trainer_profile',
-                  label: (
-                    <span style={{ fontWeight: 600, fontSize: 13 }}>
-                      <CrownOutlined /> Trainer Profile & Showcase
-                    </span>
-                  ),
-                  children: (
-                    <div style={{ paddingTop: 8 }}>
-                      <Form.Item
-                        label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>About Me / Trainer Description</span>}
-                        name="description"
-                        style={{ marginBottom: 14 }}
-                      >
-                        <TextArea
-                          rows={3}
-                          placeholder="e.g. Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance."
-                          style={{ borderRadius: 'var(--radius-base)' }}
-                        />
-                      </Form.Item>
+                ...(showTrainerShowcaseTab
+                  ? [
+                      {
+                        key: 'trainer_profile',
+                        label: (
+                          <span style={{ fontWeight: 600, fontSize: 13 }}>
+                            <CrownOutlined /> Trainer Profile & Showcase
+                          </span>
+                        ),
+                        children: (
+                          <div style={{ paddingTop: 8 }}>
+                            <Form.Item
+                              label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>About Me / Trainer Description</span>}
+                              name="description"
+                              style={{ marginBottom: 14 }}
+                            >
+                              <TextArea
+                                rows={3}
+                                placeholder="e.g. Certified fitness trainer helping clients achieve their fitness goals through personalized training."
+                                style={{ borderRadius: 'var(--radius-base)' }}
+                              />
+                            </Form.Item>
 
-                      <Row gutter={16}>
-                        <Col xs={24} sm={12}>
-                          <Form.Item
-                            label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Services Offered</span>}
-                            name="servicesOffered"
-                            style={{ marginBottom: 14 }}
-                          >
-                            <Select mode="multiple" placeholder="Select services" style={{ width: '100%' }}>
-                              <Option value="Weight Loss Program">Weight Loss Program</Option>
-                              <Option value="Muscle Gain">Muscle Gain</Option>
-                              <Option value="Strength Training">Strength Training</Option>
-                              <Option value="Fat Loss">Fat Loss</Option>
-                              <Option value="HIIT Workouts">HIIT Workouts</Option>
-                              <Option value="Diet & Nutrition">Diet & Nutrition</Option>
-                              <Option value="Body Transformation">Body Transformation</Option>
-                            </Select>
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} sm={6}>
-                          <Form.Item
-                            label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Experience</span>}
-                            name="experience"
-                            style={{ marginBottom: 14 }}
-                          >
-                            <Input placeholder="e.g. 8+ Years" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} sm={6}>
-                          <Form.Item
-                            label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Languages</span>}
-                            name="languages"
-                            style={{ marginBottom: 14 }}
-                          >
-                            <Select mode="tags" placeholder="Languages" style={{ width: '100%' }}>
-                              <Option value="English">English</Option>
-                              <Option value="Hindi">Hindi</Option>
-                              <Option value="Tamil">Tamil</Option>
-                              <Option value="Telugu">Telugu</Option>
-                              <Option value="Kannada">Kannada</Option>
-                            </Select>
-                          </Form.Item>
-                        </Col>
-                      </Row>
+                            <Row gutter={16}>
+                              <Col xs={24} sm={12}>
+                                <Form.Item
+                                  label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Services Offered</span>}
+                                  name="servicesOffered"
+                                  style={{ marginBottom: 14 }}
+                                >
+                                  <Select mode="multiple" placeholder="Select services" style={{ width: '100%' }}>
+                                    <Option value="Weight Loss Program">Weight Loss Program</Option>
+                                    <Option value="Muscle Gain">Muscle Gain</Option>
+                                    <Option value="Strength Training">Strength Training</Option>
+                                    <Option value="Fat Loss">Fat Loss</Option>
+                                    <Option value="HIIT Workouts">HIIT Workouts</Option>
+                                    <Option value="Diet & Nutrition">Diet & Nutrition</Option>
+                                    <Option value="Body Transformation">Body Transformation</Option>
+                                  </Select>
+                                </Form.Item>
+                              </Col>
+                              <Col xs={24} sm={6}>
+                                <Form.Item
+                                  label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Experience</span>}
+                                  name="experience"
+                                  style={{ marginBottom: 14 }}
+                                >
+                                  <Input placeholder="e.g. 3+ Years" style={{ height: 40, borderRadius: 'var(--radius-base)' }} />
+                                </Form.Item>
+                              </Col>
+                              <Col xs={24} sm={6}>
+                                <Form.Item
+                                  label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Languages</span>}
+                                  name="languages"
+                                  style={{ marginBottom: 14 }}
+                                >
+                                  <Select mode="tags" placeholder="Languages" style={{ width: '100%' }}>
+                                    <Option value="English">English</Option>
+                                    <Option value="Hindi">Hindi</Option>
+                                    <Option value="Tamil">Tamil</Option>
+                                    <Option value="Telugu">Telugu</Option>
+                                    <Option value="Kannada">Kannada</Option>
+                                  </Select>
+                                </Form.Item>
+                              </Col>
+                            </Row>
 
-                      <Form.Item
-                        label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Certifications</span>}
-                        name="certifications"
-                        style={{ marginBottom: 14 }}
-                      >
-                        <Select mode="tags" placeholder="Add certifications" style={{ width: '100%' }} />
-                      </Form.Item>
-                    </div>
-                  ),
-                },
+                            <Form.Item
+                              label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Certifications</span>}
+                              name="certifications"
+                              style={{ marginBottom: 14 }}
+                            >
+                              <Select mode="tags" placeholder="Add certifications" style={{ width: '100%' }} />
+                            </Form.Item>
+                          </div>
+                        ),
+                      },
+                    ]
+                  : []),
                 {
                   key: 'schedule_pay',
                   label: (
@@ -2430,6 +2754,7 @@ export const EmployeeManagement = ({
           setPersonalDocs([]);
           setEmpDocs([]);
           setTrainerCerts([]);
+          setAddPrevEmployments([{ id: 1, companyName: '', designation: '', experience: '1-2 Years' }]);
         }}
         footer={null}
         width={760}
@@ -2571,12 +2896,11 @@ export const EmployeeManagement = ({
               <Form.Item
                 label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>About Me / Trainer Description</span>}
                 name="description"
-                initialValue="Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance."
                 style={{ marginBottom: 12 }}
               >
                 <TextArea
                   rows={3}
-                  placeholder="e.g. Certified fitness trainer with 8+ years of experience helping clients achieve their fitness goals through personalized training and nutrition guidance."
+                  placeholder="e.g. Certified fitness trainer helping clients achieve their fitness goals through personalized training."
                   style={{ borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }}
                 />
               </Form.Item>
@@ -2586,7 +2910,6 @@ export const EmployeeManagement = ({
                   <Form.Item
                     label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Services Offered</span>}
                     name="servicesOffered"
-                    initialValue={['Weight Loss Program', 'Muscle Gain', 'Strength Training', 'Fat Loss', 'HIIT Workouts', 'Diet & Nutrition', 'Body Transformation']}
                     style={{ marginBottom: 12 }}
                   >
                     <Select mode="multiple" placeholder="Select services offered" style={{ width: '100%' }}>
@@ -2605,11 +2928,10 @@ export const EmployeeManagement = ({
                   <Form.Item
                     label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Experience</span>}
                     name="experience"
-                    initialValue="8+ Years"
                     style={{ marginBottom: 12 }}
                   >
                     <Input
-                      placeholder="e.g. 8+ Years"
+                      placeholder="e.g. 3+ Years"
                       style={{ height: 40, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }}
                     />
                   </Form.Item>
@@ -2619,7 +2941,6 @@ export const EmployeeManagement = ({
                   <Form.Item
                     label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Languages</span>}
                     name="languages"
-                    initialValue={['English', 'Hindi']}
                     style={{ marginBottom: 12 }}
                   >
                     <Select mode="tags" placeholder="Languages spoken" style={{ width: '100%' }}>
@@ -2636,7 +2957,6 @@ export const EmployeeManagement = ({
               <Form.Item
                 label={<span style={{ fontWeight: 600, fontSize: 12.5 }}>Certifications</span>}
                 name="certifications"
-                initialValue={['ACE Certified Personal Trainer', 'Certified Strength & Conditioning Specialist (CSCS)', 'Nutrition & Weight Management Certification']}
                 style={{ marginBottom: 12 }}
               >
                 <Select mode="tags" placeholder="Type certification and press enter" style={{ width: '100%' }} />
@@ -2645,31 +2965,131 @@ export const EmployeeManagement = ({
 
             {/* Previous Employment Details */}
             <div style={{ borderTop: `1px solid ${isDarkMode ? '#222222' : '#f1f5f9'}`, paddingTop: 14, marginTop: 6, marginBottom: 14 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                <CalendarOutlined /> Previous Employment Details
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <CalendarOutlined /> Previous Employment Details
+                </div>
+                <Button
+                  size="small"
+                  type="dashed"
+                  icon={<PlusOutlined />}
+                  onClick={() =>
+                    setAddPrevEmployments((prev) => [
+                      ...prev,
+                      { id: Date.now(), companyName: '', designation: '', experience: '1-2 Years' },
+                    ])
+                  }
+                  style={{
+                    borderRadius: 'var(--radius-base)',
+                    fontWeight: 600,
+                    fontSize: 11.5,
+                    color: '#722ed1',
+                    borderColor: '#722ed1',
+                  }}
+                >
+                  Add Another
+                </Button>
               </div>
 
-              <Row gutter={12}>
-                <Col xs={24} sm={8}>
-                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Company Name</span>} name="prevCompany" style={{ marginBottom: 10 }}>
-                    <Input placeholder="e.g. Gold's Gym" style={{ height: 38, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={8}>
-                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Designation</span>} name="prevDesignation" style={{ marginBottom: 10 }}>
-                    <Input placeholder="e.g. Senior Trainer" style={{ height: 38, borderRadius: 'var(--radius-base)', backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff' }} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={8}>
-                  <Form.Item label={<span style={{ fontWeight: 600, fontSize: 12 }}>Years of Experience</span>} name="prevExp" style={{ marginBottom: 10 }}>
-                    <Select placeholder="Select experience" style={{ height: 38 }}>
-                      <Option value="1-2 Years">1-2 Years</Option>
-                      <Option value="3-5 Years">3-5 Years</Option>
-                      <Option value="5+ Years">5+ Years</Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-              </Row>
+              {addPrevEmployments.map((emp, index) => (
+                <div
+                  key={emp.id}
+                  style={{
+                    position: 'relative',
+                    backgroundColor: isDarkMode ? '#1a1a1a' : '#f8fafc',
+                    border: `1px solid ${isDarkMode ? '#2d2d2d' : '#e2e8f0'}`,
+                    borderRadius: 8,
+                    padding: '10px 12px 2px',
+                    marginBottom: 10,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: '#722ed1' }}>
+                      Employment #{index + 1}
+                    </span>
+                    {addPrevEmployments.length > 1 && (
+                      <Button
+                        type="text"
+                        danger
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        onClick={() => setAddPrevEmployments((prev) => prev.filter((e) => e.id !== emp.id))}
+                        style={{ height: 22, padding: '0 6px', fontSize: 11 }}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+
+                  <Row gutter={12}>
+                    <Col xs={24} sm={8}>
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4, color: isDarkMode ? '#e2e8f0' : '#334155' }}>
+                          Company Name
+                        </div>
+                        <Input
+                          placeholder="e.g. Gold's Gym"
+                          value={emp.companyName}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setAddPrevEmployments((prev) =>
+                              prev.map((item) => (item.id === emp.id ? { ...item, companyName: val } : item))
+                            );
+                          }}
+                          style={{
+                            height: 38,
+                            borderRadius: 'var(--radius-base)',
+                            backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff',
+                          }}
+                        />
+                      </div>
+                    </Col>
+                    <Col xs={24} sm={8}>
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4, color: isDarkMode ? '#e2e8f0' : '#334155' }}>
+                          Designation
+                        </div>
+                        <Input
+                          placeholder="e.g. Senior Trainer"
+                          value={emp.designation}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setAddPrevEmployments((prev) =>
+                              prev.map((item) => (item.id === emp.id ? { ...item, designation: val } : item))
+                            );
+                          }}
+                          style={{
+                            height: 38,
+                            borderRadius: 'var(--radius-base)',
+                            backgroundColor: isDarkMode ? '#1e1e1e' : '#ffffff',
+                          }}
+                        />
+                      </div>
+                    </Col>
+                    <Col xs={24} sm={8}>
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4, color: isDarkMode ? '#e2e8f0' : '#334155' }}>
+                          Years of Experience
+                        </div>
+                        <Select
+                          placeholder="Select experience"
+                          value={emp.experience || '1-2 Years'}
+                          onChange={(val) => {
+                            setAddPrevEmployments((prev) =>
+                              prev.map((item) => (item.id === emp.id ? { ...item, experience: val } : item))
+                            );
+                          }}
+                          style={{ width: '100%', height: 38 }}
+                        >
+                          <Option value="1-2 Years">1-2 Years</Option>
+                          <Option value="3-5 Years">3-5 Years</Option>
+                          <Option value="5+ Years">5+ Years</Option>
+                        </Select>
+                      </div>
+                    </Col>
+                  </Row>
+                </div>
+              ))}
 
               {/* Added Employment Documents Table */}
               <div style={{ marginTop: 12 }}>
@@ -3414,16 +3834,55 @@ export const EmployeeManagement = ({
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
                   Working Time <span style={{ color: '#ef4444' }}>*</span>
                 </div>
-                <Row gutter={8} align="middle">
-                  <Col span={11}>
-                    <TimePicker use12Hours format="h:mm a" placeholder="09:00 AM" style={{ width: '100%', height: 38, borderRadius: 'var(--radius-base)' }} />
-                  </Col>
-                  <Col span={2} style={{ textAlign: 'center', color: '#888888' }}>to</Col>
-                  <Col span={11}>
-                    <TimePicker use12Hours format="h:mm a" placeholder="06:00 PM" style={{ width: '100%', height: 38, borderRadius: 'var(--radius-base)' }} />
-                  </Col>
-                </Row>
-                <Checkbox style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 6 }}>
+                {!isDifferentDays ? (
+                  <Row gutter={8} align="middle">
+                    <Col span={11}>
+                      <Form.Item name="workingTimeStart" noStyle>
+                        <TimePicker use12Hours format="h:mm a" placeholder="09:00 AM" style={{ width: '100%', height: 38, borderRadius: 'var(--radius-base)' }} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={2} style={{ textAlign: 'center', color: '#888888' }}>to</Col>
+                    <Col span={11}>
+                      <Form.Item name="workingTimeEnd" noStyle>
+                        <TimePicker use12Hours format="h:mm a" placeholder="06:00 PM" style={{ width: '100%', height: 38, borderRadius: 'var(--radius-base)' }} />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                ) : (
+                  <div style={{ maxHeight: 160, overflowY: 'auto', paddingRight: 4 }}>
+                    {workingDays.length === 0 ? (
+                      <div style={{ fontSize: 11, color: '#fa8c16' }}>Please select working days first.</div>
+                    ) : (
+                      workingDays.map((day) => (
+                        <div key={day} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                          <span style={{ width: 36, fontSize: 11, fontWeight: 700 }}>{day}</span>
+                          <TimePicker
+                            use12Hours
+                            format="h:mm a"
+                            placeholder="Start"
+                            value={dayWiseHours[day]?.startTime}
+                            onChange={(t) => setDayWiseHours((prev) => ({ ...prev, [day]: { ...prev[day], startTime: t } }))}
+                            style={{ flex: 1, height: 32 }}
+                          />
+                          <span style={{ fontSize: 10, color: '#888888' }}>-</span>
+                          <TimePicker
+                            use12Hours
+                            format="h:mm a"
+                            placeholder="End"
+                            value={dayWiseHours[day]?.endTime}
+                            onChange={(t) => setDayWiseHours((prev) => ({ ...prev, [day]: { ...prev[day], endTime: t } }))}
+                            style={{ flex: 1, height: 32 }}
+                          />
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+                <Checkbox
+                  checked={isDifferentDays}
+                  onChange={(e) => setIsDifferentDays(e.target.checked)}
+                  style={{ fontSize: 11, color: isDarkMode ? '#888888' : '#64748b', marginTop: 6 }}
+                >
                   Different time for different days
                 </Checkbox>
               </div>
@@ -3440,6 +3899,7 @@ export const EmployeeManagement = ({
                         <Option value="Hourly">Per Hour</Option>
                         <Option value="Session">Per Session</Option>
                         <Option value="Daily">Daily</Option>
+                        <Option value="Weekly">Weekly</Option>
                         <Option value="Monthly">Monthly</Option>
                       </Select>
                     </Form.Item>
@@ -3456,6 +3916,8 @@ export const EmployeeManagement = ({
                     <Option value="Daily">Daily</Option>
                     <Option value="Weekly">Weekly</Option>
                     <Option value="Monthly">Monthly</Option>
+                    <Option value="Per Session">Per Session</Option>
+                    <Option value="Per Hour">Per Hour</Option>
                   </Select>
                 </Form.Item>
                 <div style={{ fontSize: 10.5, color: isDarkMode ? '#888888' : '#64748b', marginBottom: 12 }}>
@@ -3468,7 +3930,9 @@ export const EmployeeManagement = ({
                 <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? '#cccccc' : '#334155', marginBottom: 6 }}>
                   Additional Notes (Optional)
                 </div>
-                <TextArea rows={2} placeholder="Enter any additional information..." maxLength={250} showCount style={{ borderRadius: 'var(--radius-base)' }} />
+                <Form.Item name="notes" style={{ marginBottom: 0 }}>
+                  <TextArea rows={2} placeholder="Enter any additional information..." maxLength={250} showCount style={{ borderRadius: 'var(--radius-base)' }} />
+                </Form.Item>
               </div>
             </Col>
           </Row>

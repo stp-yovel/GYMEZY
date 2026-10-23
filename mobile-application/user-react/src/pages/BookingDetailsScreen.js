@@ -9,6 +9,8 @@ import {
   Image,
   Dimensions,
   Platform,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
@@ -20,6 +22,7 @@ import { MonthlyGridCalendar } from '../widgets/CustomCalendar';
 import { DigitalQrPassCard } from '../widgets/DigitalQrPassCard';
 import { useBookingRepository } from '../data/BookingContext';
 import { useToast } from '../widgets/CustomScaffoldMessage';
+import { apiService } from '../services/apiService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -67,6 +70,118 @@ export const BookingDetailsScreen = ({ route, navigation }) => {
 
   // Cancel Booking Sheet State
   const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0]);
+
+  // Custom Dates Reschedule State
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState(null); // { index, date }
+  const [selectedRescheduleDate, setSelectedRescheduleDate] = useState(null);
+  const [rescheduleReason, setRescheduleReason] = useState('');
+  const [isSubmittingReschedule, setIsSubmittingReschedule] = useState(false);
+  const [isRespondingProposal, setIsRespondingProposal] = useState(false);
+
+  const getEligibleDatesForSession = (sessionIndex, customDates) => {
+    if (!Array.isArray(customDates)) return { dates: [], nextSessionDate: null };
+    const nextSession = customDates.slice(sessionIndex + 1).find(
+      (s) => s.status === 'Scheduled' || s.status === 'Rescheduled'
+    );
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let maxLimit;
+    let nextDateObj = null;
+    if (nextSession) {
+      nextDateObj = new Date(nextSession.date);
+      nextDateObj.setHours(0, 0, 0, 0);
+      maxLimit = new Date(nextDateObj.getTime() - 86400000);
+    } else {
+      maxLimit = new Date(today.getTime() + 7 * 86400000);
+    }
+
+    const dates = [];
+    let cur = new Date(today);
+    while (cur <= maxLimit) {
+      dates.push(new Date(cur));
+      cur = new Date(cur.getTime() + 86400000);
+    }
+    return { dates, nextSessionDate: nextDateObj };
+  };
+
+  const formatSessionDate = (d) => {
+    if (!d) return '';
+    const dateObj = new Date(d);
+    if (Number.isNaN(dateObj.getTime())) return String(d);
+    return dateObj.toLocaleDateString('en-IN', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const handleOpenReschedule = (sessionIndex, sessionDate) => {
+    const { dates } = getEligibleDatesForSession(sessionIndex, booking.customDates);
+    setRescheduleTarget({ index: sessionIndex, date: sessionDate });
+    setSelectedRescheduleDate(dates.length > 0 ? dates[0] : null);
+    setRescheduleReason('');
+    setShowRescheduleModal(true);
+  };
+
+  const handleSubmitReschedule = async () => {
+    if (!rescheduleTarget || !selectedRescheduleDate) {
+      showToast({ message: 'Please select a valid reschedule date.', isSuccess: false });
+      return;
+    }
+    try {
+      setIsSubmittingReschedule(true);
+      const reqDateStr = selectedRescheduleDate.toISOString().split('T')[0];
+      const updated = await apiService.requestBookingReschedule(booking._id || booking.id, {
+        sessionIndex: rescheduleTarget.index,
+        sessionDate: rescheduleTarget.date,
+        requestedDate: reqDateStr,
+        reason: rescheduleReason,
+      });
+      if (updated) {
+        updateBooking(updated);
+      }
+      setShowRescheduleModal(false);
+      showToast({
+        message: 'Reschedule request submitted to gym owner for approval.',
+        isSuccess: true,
+      });
+    } catch (err) {
+      showToast({
+        message: err.message || 'Failed to submit reschedule request.',
+        isSuccess: false,
+      });
+    } finally {
+      setIsSubmittingReschedule(false);
+    }
+  };
+
+  const handleRespondProposal = async (sessionIndex, sessionDate, decision) => {
+    try {
+      setIsRespondingProposal(true);
+      const updated = await apiService.respondRescheduleProposal(booking._id || booking.id, {
+        sessionIndex,
+        sessionDate,
+        decision,
+      });
+      if (updated) {
+        updateBooking(updated);
+      }
+      showToast({
+        message: decision === 'ACCEPT' ? 'Proposed date accepted!' : 'Proposed date declined.',
+        isSuccess: true,
+      });
+    } catch (err) {
+      showToast({
+        message: err.message || 'Failed to update proposal response.',
+        isSuccess: false,
+      });
+    } finally {
+      setIsRespondingProposal(false);
+    }
+  };
 
   const copyToClipboard = async (text, label) => {
     await Clipboard.setStringAsync(text);
@@ -134,17 +249,7 @@ export const BookingDetailsScreen = ({ route, navigation }) => {
 
           <Text style={[styles.appBarTitle, { color: colors.text }]}>Digital Entry Pass</Text>
 
-          <TouchableOpacity
-            onPress={() => setShowFullscreenQr(true)}
-            style={styles.fullscreenBtn}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons
-              name="fullscreen"
-              size={26}
-              color={isDark ? '#93C5FD' : AppColors.primaryColor}
-            />
-          </TouchableOpacity>
+          <View style={styles.fullscreenBtn} />
         </View>
       </SafeAreaView>
 
@@ -161,16 +266,198 @@ export const BookingDetailsScreen = ({ route, navigation }) => {
               otp={booking.otp}
               gymName={booking.gymName}
               subtitle={booking.sessionSubtitle}
-              primaryDateLabel="BATCH DATES"
+              primaryDateLabel={booking.isCustomDates ? 'CUSTOM DATES' : 'BATCH DATES'}
               primaryDateValue={booking.date}
               secondaryDateLabel="TIME SLOT"
               secondaryDateValue={booking.time}
               status={booking.status}
               iconName="fitness-center"
+              gymImageUrl={booking.gymLogo || booking.gymImageUrl}
               accentColor={isDark ? '#93C5FD' : AppColors.primaryColor}
               qrValue={booking.qrCodeData || booking.rawBackendBooking?.qrCodeData}
               passType="BOOKING"
+              isCustomDates={booking.isCustomDates}
+              isTodayValid={booking.isTodayValid}
+              nextSessionDateFormatted={booking.nextSessionDateFormatted}
             />
+          </View>
+        )}
+
+        {/* Custom Sessions Schedule Breakdown */}
+        {booking.isCustomDates && Array.isArray(booking.customDates) && booking.customDates.length > 0 && (
+          <View style={{ marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text style={[styles.summaryHeader, { color: colors.text, marginBottom: 0 }]}>
+                Custom Sessions Schedule
+              </Text>
+              <View style={[styles.statusPill, { backgroundColor: 'rgba(0, 56, 130, 0.1)' }]}>
+                <Text style={[styles.statusPillText, { color: AppColors.primaryColor, fontWeight: '700' }]}>
+                  {booking.customDates.length} Days Plan
+                </Text>
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.summaryCard,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  padding: 12,
+                },
+              ]}
+            >
+              {booking.customDates.map((item, idx) => {
+                const sessionDateStr = formatSessionDate(item.date);
+                const isMissed = item.status === 'Missed';
+                const isAttended = item.status === 'Attended';
+                const isProposed = item.status === 'Reschedule_Proposed';
+                const isRequested = item.status === 'Reschedule_Requested';
+                const isRescheduled = item.status === 'Rescheduled';
+
+                let tagBg = 'rgba(2, 132, 199, 0.12)';
+                let tagColor = '#0284C7';
+                let tagLabel = 'Scheduled';
+
+                if (isAttended) {
+                  tagBg = 'rgba(5, 150, 105, 0.12)';
+                  tagColor = '#059669';
+                  tagLabel = 'Attended';
+                } else if (isMissed) {
+                  tagBg = 'rgba(220, 38, 38, 0.12)';
+                  tagColor = '#DC2626';
+                  tagLabel = 'Missed';
+                } else if (isRequested) {
+                  tagBg = 'rgba(217, 119, 6, 0.12)';
+                  tagColor = '#D97706';
+                  tagLabel = 'Reschedule Requested';
+                } else if (isProposed) {
+                  tagBg = 'rgba(124, 58, 237, 0.12)';
+                  tagColor = '#7C3AED';
+                  tagLabel = 'Gym Proposed New Date';
+                } else if (isRescheduled) {
+                  tagBg = 'rgba(13, 148, 136, 0.12)';
+                  tagColor = '#0D9488';
+                  tagLabel = 'Rescheduled';
+                }
+
+                return (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.customSessionItem,
+                      {
+                        backgroundColor: isDark ? '#262626' : '#F8FAFC',
+                        borderColor: colors.border,
+                        marginBottom: idx === booking.customDates.length - 1 ? 0 : 12,
+                      },
+                    ]}
+                  >
+                    <View style={styles.customSessionHeader}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={[styles.sessionNumberBadge, { backgroundColor: isDark ? 'rgba(147, 197, 253, 0.15)' : 'rgba(0, 56, 130, 0.1)' }]}>
+                          <Text style={[styles.sessionNumberText, { color: isDark ? '#93C5FD' : AppColors.primaryNavy }]}>
+                            {idx + 1}
+                          </Text>
+                        </View>
+                        <View style={{ marginLeft: 10 }}>
+                          <Text style={[styles.customSessionDate, { color: colors.text }]}>
+                            {sessionDateStr}
+                          </Text>
+                          {item.dailyOtp ? (
+                            <Text style={[styles.customSessionOtp, { color: colors.subtitle }]}>
+                              Daily Pass OTP: <Text style={{ fontWeight: '700', color: colors.text }}>{item.dailyOtp}</Text>
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+
+                      <View style={[styles.statusPill, { backgroundColor: tagBg }]}>
+                        <Text style={[styles.statusPillText, { color: tagColor }]}>{tagLabel}</Text>
+                      </View>
+                    </View>
+
+                    {/* Missed session prompt to reschedule */}
+                    {isMissed && (
+                      <View style={[styles.sessionActionRow, { borderTopColor: colors.border }]}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.missedNoticeText, { color: '#DC2626' }]}>
+                            You missed this session. Reschedule before your next scheduled date.
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.rescheduleBtn}
+                          onPress={() => handleOpenReschedule(idx, item.date)}
+                        >
+                          <MaterialIcons name="edit-calendar" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+                          <Text style={styles.rescheduleBtnText}>Reschedule</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {/* Reschedule Requested Info */}
+                    {isRequested && item.requestedDate && (
+                      <View style={[styles.pendingNoticeBox, { backgroundColor: 'rgba(217, 119, 6, 0.08)', borderColor: 'rgba(217, 119, 6, 0.25)' }]}>
+                        <MaterialIcons name="schedule" size={16} color="#D97706" />
+                        <Text style={[styles.pendingNoticeText, { color: '#B45309' }]}>
+                          Requested Date: {formatSessionDate(item.requestedDate)} (Awaiting Gym Approval)
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Reschedule Proposed with Accept / Decline */}
+                    {isProposed && item.proposedDate && (
+                      <View style={[styles.proposedBox, { backgroundColor: 'rgba(124, 58, 237, 0.08)', borderColor: 'rgba(124, 58, 237, 0.25)' }]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                          <MaterialIcons name="notifications-active" size={16} color="#7C3AED" />
+                          <Text style={[styles.proposedTitle, { color: '#7C3AED' }]}>
+                            Gym proposed a new date: {formatSessionDate(item.proposedDate)}
+                          </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                          <TouchableOpacity
+                            style={[styles.acceptProposalBtn, { opacity: isRespondingProposal ? 0.6 : 1 }]}
+                            disabled={isRespondingProposal}
+                            onPress={() => handleRespondProposal(idx, item.date, 'ACCEPT')}
+                          >
+                            <MaterialIcons name="check" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
+                            <Text style={styles.acceptProposalText}>Accept Date</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.declineProposalBtn, { opacity: isRespondingProposal ? 0.6 : 1 }]}
+                            disabled={isRespondingProposal}
+                            onPress={() => handleRespondProposal(idx, item.date, 'DECLINE')}
+                          >
+                            <MaterialIcons name="close" size={15} color="#EF4444" style={{ marginRight: 4 }} />
+                            <Text style={styles.declineProposalText}>Decline</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Rescheduled info */}
+                    {isRescheduled && item.rescheduledTo && (
+                      <View style={[styles.rescheduledNoticeBox, { backgroundColor: 'rgba(13, 148, 136, 0.08)', borderColor: 'rgba(13, 148, 136, 0.25)' }]}>
+                        <MaterialIcons name="event-repeat" size={16} color="#0D9488" />
+                        <Text style={[styles.rescheduledNoticeText, { color: '#0F766E' }]}>
+                          Successfully rescheduled to {formatSessionDate(item.rescheduledTo)}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Attended info */}
+                    {isAttended && item.attendedAt && (
+                      <View style={[styles.attendedNoticeBox, { backgroundColor: 'rgba(5, 150, 105, 0.08)', borderColor: 'rgba(5, 150, 105, 0.25)' }]}>
+                        <MaterialIcons name="check-circle" size={16} color="#059669" />
+                        <Text style={[styles.attendedNoticeText, { color: '#047857' }]}>
+                          Attended at {new Date(item.attendedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
           </View>
         )}
 
@@ -661,6 +948,184 @@ export const BookingDetailsScreen = ({ route, navigation }) => {
           </View>
         </View>
       </Modal>
+
+      {/* ========================================== */}
+      {/* RESCHEDULE SESSION MODAL                   */}
+      {/* ========================================== */}
+      <Modal
+        visible={showRescheduleModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowRescheduleModal(false)}
+      >
+        <View style={styles.sheetBackdrop}>
+          <View
+            style={[
+              styles.sheetContainer,
+              { backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF', maxHeight: '85%' },
+            ]}
+          >
+            {/* Sheet Header */}
+            <View style={styles.sheetHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sheetTitle, { color: colors.text }]}>Reschedule Missed Session</Text>
+                <Text style={{ fontSize: 12, color: colors.subtitle, marginTop: 2 }}>
+                  Pick a new date before your next scheduled workout
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowRescheduleModal(false)}>
+                <MaterialIcons name="close" size={24} color={colors.subtitle} />
+              </TouchableOpacity>
+            </View>
+
+            {rescheduleTarget && (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 10 }}>
+                {/* Missed Session Info */}
+                <View
+                  style={[
+                    styles.currentBookingCard,
+                    {
+                      backgroundColor: isDark ? '#262626' : '#F8FAFC',
+                      borderColor: colors.border,
+                      marginBottom: 16,
+                    },
+                  ]}
+                >
+                  <View style={[styles.bookingIconBox, { backgroundColor: 'rgba(220, 38, 38, 0.12)' }]}>
+                    <MaterialIcons name="event-busy" size={20} color="#DC2626" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={[styles.bookingGymTitle, { color: colors.text }]}>
+                      Missed Session #{rescheduleTarget.index + 1}
+                    </Text>
+                    <Text style={[styles.bookingSubtitle, { color: colors.subtitle }]}>
+                      Originally booked for: {formatSessionDate(rescheduleTarget.date)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Available Date Chips */}
+                {(() => {
+                  const { dates, nextSessionDate } = getEligibleDatesForSession(
+                    rescheduleTarget.index,
+                    booking.customDates
+                  );
+
+                  return (
+                    <View style={{ marginBottom: 16 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 6 }}>
+                        Select New Date
+                      </Text>
+                      {nextSessionDate && (
+                        <Text style={{ fontSize: 12, color: '#D97706', marginBottom: 10 }}>
+                          Strict constraint: Must be scheduled before {formatSessionDate(nextSessionDate)}
+                        </Text>
+                      )}
+
+                      {dates.length === 0 ? (
+                        <View style={{ padding: 14, borderRadius: 12, backgroundColor: 'rgba(220, 38, 38, 0.08)', borderWidth: 1, borderColor: 'rgba(220, 38, 38, 0.2)' }}>
+                          <Text style={{ fontSize: 12.5, color: '#DC2626', lineHeight: 18 }}>
+                            No available gap days between today and your next scheduled session. Please contact gym reception.
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                          {dates.map((d, i) => {
+                            const isSelected =
+                              selectedRescheduleDate &&
+                              selectedRescheduleDate.toDateString() === d.toDateString();
+                            return (
+                              <TouchableOpacity
+                                key={i}
+                                onPress={() => setSelectedRescheduleDate(d)}
+                                style={[
+                                  styles.dateChip,
+                                  {
+                                    backgroundColor: isSelected
+                                      ? (isDark ? '#93C5FD' : AppColors.primaryNavy)
+                                      : (isDark ? '#262626' : '#F1F5F9'),
+                                    borderColor: isSelected
+                                      ? (isDark ? '#93C5FD' : AppColors.primaryNavy)
+                                      : colors.border,
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.dateChipDay,
+                                    {
+                                      color: isSelected
+                                        ? '#FFFFFF'
+                                        : (isDark ? '#93C5FD' : AppColors.primaryNavy),
+                                    },
+                                  ]}
+                                >
+                                  {d.toLocaleDateString('en-US', { weekday: 'short' })}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.dateChipNum,
+                                    { color: isSelected ? '#FFFFFF' : colors.text },
+                                  ]}
+                                >
+                                  {d.getDate()} {d.toLocaleDateString('en-US', { month: 'short' })}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })()}
+
+                {/* Reason Input */}
+                <View style={{ marginBottom: 20 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: 6 }}>
+                    Reason for Reschedule (Optional)
+                  </Text>
+                  <TextInput
+                    value={rescheduleReason}
+                    onChangeText={setRescheduleReason}
+                    placeholder="e.g. Health emergency, schedule conflict..."
+                    placeholderTextColor={colors.subtitle}
+                    style={[
+                      styles.reasonInput,
+                      {
+                        backgroundColor: isDark ? '#262626' : '#F8FAFC',
+                        color: colors.text,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  onPress={handleSubmitReschedule}
+                  disabled={isSubmittingReschedule || !selectedRescheduleDate}
+                  style={[
+                    styles.submitRescheduleBtn,
+                    {
+                      backgroundColor: isSubmittingReschedule || !selectedRescheduleDate
+                        ? '#94A3B8'
+                        : AppColors.primaryColor,
+                    },
+                  ]}
+                >
+                  {isSubmittingReschedule ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.submitRescheduleBtnText}>Submit to Gym Owner</Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1011,5 +1476,186 @@ const styles = StyleSheet.create({
     color: '#B45309',
     lineHeight: 15,
     marginLeft: 8,
+  },
+
+  /* Custom Sessions & Reschedule Styles */
+  customSessionItem: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+  },
+  customSessionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sessionNumberBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sessionNumberText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  customSessionDate: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  customSessionOtp: {
+    fontSize: 11.5,
+    marginTop: 2,
+  },
+  sessionActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+  },
+  missedNoticeText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    lineHeight: 16,
+    marginRight: 8,
+  },
+  rescheduleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#003882',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  rescheduleBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  pendingNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 8,
+    gap: 6,
+  },
+  pendingNoticeText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    flex: 1,
+  },
+  proposedBox: {
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  proposedTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 6,
+    flex: 1,
+  },
+  acceptProposalBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#059669',
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  acceptProposalText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  declineProposalBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  declineProposalText: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  rescheduledNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 8,
+    gap: 6,
+  },
+  rescheduledNoticeText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    flex: 1,
+  },
+  attendedNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 8,
+    gap: 6,
+  },
+  attendedNoticeText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    flex: 1,
+  },
+  dateChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    minWidth: 72,
+  },
+  dateChipDay: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  dateChipNum: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  reasonInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 13,
+    textAlignVertical: 'top',
+    minHeight: 70,
+  },
+  submitRescheduleBtn: {
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+    marginBottom: 20,
+  },
+  submitRescheduleBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

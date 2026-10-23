@@ -27,7 +27,7 @@ import {
   getServiceIconName,
 } from '../../widgets/AddEmployeeModal';
 
-const FILTER_TABS = ['All', 'Trainers', 'Floor Staff', 'Pending Approval'];
+const FILTER_TABS = ['All', 'Trainers', 'Floor Staff', 'Part-Time', 'Temporary', 'Pending Approval'];
 
 export const EmployeesTab = ({ topInset, navigation }) => {
   const { isDark } = useTheme();
@@ -102,6 +102,8 @@ export const EmployeesTab = ({ topInset, navigation }) => {
 
       if (activeTab === 'Trainers' && !isTrainer) return false;
       if (activeTab === 'Floor Staff' && isTrainer) return false;
+      if (activeTab === 'Part-Time' && emp.type !== 'Part-Time') return false;
+      if (activeTab === 'Temporary' && emp.type !== 'Temporary') return false;
       if (activeTab === 'Pending Approval' && emp.approvalStatus !== 'Pending Approval') return false;
 
       // Search query
@@ -481,12 +483,23 @@ export const EmployeesTab = ({ topInset, navigation }) => {
                       <View
                         style={[
                           styles.typePill,
-                          {
-                            backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
-                          },
+                          emp.type === 'Temporary'
+                            ? { backgroundColor: isDark ? 'rgba(234, 88, 12, 0.18)' : '#FFEDD5' }
+                            : emp.type === 'Part-Time'
+                            ? { backgroundColor: isDark ? 'rgba(8, 145, 178, 0.18)' : '#CFFAFE' }
+                            : { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9' },
                         ]}
                       >
-                        <Text style={[styles.typePillText, { color: isDark ? '#94A3B8' : '#475569' }]}>
+                        <Text
+                          style={[
+                            styles.typePillText,
+                            emp.type === 'Temporary'
+                              ? { color: '#EA580C', fontWeight: '700' }
+                              : emp.type === 'Part-Time'
+                              ? { color: '#0891B2', fontWeight: '700' }
+                              : { color: isDark ? '#94A3B8' : '#475569' },
+                          ]}
+                        >
                           {emp.type || 'Full Time'} • {emp.accessType || 'Employee'}
                         </Text>
                       </View>

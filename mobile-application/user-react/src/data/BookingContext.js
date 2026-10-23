@@ -30,6 +30,22 @@ export const mapBackendBookingToClient = (b) => {
     }
   }
 
+  const resolvedGymLogo =
+    b.gymLogo
+    || (typeof b.gymId?.logo === 'string' && b.gymId.logo.trim())
+    || b.gymId?.logo?.fileData
+    || b.gymId?.logoUrl
+    || b.gymId?.coverPhoto?.fileData
+    || b.gymId?.coverPhotoUrl
+    || b.gymId?.image
+    || (typeof b.gym?.logo === 'string' && b.gym.logo.trim())
+    || b.gym?.logo?.fileData
+    || b.gym?.logoUrl
+    || b.gymImageUrl
+    || b.gymId?.imageUrl
+    || b.gymId?.images?.[0]
+    || null;
+
   return {
     ...b,
     id: b.bookingId || b.id || b._id,
@@ -38,7 +54,8 @@ export const mapBackendBookingToClient = (b) => {
     customerId: b.userId?.customerId || b.customerId || 'GYZ0001',
     gymName: b.gymId?.name || b.gymName || 'GYMEZY Partner Gym',
     gymLocation: b.gymId?.location || b.gymId?.address?.city || b.gymLocation || '',
-    gymImageUrl: b.gymId?.imageUrl || b.gymId?.images?.[0] || b.gymImageUrl || '',
+    gymLogo: resolvedGymLogo,
+    gymImageUrl: resolvedGymLogo || b.gymId?.imageUrl || b.gymId?.images?.[0] || b.gymImageUrl || '',
     type: b.bookingType === 'GROUP_CLASS'
       ? 'Group Class'
       : (b.bookingType === 'SECTION' ? 'Section Batch' : (b.type || 'Gym Access')),
@@ -51,6 +68,10 @@ export const mapBackendBookingToClient = (b) => {
     amountPaid: b.pricing?.totalAmount ?? b.amountPaid ?? 0,
     paymentMode: b.payment?.method || b.paymentMode || 'UPI',
     otp: b.entryOtp || b.otp || '',
+    isCustomDates: Boolean(b.isCustomDates || (Array.isArray(b.customDates) && b.customDates.length > 0)),
+    isTodayValid: b.isTodayValid !== undefined ? b.isTodayValid : true,
+    customDates: b.customDates || [],
+    nextSessionDateFormatted: b.nextSessionDateFormatted || null,
     status: resolvedStatus,
     iconName: b.category === 'yoga' ? 'self-improvement' : (b.category === 'zumba' ? 'music-note' : 'fitness-center'),
     accentColor: '#003882',

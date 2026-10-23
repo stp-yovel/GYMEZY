@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import Attendance from '../models/attendance.model.js';
 import Membership from '../models/membership.model.js';
 import MembershipSwitchRequest from '../models/membershipSwitchRequest.model.js';
+import Employee from '../models/employee.model.js';
 
 /**
  * Auto-transition memberships based on date window:
@@ -124,12 +125,64 @@ export const autoCheckoutStaleRecords = async () => {
       console.log(`[ATTENDANCE CRON] Auto-checked out ${updatedCount} stale check-in records.`);
     }
 
-    // Also sync membership statuses
+    // Sync membership statuses
     await syncMembershipStatuses();
+
+    // Auto-deactivate expired temporary staff contracts
+    await autoDeactivateExpiredTemporaryStaff();
 
     return updatedCount;
   } catch (error) {
     console.error('[ATTENDANCE CRON ERROR]:', error.message);
+    return 0;
+  }
+};
+
+/**
+ * Auto-deactivate temporary contract staff whose contract endDate has passed
+ */
+export const autoDeactivateExpiredTemporaryStaff = async () => {
+  try {
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+
+    const expiredStaff = await Employee.find({
+      type: 'Temporary',
+      status: 'Active',
+      'schedule.endDate': { $exists: true, $ne: '' },
+    });
+
+    let deactivatedCount = 0;
+    for (const emp of expiredStaff) {
+      const endStr = emp.schedule?.endDate
+        ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(emp.schedule.endDate))
+        : null;
+
+      if (endStr && endStr < todayStr) {
+        emp.status = 'Inactive';
+        emp.adminRemarks = (emp.adminRemarks ? emp.adminRemarks + '; ' : '') + 'Contract Expired - Auto-deactivated by Nightly Cron';
+        if (!Array.isArray(emp.auditHistory)) emp.auditHistory = [];
+        emp.auditHistory.push({
+          changeType: 'STATUS_CHANGE',
+          changedBy: 'Nightly System Cron',
+          changedByRole: 'SYSTEM',
+          changedAt: new Date(),
+          gymId: emp.gymId,
+          gymPartnerId: emp.gymPartnerId,
+          fieldDiffs: [
+            { field: 'status', previousValue: 'Active', updatedValue: 'Inactive' },
+          ],
+        });
+        await emp.save();
+        deactivatedCount += 1;
+      }
+    }
+
+    if (deactivatedCount > 0) {
+      console.log(`[ATTENDANCE CRON] Auto-deactivated ${deactivatedCount} expired temporary staff contracts.`);
+    }
+    return deactivatedCount;
+  } catch (error) {
+    console.error('[ATTENDANCE CRON ERROR] Error deactivating expired staff:', error?.message);
     return 0;
   }
 };
@@ -140,8 +193,9 @@ export const autoCheckoutStaleRecords = async () => {
 export const initAttendanceCron = () => {
   // Run daily at 02:00 AM
   cron.schedule('0 2 * * *', async () => {
-    console.log('[ATTENDANCE CRON] Running 02:00 AM nightly stale check-out and membership sync...');
+    console.log('[ATTENDANCE CRON] Running 02:00 AM nightly stale check-out, membership sync & staff expiration check...');
     await autoCheckoutStaleRecords();
+    await autoDeactivateExpiredTemporaryStaff();
   });
 
   // Also run every hour to activate memberships as soon as their start date arrives

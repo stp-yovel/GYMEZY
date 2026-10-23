@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,15 +15,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
+import { useBookingRepository } from '../data/BookingContext';
 import { MonthlyGridCalendar } from '../widgets/CustomCalendar';
 import { TrainerReviewsPopup } from '../widgets/DetailsPopups';
-import { useBookingRepository } from '../data/BookingContext';
 import apiService from '../services/apiService';
+import { generateAvailableSlots, generateTrainerAvailableSlots } from '../utils/gymTimingHelper';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const MORNING_SLOTS = ['6:00 AM', '7:00 AM', '8:00 AM'];
-const EVENING_SLOTS = ['6:00 PM', '7:00 PM', '8:00 PM'];
 const ALL_WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const formatToDDMMYYYY = (val) => {
@@ -176,7 +175,12 @@ export const BookingSessionScreen = ({ route, navigation }) => {
   const [trainerReviewsList, setTrainerReviewsList] = useState([]);
 
   // Gym Booking State
-  const [gymBookingType, setGymBookingType] = useState('Per Session'); // 'Per Session', 'Weekly Plan', 'Custom Dates'
+  const isSingleSessionEnabled = gym?.singleSessionBookingEnabled !== false;
+  const sessionBasePrice = Number(gym?.singleSessionPrice ?? gym?.pricePerSession ?? 199);
+
+  const [gymBookingType, setGymBookingType] = useState(
+    isSingleSessionEnabled ? 'Per Session' : 'Weekly Plan'
+  ); // 'Per Session', 'Weekly Plan', 'Custom Dates'
   const [selectedStartDate, setSelectedStartDate] = useState(new Date());
   const [customSelectedDates, setCustomSelectedDates] = useState([
     new Date(),
@@ -184,12 +188,92 @@ export const BookingSessionScreen = ({ route, navigation }) => {
     new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
   ]);
 
+  // Personal Trainer Selection for Session Bookings
+  const [selectedSessionTrainer, setSelectedSessionTrainer] = useState(null);
+  const [gymTrainers, setGymTrainers] = useState(Array.isArray(gym?.trainers) ? gym.trainers : []);
+
+  useEffect(() => {
+    if (!isSingleSessionEnabled && gymBookingType === 'Per Session') {
+      setGymBookingType('Weekly Plan');
+    }
+  }, [isSingleSessionEnabled, gymBookingType]);
+
+  useEffect(() => {
+    const targetGymId = gym?._id || gym?.id || gym?.partnerId;
+    if (!targetGymId) return;
+    let isMounted = true;
+    apiService
+      .getGymTrainers(targetGymId)
+      .then((fetched) => {
+        if (isMounted && Array.isArray(fetched) && fetched.length > 0) {
+          setGymTrainers(fetched);
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to load gym trainers for booking:', err?.message);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [gym?._id, gym?.id, gym?.partnerId]);
+
+  // Trainers who offer Single Session pass (price > 0)
+  const availableSessionTrainers = useMemo(() => {
+    return (gymTrainers || []).filter((tr) => Number(tr.trainerPricing?.singleSession || 0) > 0);
+  }, [gymTrainers]);
+
+  // Auto-reset selectedSessionTrainer if they do not offer session passes
+  useEffect(() => {
+    if (selectedSessionTrainer) {
+      const selectedId = selectedSessionTrainer._id || selectedSessionTrainer.id || selectedSessionTrainer.employeeId;
+      const isValid = availableSessionTrainers.some((tr) => {
+        const trId = tr._id || tr.id || tr.employeeId;
+        return trId === selectedId;
+      });
+      if (!isValid) {
+        setSelectedSessionTrainer(null);
+      }
+    }
+  }, [availableSessionTrainers, selectedSessionTrainer]);
+
+  const trainerDailyFee = selectedSessionTrainer
+    ? Number(selectedSessionTrainer?.trainerPricing?.singleSession || 0)
+    : 0;
+  const singleSessionTotalPerDay = sessionBasePrice + trainerDailyFee;
+
   // Class Booking State (Yoga, Zumba, HIIT, etc.)
   const [selectedClassName, setSelectedClassName] = useState('Yoga Classes');
   const [selectedClassType, setSelectedClassType] = useState('Hatha Yoga');
   const [selectedClassPrice, setSelectedClassPrice] = useState(249.0);
   const [selectedClassDate, setSelectedClassDate] = useState(new Date());
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState('7:00 AM');
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState('07:00 AM');
+
+  const targetClassDateObj = useMemo(() => {
+    return selectedClassDate ? new Date(selectedClassDate) : new Date();
+  }, [selectedClassDate]);
+
+  const classSlotsData = useMemo(() => {
+    if (selectedSessionTrainer) {
+      return generateTrainerAvailableSlots(gym?.openingHours, targetClassDateObj, selectedSessionTrainer);
+    }
+    return generateAvailableSlots(gym?.openingHours, targetClassDateObj);
+  }, [gym?.openingHours, targetClassDateObj, selectedSessionTrainer]);
+
+  const dynamicMorningSlots = classSlotsData.morningSlots || [];
+  const dynamicEveningSlots = classSlotsData.eveningSlots || [];
+  const isGymOpenOnSelectedDate = classSlotsData.isOpen;
+
+  // Auto-select valid slot when date changes or current selectedTimeSlot is invalid
+  useEffect(() => {
+    if (!isGymOpenOnSelectedDate) {
+      setSelectedTimeSlot('');
+      return;
+    }
+    const allValid = [...dynamicMorningSlots, ...dynamicEveningSlots];
+    if (allValid.length > 0 && !allValid.includes(selectedTimeSlot)) {
+      setSelectedTimeSlot(allValid[0]);
+    }
+  }, [isGymOpenOnSelectedDate, dynamicMorningSlots, dynamicEveningSlots]);
 
   const primaryNavy = isDark ? '#93C5FD' : '#003882';
   const cardColor = isDark ? '#1E1E1E' : '#FFFFFF';
@@ -251,8 +335,8 @@ export const BookingSessionScreen = ({ route, navigation }) => {
     setCurrentView('class_booking');
   };
 
-  const handleOpenTrainerProfile = () => {
-    const tr = selectedSection?.trainerId;
+  const handleOpenTrainerProfile = (specificTrainer = null) => {
+    const tr = specificTrainer || selectedSection?.trainerId;
     if (!tr) return;
 
     const trainerData = {
@@ -263,9 +347,13 @@ export const BookingSessionScreen = ({ route, navigation }) => {
       specialty: tr.specialty || tr.specialization || 'Trainer',
       specialization: tr.specialization || tr.specialty || 'Head Fitness Instructor',
       experience: tr.experience || (tr.experienceYears ? `${tr.experienceYears}+ Years` : '1+ Years'),
-      rating: tr.rating !== undefined ? tr.rating : 4,
+      rating: tr.rating !== undefined ? tr.rating : 4.8,
       reviewsCount: tr.reviewsCount !== undefined ? tr.reviewsCount : 2,
-      aboutMe: tr.aboutMe || tr.description,
+      aboutMe: tr.aboutMe || tr.description || tr.bio || `${tr.name || 'This trainer'} is a certified fitness coach specialized in ${tr.specialization || tr.specialty || 'personal fitness coaching'}.`,
+      servicesOffered: Array.isArray(tr.specializations) && tr.specializations.length > 0
+        ? tr.specializations
+        : (tr.specialty || tr.specialization ? [tr.specialty || tr.specialization, 'Personal Training', 'Fitness Assessment'] : undefined),
+      certifications: tr.trainerCerts?.map?.((c) => c.certType || c.fileName) || tr.certifications,
     };
     setSelectedTrainerData(trainerData);
     setTrainerReviewsList(tr.ratings || tr.reviews || []);
@@ -394,22 +482,28 @@ export const BookingSessionScreen = ({ route, navigation }) => {
       sessions = activeSection.durationDays || 20;
       subtotal = Number(activeSection.cost) || 0;
     } else if (currentView === 'gym_booking' && gymBookingType === 'Per Session') {
-      title = 'Gym Access (Single Session)';
+      title = selectedSessionTrainer
+        ? `Gym Access + Coach ${selectedSessionTrainer.name || ''}`.trim()
+        : 'Gym Access (Single Session)';
       datesSummary = 'Valid for today / next 24 hrs';
       sessions = 1;
-      subtotal = gym.pricePerSession;
+      subtotal = singleSessionTotalPerDay;
     } else if (currentView === 'weekly_plan' || (currentView === 'gym_booking' && gymBookingType === 'Weekly Plan')) {
-      title = 'Weekly Unlimited Gym Pass';
+      title = selectedSessionTrainer
+        ? `Weekly Unlimited Gym Pass + Coach ${selectedSessionTrainer.name || ''}`.trim()
+        : 'Weekly Unlimited Gym Pass';
       const end = new Date(selectedStartDate.getTime() + 6 * 24 * 60 * 60 * 1000);
       datesSummary = `${formatDate(selectedStartDate)} to ${formatDate(end)} (7 Days)`;
       sessions = 7;
-      subtotal = 999.0;
+      subtotal = 999.0 + (selectedSessionTrainer ? trainerDailyFee * 7 : 0);
     } else if (currentView === 'custom_dates' || (currentView === 'gym_booking' && gymBookingType === 'Custom Dates')) {
-      title = 'Gym Access (Custom Dates)';
+      title = selectedSessionTrainer
+        ? `Gym Access + Coach ${selectedSessionTrainer.name || ''} (Custom Dates)`.trim()
+        : 'Gym Access (Custom Dates)';
       sessions = customSelectedDates.length;
       const sortedDates = [...customSelectedDates].sort((a, b) => a.getTime() - b.getTime());
       datesSummary = sortedDates.map((d) => `${d.getDate()} ${monthName(d.getMonth())}`).join(', ');
-      subtotal = gym.pricePerSession * sessions;
+      subtotal = singleSessionTotalPerDay * sessions;
     } else if (currentView === 'class_booking') {
       title = `${selectedClassName} (${selectedClassType})`;
       datesSummary = formatDate(selectedClassDate);
@@ -430,11 +524,20 @@ export const BookingSessionScreen = ({ route, navigation }) => {
       amount: subtotal,
       sectionId: activeSection?._id || null,
       bookingType: (currentView === 'group_classes' || currentView === 'group_class_detail') ? 'GROUP_CLASS' : 'GYM_SESSION',
-      startDate: activeSection?.startDate || selectedStartDate || new Date(),
-      endDate: activeSection?.endDate || null,
+      startDate: (currentView === 'custom_dates' || (currentView === 'gym_booking' && gymBookingType === 'Custom Dates'))
+        ? [...customSelectedDates].sort((a, b) => a.getTime() - b.getTime())[0] || new Date()
+        : (activeSection?.startDate || selectedStartDate || new Date()),
+      endDate: (currentView === 'custom_dates' || (currentView === 'gym_booking' && gymBookingType === 'Custom Dates'))
+        ? [...customSelectedDates].sort((a, b) => a.getTime() - b.getTime())[customSelectedDates.length - 1] || null
+        : (activeSection?.endDate || null),
       durationDays: activeSection?.durationDays || sessions,
+      customDates: (currentView === 'custom_dates' || (currentView === 'gym_booking' && gymBookingType === 'Custom Dates'))
+        ? customSelectedDates.map((d) => d.toISOString())
+        : null,
       category: activeSection?.category || 'general',
-      trainerId: activeSection?.trainerId?._id || activeSection?.trainerId || null,
+      trainerId: (currentView === 'group_classes' || currentView === 'group_class_detail')
+        ? (activeSection?.trainerId?._id || activeSection?.trainerId || null)
+        : (selectedSessionTrainer?._id || selectedSessionTrainer?.employeeId || null),
     });
   };
 
@@ -477,6 +580,189 @@ export const BookingSessionScreen = ({ route, navigation }) => {
       : sections.filter(
           (s) => (s.category || '').toLowerCase() === selectedGroupCategory.toLowerCase()
         );
+
+  const renderTrainerSelector = (bookingMode = 'session') => {
+    const isWeekly = bookingMode === 'weekly';
+    const isCustom = bookingMode === 'custom';
+    const customCount = customSelectedDates.length || 1;
+
+    const subText = isWeekly
+      ? 'Train with a dedicated personal coach for your 7-day pass'
+      : isCustom
+      ? `Add personal coaching across your ${customCount} selected dates`
+      : 'Work out independently or add 1-on-1 coaching for your visit';
+
+    const freeText = isWeekly
+      ? 'Included in Weekly Pass'
+      : isCustom
+      ? 'Included in Custom Pass'
+      : 'Included in Day Pass';
+
+    return (
+      <View style={styles.trainerSelectorSection}>
+        <View style={styles.trainerSelectorHeader}>
+          <Text style={[styles.trainerSelectorTitle, { color: textColor }]}>
+            Add Personal Trainer (Optional)
+          </Text>
+          <Text style={[styles.trainerSelectorSub, { color: subtitleColor }]}>
+            {subText}
+          </Text>
+        </View>
+
+        {/* Option: No Trainer */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setSelectedSessionTrainer(null)}
+          style={[
+            styles.trainerSelectCard,
+            {
+              backgroundColor: selectedSessionTrainer === null
+                ? (isDark ? '#262626' : '#F1F5F9')
+                : cardColor,
+              borderColor: selectedSessionTrainer === null
+                ? (isDark ? '#60A5FA' : '#003882')
+                : borderColor,
+              borderWidth: selectedSessionTrainer === null ? 1.5 : 1,
+            },
+          ]}
+        >
+          <View style={[styles.trainerAvatarFallback, { backgroundColor: isDark ? 'rgba(59,130,246,0.2)' : 'rgba(0,56,130,0.1)' }]}>
+            <MaterialIcons name="person-outline" size={20} color={isDark ? '#93C5FD' : '#003882'} />
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={[styles.trainerSelectName, { color: textColor }]}>
+              Without Personal Trainer
+            </Text>
+            <Text style={[styles.trainerSelectDesc, { color: subtitleColor }]}>
+              Standard gym floor and equipment access
+            </Text>
+            <Text style={styles.trainerSelectFreePrice}>{freeText}</Text>
+          </View>
+          <MaterialIcons
+            name={selectedSessionTrainer === null ? 'radio-button-checked' : 'radio-button-unchecked'}
+            size={20}
+            color={selectedSessionTrainer === null ? (isDark ? '#60A5FA' : '#003882') : subtitleColor}
+          />
+        </TouchableOpacity>
+
+        {/* Trainer Options */}
+        {availableSessionTrainers.length === 0 ? (
+          <View
+            style={[
+              styles.noTrainerNoticeCard,
+              {
+                backgroundColor: isDark ? '#262626' : '#F8FAFC',
+                borderColor: borderColor,
+              },
+            ]}
+          >
+            <MaterialIcons name="info-outline" size={18} color={subtitleColor} />
+            <Text style={[styles.noTrainerNoticeText, { color: subtitleColor }]}>
+              No personal trainers available for day/session passes
+            </Text>
+          </View>
+        ) : (
+          availableSessionTrainers.map((tr) => {
+            const trId = tr._id || tr.id || tr.employeeId;
+            const isSelected = Boolean(
+              selectedSessionTrainer && (
+                (selectedSessionTrainer._id && tr._id && selectedSessionTrainer._id === tr._id) ||
+                (selectedSessionTrainer.employeeId && tr.employeeId && selectedSessionTrainer.employeeId === tr.employeeId) ||
+                selectedSessionTrainer === tr
+              )
+            );
+            const trFee = Number(tr.trainerPricing?.singleSession || 0);
+
+            let feeText = `+₹${trFee} / Day`;
+            if (isWeekly) {
+              feeText = `+₹${trFee * 7} / Week (7 Days)`;
+            } else if (isCustom) {
+              feeText = `+₹${trFee * customCount} (${customCount} Days)`;
+            }
+
+            return (
+              <TouchableOpacity
+                key={String(trId || tr.name)}
+                activeOpacity={0.85}
+                onPress={() => setSelectedSessionTrainer(tr)}
+                style={[
+                  styles.trainerSelectCard,
+                  {
+                    backgroundColor: isSelected
+                      ? (isDark ? '#262626' : '#F1F5F9')
+                      : cardColor,
+                    borderColor: isSelected
+                      ? (isDark ? '#60A5FA' : '#003882')
+                      : borderColor,
+                    borderWidth: isSelected ? 1.5 : 1,
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenTrainerProfile(tr)}
+                >
+                  {tr.avatar ? (
+                    <Image source={{ uri: tr.avatar }} style={styles.trainerAvatarImg} />
+                  ) : (
+                    <View style={[styles.trainerAvatarFallback, { backgroundColor: isDark ? '#334155' : '#E2E8F0' }]}>
+                      <Text style={[styles.trainerInitials, { color: textColor }]}>
+                        {(tr.name || 'T').charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.trainerSelectName, { color: textColor }]} numberOfLines={1}>
+                      {tr.name ? `Coach ${tr.name}` : 'Personal Trainer'}
+                    </Text>
+                    {tr.rating ? (
+                      <View style={styles.trainerRatingBadge}>
+                        <MaterialIcons name="star" size={12} color="#F59E0B" />
+                        <Text style={styles.trainerRatingText}>{tr.rating}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={[styles.trainerSelectDesc, { color: subtitleColor }]} numberOfLines={1}>
+                    {tr.specialization || tr.specialty || 'Fitness Trainer'}
+                  </Text>
+
+                  <View style={styles.trainerDetailsRow}>
+                    <Text style={styles.trainerSelectAddonPrice}>
+                      {feeText}
+                    </Text>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={(e) => {
+                        e?.stopPropagation?.();
+                        handleOpenTrainerProfile(tr);
+                      }}
+                      style={styles.viewTrainerDetailsBtn}
+                    >
+                      <Text style={[styles.viewTrainerDetailsText, { color: isDark ? '#93C5FD' : '#003882' }]}>
+                        View Details
+                      </Text>
+                      <MaterialIcons name="chevron-right" size={14} color={isDark ? '#93C5FD' : '#003882'} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <MaterialIcons
+                  name={isSelected ? 'radio-button-checked' : 'radio-button-unchecked'}
+                  size={20}
+                  color={isSelected ? (isDark ? '#60A5FA' : '#003882') : subtitleColor}
+                  style={{ marginLeft: 8 }}
+                />
+              </TouchableOpacity>
+            );
+          })
+        )}
+      </View>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -642,16 +928,25 @@ export const BookingSessionScreen = ({ route, navigation }) => {
 
             {/* Option 1: Per Session */}
             <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => setGymBookingType('Per Session')}
+              activeOpacity={isSingleSessionEnabled ? 0.85 : 1}
+              onPress={() => {
+                if (isSingleSessionEnabled) {
+                  setGymBookingType('Per Session');
+                }
+              }}
               style={[
                 styles.typeOptionCard,
                 {
-                  backgroundColor: gymBookingType === 'Per Session'
+                  backgroundColor: !isSingleSessionEnabled
+                    ? (isDark ? '#1C1C1E' : '#F8FAFC')
+                    : gymBookingType === 'Per Session'
                     ? (isDark ? '#262626' : '#F1F5F9')
                     : cardColor,
-                  borderColor: gymBookingType === 'Per Session' ? (isDark ? '#60A5FA' : '#003882') : borderColor,
-                  borderWidth: gymBookingType === 'Per Session' ? 1.5 : 1,
+                  borderColor: !isSingleSessionEnabled
+                    ? (isDark ? 'rgba(255,255,255,0.06)' : '#E2E8F0')
+                    : gymBookingType === 'Per Session' ? (isDark ? '#60A5FA' : '#003882') : borderColor,
+                  borderWidth: gymBookingType === 'Per Session' && isSingleSessionEnabled ? 1.5 : 1,
+                  opacity: isSingleSessionEnabled ? 1 : 0.65,
                 },
               ]}
             >
@@ -659,15 +954,30 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                 <MaterialIcons name="calendar-today" size={22} color={isDark ? '#93C5FD' : '#003882'} />
               </View>
               <View style={styles.typeContent}>
-                <Text style={[styles.typeTitle, { color: textColor }]}>Per Session</Text>
-                <Text style={[styles.typeSubtitle, { color: subtitleColor }]}>Book for a single visit</Text>
-                <Text style={styles.typePrice}>₹{Math.round(gym.pricePerSession)} / Session</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.typeTitle, { color: textColor }]}>Per Session</Text>
+                  {!isSingleSessionEnabled && (
+                    <View style={styles.disabledBadge}>
+                      <Text style={styles.disabledBadgeText}>Disabled by Gym</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.typeSubtitle, { color: subtitleColor }]}>
+                  {isSingleSessionEnabled ? 'Book for a single visit' : 'Single session bookings are currently disabled'}
+                </Text>
+                <Text style={[styles.typePrice, !isSingleSessionEnabled && { color: subtitleColor }]}>
+                  ₹{Math.round(sessionBasePrice)} / Session
+                </Text>
               </View>
-              <MaterialIcons
-                name={gymBookingType === 'Per Session' ? 'radio-button-checked' : 'radio-button-unchecked'}
-                size={20}
-                color={gymBookingType === 'Per Session' ? (isDark ? '#60A5FA' : '#003882') : subtitleColor}
-              />
+              {isSingleSessionEnabled ? (
+                <MaterialIcons
+                  name={gymBookingType === 'Per Session' ? 'radio-button-checked' : 'radio-button-unchecked'}
+                  size={20}
+                  color={gymBookingType === 'Per Session' ? (isDark ? '#60A5FA' : '#003882') : subtitleColor}
+                />
+              ) : (
+                <MaterialIcons name="block" size={18} color={subtitleColor} />
+              )}
             </TouchableOpacity>
 
             {/* Option 2: Weekly Plan */}
@@ -735,6 +1045,9 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                 color={gymBookingType === 'Custom Dates' ? (isDark ? '#60A5FA' : '#003882') : subtitleColor}
               />
             </TouchableOpacity>
+
+            {/* Trainer Selector for Per Session */}
+            {gymBookingType === 'Per Session' && isSingleSessionEnabled && renderTrainerSelector()}
           </ScrollView>
 
           {/* Bottom Bar */}
@@ -755,7 +1068,7 @@ export const BookingSessionScreen = ({ route, navigation }) => {
               <Text style={[styles.bottomPriceLabel, { color: subtitleColor }]}>Price</Text>
               <Text style={[styles.bottomPriceValue, { color: textColor }]}>
                 {gymBookingType === 'Per Session'
-                  ? `₹${Math.round(gym.pricePerSession)}`
+                  ? `₹${Math.round(singleSessionTotalPerDay)}`
                   : gymBookingType === 'Weekly Plan'
                   ? '₹999'
                   : 'Custom'}
@@ -837,6 +1150,9 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                 {formatDate(new Date(selectedStartDate.getTime() + 6 * 24 * 60 * 60 * 1000))}
               </Text>
             </View>
+
+            {/* Trainer Selector for Weekly Plan */}
+            {renderTrainerSelector('weekly')}
           </ScrollView>
 
           {/* Bottom Bar */}
@@ -855,7 +1171,9 @@ export const BookingSessionScreen = ({ route, navigation }) => {
           >
             <View>
               <Text style={[styles.bottomPriceLabel, { color: subtitleColor }]}>Price</Text>
-              <Text style={[styles.bottomPriceValue, { color: textColor }]}>₹999</Text>
+              <Text style={[styles.bottomPriceValue, { color: textColor }]}>
+                ₹{Math.round(999.0 + (selectedSessionTrainer ? trainerDailyFee * 7 : 0))}
+              </Text>
             </View>
             <TouchableOpacity
               activeOpacity={0.85}
@@ -927,9 +1245,12 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                 {customSelectedDates.length} Dates Selected
               </Text>
               <Text style={[styles.selectedCalcText, { color: textColor }]}>
-                ₹{Math.round(gym.pricePerSession)} × {customSelectedDates.length} Sessions
+                ₹{Math.round(singleSessionTotalPerDay)} × {customSelectedDates.length} Sessions
               </Text>
             </View>
+
+            {/* Optional Personal Trainer Selector for Custom Dates */}
+            {renderTrainerSelector()}
           </ScrollView>
 
           {/* Bottom Bar */}
@@ -949,7 +1270,7 @@ export const BookingSessionScreen = ({ route, navigation }) => {
             <View>
               <Text style={[styles.bottomPriceLabel, { color: subtitleColor }]}>Price</Text>
               <Text style={[styles.bottomPriceValue, { color: textColor }]}>
-                ₹{Math.round(gym.pricePerSession * customSelectedDates.length)}
+                ₹{Math.round(singleSessionTotalPerDay * customSelectedDates.length)}
               </Text>
             </View>
             <TouchableOpacity
@@ -1066,67 +1387,95 @@ export const BookingSessionScreen = ({ route, navigation }) => {
               Select Time Slot
             </Text>
 
-            {/* Morning */}
-            <Text style={[styles.slotCategoryLabel, { color: subtitleColor }]}>Morning</Text>
-            <View style={styles.slotsRow}>
-              {MORNING_SLOTS.map((slot) => {
-                const isSel = selectedTimeSlot === slot;
-                return (
-                  <TouchableOpacity
-                    key={slot}
-                    activeOpacity={0.8}
-                    onPress={() => setSelectedTimeSlot(slot)}
-                    style={[
-                      styles.slotPill,
-                      {
-                        backgroundColor: isSel ? '#003882' : isDark ? '#262626' : '#F1F5F9',
-                        borderColor: isSel ? 'transparent' : borderColor,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.slotPillText,
-                        { color: isSel ? '#FFFFFF' : textColor, fontWeight: isSel ? 'bold' : '500' },
-                      ]}
-                    >
-                      {slot}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            {!isGymOpenOnSelectedDate ? (
+              <View style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                borderColor: 'rgba(239, 68, 68, 0.3)',
+                borderWidth: 1,
+                borderRadius: 12,
+                padding: 14,
+                marginTop: 10,
+              }}>
+                <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 13, marginBottom: 2 }}>
+                  {selectedSessionTrainer ? 'Trainer Unavailable on this Day' : 'Gym Closed on this Day'}
+                </Text>
+                <Text style={{ color: textColor, fontSize: 12 }}>
+                  {classSlotsData.reason || `${gym?.name || 'This gym'} is closed on ${targetClassDateObj.toLocaleDateString('en-US', { weekday: 'long' })}. Please select another date on the calendar above.`}
+                </Text>
+              </View>
+            ) : (
+              <View>
+                {/* Morning */}
+                {dynamicMorningSlots.length > 0 && (
+                  <View>
+                    <Text style={[styles.slotCategoryLabel, { color: subtitleColor }]}>Morning Slots</Text>
+                    <View style={styles.slotsRow}>
+                      {dynamicMorningSlots.map((slot) => {
+                        const isSel = selectedTimeSlot === slot;
+                        return (
+                          <TouchableOpacity
+                            key={slot}
+                            activeOpacity={0.8}
+                            onPress={() => setSelectedTimeSlot(slot)}
+                            style={[
+                              styles.slotPill,
+                              {
+                                backgroundColor: isSel ? '#003882' : isDark ? '#262626' : '#F1F5F9',
+                                borderColor: isSel ? 'transparent' : borderColor,
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.slotPillText,
+                                { color: isSel ? '#FFFFFF' : textColor, fontWeight: isSel ? 'bold' : '500' },
+                              ]}
+                            >
+                              {slot}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
 
-            {/* Evening */}
-            <Text style={[styles.slotCategoryLabel, { color: subtitleColor, marginTop: 12 }]}>Evening</Text>
-            <View style={styles.slotsRow}>
-              {EVENING_SLOTS.map((slot) => {
-                const isSel = selectedTimeSlot === slot;
-                return (
-                  <TouchableOpacity
-                    key={slot}
-                    activeOpacity={0.8}
-                    onPress={() => setSelectedTimeSlot(slot)}
-                    style={[
-                      styles.slotPill,
-                      {
-                        backgroundColor: isSel ? '#003882' : isDark ? '#262626' : '#F1F5F9',
-                        borderColor: isSel ? 'transparent' : borderColor,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.slotPillText,
-                        { color: isSel ? '#FFFFFF' : textColor, fontWeight: isSel ? 'bold' : '500' },
-                      ]}
-                    >
-                      {slot}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                {/* Evening */}
+                {dynamicEveningSlots.length > 0 && (
+                  <View>
+                    <Text style={[styles.slotCategoryLabel, { color: subtitleColor, marginTop: 12 }]}>Evening Slots</Text>
+                    <View style={styles.slotsRow}>
+                      {dynamicEveningSlots.map((slot) => {
+                        const isSel = selectedTimeSlot === slot;
+                        return (
+                          <TouchableOpacity
+                            key={slot}
+                            activeOpacity={0.8}
+                            onPress={() => setSelectedTimeSlot(slot)}
+                            style={[
+                              styles.slotPill,
+                              {
+                                backgroundColor: isSel ? '#003882' : isDark ? '#262626' : '#F1F5F9',
+                                borderColor: isSel ? 'transparent' : borderColor,
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.slotPillText,
+                                { color: isSel ? '#FFFFFF' : textColor, fontWeight: isSel ? 'bold' : '500' },
+                              ]}
+                            >
+                              {slot}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
           </ScrollView>
 
           {/* Bottom Bar */}
@@ -1151,10 +1500,19 @@ export const BookingSessionScreen = ({ route, navigation }) => {
             </View>
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={goToCheckout}
-              style={styles.continueBtn}
+              onPress={() => {
+                if (!isGymOpenOnSelectedDate) return;
+                goToCheckout();
+              }}
+              disabled={!isGymOpenOnSelectedDate || !selectedTimeSlot}
+              style={[
+                styles.continueBtn,
+                (!isGymOpenOnSelectedDate || !selectedTimeSlot) && { opacity: 0.5 },
+              ]}
             >
-              <Text style={styles.continueBtnText}>Continue to Payment</Text>
+              <Text style={styles.continueBtnText}>
+                {!isGymOpenOnSelectedDate ? 'Facility Closed' : 'Continue to Payment'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2512,5 +2870,103 @@ const styles = StyleSheet.create({
     color: '#64748B',
     flex: 1,
     lineHeight: 15,
+  },
+  disabledBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+  },
+  disabledBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#EF4444',
+    textTransform: 'uppercase',
+  },
+  trainerSelectorSection: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  trainerSelectorHeader: {
+    marginBottom: 12,
+  },
+  trainerSelectorTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  trainerSelectorSub: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  trainerSelectCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 16,
+    marginBottom: 10,
+  },
+  trainerSelectName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  trainerSelectDesc: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  trainerSelectFreePrice: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#00BF62',
+    marginTop: 3,
+  },
+  trainerSelectAddonPrice: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#00BF62',
+    marginTop: 3,
+  },
+  trainerRatingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+  },
+  trainerRatingText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#F59E0B',
+  },
+  trainerDetailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  viewTrainerDetailsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+  },
+  viewTrainerDetailsText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  noTrainerNoticeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 8,
+    gap: 8,
+  },
+  noTrainerNoticeText: {
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
   },
 });

@@ -61,6 +61,7 @@ export const PaymentSummaryScreen = ({ route, navigation }) => {
         timeSlot: timeSlot || null,
         durationDays: route.params?.durationDays || sessionsCount || 1,
         sessionsCount: sessionsCount || 1,
+        customDates: route.params?.customDates || null,
         pricing: {
           subtotal,
           discount,

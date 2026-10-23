@@ -73,10 +73,18 @@ const calculateReviewMetrics = (reviews = []) => {
 /**
  * Helper to compute relative time string
  */
-const computeTimeAgo = (dateInput) => {
+export const computeTimeAgo = (dateInput) => {
   if (!dateInput) return 'Just now';
   if (typeof dateInput === 'string' && dateInput.includes('ago') && !dateInput.toLowerCase().includes('just now')) {
     return dateInput;
+  }
+  if (
+    typeof dateInput === 'string' &&
+    (dateInput.trim().toLowerCase() === 'recent' ||
+      dateInput.trim().toLowerCase() === 'today' ||
+      dateInput.trim().toLowerCase() === 'just now')
+  ) {
+    return 'Just now';
   }
   const date = new Date(dateInput);
   if (Number.isNaN(date.getTime())) {

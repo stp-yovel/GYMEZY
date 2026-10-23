@@ -24,6 +24,13 @@
 6. [API Architecture & RESTful Endpoint Contracts](#6-api-architecture--restful-endpoint-contracts)
 7. [Non-Functional Requirements, Security & Scalability](#7-non-functional-requirements-security--scalability)
 8. [Platform System Accounts & Initial Seed Credentials](#8-platform-system-accounts--initial-seed-credentials)
+9. [Feature Specifications & Architecture Plans (October 2026 Releases)](#9-feature-specifications--architecture-plans-october-2026-releases)
+   - 9.1 [Location-Aware Banners & Geo-Targeted Promotion System](#91-location-aware-banners--geo-targeted-promotion-system)
+   - 9.2 [Single Source of Truth (SSOT) Gym Operating Hours & Dynamic Slot Engine](#92-single-source-of-truth-ssot-gym-operating-hours--dynamic-slot-engine)
+   - 9.3 [Per-Session Booking & Trainer Add-on Architecture](#93-per-session-booking--trainer-add-on-architecture)
+   - 9.4 [Section Batch Scheduling, Turnstile QR Check-in & Auto Check-Out](#94-section-batch-scheduling-turnstile-qr-check-in--auto-check-out)
+   - 9.5 [Part-Time & Temporary Staff Management Module](#95-part-time--temporary-staff-management-module)
+   - 9.6 [Strict Trainer Schedule Enforcement Across Bookings & Membership Tiers](#96-strict-trainer-schedule-enforcement-across-bookings--membership-tiers)
 
 ---
 
@@ -749,4 +756,171 @@ node src/scripts/seedSuperAdmin.js
 ```
 
 ---
+
+## 9. Feature Specifications & Architecture Plans (October 2026 Releases)
+
+### 9.1 Location-Aware Banners & Geo-Targeted Promotion System
+
+#### Overview
+The user home screen features dynamic promotion banners that adapt to the user's geographic location (city, area, and coordinates) rather than presenting a static global list.
+
+#### Technical Implementation
+- **Location Resolution:** The client passes coordinates (`lat`, `lng`) or active city name in discovery queries.
+- **Radius Filtering:** Banners assigned to specific partner gyms only render if the user's location is within the gym's defined operational radius (default: 25 km).
+- **Proximity Pill:** Banners display a real-time proximity badge (e.g. *1.4 km away* or *Near Anna Nagar*) calculated via the Haversine formula.
+- **Fail-Safe Fallback:** If GPS permissions are denied or no nearby gym promotions exist, curated platform-wide fallback banners (e.g. seasonal passes or app features) render seamlessly.
+
+---
+
+### 9.2 Single Source of Truth (SSOT) Gym Operating Hours & Dynamic Slot Engine
+
+#### Overview
+To prevent discrepancies between advertised gym hours and actual booking slot availability, GYMEZY establishes a centralized operating hours schema in `gym.model.js` (`operatingHours` subdocument) consumed by both Web and Mobile platforms via `gymTimingHelper.js`.
+
+#### Data Schema
+```javascript
+operatingHours: {
+  monday:    { isOpen: Boolean, openTime: String, closeTime: String },
+  tuesday:   { isOpen: Boolean, openTime: String, closeTime: String },
+  wednesday: { isOpen: Boolean, openTime: String, closeTime: String },
+  thursday:  { isOpen: Boolean, openTime: String, closeTime: String },
+  friday:    { isOpen: Boolean, openTime: String, closeTime: String },
+  saturday:  { isOpen: Boolean, openTime: String, closeTime: String },
+  sunday:    { isOpen: Boolean, openTime: String, closeTime: String }
+}
+```
+
+#### Core Engine Capabilities (`gymTimingHelper.js`)
+1. **Live Open/Closed Calculation:** Evaluates `isOpen`, `openTime`, and `closeTime` for the current day in `Asia/Kolkata` time zone.
+2. **Countdown Badges:** Computes exact countdown strings (*Closes in 45m* or *Opens at 06:00 AM*).
+3. **Dynamic Slot Generation (`generateAvailableSlots`):**
+   - Segregates day into **Morning Slots** (before 12:00 PM) and **Evening Slots** (12:00 PM onward).
+   - Generates 1-hour bookable increments strictly within the gym's opening window.
+   - Automatically excludes past slots when viewing today's calendar.
+
+---
+
+### 9.3 Per-Session Booking & Trainer Add-on Architecture
+
+#### Overview
+Users can book single-session day passes or custom multi-date workout sessions on the gym floor or in specialized classes without purchasing a monthly membership.
+
+#### Pricing Architecture
+- **Base Fee:** `gym.pricing.perDayPrice` (or gym session rate).
+- **Trainer Single Session Fee:** `employee.trainerPricing.singleSession` (or `personalTrainingFee`).
+- **Calculation Formula:**
+  $$\text{Total Amount} = \text{Sessions Count} \times (\text{Base Day Price} + \text{Trainer Single Session Fee})$$
+
+#### Custom Multi-Date Engine
+- Users select non-contiguous dates (e.g., 24th, 26th, and 27th).
+- Backend creates an array of `customDates`:
+  ```javascript
+  customDates: [
+    { date: Date, status: 'Scheduled', dailyOtp: String }
+  ]
+  ```
+- Each scheduled session generates a unique daily 6-digit OTP and dynamic QR token. On the scheduled date, turnstile scanning verifies that specific session and marks it `Attended`.
+
+---
+
+### 9.4 Section Batch Scheduling, Turnstile QR Check-in & Auto Check-Out
+
+#### Overview
+Sections represent capacity-constrained, coach-led group batches (Yoga, Zumba, HIIT, Boxing, CrossFit, Strength) with fixed date ranges and active weekly schedules.
+
+#### Batch Access & Attendance Lifecycle
+1. **Batch Validation:**
+   - Pre-start check: Rejects check-in before `section.startDate`.
+   - Expiration check: Rejects check-in after `section.endDate`.
+   - Scheduled days check: Rejects entry on non-active weekdays (e.g., Tuesday when batch is Mon/Wed/Fri).
+   - Same-day duplicate check: Prevents multiple check-ins on the same day for the same batch.
+2. **Audit Tracking:**
+   - **`Attendance` Collection:** Creates a check-in log with `status: 'Checked-In'` and `area: 'Section - [Title]'`.
+   - **`Booking` Model:** Increments `attendedSessionsCount += 1`, appends audit item to `attendanceHistory [{ attendedAt, method, area }]`.
+   - When `attendedSessionsCount >= durationDays`, booking status automatically transitions to `Completed`.
+3. **Auto Check-Out on Rescan (Tap-In, Tap-Out):**
+   - If a member with an active `Checked-In` status rescans their QR pass or enters their OTP at the gym on the same date, the system records departure:
+     - Updates status to `Completed`.
+     - Records `checkOutTime: now`.
+     - Calculates total duration spent (e.g., *1h 24m*).
+     - Returns `action: 'CHECK_OUT'`.
+   - **Debounce Safety:** Enforces a 2-minute debounce delay between check-in and check-out to avoid accidental double triggers from turnstile camera auto-focus.
+
+---
+
+### 9.5 Part-Time & Temporary Staff Management Module
+
+#### Overview
+Gym owners can onboard part-time coaches (working specific days and hours) and temporary contract instructors (working for a limited date window) directly through a dedicated 2-column modal.
+
+#### Schema Specifications (`employee.model.js`)
+```javascript
+{
+  type: {
+    type: String,
+    enum: ['Full-Time', 'Part-Time', 'Temporary'],
+    default: 'Full-Time'
+  },
+  schedule: {
+    workingDays: [{ type: String }],
+    workingTimeStart: { type: String, default: '09:00 AM' },
+    workingTimeEnd: { type: String, default: '06:00 PM' },
+    isDifferentDays: { type: Boolean, default: false },
+    dayWiseHours: [
+      { day: String, startTime: String, endTime: String }
+    ],
+    startDate: { type: String },
+    endDate: { type: String }
+  },
+  compensation: {
+    payType: { type: String, enum: ['Hourly', 'Session', 'Daily', 'Weekly', 'Monthly'] },
+    payAmount: { type: Number, default: 0 },
+    payFreq: { type: String, enum: ['Per Hour', 'Per Session', 'Daily', 'Weekly', 'Monthly'] }
+  },
+  notes: { type: String, maxlength: 250 }
+}
+```
+
+#### Governance & Workflows
+- **Direct Auto-Approval:** Part-Time and Temporary staff created by gym owners receive immediate `approvalStatus: 'Approved'` and `status: 'Active'` without requiring Super Admin approval.
+- **Super Admin Oversight:** Super Admin dashboard retains full audit visibility with filter toggles (`Full-Time`, `Part-Time`, `Temporary`) and can inspect or suspend accounts.
+- **Automatic Contract Expiration:** The nightly cron (`0 2 * * *` in `attendanceCron.service.js`) automatically inspects staff where `type === 'Temporary'` and `schedule.endDate < today`, transitioning them to `status: 'Inactive'` with audit remark `Contract Expired - Auto-deactivated by Nightly Cron`.
+
+---
+
+### 9.6 Strict Trainer Schedule Enforcement Across Bookings & Membership Tiers
+
+#### Overview
+Because part-time and temporary staff work strict hours and dates, the system enforces automated boundary constraints to prevent users from booking them outside their availability.
+
+#### Enforcement Mechanisms
+
+```mermaid
+flowchart TD
+    A["User Selects Trainer"] --> B{"Trainer Type"}
+    B -->|Full-Time| C["Allow All Gym Operating Days & Hours"]
+    B -->|Part-Time / Temporary| D["Enforce Strict Boundaries"]
+    
+    D --> E["Calendar Day Filter"]
+    E -->|Check workingDays| F["Disable Off-Days on Calendar"]
+    
+    D --> G["Working Hours Filter"]
+    G -->|generateTrainerAvailableSlots| H["Generate Slots Strictly Between workingTimeStart & workingTimeEnd"]
+    
+    D --> I{"Contract End Date Check"}
+    I -->|Date > endDate| J["Block Booking / Show Contract Expired"]
+    I -->|Date <= endDate| K["Allow Slot Selection"]
+```
+
+1. **Per-Session & Day Pass Bookings:**
+   - **Calendar Day Filtering:** When a part-time trainer is selected, only dates matching `schedule.workingDays` (e.g. Mon, Wed, Fri) remain active on the booking calendar.
+   - **Slot Intersection (`generateTrainerAvailableSlots`):** Available booking slots are generated strictly within `schedule.workingTimeStart` to `schedule.workingTimeEnd` (e.g. 04:00 PM - 07:00 PM) rather than full gym opening hours.
+   - **Contract Expiration Guard:** If the trainer is `Temporary`, dates beyond `schedule.endDate` are disabled.
+   - **Backend API Validation:** `booking.controller.js` validates requested `startDate`, `customDates`, and `timeSlot` against the trainer's schedule. Any booking outside their hours or contract window returns an `ApiError.badRequest`.
+2. **Standard Membership Tiers (Personal Training Add-on):**
+   - **Coaching Window Notice:** Membership cards display the trainer's dedicated coaching hours (e.g. *Coaching Window: Mon, Wed, Fri • 04:00 PM - 07:00 PM*).
+   - **Duration Safeguard:** In `GymProfileManagement.jsx` and `membership.controller.js`, temporary staff whose contract ends before the tier plan duration completes cannot be assigned to that tier, preventing orphaned memberships.
+
+---
+
 *Authored for the GYMEZY Platform Engineering & Architecture Team.*

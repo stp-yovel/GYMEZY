@@ -88,6 +88,16 @@ export const formatTimeAgo = (dateInput) => {
     return dateInput;
   }
 
+  // Handle common unparsed strings like 'Recent', 'Today', 'Just now'
+  if (
+    typeof dateInput === 'string' &&
+    (dateInput.trim().toLowerCase() === 'recent' ||
+      dateInput.trim().toLowerCase() === 'today' ||
+      dateInput.trim().toLowerCase() === 'just now')
+  ) {
+    return 'Just now';
+  }
+
   const date = parseDate(dateInput);
   if (!date) {
     if (typeof dateInput === 'string' && dateInput.trim() && dateInput !== 'Just now') {

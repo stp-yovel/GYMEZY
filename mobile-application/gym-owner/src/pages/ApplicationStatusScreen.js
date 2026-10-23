@@ -96,10 +96,15 @@ export const ApplicationStatusScreen = ({ navigation }) => {
   const [formPincode, setFormPincode] = useState('');
   const [formGoogleMapsUrl, setFormGoogleMapsUrl] = useState('');
 
+  const [formTimingMode, setFormTimingMode] = useState('REGULAR');
   const [formWeekdayOpen, setFormWeekdayOpen] = useState('05:30 AM');
   const [formWeekdayClose, setFormWeekdayClose] = useState('10:30 PM');
   const [formWeekendOpen, setFormWeekendOpen] = useState('06:00 AM');
   const [formWeekendClose, setFormWeekendClose] = useState('09:00 PM');
+  const [formMorningOpen, setFormMorningOpen] = useState('05:30 AM');
+  const [formMorningClose, setFormMorningClose] = useState('11:30 AM');
+  const [formEveningOpen, setFormEveningOpen] = useState('04:30 PM');
+  const [formEveningClose, setFormEveningClose] = useState('10:30 PM');
 
   const [formSinglePrice, setFormSinglePrice] = useState('199');
   const [formWeeklyPrice, setFormWeeklyPrice] = useState('799');
@@ -167,10 +172,17 @@ export const ApplicationStatusScreen = ({ navigation }) => {
     setFormPincode(currentGym.pincode || '');
     setFormGoogleMapsUrl(currentGym.googleMapsUrl || '');
 
-    setFormWeekdayOpen(currentGym.openingHours?.weekdayOpen || '05:30 AM');
-    setFormWeekdayClose(currentGym.openingHours?.weekdayClose || '10:30 PM');
-    setFormWeekendOpen(currentGym.openingHours?.weekendOpen || '06:00 AM');
-    setFormWeekendClose(currentGym.openingHours?.weekendClose || '09:00 PM');
+    const opHours = currentGym.openingHours || {};
+    const mode = opHours.mode || (opHours.is24Hours ? '24_HOURS' : (opHours.morningShift ? 'SPLIT_SHIFT' : 'REGULAR'));
+    setFormTimingMode(mode);
+    setFormWeekdayOpen(opHours.weekdayOpen || '05:30 AM');
+    setFormWeekdayClose(opHours.weekdayClose || '10:30 PM');
+    setFormWeekendOpen(opHours.weekendOpen || '06:00 AM');
+    setFormWeekendClose(opHours.weekendClose || '09:00 PM');
+    setFormMorningOpen(opHours.morningShift?.open || '05:30 AM');
+    setFormMorningClose(opHours.morningShift?.close || '11:30 AM');
+    setFormEveningOpen(opHours.eveningShift?.open || '04:30 PM');
+    setFormEveningClose(opHours.eveningShift?.close || '10:30 PM');
 
     setFormSinglePrice(String(currentGym.singleSessionPrice || currentGym.pricingPlans?.singleSession || 199));
     setFormWeeklyPrice(String(currentGym.pricingPlans?.weeklyPass || 799));
@@ -224,10 +236,15 @@ export const ApplicationStatusScreen = ({ navigation }) => {
         googleMapsUrl: formGoogleMapsUrl.trim(),
 
         openingHours: {
-          weekdayOpen: formWeekdayOpen,
-          weekdayClose: formWeekdayClose,
-          weekendOpen: formWeekendOpen,
-          weekendClose: formWeekendClose,
+          mode: formTimingMode,
+          weekdayOpen: formTimingMode === 'SPLIT_SHIFT' ? formMorningOpen : (formTimingMode === '24_HOURS' ? '12:00 AM' : formWeekdayOpen),
+          weekdayClose: formTimingMode === 'SPLIT_SHIFT' ? formEveningClose : (formTimingMode === '24_HOURS' ? '11:59 PM' : formWeekdayClose),
+          weekendOpen: formTimingMode === 'SPLIT_SHIFT' ? formMorningOpen : (formTimingMode === '24_HOURS' ? '12:00 AM' : formWeekendOpen),
+          weekendClose: formTimingMode === 'SPLIT_SHIFT' ? formEveningClose : (formTimingMode === '24_HOURS' ? '11:59 PM' : formWeekendClose),
+          is24Hours: formTimingMode === '24_HOURS',
+          morningShift: formTimingMode === 'SPLIT_SHIFT' ? { open: formMorningOpen, close: formMorningClose } : undefined,
+          eveningShift: formTimingMode === 'SPLIT_SHIFT' ? { open: formEveningOpen, close: formEveningClose } : undefined,
+          displayText: formTimingMode === '24_HOURS' ? 'Open 24 Hours' : formTimingMode === 'SPLIT_SHIFT' ? `${formMorningOpen} - ${formMorningClose} & ${formEveningOpen} - ${formEveningClose}` : `${formWeekdayOpen} - ${formWeekdayClose}`,
         },
 
         singleSessionPrice: Number(formSinglePrice) || 199,
@@ -663,20 +680,43 @@ export const ApplicationStatusScreen = ({ navigation }) => {
               </Text>
             </View>
 
-            <View style={styles.infoRow}>
-              <View style={styles.infoCol}>
-                <Text style={[styles.fieldLabel, { color: textMuted }]}>Weekday Timings</Text>
-                <Text style={[styles.fieldValue, { color: textPrimary }]}>
-                  {currentGym.openingHours?.weekdayOpen || '05:30 AM'} - {currentGym.openingHours?.weekdayClose || '10:30 PM'}
-                </Text>
+            {currentGym.openingHours?.mode === '24_HOURS' || currentGym.openingHours?.is24Hours ? (
+              <View style={[styles.infoRow, { alignItems: 'center' }]}>
+                <View style={[styles.badge, { backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }]}>
+                  <Text style={{ color: '#10B981', fontWeight: '700', fontSize: 13 }}>Open 24 Hours Round-the-Clock</Text>
+                </View>
               </View>
-              <View style={styles.infoCol}>
-                <Text style={[styles.fieldLabel, { color: textMuted }]}>Weekend Timings</Text>
-                <Text style={[styles.fieldValue, { color: textPrimary }]}>
-                  {currentGym.openingHours?.weekendOpen || '06:00 AM'} - {currentGym.openingHours?.weekendClose || '09:00 PM'}
-                </Text>
+            ) : currentGym.openingHours?.mode === 'SPLIT_SHIFT' || currentGym.openingHours?.morningShift ? (
+              <View style={styles.infoRow}>
+                <View style={styles.infoCol}>
+                  <Text style={[styles.fieldLabel, { color: textMuted }]}>Morning Shift</Text>
+                  <Text style={[styles.fieldValue, { color: textPrimary }]}>
+                    {currentGym.openingHours?.morningShift?.open || '05:30 AM'} - {currentGym.openingHours?.morningShift?.close || '11:30 AM'}
+                  </Text>
+                </View>
+                <View style={styles.infoCol}>
+                  <Text style={[styles.fieldLabel, { color: textMuted }]}>Evening Shift</Text>
+                  <Text style={[styles.fieldValue, { color: textPrimary }]}>
+                    {currentGym.openingHours?.eveningShift?.open || '04:30 PM'} - {currentGym.openingHours?.eveningShift?.close || '10:30 PM'}
+                  </Text>
+                </View>
               </View>
-            </View>
+            ) : (
+              <View style={styles.infoRow}>
+                <View style={styles.infoCol}>
+                  <Text style={[styles.fieldLabel, { color: textMuted }]}>Weekday Timings</Text>
+                  <Text style={[styles.fieldValue, { color: textPrimary }]}>
+                    {currentGym.openingHours?.weekdayOpen || '05:30 AM'} - {currentGym.openingHours?.weekdayClose || '10:30 PM'}
+                  </Text>
+                </View>
+                <View style={styles.infoCol}>
+                  <Text style={[styles.fieldLabel, { color: textMuted }]}>Weekend Timings</Text>
+                  <Text style={[styles.fieldValue, { color: textPrimary }]}>
+                    {currentGym.openingHours?.weekendOpen || '06:00 AM'} - {currentGym.openingHours?.weekendClose || '09:00 PM'}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         </View>
 
@@ -1038,51 +1078,141 @@ export const ApplicationStatusScreen = ({ navigation }) => {
 
                 <Text style={[styles.sectionDividerText, { color: textPrimary }]}>Operating Hours</Text>
 
-                <View style={styles.formTwoCols}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.inputLabel, { color: textSecondary }]}>Weekday Open</Text>
-                    <TextInput
-                      style={[styles.formInput, { backgroundColor: cardBg, borderColor: borderCol, color: textPrimary }]}
-                      value={formWeekdayOpen}
-                      onChangeText={setFormWeekdayOpen}
-                      placeholder="05:30 AM"
-                      placeholderTextColor={textMuted}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.inputLabel, { color: textSecondary }]}>Weekday Close</Text>
-                    <TextInput
-                      style={[styles.formInput, { backgroundColor: cardBg, borderColor: borderCol, color: textPrimary }]}
-                      value={formWeekdayClose}
-                      onChangeText={setFormWeekdayClose}
-                      placeholder="10:30 PM"
-                      placeholderTextColor={textMuted}
-                    />
-                  </View>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                  {[
+                    { key: 'REGULAR', label: 'Single Shift' },
+                    { key: 'SPLIT_SHIFT', label: 'Split Shift' },
+                    { key: '24_HOURS', label: '24 Hours' },
+                  ].map((modeOpt) => {
+                    const isSel = formTimingMode === modeOpt.key;
+                    return (
+                      <TouchableOpacity
+                        key={modeOpt.key}
+                        onPress={() => setFormTimingMode(modeOpt.key)}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          backgroundColor: isSel ? '#FF6B00' : (cardBg),
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderWidth: 1,
+                          borderColor: isSel ? '#FF6B00' : borderCol,
+                        }}
+                      >
+                        <Text style={{
+                          color: isSel ? '#FFFFFF' : textSecondary,
+                          fontSize: 12,
+                          fontWeight: '700',
+                        }}>
+                          {modeOpt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
 
-                <View style={styles.formTwoCols}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.inputLabel, { color: textSecondary }]}>Weekend Open</Text>
-                    <TextInput
-                      style={[styles.formInput, { backgroundColor: cardBg, borderColor: borderCol, color: textPrimary }]}
-                      value={formWeekendOpen}
-                      onChangeText={setFormWeekendOpen}
-                      placeholder="06:00 AM"
-                      placeholderTextColor={textMuted}
-                    />
+                {formTimingMode === '24_HOURS' ? (
+                  <View style={{ padding: 12, borderRadius: 8, backgroundColor: 'rgba(16, 185, 129, 0.1)', borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.3)', marginBottom: 10 }}>
+                    <Text style={{ color: '#10B981', fontWeight: '700', fontSize: 13, marginBottom: 2 }}>Open 24/7 Facility</Text>
+                    <Text style={{ color: textSecondary, fontSize: 12 }}>Gym is open round the clock every day.</Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.inputLabel, { color: textSecondary }]}>Weekend Close</Text>
-                    <TextInput
-                      style={[styles.formInput, { backgroundColor: cardBg, borderColor: borderCol, color: textPrimary }]}
-                      value={formWeekendClose}
-                      onChangeText={setFormWeekendClose}
-                      placeholder="09:00 PM"
-                      placeholderTextColor={textMuted}
-                    />
+                ) : formTimingMode === 'SPLIT_SHIFT' ? (
+                  <View>
+                    <View style={styles.formTwoCols}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.inputLabel, { color: textSecondary }]}>Morning Open</Text>
+                        <TextInput
+                          style={[styles.formInput, { backgroundColor: cardBg, borderColor: borderCol, color: textPrimary }]}
+                          value={formMorningOpen}
+                          onChangeText={setFormMorningOpen}
+                          placeholder="05:30 AM"
+                          placeholderTextColor={textMuted}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.inputLabel, { color: textSecondary }]}>Morning Close</Text>
+                        <TextInput
+                          style={[styles.formInput, { backgroundColor: cardBg, borderColor: borderCol, color: textPrimary }]}
+                          value={formMorningClose}
+                          onChangeText={setFormMorningClose}
+                          placeholder="11:30 AM"
+                          placeholderTextColor={textMuted}
+                        />
+                      </View>
+                    </View>
+                    <View style={styles.formTwoCols}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.inputLabel, { color: textSecondary }]}>Evening Open</Text>
+                        <TextInput
+                          style={[styles.formInput, { backgroundColor: cardBg, borderColor: borderCol, color: textPrimary }]}
+                          value={formEveningOpen}
+                          onChangeText={setFormEveningOpen}
+                          placeholder="04:30 PM"
+                          placeholderTextColor={textMuted}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.inputLabel, { color: textSecondary }]}>Evening Close</Text>
+                        <TextInput
+                          style={[styles.formInput, { backgroundColor: cardBg, borderColor: borderCol, color: textPrimary }]}
+                          value={formEveningClose}
+                          onChangeText={setFormEveningClose}
+                          placeholder="10:30 PM"
+                          placeholderTextColor={textMuted}
+                        />
+                      </View>
+                    </View>
                   </View>
-                </View>
+                ) : (
+                  <View>
+                    <View style={styles.formTwoCols}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.inputLabel, { color: textSecondary }]}>Weekday Open</Text>
+                        <TextInput
+                          style={[styles.formInput, { backgroundColor: cardBg, borderColor: borderCol, color: textPrimary }]}
+                          value={formWeekdayOpen}
+                          onChangeText={setFormWeekdayOpen}
+                          placeholder="05:30 AM"
+                          placeholderTextColor={textMuted}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.inputLabel, { color: textSecondary }]}>Weekday Close</Text>
+                        <TextInput
+                          style={[styles.formInput, { backgroundColor: cardBg, borderColor: borderCol, color: textPrimary }]}
+                          value={formWeekdayClose}
+                          onChangeText={setFormWeekdayClose}
+                          placeholder="10:30 PM"
+                          placeholderTextColor={textMuted}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.formTwoCols}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.inputLabel, { color: textSecondary }]}>Weekend Open</Text>
+                        <TextInput
+                          style={[styles.formInput, { backgroundColor: cardBg, borderColor: borderCol, color: textPrimary }]}
+                          value={formWeekendOpen}
+                          onChangeText={setFormWeekendOpen}
+                          placeholder="06:00 AM"
+                          placeholderTextColor={textMuted}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.inputLabel, { color: textSecondary }]}>Weekend Close</Text>
+                        <TextInput
+                          style={[styles.formInput, { backgroundColor: cardBg, borderColor: borderCol, color: textPrimary }]}
+                          value={formWeekendClose}
+                          onChangeText={setFormWeekendClose}
+                          placeholder="09:00 PM"
+                          placeholderTextColor={textMuted}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                )}
               </View>
             )}
 

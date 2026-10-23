@@ -72,6 +72,7 @@ const buildGymPlans = (gym) => {
         'Locker and shower facility',
         'Trainer guidance on floor',
       ],
+      assignedTrainers: monthlyTier?.assignedTrainers || [],
     },
     Quarterly: {
       name: quarterlyTier?.name || 'Quarterly Plan',
@@ -88,6 +89,7 @@ const buildGymPlans = (gym) => {
         '1 Guest pass per month',
         '2 Complimentary PT Sessions',
       ],
+      assignedTrainers: quarterlyTier?.assignedTrainers || [],
     },
     'Half Yearly': {
       name: halfYearlyTier?.name || 'Half Yearly Plan',
@@ -105,6 +107,7 @@ const buildGymPlans = (gym) => {
         'Personalized nutrition guidance',
         '4 Complimentary PT Sessions',
       ],
+      assignedTrainers: halfYearlyTier?.assignedTrainers || [],
     },
     Annual: {
       name: annualTier?.name || 'Annual Plan',
@@ -121,6 +124,7 @@ const buildGymPlans = (gym) => {
         '2 Guest passes per month',
         'Personalized nutrition guidance',
       ],
+      assignedTrainers: annualTier?.assignedTrainers || [],
     },
   };
 };
@@ -215,12 +219,41 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
     };
   }, [gym?._id, gym?.id, gym?.partnerId]);
 
+  // Compute trainer rate mapped to the chosen membership tier (0 means not available)
+  const getTrainerFeeForPlan = useCallback((trainer, planKey) => {
+    if (!trainer || trainer.name === 'No Personal Trainer') return 0;
+    const pricing = trainer.trainerPricing || {};
+    const tierMap = {
+      Monthly: 'monthly',
+      Quarterly: 'quarterly',
+      'Half Yearly': 'halfYearly',
+      Annual: 'annual',
+    };
+    const key = tierMap[planKey] || 'monthly';
+    const fee = Number(pricing[key] ?? 0);
+    return fee > 0 ? fee : 0;
+  }, []);
+
   const trainersList = useMemo(() => {
     const rawTrainers = Array.isArray(gymTrainers) && gymTrainers.length > 0
       ? gymTrainers
       : (Array.isArray(gym?.trainers) && gym.trainers.length > 0 ? gym.trainers : []);
 
-    const formatted = rawTrainers.map((t) => ({
+    const planAssigned = plans[selectedPlan]?.assignedTrainers;
+    const hasRestrictions = Array.isArray(planAssigned) && planAssigned.length > 0;
+    const allowedIds = hasRestrictions
+      ? new Set(planAssigned.map((item) => String(item?._id || item?.id || item?.employeeId || item)))
+      : null;
+
+    // Filter out trainers if restricted OR if rate is 0 for the selected plan tier
+    const filteredTrainers = rawTrainers.filter((t) => {
+      const tid = String(t._id || t.id || t.employeeId || '');
+      if (allowedIds && !allowedIds.has(tid)) return false;
+      const fee = getTrainerFeeForPlan(t, selectedPlan);
+      return fee > 0;
+    });
+
+    const formatted = filteredTrainers.map((t) => ({
       id: t.id || t._id || t.employeeId || t.name,
       _id: t._id || t.id,
       employeeId: t.employeeId || '',
@@ -231,12 +264,13 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
       reviews: Number(t.reviewsCount || t.reviews) || 0,
       image: t.imageUrl || t.avatar || t.image || null,
       trainerPricing: t.trainerPricing || {},
-      monthlyFee: Number(t.monthlyFee || t.price) || 0,
+      monthlyFee: Number(t.trainerPricing?.monthly || t.monthlyFee || t.price) || 0,
       schedule: t.schedule || {
         workingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
         workingTimeStart: '09:00 AM',
         workingTimeEnd: '06:00 PM',
       },
+      type: t.type || 'Full-Time',
       aboutText: t.aboutText || t.notes || '',
     }));
 
@@ -255,7 +289,7 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
     });
 
     return formatted;
-  }, [gymTrainers, gym?.trainers]);
+  }, [gymTrainers, gym?.trainers, plans, selectedPlan, getTrainerFeeForPlan]);
 
   // Dynamically extract goals from real trainers
   const availableGoals = useMemo(() => {
@@ -274,27 +308,6 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
     return Array.from(goalsSet);
   }, [trainersList]);
 
-  // Compute trainer rate mapped to the chosen membership tier
-  const getTrainerFeeForPlan = useCallback((trainer, planKey) => {
-    if (!trainer || trainer.name === 'No Personal Trainer') return 0;
-    const pricing = trainer.trainerPricing || {};
-    const baseMonthly = Number(pricing.monthly) > 0 ? Number(pricing.monthly) : (Number(trainer.monthlyFee) || 0);
-
-    if (planKey === 'Monthly') {
-      return Number(pricing.monthly) > 0 ? Number(pricing.monthly) : baseMonthly;
-    }
-    if (planKey === 'Quarterly') {
-      return Number(pricing.quarterly) > 0 ? Number(pricing.quarterly) : baseMonthly * 3;
-    }
-    if (planKey === 'Half Yearly') {
-      return Number(pricing.halfYearly) > 0 ? Number(pricing.halfYearly) : baseMonthly * 6;
-    }
-    if (planKey === 'Annual') {
-      return Number(pricing.annual) > 0 ? Number(pricing.annual) : baseMonthly * 12;
-    }
-    return baseMonthly;
-  }, []);
-
   // Trainer Selection
   const [trainerGoal, setTrainerGoal] = useState('All');
   const [selectedTrainer, setSelectedTrainer] = useState(
@@ -304,8 +317,7 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
 
   useEffect(() => {
     if (!trainersList.some((t) => t.name === selectedTrainer)) {
-      const firstReal = trainersList.find((t) => t.name !== 'No Personal Trainer');
-      setSelectedTrainer(firstReal ? firstReal.name : 'No Personal Trainer');
+      setSelectedTrainer('No Personal Trainer');
     }
   }, [trainersList, selectedTrainer]);
 
@@ -801,6 +813,24 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
 
             <Text style={[styles.sectionSubtitle, { color: textColor }]}>Top Trainers</Text>
 
+            {plans[selectedPlan]?.assignedTrainers?.length > 0 && (
+              <View
+                style={{
+                  marginBottom: 12,
+                  paddingVertical: 8,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  backgroundColor: isDark ? 'rgba(96,165,250,0.1)' : '#EFF6FF',
+                  borderWidth: 1,
+                  borderColor: isDark ? 'rgba(96,165,250,0.2)' : '#BFDBFE',
+                }}
+              >
+                <Text style={{ fontSize: 12, color: primaryAccent, fontWeight: '600' }}>
+                  Showing {trainersList.filter((t) => t.name !== 'No Personal Trainer').length} personal trainer(s) assigned to {selectedPlan} Plan
+                </Text>
+              </View>
+            )}
+
             {trainersList
               .filter((t) => {
                 if (t.name === 'No Personal Trainer' || trainerGoal === 'All') return true;
@@ -855,6 +885,28 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
                           {t.rating} ({t.reviews})
                         </Text>
                         <Text style={styles.trainerPriceText}>₹{Math.round(tFee)} / {selectedPlan}</Text>
+                      </View>
+                    )}
+                    {!isNone && t.type && t.type !== 'Full-Time' && (
+                      <View style={{
+                        marginTop: 6,
+                        paddingVertical: 3,
+                        paddingHorizontal: 8,
+                        borderRadius: 6,
+                        backgroundColor: t.type === 'Temporary'
+                          ? (isDark ? 'rgba(234, 88, 12, 0.16)' : '#FFEDD5')
+                          : (isDark ? 'rgba(8, 145, 178, 0.16)' : '#CFFAFE'),
+                        alignSelf: 'flex-start',
+                      }}>
+                        <Text style={{
+                          fontSize: 10.5,
+                          fontWeight: '600',
+                          color: t.type === 'Temporary' ? '#EA580C' : '#0891B2',
+                        }}>
+                          {t.type} • {Array.isArray(t.schedule?.workingDays) && t.schedule.workingDays.length > 0
+                            ? t.schedule.workingDays.slice(0, 3).join(', ')
+                            : 'Specific Hours'} • {t.schedule?.workingTimeStart || '09:00 AM'} - {t.schedule?.workingTimeEnd || '06:00 PM'}
+                        </Text>
                       </View>
                     )}
                   </View>
@@ -1261,21 +1313,21 @@ export const BuyMembershipScreen = ({ route, navigation }) => {
                   Tiered Membership Add-on Rates
                 </Text>
                 <View style={{ marginTop: 8, padding: 12, borderRadius: 8, backgroundColor: isDark ? '#1E293B' : '#F8FAFC' }}>
-                  <Text style={{ fontSize: 13, color: textColor, marginBottom: 6 }}>
-                    • Monthly Plan: ₹{Math.round(getTrainerFeeForPlan(selectedModalTrainer, 'Monthly'))}
-                  </Text>
-                  <Text style={{ fontSize: 13, color: textColor, marginBottom: 6 }}>
-                    • Quarterly Plan: ₹{Math.round(getTrainerFeeForPlan(selectedModalTrainer, 'Quarterly'))}
-                  </Text>
-                  <Text style={{ fontSize: 13, color: textColor, marginBottom: 6 }}>
-                    • Half Yearly Plan: ₹{Math.round(getTrainerFeeForPlan(selectedModalTrainer, 'Half Yearly'))}
-                  </Text>
-                  <Text style={{ fontSize: 13, color: textColor, marginBottom: 6 }}>
-                    • Annual Plan: ₹{Math.round(getTrainerFeeForPlan(selectedModalTrainer, 'Annual'))}
-                  </Text>
-                  {selectedModalTrainer.trainerPricing?.singleSession > 0 && (
+                  {['Monthly', 'Quarterly', 'Half Yearly', 'Annual'].map((tier) => {
+                    const fee = getTrainerFeeForPlan(selectedModalTrainer, tier);
+                    return (
+                      <Text key={tier} style={{ fontSize: 13, color: textColor, marginBottom: 6 }}>
+                        • {tier} Plan: {fee > 0 ? `₹${Math.round(fee)}` : 'Not Available'}
+                      </Text>
+                    );
+                  })}
+                  {selectedModalTrainer.trainerPricing?.singleSession > 0 ? (
                     <Text style={{ fontSize: 13, color: textColor }}>
                       • Single Session: ₹{Math.round(selectedModalTrainer.trainerPricing.singleSession)}
+                    </Text>
+                  ) : (
+                    <Text style={{ fontSize: 13, color: subtitleColor }}>
+                      • Single Session: Not Available
                     </Text>
                   )}
                 </View>

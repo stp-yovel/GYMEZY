@@ -36,9 +36,9 @@ export const getPublicBanners = async (req, res) => {
     const userLat = req.query.lat ? parseFloat(req.query.lat) : null;
     const userLng = req.query.lng ? parseFloat(req.query.lng) : null;
 
-    // Fetch active banners
+    // Fetch active banners with full gym details
     const banners = await Banner.find({ isActive: true })
-      .populate('gymId', 'name slug area address location coverPhoto logo pricing')
+      .populate('gymId', 'name slug area city state address fullAddress location coverPhoto logo images photos pricing singleSessionPrice monthlyPrice rating reviewCount reviewsCount facilities workouts amenities openingHours badgeText isVerified partnerId phone email ownerName')
       .lean();
 
     if (!banners || banners.length === 0) {
@@ -60,6 +60,40 @@ export const getPublicBanners = async (req, res) => {
       const gymLat = coords[1];
       const distanceKm = calculateDistanceKm(userLat, userLng, gymLat, gymLng);
 
+      let populatedGym = null;
+      if (banner.gymId && typeof banner.gymId === 'object') {
+        const g = banner.gymId;
+        const sessionPrice = g.singleSessionPrice || g.pricing?.singleSession || 199;
+        const monthlyPrice = g.monthlyPrice || g.pricing?.monthly || sessionPrice * 10;
+        const displayLocation = g.area ? `${g.area}, ${g.city || 'Chennai'}` : (g.city || 'Chennai');
+        populatedGym = {
+          ...g,
+          id: g.partnerId || g._id?.toString(),
+          _id: g._id?.toString(),
+          mongoId: g._id?.toString(),
+          partnerId: g.partnerId || '',
+          location: displayLocation,
+          place: displayLocation,
+          area: g.area || '',
+          city: g.city || '',
+          state: g.state || 'Tamil Nadu',
+          address: g.address || g.fullAddress || displayLocation,
+          fullAddress: g.fullAddress || g.address || displayLocation,
+          distance: distanceKm,
+          distanceText: distanceKm != null ? `${distanceKm} km away` : 'Near You',
+          rating: g.rating || 0,
+          reviewsCount: g.reviewsCount || 0,
+          singleSessionPrice: sessionPrice,
+          pricePerSession: sessionPrice,
+          monthlyPrice,
+          badgeText: g.badgeText || (g.rating >= 4.8 ? 'Top Rated' : 'Verified Gym'),
+          workouts: Array.isArray(g.workouts) ? g.workouts : [],
+          facilities: Array.isArray(g.facilities) ? g.facilities : [],
+          amenities: Array.isArray(g.amenities) ? g.amenities : [],
+          openingHours: g.openingHours || null,
+        };
+      }
+
       // Return unified banner payload
       return {
         _id: banner._id,
@@ -77,7 +111,7 @@ export const getPublicBanners = async (req, res) => {
           coordinates: [gymLng, gymLat],
         },
         distanceKm,
-        gym: banner.gymId || null,
+        gym: populatedGym || banner.gymId || null,
         createdAt: banner.createdAt,
       };
     });

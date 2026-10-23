@@ -238,7 +238,7 @@ export const CheckInScreen = ({ navigation, route }) => {
 
     try {
       const gymId = gym?.id || gym?._id || gym?.partnerId;
-      await apiService.checkInMember({
+      const res = await apiService.checkInMember({
         gymId,
         code: selectedMember.membershipId || selectedMember.id || selectedMember.entryOtp,
         otp: selectedMember.entryOtp,
@@ -247,13 +247,29 @@ export const CheckInScreen = ({ navigation, route }) => {
         verifiedBy: 'Gym Owner App',
       });
 
+      const isCheckout = res?.action === 'CHECK_OUT';
+      const memberData = res?.member || {};
+      setSelectedMember((prev) => ({
+        ...prev,
+        action: res?.action || 'CHECK_IN',
+        durationStr: res?.durationStr || '',
+        checkInTime: res?.checkInTime,
+        checkOutTime: res?.checkOutTime,
+        area: res?.area || selectedArea,
+        attendedSessionsCount: memberData.attendedSessionsCount,
+        durationDays: memberData.durationDays,
+        bookingType: memberData.bookingType || prev?.bookingType,
+      }));
+
       showToast({
-        message: `${selectedMember.name} checked in successfully for ${selectedArea}!`,
+        message: isCheckout
+          ? `Check-out recorded for ${selectedMember.name}! Duration: ${res?.durationStr}`
+          : `${selectedMember.name} checked in successfully for ${res?.area || selectedArea}!`,
         isSuccess: true,
       });
       setCurrentStep('SUCCESS');
     } catch (err) {
-      Alert.alert('Check-In Failed', err.message || 'Unable to check in member.');
+      Alert.alert('Verification Failed', err.message || 'Unable to process member entry/exit.');
     }
   };
 
@@ -285,19 +301,35 @@ export const CheckInScreen = ({ navigation, route }) => {
       });
 
       const memberData = res?.member || {};
+      const isCheckout = res?.action === 'CHECK_OUT';
+
       setSelectedMember({
         id: memberData.membershipId || memberData.id || codeToSend,
+        customerId: memberData.id || codeToSend,
         membershipId: memberData.membershipId || codeToSend,
+        bookingId: memberData.bookingId || null,
+        bookingType: memberData.bookingType || (memberData.bookingId ? 'Section Batch' : 'Membership Pass'),
         name: memberData.name || 'Gym Member',
-        plan: memberData.tier ? `${memberData.tier} Pass` : 'Gym Access Pass',
+        plan: memberData.tier
+          ? `${memberData.tier} Pass`
+          : (memberData.title || (memberData.bookingType === 'SECTION' ? 'Section Batch' : 'Gym Access Pass')),
         avatar: (memberData.name || 'M').charAt(0).toUpperCase(),
         phone: memberData.phone || '',
-        status: 'Active',
+        status: isCheckout ? 'Checked-Out' : 'Active',
         entryOtp: memberData.entryOtp || otpToSend || codeToSend,
+        action: res?.action || 'CHECK_IN',
+        durationStr: res?.durationStr || '',
+        checkInTime: res?.checkInTime,
+        checkOutTime: res?.checkOutTime,
+        area: res?.area || selectedArea,
+        attendedSessionsCount: memberData.attendedSessionsCount,
+        durationDays: memberData.durationDays,
       });
 
       showToast({
-        message: `${memberData.name || 'Member'} verified successfully!`,
+        message: isCheckout
+          ? `Check-out recorded for ${memberData.name || 'Member'}! Time spent: ${res?.durationStr}`
+          : `${memberData.name || 'Member'} verified successfully!`,
         isSuccess: true,
       });
       setCurrentStep('SUCCESS');
@@ -1223,121 +1255,161 @@ export const CheckInScreen = ({ navigation, route }) => {
   /* -------------------------------------------------------------------------- */
   /* STEP 5: SUCCESS CONFIRMATION RECEIPT VIEW                                  */
   /* -------------------------------------------------------------------------- */
-  const renderSuccessView = () => (
-    <ScrollView
-      contentContainerStyle={[
-        styles.successScrollContent,
-        { paddingTop: topInset + 20, paddingBottom: 40 },
-      ]}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Celebration Badge */}
-      <View style={styles.celebrationBox}>
-        <Animated.View
+  const renderSuccessView = () => {
+    if (!selectedMember) return null;
+    const isCheckout = selectedMember.action === 'CHECK_OUT';
+    const timeDisplay = isCheckout
+      ? (selectedMember.checkOutTime ? new Date(selectedMember.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+      : (selectedMember.checkInTime ? new Date(selectedMember.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+
+    return (
+      <ScrollView
+        contentContainerStyle={[
+          styles.successScrollContent,
+          { paddingTop: topInset + 20, paddingBottom: 40 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Celebration Badge */}
+        <View style={styles.celebrationBox}>
+          <Animated.View
+            style={[
+              styles.successCircleWrapper,
+              {
+                transform: [{ scale: successScaleAnim }],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={isCheckout ? ['#F59E0B', '#D97706'] : [AppColors.secondaryColor, '#059669']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.successCircleGradient}
+            >
+              <MaterialIcons name={isCheckout ? 'logout' : 'check'} size={48} color="#FFFFFF" />
+            </LinearGradient>
+          </Animated.View>
+
+          <Text style={[styles.successMainTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+            {isCheckout ? 'Check-out Recorded!' : 'Check-in Successful!'}
+          </Text>
+          <Text style={[styles.successCustomerName, { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' }]}>
+            {selectedMember.name} • Customer ID: {selectedMember.customerId || selectedMember.id || 'Member'}
+          </Text>
+        </View>
+
+        {/* Summary Receipt Card */}
+        <View
           style={[
-            styles.successCircleWrapper,
+            styles.receiptCard,
             {
-              transform: [{ scale: successScaleAnim }],
+              backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
+              borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
             },
           ]}
         >
-          <LinearGradient
-            colors={[AppColors.secondaryColor, '#059669']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.successCircleGradient}
-          >
-            <MaterialIcons name="check" size={48} color="#FFFFFF" />
-          </LinearGradient>
-        </Animated.View>
-
-        <Text style={[styles.successMainTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-          Check-in Successful!
-        </Text>
-        <Text style={[styles.successCustomerName, { color: isDark ? 'rgba(255,255,255,0.7)' : '#64748B' }]}>
-          {selectedMember.name} • Customer ID: {selectedMember.customerId}
-        </Text>
-      </View>
-
-      {/* Summary Receipt Card */}
-      <View
-        style={[
-          styles.receiptCard,
-          {
-            backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF',
-            borderColor: isDark ? AppColors.darkBorder : '#E2E8F0',
-          },
-        ]}
-      >
-        <View style={styles.receiptRow}>
-          <View style={styles.receiptLabelRow}>
-            <MaterialIcons name="schedule" size={18} color={AppColors.secondaryColor} />
-            <Text style={[styles.receiptLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-              Check-in Time
+          <View style={styles.receiptRow}>
+            <View style={styles.receiptLabelRow}>
+              <MaterialIcons name="schedule" size={18} color={isCheckout ? '#F59E0B' : AppColors.secondaryColor} />
+              <Text style={[styles.receiptLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                {isCheckout ? 'Check-out Time' : 'Check-in Time'}
+              </Text>
+            </View>
+            <Text style={[styles.receiptValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+              {timeDisplay}
             </Text>
           </View>
-          <Text style={[styles.receiptValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-            21 May 2026, 07:10 AM
+
+          {isCheckout && selectedMember.durationStr ? (
+            <View style={styles.receiptRow}>
+              <View style={styles.receiptLabelRow}>
+                <MaterialIcons name="timer" size={18} color={AppColors.primaryColor} />
+                <Text style={[styles.receiptLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                  Duration Spent
+                </Text>
+              </View>
+              <Text style={[styles.receiptValue, { color: isDark ? '#FFFFFF' : '#0F172A', fontWeight: '700' }]}>
+                {selectedMember.durationStr}
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={styles.receiptRow}>
+            <View style={styles.receiptLabelRow}>
+              <MaterialIcons name="confirmation-number" size={18} color={AppColors.primaryColor} />
+              <Text style={[styles.receiptLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                Booking Type
+              </Text>
+            </View>
+            <Text style={[styles.receiptValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+              {selectedMember.bookingType || selectedMember.plan || 'Membership Pass'}
+            </Text>
+          </View>
+
+          {selectedMember.bookingId ? (
+            <View style={styles.receiptRow}>
+              <View style={styles.receiptLabelRow}>
+                <MaterialIcons name="badge" size={18} color={AppColors.accentColor} />
+                <Text style={[styles.receiptLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                  Booking ID
+                </Text>
+              </View>
+              <Text style={[styles.receiptValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                {selectedMember.bookingId}
+              </Text>
+            </View>
+          ) : null}
+
+          {typeof selectedMember.attendedSessionsCount === 'number' && (
+            <View style={styles.receiptRow}>
+              <View style={styles.receiptLabelRow}>
+                <MaterialIcons name="event-available" size={18} color="#8B5CF6" />
+                <Text style={[styles.receiptLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                  Section Session
+                </Text>
+              </View>
+              <Text style={[styles.receiptValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+                Session {selectedMember.attendedSessionsCount}
+                {selectedMember.durationDays ? ` of ${selectedMember.durationDays}` : ''}
+              </Text>
+            </View>
+          )}
+
+          <View style={[styles.receiptRow, { borderBottomWidth: 0 }]}>
+            <View style={styles.receiptLabelRow}>
+              <MaterialIcons name="fitness-center" size={18} color={AppColors.warningAmber} />
+              <Text style={[styles.receiptLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
+                Session / Plan
+              </Text>
+            </View>
+            <Text style={[styles.receiptValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
+              {selectedMember.area || selectedArea}
+            </Text>
+          </View>
+        </View>
+
+        {/* Success verified banner */}
+        <View style={styles.verifiedSuccessBanner}>
+          <MaterialIcons name="check-circle" size={18} color={isCheckout ? '#F59E0B' : AppColors.secondaryColor} />
+          <Text style={styles.verifiedSuccessBannerText}>
+            {isCheckout
+              ? `Member check-out recorded. Total duration: ${selectedMember.durationStr || 'Completed'}`
+              : 'Customer has been successfully checked-in.'}
           </Text>
         </View>
 
-        <View style={styles.receiptRow}>
-          <View style={styles.receiptLabelRow}>
-            <MaterialIcons name="confirmation-number" size={18} color={AppColors.primaryColor} />
-            <Text style={[styles.receiptLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-              Booking Type
-            </Text>
-          </View>
-          <Text style={[styles.receiptValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-            {selectedMember.bookingType}
-          </Text>
-        </View>
-
-        <View style={styles.receiptRow}>
-          <View style={styles.receiptLabelRow}>
-            <MaterialIcons name="badge" size={18} color={AppColors.accentColor} />
-            <Text style={[styles.receiptLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-              Booking ID
-            </Text>
-          </View>
-          <Text style={[styles.receiptValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-            {selectedMember.bookingId}
-          </Text>
-        </View>
-
-        <View style={[styles.receiptRow, { borderBottomWidth: 0 }]}>
-          <View style={styles.receiptLabelRow}>
-            <MaterialIcons name="fitness-center" size={18} color={AppColors.warningAmber} />
-            <Text style={[styles.receiptLabel, { color: isDark ? 'rgba(255,255,255,0.6)' : '#64748B' }]}>
-              Session / Plan
-            </Text>
-          </View>
-          <Text style={[styles.receiptValue, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
-            {selectedArea}
-          </Text>
-        </View>
-      </View>
-
-      {/* Success verified banner */}
-      <View style={styles.verifiedSuccessBanner}>
-        <MaterialIcons name="check-circle" size={18} color={AppColors.secondaryColor} />
-        <Text style={styles.verifiedSuccessBannerText}>
-          Customer has been successfully checked-in.
-        </Text>
-      </View>
-
-      {/* Action Buttons */}
-      <TouchableOpacity
-        style={styles.checkinAnotherBtn}
-        onPress={() => {
-          setSearchQuery('');
-          setCurrentStep('HUB');
-        }}
-        activeOpacity={0.88}
-      >
-        <MaterialIcons name="refresh" size={20} color="#FFFFFF" />
-        <Text style={styles.checkinAnotherBtnText}>Check-in Another</Text>
-      </TouchableOpacity>
+        {/* Action Buttons */}
+        <TouchableOpacity
+          style={styles.checkinAnotherBtn}
+          onPress={() => {
+            setSearchQuery('');
+            setCurrentStep('HUB');
+          }}
+          activeOpacity={0.88}
+        >
+          <MaterialIcons name="refresh" size={20} color="#FFFFFF" />
+          <Text style={styles.checkinAnotherBtnText}>Check-in Another</Text>
+        </TouchableOpacity>
 
       <TouchableOpacity
         style={[
@@ -1356,6 +1428,7 @@ export const CheckInScreen = ({ navigation, route }) => {
       </TouchableOpacity>
     </ScrollView>
   );
+};
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground }]}>

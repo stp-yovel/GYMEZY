@@ -24,6 +24,7 @@ import {
   Form,
   InputNumber,
   Checkbox,
+  Radio,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -320,11 +321,17 @@ export const GymDetailsView = ({
       pincode: gym.pincode || '',
       googleMapsUrl: gym.googleMapsUrl || '',
 
+      timingMode: gym.openingHours?.mode || (gym.openingHours?.is24Hours ? '24_HOURS' : (gym.openingHours?.isSplitShift ? 'SPLIT_SHIFT' : 'REGULAR')),
       weekdayOpen: gym.openingHours?.weekdayOpen || '05:30 AM',
       weekdayClose: gym.openingHours?.weekdayClose || '10:30 PM',
       weekendOpen: gym.openingHours?.weekendOpen || '06:00 AM',
       weekendClose: gym.openingHours?.weekendClose || '09:00 PM',
+      morningOpen: gym.openingHours?.morningOpen || '05:30 AM',
+      morningClose: gym.openingHours?.morningClose || '11:30 AM',
+      eveningOpen: gym.openingHours?.eveningOpen || '04:30 PM',
+      eveningClose: gym.openingHours?.eveningClose || '10:30 PM',
 
+      singleSessionBookingEnabled: gym.singleSessionBookingEnabled !== undefined ? Boolean(gym.singleSessionBookingEnabled) : true,
       singleSessionPrice: gym.singleSessionPrice || gym.pricingPlans?.singleSession || 199,
       weeklyPassPrice: gym.pricingPlans?.weeklyPass || 799,
       monthlyPrice: gym.pricingPlans?.monthly || 1999,
@@ -354,7 +361,24 @@ export const GymDetailsView = ({
 
     setSavingEdit(true);
     try {
-      const res = await apiClient.put(`/gyms/${gymId}`, values);
+      const payload = {
+        ...values,
+        openingHours: {
+          mode: values.timingMode || gym.openingHours?.mode || 'REGULAR',
+          weekdayOpen: values.weekdayOpen || gym.openingHours?.weekdayOpen || '05:30 AM',
+          weekdayClose: values.weekdayClose || gym.openingHours?.weekdayClose || '10:30 PM',
+          weekendOpen: values.weekendOpen || gym.openingHours?.weekendOpen || '06:00 AM',
+          weekendClose: values.weekendClose || gym.openingHours?.weekendClose || '09:00 PM',
+          morningOpen: values.morningOpen || gym.openingHours?.morningOpen || '05:30 AM',
+          morningClose: values.morningClose || gym.openingHours?.morningClose || '11:30 AM',
+          eveningOpen: values.eveningOpen || gym.openingHours?.eveningOpen || '04:30 PM',
+          eveningClose: values.eveningClose || gym.openingHours?.eveningClose || '10:30 PM',
+          isSplitShift: values.timingMode === 'SPLIT_SHIFT',
+          is24Hours: values.timingMode === '24_HOURS',
+          isOpenHolidays: values.isOpenHolidays !== false,
+        },
+      };
+      const res = await apiClient.put(`/gyms/${gymId}`, payload);
       if (res.data?.success) {
         message.success(`Gym "${values.name || gym.name}" updated successfully.`);
         setIsEditModalOpen(false);
@@ -772,6 +796,16 @@ export const GymDetailsView = ({
                       <Descriptions.Item label="Contact Phone">{gym.phone || '—'}</Descriptions.Item>
                       <Descriptions.Item label="Official Email">{gym.email || '—'}</Descriptions.Item>
                       <Descriptions.Item label="Registered On">{gym.registeredOn || gym.createdAt ? new Date(gym.createdAt).toLocaleDateString() : 'Active Partner'}</Descriptions.Item>
+                      <Descriptions.Item label="Operating Hours" span={2}>
+                        <Space align="center" wrap>
+                          <Tag color={gym.openingHours?.mode === '24_HOURS' ? 'green' : (gym.openingHours?.mode === 'SPLIT_SHIFT' ? 'purple' : 'blue')}>
+                            {gym.openingHours?.mode === '24_HOURS' ? '24/7 Facility' : (gym.openingHours?.mode === 'SPLIT_SHIFT' ? 'Split Shift' : 'Regular Single Shift')}
+                          </Tag>
+                          <span style={{ fontWeight: 600 }}>
+                            {gym.openingHours?.displayText || `${gym.openingHours?.weekdayOpen || '05:30 AM'} - ${gym.openingHours?.weekdayClose || '10:30 PM'}`}
+                          </span>
+                        </Space>
+                      </Descriptions.Item>
                       <Descriptions.Item label="Full Street Address" span={2}>
                         {locationStr}
                       </Descriptions.Item>
@@ -1710,6 +1744,17 @@ export const GymDetailsView = ({
                       <Input placeholder="https://maps.google.com/?q=..." />
                     </Form.Item>
                     <Divider style={{ margin: '12px 0' }} />
+                    <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 13 }}>
+                      Operating Hours & Shift Architecture
+                    </div>
+                    <Form.Item name="timingMode" label="Timing Model">
+                      <Radio.Group buttonStyle="solid">
+                        <Radio.Button value="REGULAR">Single Shift (Continuous 12h/16h)</Radio.Button>
+                        <Radio.Button value="SPLIT_SHIFT">Split Shift (Morning + Evening)</Radio.Button>
+                        <Radio.Button value="24_HOURS">24 Hours Open (24x7)</Radio.Button>
+                      </Radio.Group>
+                    </Form.Item>
+
                     <Row gutter={16}>
                       <Col xs={12} sm={6}>
                         <Form.Item name="weekdayOpen" label="Weekday Open">
@@ -1731,6 +1776,26 @@ export const GymDetailsView = ({
                           <Input placeholder="09:00 PM" />
                         </Form.Item>
                       </Col>
+                      <Col xs={12} sm={6}>
+                        <Form.Item name="morningOpen" label="Morning Shift Open">
+                          <Input placeholder="05:30 AM" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={12} sm={6}>
+                        <Form.Item name="morningClose" label="Morning Shift Close">
+                          <Input placeholder="11:30 AM" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={12} sm={6}>
+                        <Form.Item name="eveningOpen" label="Evening Shift Open">
+                          <Input placeholder="04:30 PM" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={12} sm={6}>
+                        <Form.Item name="eveningClose" label="Evening Shift Close">
+                          <Input placeholder="10:30 PM" />
+                        </Form.Item>
+                      </Col>
                     </Row>
                   </>
                 ),
@@ -1740,9 +1805,16 @@ export const GymDetailsView = ({
                 label: 'Pricing & Capacity',
                 children: (
                   <>
+                    <Row gutter={16} align="middle">
+                      <Col xs={24} sm={12}>
+                        <Form.Item name="singleSessionBookingEnabled" label="Enable Per-Session / Day Pass Booking" valuePropName="checked">
+                          <Switch checkedChildren="Enabled" unCheckedChildren="Disabled" />
+                        </Form.Item>
+                      </Col>
+                    </Row>
                     <Row gutter={16}>
                       <Col xs={24} sm={12}>
-                        <Form.Item name="singleSessionPrice" label="Single Session Pass (₹)">
+                        <Form.Item name="singleSessionPrice" label="Single Session Pass Base Price (₹)">
                           <InputNumber min={0} style={{ width: '100%' }} />
                         </Form.Item>
                       </Col>

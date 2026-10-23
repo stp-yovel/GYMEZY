@@ -253,7 +253,6 @@ export const WalletScreen = ({ navigation }) => {
           >
             <View style={styles.backLayerHeader}>
               <View style={[styles.currencyPillMini, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#FFFFFF' }]}>
-                <Text style={styles.flagEmoji}>🇮🇳</Text>
                 <Text style={[styles.currencyPillTextMini, { color: isDark ? '#E2E8F0' : '#374151' }]}>INR</Text>
               </View>
             </View>
@@ -274,7 +273,6 @@ export const WalletScreen = ({ navigation }) => {
             {/* Top Pill Badge */}
             <View style={styles.cardTopRow}>
               <View style={[styles.currencyPill, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : '#FFFFFF' }]}>
-                <Text style={styles.flagEmoji}>🇮🇳</Text>
                 <Text style={[styles.currencyPillText, { color: isDark ? '#E2E8F0' : '#1F2937' }]}>
                   INR • Indian Rupee
                 </Text>

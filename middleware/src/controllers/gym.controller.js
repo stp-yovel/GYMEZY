@@ -13,6 +13,11 @@ import {
 import {
   sanitizeDocument,
 } from '../utils/responseTransformer.js';
+import {
+  normalizeOpeningHours,
+  getGymTimingStatus,
+} from '../utils/gymTimingHelper.js';
+import { computeTimeAgo } from './gymReviews.controller.js';
 
 
 /**
@@ -103,6 +108,7 @@ export const buildStandardCustomPricingPlans = (pricing = {}, customPlans = []) 
           ],
       popular: Boolean(planMap.monthly?.popular),
       savingsText: '',
+      assignedTrainers: Array.isArray(planMap.monthly?.assignedTrainers) ? planMap.monthly.assignedTrainers : [],
     },
     {
       id: 'plan-quarterly',
@@ -124,6 +130,7 @@ export const buildStandardCustomPricingPlans = (pricing = {}, customPlans = []) 
           ],
       popular: Boolean(planMap.quarterly?.popular),
       savingsText: calcSavings(qPrice, 3),
+      assignedTrainers: Array.isArray(planMap.quarterly?.assignedTrainers) ? planMap.quarterly.assignedTrainers : [],
     },
     {
       id: 'plan-half-yearly',
@@ -135,7 +142,7 @@ export const buildStandardCustomPricingPlans = (pricing = {}, customPlans = []) 
       months: 6,
       description: planMap.half_yearly?.description || planMap.halfYearly?.description || '6-month transformation package.',
       features: Array.isArray(planMap.half_yearly?.features || planMap.halfYearly?.features) && (planMap.half_yearly?.features || planMap.halfYearly?.features).length > 0
-        ? (planMap.half_yearly?.features || planMap.half_yearly?.features)
+        ? (planMap.half_yearly?.features || planMap.halfYearly?.features)
         : [
             'Access to all gym facilities',
             'Free group workout classes',
@@ -146,6 +153,9 @@ export const buildStandardCustomPricingPlans = (pricing = {}, customPlans = []) 
           ],
       popular: Boolean(planMap.half_yearly?.popular || planMap.halfYearly?.popular),
       savingsText: calcSavings(hPrice, 6),
+      assignedTrainers: Array.isArray(planMap.half_yearly?.assignedTrainers || planMap.halfYearly?.assignedTrainers)
+        ? (planMap.half_yearly?.assignedTrainers || planMap.halfYearly?.assignedTrainers)
+        : [],
     },
     {
       id: 'plan-annual',
@@ -169,6 +179,7 @@ export const buildStandardCustomPricingPlans = (pricing = {}, customPlans = []) 
           ],
       popular: planMap.annual?.popular !== undefined ? Boolean(planMap.annual.popular) : true,
       savingsText: calcSavings(aPrice, 12),
+      assignedTrainers: Array.isArray(planMap.annual?.assignedTrainers) ? planMap.annual.assignedTrainers : [],
     },
   ];
 };
@@ -385,16 +396,21 @@ export const onboardGym = asyncHandler(async (req, res) => {
   };
 
   // Operational Hours
-  const resolvedOpeningHours = openingHours || {
+  const rawOpeningHours = openingHours || {
+    mode: is24Hours ? '24_HOURS' : (isSplitShift ? 'SPLIT_SHIFT' : 'REGULAR'),
     weekdayOpen: weekdayOpen || '05:30 AM',
     weekdayClose: weekdayClose || '10:30 PM',
     weekendOpen: weekendOpen || '06:00 AM',
     weekendClose: weekendClose || '09:00 PM',
-    displayText: `${weekdayOpen || '05:30 AM'} - ${weekdayClose || '10:30 PM'}`,
+    morningOpen: req.body.morningOpen || '05:30 AM',
+    morningClose: req.body.morningClose || '11:30 AM',
+    eveningOpen: req.body.eveningOpen || '04:30 PM',
+    eveningClose: req.body.eveningClose || '10:30 PM',
     isSplitShift: Boolean(isSplitShift),
     isOpenHolidays: isOpenHolidays !== false,
     is24Hours: Boolean(is24Hours),
   };
+  const resolvedOpeningHours = normalizeOpeningHours(rawOpeningHours);
 
   // 4. Determine Initial Status and Sequential Partner ID
   const resolvedApprovalStatus =
@@ -961,6 +977,8 @@ export const getGyms = asyncHandler(async (req, res) => {
       tags: g.tags || [],
       workouts: g.workouts || [],
       facilities: g.facilities || [],
+      openingHours: g.openingHours || null,
+      timingStatus: getGymTimingStatus(g.openingHours),
       subscriptionType: g.subscriptionType || 'Standard',
       status: g.status,
       approvalStatus: g.approvalStatus,
@@ -1275,6 +1293,22 @@ export const getGymById = asyncHandler(async (req, res) => {
     console.error('[GET_GYM_BY_ID] Error pulling employee trainers from SSOT:', err?.message);
   }
 
+  // Format reviews and ratings with dynamic relative time and bookingType
+  if (Array.isArray(sanitized.reviews)) {
+    sanitized.reviews = sanitized.reviews.map((rev) => ({
+      ...rev,
+      date: computeTimeAgo(rev.createdAt || rev.date),
+      bookingType: rev.bookingType || 'Member',
+    }));
+  }
+  if (Array.isArray(sanitized.ratings)) {
+    sanitized.ratings = sanitized.ratings.map((rev) => ({
+      ...rev,
+      date: computeTimeAgo(rev.createdAt || rev.date),
+      bookingType: rev.bookingType || 'Member',
+    }));
+  }
+
   return res.status(200).json(
     ApiResponse.success(
       {
@@ -1424,22 +1458,58 @@ const applyChangesToGymDocument = async (gym, changes) => {
     gym.customPricingPlans = buildStandardCustomPricingPlans(gym.pricingPlans, gym.customPricingPlans);
   }
 
+  if (changes.singleSessionBookingEnabled !== undefined) {
+    gym.singleSessionBookingEnabled = Boolean(changes.singleSessionBookingEnabled);
+  }
+  if (changes.singleSessionPrice !== undefined) {
+    gym.singleSessionPrice = Number(changes.singleSessionPrice);
+    if (!gym.pricingPlans) gym.pricingPlans = {};
+    gym.pricingPlans.singleSession = Number(changes.singleSessionPrice);
+  }
+
   // Operations & Schedule
-  if (changes.openingHours || changes.schedule || changes.holidays || changes.weekdayOpen || changes.weekdayClose) {
-    const rawHours = changes.openingHours || {};
-    gym.openingHours = {
-      ...(gym.openingHours || {}),
-      weekdayOpen: changes.weekdayOpen || rawHours.weekdayOpen || gym.openingHours?.weekdayOpen || '05:30 AM',
-      weekdayClose: changes.weekdayClose || rawHours.weekdayClose || gym.openingHours?.weekdayClose || '10:30 PM',
-      weekendOpen: changes.weekendOpen || rawHours.weekendOpen || gym.openingHours?.weekendOpen || '06:00 AM',
-      weekendClose: changes.weekendClose || rawHours.weekendClose || gym.openingHours?.weekendClose || '09:00 PM',
-      displayText: changes.displayText || rawHours.displayText || `${changes.weekdayOpen || rawHours.weekdayOpen || gym.openingHours?.weekdayOpen || '05:30 AM'} - ${changes.weekdayClose || rawHours.weekdayClose || gym.openingHours?.weekdayClose || '10:30 PM'}`,
-      isSplitShift: changes.isSplitShift !== undefined ? Boolean(changes.isSplitShift) : (rawHours.isSplitShift !== undefined ? Boolean(rawHours.isSplitShift) : gym.openingHours?.isSplitShift),
-      isOpenHolidays: changes.isOpenHolidays !== undefined ? Boolean(changes.isOpenHolidays) : (rawHours.isOpenHolidays !== undefined ? Boolean(rawHours.isOpenHolidays) : gym.openingHours?.isOpenHolidays),
-      is24Hours: changes.is24Hours !== undefined ? Boolean(changes.is24Hours) : (rawHours.is24Hours !== undefined ? Boolean(rawHours.is24Hours) : gym.openingHours?.is24Hours),
-      schedule: changes.schedule !== undefined ? changes.schedule : (rawHours.schedule !== undefined ? rawHours.schedule : gym.openingHours?.schedule),
-      holidays: changes.holidays !== undefined ? changes.holidays : (rawHours.holidays !== undefined ? rawHours.holidays : gym.openingHours?.holidays),
+  if (
+    changes.openingHours ||
+    changes.schedule ||
+    changes.holidays ||
+    changes.weekdayOpen ||
+    changes.weekdayClose ||
+    changes.weekendOpen ||
+    changes.weekendClose ||
+    changes.morningOpen ||
+    changes.morningClose ||
+    changes.eveningOpen ||
+    changes.eveningClose ||
+    changes.mode ||
+    changes.isSplitShift !== undefined ||
+    changes.is24Hours !== undefined
+  ) {
+    const existingHours = gym.openingHours?.toObject
+      ? gym.openingHours.toObject()
+      : (gym.openingHours || {});
+    const incomingHours = changes.openingHours || {};
+
+    const rawHours = {
+      ...existingHours,
+      ...incomingHours,
     };
+
+    if (changes.weekdayOpen) rawHours.weekdayOpen = changes.weekdayOpen;
+    if (changes.weekdayClose) rawHours.weekdayClose = changes.weekdayClose;
+    if (changes.weekendOpen) rawHours.weekendOpen = changes.weekendOpen;
+    if (changes.weekendClose) rawHours.weekendClose = changes.weekendClose;
+    if (changes.morningOpen) rawHours.morningOpen = changes.morningOpen;
+    if (changes.morningClose) rawHours.morningClose = changes.morningClose;
+    if (changes.eveningOpen) rawHours.eveningOpen = changes.eveningOpen;
+    if (changes.eveningClose) rawHours.eveningClose = changes.eveningClose;
+    if (changes.mode) rawHours.mode = changes.mode;
+    if (changes.isSplitShift !== undefined) rawHours.isSplitShift = Boolean(changes.isSplitShift);
+    if (changes.is24Hours !== undefined) rawHours.is24Hours = Boolean(changes.is24Hours);
+    if (changes.isOpenHolidays !== undefined) rawHours.isOpenHolidays = Boolean(changes.isOpenHolidays);
+    if (changes.schedule !== undefined) rawHours.schedule = changes.schedule;
+    if (changes.holidays !== undefined) rawHours.holidays = changes.holidays;
+
+    gym.openingHours = normalizeOpeningHours(rawHours);
   }
 
   // Bank Details

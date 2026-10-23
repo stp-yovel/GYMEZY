@@ -214,10 +214,15 @@ export const SettingsTab = ({ topInset, navigation }) => {
   const [isSavingBasic, setIsSavingBasic] = useState(false);
 
   // Timings Form Fields
+  const [timingMode, setTimingMode] = useState('REGULAR');
   const [weekdayOpen, setWeekdayOpen] = useState('05:30 AM');
   const [weekdayClose, setWeekdayClose] = useState('10:30 PM');
   const [weekendOpen, setWeekendOpen] = useState('06:00 AM');
   const [weekendClose, setWeekendClose] = useState('09:00 PM');
+  const [morningOpen, setMorningOpen] = useState('05:30 AM');
+  const [morningClose, setMorningClose] = useState('11:30 AM');
+  const [eveningOpen, setEveningOpen] = useState('04:30 PM');
+  const [eveningClose, setEveningClose] = useState('10:30 PM');
   const [is24Hours, setIs24Hours] = useState(false);
 
   // Bank Form Fields
@@ -307,11 +312,21 @@ export const SettingsTab = ({ topInset, navigation }) => {
         if (Array.isArray(data.safetyMeasures) && data.safetyMeasures.length > 0) setSafetyMeasures(data.safetyMeasures);
 
         if (data.openingHours) {
+          const mode = data.openingHours.mode || (data.openingHours.is24Hours ? '24_HOURS' : (data.openingHours.morningShift ? 'SPLIT_SHIFT' : 'REGULAR'));
+          setTimingMode(mode);
           setWeekdayOpen(data.openingHours.weekdayOpen || '05:30 AM');
           setWeekdayClose(data.openingHours.weekdayClose || '10:30 PM');
           setWeekendOpen(data.openingHours.weekendOpen || '06:00 AM');
           setWeekendClose(data.openingHours.weekendClose || '09:00 PM');
-          setIs24Hours(Boolean(data.openingHours.is24Hours));
+          setIs24Hours(Boolean(data.openingHours.is24Hours || mode === '24_HOURS'));
+          if (data.openingHours.morningShift) {
+            setMorningOpen(data.openingHours.morningShift.open || '05:30 AM');
+            setMorningClose(data.openingHours.morningShift.close || '11:30 AM');
+          }
+          if (data.openingHours.eveningShift) {
+            setEveningOpen(data.openingHours.eveningShift.open || '04:30 PM');
+            setEveningClose(data.openingHours.eveningShift.close || '10:30 PM');
+          }
         }
 
         if (data.bankDetails) {
@@ -607,14 +622,24 @@ export const SettingsTab = ({ topInset, navigation }) => {
   };
 
   const handleSaveOperatingHours = async () => {
+    let displayText = `${weekdayOpen} - ${weekdayClose}`;
+    if (timingMode === '24_HOURS') {
+      displayText = 'Open 24 Hours';
+    } else if (timingMode === 'SPLIT_SHIFT') {
+      displayText = `${morningOpen} - ${morningClose} & ${eveningOpen} - ${eveningClose}`;
+    }
+
     const payload = {
       openingHours: {
-        weekdayOpen,
-        weekdayClose,
-        weekendOpen,
-        weekendClose,
-        displayText: `${weekdayOpen} - ${weekdayClose}`,
-        is24Hours,
+        mode: timingMode,
+        weekdayOpen: timingMode === 'SPLIT_SHIFT' ? morningOpen : (timingMode === '24_HOURS' ? '12:00 AM' : weekdayOpen),
+        weekdayClose: timingMode === 'SPLIT_SHIFT' ? eveningClose : (timingMode === '24_HOURS' ? '11:59 PM' : weekdayClose),
+        weekendOpen: timingMode === 'SPLIT_SHIFT' ? morningOpen : (timingMode === '24_HOURS' ? '12:00 AM' : weekendOpen),
+        weekendClose: timingMode === 'SPLIT_SHIFT' ? eveningClose : (timingMode === '24_HOURS' ? '11:59 PM' : weekendClose),
+        is24Hours: timingMode === '24_HOURS',
+        morningShift: timingMode === 'SPLIT_SHIFT' ? { open: morningOpen, close: morningClose } : undefined,
+        eveningShift: timingMode === 'SPLIT_SHIFT' ? { open: eveningOpen, close: eveningClose } : undefined,
+        displayText,
       },
     };
     await handleSaveGymUpdate(payload, 'Operating hours submitted for Super Admin review.');
@@ -1292,13 +1317,46 @@ export const SettingsTab = ({ topInset, navigation }) => {
             <Text style={styles.editPillText}>Edit</Text>
           </TouchableOpacity>
         </View>
-        <View style={{ marginTop: 6 }}>
-          <Text style={[styles.timingsDays, { color: isDark ? 'rgba(255,255,255,0.7)' : '#334155' }]}>
-            Weekday: {gymData?.openingHours?.weekdayOpen || weekdayOpen} - {gymData?.openingHours?.weekdayClose || weekdayClose}
-          </Text>
-          <Text style={[styles.timingsDays, { color: isDark ? 'rgba(255,255,255,0.7)' : '#334155', marginTop: 4 }]}>
-            Weekend: {gymData?.openingHours?.weekendOpen || weekendOpen} - {gymData?.openingHours?.weekendClose || weekendClose}
-          </Text>
+        <View style={{ marginTop: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 6 }}>
+            <View style={{
+              backgroundColor: timingMode === '24_HOURS' ? 'rgba(16, 185, 129, 0.15)' : timingMode === 'SPLIT_SHIFT' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              borderRadius: 6,
+            }}>
+              <Text style={{
+                color: timingMode === '24_HOURS' ? '#10B981' : timingMode === 'SPLIT_SHIFT' ? '#3B82F6' : '#F59E0B',
+                fontSize: 11,
+                fontWeight: '700',
+              }}>
+                {timingMode === '24_HOURS' ? '24 Hours Open' : timingMode === 'SPLIT_SHIFT' ? 'Split Shift (Morning + Evening)' : 'Single Continuous Shift'}
+              </Text>
+            </View>
+          </View>
+          {timingMode === '24_HOURS' ? (
+            <Text style={[styles.timingsDays, { color: isDark ? 'rgba(255,255,255,0.7)' : '#334155' }]}>
+              Gym facility operates 24 hours round the clock, 7 days a week.
+            </Text>
+          ) : timingMode === 'SPLIT_SHIFT' ? (
+            <View>
+              <Text style={[styles.timingsDays, { color: isDark ? 'rgba(255,255,255,0.7)' : '#334155' }]}>
+                Morning Shift: {gymData?.openingHours?.morningShift?.open || morningOpen} - {gymData?.openingHours?.morningShift?.close || morningClose}
+              </Text>
+              <Text style={[styles.timingsDays, { color: isDark ? 'rgba(255,255,255,0.7)' : '#334155', marginTop: 4 }]}>
+                Evening Shift: {gymData?.openingHours?.eveningShift?.open || eveningOpen} - {gymData?.openingHours?.eveningShift?.close || eveningClose}
+              </Text>
+            </View>
+          ) : (
+            <View>
+              <Text style={[styles.timingsDays, { color: isDark ? 'rgba(255,255,255,0.7)' : '#334155' }]}>
+                Weekday: {gymData?.openingHours?.weekdayOpen || weekdayOpen} - {gymData?.openingHours?.weekdayClose || weekdayClose}
+              </Text>
+              <Text style={[styles.timingsDays, { color: isDark ? 'rgba(255,255,255,0.7)' : '#334155', marginTop: 4 }]}>
+                Weekend: {gymData?.openingHours?.weekendOpen || weekendOpen} - {gymData?.openingHours?.weekendClose || weekendClose}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -2429,7 +2487,7 @@ export const SettingsTab = ({ topInset, navigation }) => {
         onRequestClose={() => setShowEditTimingsModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.pickerModalCard, { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', maxHeight: 420 }]}>
+          <View style={[styles.pickerModalCard, { backgroundColor: isDark ? AppColors.darkCard : '#FFFFFF', maxHeight: 540 }]}>
             <View style={styles.pickerModalHeader}>
               <Text style={[styles.pickerModalTitle, { color: isDark ? '#FFFFFF' : '#0F172A' }]}>
                 Edit Gym Operating Hours
@@ -2440,33 +2498,134 @@ export const SettingsTab = ({ topInset, navigation }) => {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 10 }}>
-              <Text style={[styles.inputLabel, { color: isDark ? '#FFF' : '#0F172A' }]}>Weekday Open Time</Text>
-              <TextInput
-                value={weekdayOpen}
-                onChangeText={setWeekdayOpen}
-                style={[styles.modalInput, { color: isDark ? '#FFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
-              />
+              <Text style={[styles.inputLabel, { color: isDark ? '#FFF' : '#0F172A', marginBottom: 6 }]}>Timing Model</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                {[
+                  { key: 'REGULAR', label: 'Single Shift' },
+                  { key: 'SPLIT_SHIFT', label: 'Split Shift' },
+                  { key: '24_HOURS', label: '24 Hours' },
+                ].map((modeOption) => {
+                  const isSelected = timingMode === modeOption.key;
+                  return (
+                    <TouchableOpacity
+                      key={modeOption.key}
+                      onPress={() => setTimingMode(modeOption.key)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        backgroundColor: isSelected ? AppColors.primaryColor : (isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9'),
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: isSelected ? AppColors.primaryColor : (isDark ? AppColors.darkBorder : '#E2E8F0'),
+                      }}
+                    >
+                      <Text style={{
+                        color: isSelected ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B'),
+                        fontSize: 12,
+                        fontWeight: '700',
+                      }}>
+                        {modeOption.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-              <Text style={[styles.inputLabel, { color: isDark ? '#FFF' : '#0F172A', marginTop: 8 }]}>Weekday Close Time</Text>
-              <TextInput
-                value={weekdayClose}
-                onChangeText={setWeekdayClose}
-                style={[styles.modalInput, { color: isDark ? '#FFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
-              />
+              {timingMode === '24_HOURS' ? (
+                <View style={{
+                  padding: 14,
+                  borderRadius: 8,
+                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(16, 185, 129, 0.3)',
+                  marginBottom: 10,
+                }}>
+                  <Text style={{ color: '#10B981', fontWeight: '700', fontSize: 13, marginBottom: 2 }}>
+                    Open 24/7 Facility
+                  </Text>
+                  <Text style={{ color: isDark ? 'rgba(255,255,255,0.7)' : '#334155', fontSize: 12 }}>
+                    Members can book slots and access the gym at any hour of the day or night.
+                  </Text>
+                </View>
+              ) : timingMode === 'SPLIT_SHIFT' ? (
+                <View>
+                  <Text style={[styles.inputLabel, { color: isDark ? '#FFF' : '#0F172A' }]}>Morning Shift - Open</Text>
+                  <TextInput
+                    value={morningOpen}
+                    onChangeText={setMorningOpen}
+                    placeholder="05:30 AM"
+                    placeholderTextColor="#94A3B8"
+                    style={[styles.modalInput, { color: isDark ? '#FFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
+                  />
 
-              <Text style={[styles.inputLabel, { color: isDark ? '#FFF' : '#0F172A', marginTop: 8 }]}>Weekend Open Time</Text>
-              <TextInput
-                value={weekendOpen}
-                onChangeText={setWeekendOpen}
-                style={[styles.modalInput, { color: isDark ? '#FFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
-              />
+                  <Text style={[styles.inputLabel, { color: isDark ? '#FFF' : '#0F172A', marginTop: 8 }]}>Morning Shift - Close</Text>
+                  <TextInput
+                    value={morningClose}
+                    onChangeText={setMorningClose}
+                    placeholder="11:30 AM"
+                    placeholderTextColor="#94A3B8"
+                    style={[styles.modalInput, { color: isDark ? '#FFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
+                  />
 
-              <Text style={[styles.inputLabel, { color: isDark ? '#FFF' : '#0F172A', marginTop: 8 }]}>Weekend Close Time</Text>
-              <TextInput
-                value={weekendClose}
-                onChangeText={setWeekendClose}
-                style={[styles.modalInput, { color: isDark ? '#FFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
-              />
+                  <Text style={[styles.inputLabel, { color: isDark ? '#FFF' : '#0F172A', marginTop: 8 }]}>Evening Shift - Open</Text>
+                  <TextInput
+                    value={eveningOpen}
+                    onChangeText={setEveningOpen}
+                    placeholder="04:30 PM"
+                    placeholderTextColor="#94A3B8"
+                    style={[styles.modalInput, { color: isDark ? '#FFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
+                  />
+
+                  <Text style={[styles.inputLabel, { color: isDark ? '#FFF' : '#0F172A', marginTop: 8 }]}>Evening Shift - Close</Text>
+                  <TextInput
+                    value={eveningClose}
+                    onChangeText={setEveningClose}
+                    placeholder="10:30 PM"
+                    placeholderTextColor="#94A3B8"
+                    style={[styles.modalInput, { color: isDark ? '#FFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
+                  />
+                </View>
+              ) : (
+                <View>
+                  <Text style={[styles.inputLabel, { color: isDark ? '#FFF' : '#0F172A' }]}>Weekday Open Time</Text>
+                  <TextInput
+                    value={weekdayOpen}
+                    onChangeText={setWeekdayOpen}
+                    placeholder="05:30 AM"
+                    placeholderTextColor="#94A3B8"
+                    style={[styles.modalInput, { color: isDark ? '#FFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
+                  />
+
+                  <Text style={[styles.inputLabel, { color: isDark ? '#FFF' : '#0F172A', marginTop: 8 }]}>Weekday Close Time</Text>
+                  <TextInput
+                    value={weekdayClose}
+                    onChangeText={setWeekdayClose}
+                    placeholder="10:30 PM"
+                    placeholderTextColor="#94A3B8"
+                    style={[styles.modalInput, { color: isDark ? '#FFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
+                  />
+
+                  <Text style={[styles.inputLabel, { color: isDark ? '#FFF' : '#0F172A', marginTop: 8 }]}>Weekend Open Time</Text>
+                  <TextInput
+                    value={weekendOpen}
+                    onChangeText={setWeekendOpen}
+                    placeholder="06:00 AM"
+                    placeholderTextColor="#94A3B8"
+                    style={[styles.modalInput, { color: isDark ? '#FFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
+                  />
+
+                  <Text style={[styles.inputLabel, { color: isDark ? '#FFF' : '#0F172A', marginTop: 8 }]}>Weekend Close Time</Text>
+                  <TextInput
+                    value={weekendClose}
+                    onChangeText={setWeekendClose}
+                    placeholder="09:00 PM"
+                    placeholderTextColor="#94A3B8"
+                    style={[styles.modalInput, { color: isDark ? '#FFF' : '#0F172A', borderColor: isDark ? AppColors.darkBorder : '#E2E8F0' }]}
+                  />
+                </View>
+              )}
 
               <TouchableOpacity
                 style={[styles.submitBtn, { backgroundColor: AppColors.primaryColor, marginTop: 14 }]}

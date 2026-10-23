@@ -519,6 +519,54 @@ class ApiService {
   }
 
   /**
+   * Request to reschedule a session in custom dates booking
+   */
+  async requestBookingReschedule(bookingId, { sessionIndex, sessionDate, requestedDate, reason }) {
+    const response = await this.executeFetch(`/bookings/${bookingId}/request-reschedule`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ sessionIndex, sessionDate, requestedDate, reason }),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to submit reschedule request.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Gym owner review reschedule (Approve, Propose date, or Reject)
+   */
+  async reviewBookingReschedule(bookingId, { sessionIndex, sessionDate, action, proposedDate, ownerNotes }) {
+    const response = await this.executeFetch(`/bookings/${bookingId}/review-reschedule`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ sessionIndex, sessionDate, action, proposedDate, ownerNotes }),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to review reschedule request.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Member responds to gym owner's proposed date (Accept or Decline)
+   */
+  async respondRescheduleProposal(bookingId, { sessionIndex, sessionDate, decision }) {
+    const response = await this.executeFetch(`/bookings/${bookingId}/respond-proposal`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ sessionIndex, sessionDate, decision }),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to respond to proposal.');
+    }
+    return json.data;
+  }
+
+  /**
    * Fetch location-aware & priority-sorted promotional banners
    */
   async getPromotionalBanners(lat, lng) {

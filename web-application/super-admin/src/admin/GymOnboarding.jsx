@@ -322,10 +322,15 @@ export const GymOnboarding = () => {
     lat: 13.0827,
     lng: 80.2707,
     googleMapsUrl: '',
+    timingMode: 'REGULAR',
     weekdayOpen: '05:30 AM',
     weekdayClose: '10:30 PM',
     weekendOpen: '06:00 AM',
     weekendClose: '09:00 PM',
+    morningOpen: '05:30 AM',
+    morningClose: '11:30 AM',
+    eveningOpen: '04:30 PM',
+    eveningClose: '10:30 PM',
     isSplitShift: false,
     isOpenHolidays: true,
     is24Hours: false,
@@ -709,13 +714,18 @@ export const GymOnboarding = () => {
         panNumber: formData.panNumber,
         branches: formData.branches,
         openingHours: {
+          mode: formData.timingMode,
           weekdayOpen: formData.weekdayOpen,
           weekdayClose: formData.weekdayClose,
           weekendOpen: formData.weekendOpen,
           weekendClose: formData.weekendClose,
-          isSplitShift: Boolean(formData.isSplitShift),
+          morningOpen: formData.morningOpen,
+          morningClose: formData.morningClose,
+          eveningOpen: formData.eveningOpen,
+          eveningClose: formData.eveningClose,
+          isSplitShift: formData.timingMode === 'SPLIT_SHIFT',
           isOpenHolidays: formData.isOpenHolidays !== false,
-          is24Hours: Boolean(formData.is24Hours),
+          is24Hours: formData.timingMode === '24_HOURS',
         },
         slotDurationMinutes: Number(formData.slotDurationMinutes) || 60,
         maxSlotCapacity: Number(formData.maxSlotCapacity) || 25,
@@ -1635,75 +1645,162 @@ export const GymOnboarding = () => {
 
                 <Divider style={{ margin: '24px 0 20px 0' }} />
 
-                <div style={{ fontSize: 15, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a', marginBottom: 14 }}>
-                  Regular Operating Hours
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                    Facility Operating Hours & Shift Architecture
+                  </div>
+                  <Tag color={formData.timingMode === '24_HOURS' ? 'green' : (formData.timingMode === 'SPLIT_SHIFT' ? 'purple' : 'blue')}>
+                    {formData.timingMode === '24_HOURS' ? '24/7 Mode' : (formData.timingMode === 'SPLIT_SHIFT' ? 'Split Shift' : 'Regular Mode')}
+                  </Tag>
                 </div>
 
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} sm={12} md={6}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Weekday Open (Mon – Fri)
-                    </div>
-                    <Input
-                      value={formData.weekdayOpen}
-                      onChange={(e) => handleFieldChange('weekdayOpen', e.target.value)}
-                      style={{ height: 40, borderRadius: 'var(--radius-base)' }}
-                    />
-                  </Col>
+                {/* Timing Mode Selector */}
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                    Select Operational Timing Model
+                  </div>
+                  <Radio.Group
+                    value={formData.timingMode}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      handleFieldChange('timingMode', val);
+                      handleFieldChange('is24Hours', val === '24_HOURS');
+                      handleFieldChange('isSplitShift', val === 'SPLIT_SHIFT');
+                    }}
+                    buttonStyle="solid"
+                    style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}
+                  >
+                    <Radio.Button value="REGULAR" style={{ borderRadius: 8, height: 38, lineHeight: '36px' }}>
+                      Single Shift (Continuous 12h/16h)
+                    </Radio.Button>
+                    <Radio.Button value="SPLIT_SHIFT" style={{ borderRadius: 8, height: 38, lineHeight: '36px' }}>
+                      Split Shift (Morning + Evening)
+                    </Radio.Button>
+                    <Radio.Button value="24_HOURS" style={{ borderRadius: 8, height: 38, lineHeight: '36px' }}>
+                      24 Hours (Round-the-clock)
+                    </Radio.Button>
+                  </Radio.Group>
+                </div>
 
-                  <Col xs={24} sm={12} md={6}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Weekday Close (Mon – Fri)
-                    </div>
-                    <Input
-                      value={formData.weekdayClose}
-                      onChange={(e) => handleFieldChange('weekdayClose', e.target.value)}
-                      style={{ height: 40, borderRadius: 'var(--radius-base)' }}
-                    />
-                  </Col>
-
-                  <Col xs={24} sm={12} md={6}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Weekend Open (Sat – Sun)
-                    </div>
-                    <Input
-                      value={formData.weekendOpen}
-                      onChange={(e) => handleFieldChange('weekendOpen', e.target.value)}
-                      style={{ height: 40, borderRadius: 'var(--radius-base)' }}
-                    />
-                  </Col>
-
-                  <Col xs={24} sm={12} md={6}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
-                      Weekend Close (Sat – Sun)
-                    </div>
-                    <Input
-                      value={formData.weekendClose}
-                      onChange={(e) => handleFieldChange('weekendClose', e.target.value)}
-                      style={{ height: 40, borderRadius: 'var(--radius-base)' }}
-                    />
-                  </Col>
-
-                  <Col xs={24} md={8}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-                      <Switch
-                        checked={formData.is24Hours}
-                        onChange={(chk) => handleFieldChange('is24Hours', chk)}
+                {/* Mode-Specific Time Pickers */}
+                {formData.timingMode === 'REGULAR' && (
+                  <Row gutter={[16, 16]}>
+                    <Col xs={24} sm={12} md={6}>
+                      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                        Weekday Open (Mon – Fri)
+                      </div>
+                      <Input
+                        value={formData.weekdayOpen}
+                        onChange={(e) => handleFieldChange('weekdayOpen', e.target.value)}
+                        placeholder="05:30 AM"
+                        style={{ height: 40, borderRadius: 'var(--radius-base)' }}
                       />
-                      <span style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                        24/7 Facility Access
-                      </span>
-                    </div>
-                  </Col>
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                        Weekday Close (Mon – Fri)
+                      </div>
+                      <Input
+                        value={formData.weekdayClose}
+                        onChange={(e) => handleFieldChange('weekdayClose', e.target.value)}
+                        placeholder="10:30 PM"
+                        style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                      />
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                        Weekend Open (Sat – Sun)
+                      </div>
+                      <Input
+                        value={formData.weekendOpen}
+                        onChange={(e) => handleFieldChange('weekendOpen', e.target.value)}
+                        placeholder="06:00 AM"
+                        style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                      />
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                        Weekend Close (Sat – Sun)
+                      </div>
+                      <Input
+                        value={formData.weekendClose}
+                        onChange={(e) => handleFieldChange('weekendClose', e.target.value)}
+                        placeholder="09:00 PM"
+                        style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                      />
+                    </Col>
+                  </Row>
+                )}
 
-                  <Col xs={24} md={8}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                {formData.timingMode === 'SPLIT_SHIFT' && (
+                  <div>
+                    <div style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: isDarkMode ? 'rgba(168,85,247,0.1)' : '#faf5ff', border: '1px solid #d8b4fe', marginBottom: 14, fontSize: 13, color: isDarkMode ? '#e9d5ff' : '#6b21a8' }}>
+                      <strong>Split Shift Model:</strong> Common for fitness studios in India. Gym opens for early morning routines, closes during the afternoon for sanitization/break, and reopens for evening workouts. Bookable slots are generated only during active shifts.
+                    </div>
+                    <Row gutter={[16, 16]}>
+                      <Col xs={24} sm={12} md={6}>
+                        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                          Morning Shift Open
+                        </div>
+                        <Input
+                          value={formData.morningOpen}
+                          onChange={(e) => handleFieldChange('morningOpen', e.target.value)}
+                          placeholder="05:30 AM"
+                          style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                        />
+                      </Col>
+                      <Col xs={24} sm={12} md={6}>
+                        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                          Morning Shift Close
+                        </div>
+                        <Input
+                          value={formData.morningClose}
+                          onChange={(e) => handleFieldChange('morningClose', e.target.value)}
+                          placeholder="11:30 AM"
+                          style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                        />
+                      </Col>
+                      <Col xs={24} sm={12} md={6}>
+                        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                          Evening Shift Open
+                        </div>
+                        <Input
+                          value={formData.eveningOpen}
+                          onChange={(e) => handleFieldChange('eveningOpen', e.target.value)}
+                          placeholder="04:30 PM"
+                          style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                        />
+                      </Col>
+                      <Col xs={24} sm={12} md={6}>
+                        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: isDarkMode ? '#cccccc' : '#334155' }}>
+                          Evening Shift Close
+                        </div>
+                        <Input
+                          value={formData.eveningClose}
+                          onChange={(e) => handleFieldChange('eveningClose', e.target.value)}
+                          placeholder="10:30 PM"
+                          style={{ height: 40, borderRadius: 'var(--radius-base)' }}
+                        />
+                      </Col>
+                    </Row>
+                  </div>
+                )}
+
+                {formData.timingMode === '24_HOURS' && (
+                  <div style={{ padding: '14px 18px', borderRadius: 8, backgroundColor: isDarkMode ? 'rgba(34,197,94,0.1)' : '#f0fdf4', border: '1px solid #86efac', marginBottom: 14, fontSize: 13, color: isDarkMode ? '#86efac' : '#166534' }}>
+                    <strong>24/7 Round-the-clock Facility:</strong> This gym operates continuously 24 hours a day, 7 days a week. Dynamic customer booking slots will be available around the clock.
+                  </div>
+                )}
+
+                <Row gutter={[16, 16]} style={{ marginTop: 14 }}>
+                  <Col xs={24} md={12}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <Switch
                         checked={formData.isOpenHolidays}
                         onChange={(chk) => handleFieldChange('isOpenHolidays', chk)}
                       />
                       <span style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
-                        Open on Public Holidays
+                        Facility Remains Open on Public Holidays
                       </span>
                     </div>
                   </Col>

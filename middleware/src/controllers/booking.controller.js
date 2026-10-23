@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import Booking from '../models/booking.model.js';
 import { Section } from '../models/section.model.js';
 import Gym from '../models/gym.model.js';
+import Employee from '../models/employee.model.js';
 import User from '../models/user.model.js';
 import Counter from '../models/counter.model.js';
 import { ApiError } from '../utils/apiError.js';
@@ -68,14 +69,42 @@ const resolveGym = async (gymId) => {
   return gym;
 };
 
-/**
- * Generate sequential booking ID formatted as BK{counter} scoped to the gym, starting from 100
- * e.g. BK100, BK101, BK102
- */
 const generateGymBookingId = async (gym) => {
   const gymSeqKey = `bkg_${gym.partnerId || gym._id}`;
   const seq = await Counter.getNextSequence(gymSeqKey, 100);
   return `BK${seq}`;
+};
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/**
+ * Parse time string (e.g., '09:00 AM', '18:30', '9:30 AM') into total minutes from midnight
+ */
+const parseTimeToMinutes = (timeStr) => {
+  if (!timeStr || typeof timeStr !== 'string') return null;
+  const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+  if (!match) return null;
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const period = match[3] ? match[3].toUpperCase() : null;
+  if (period === 'PM' && hours < 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+};
+
+/**
+ * Check if a date matches a trainer's workingDays array
+ */
+const isDayWorking = (date, workingDays) => {
+  if (!Array.isArray(workingDays) || workingDays.length === 0) return true;
+  const dayIndex = date.getDay();
+  const full = DAY_NAMES[dayIndex].toLowerCase();
+  const short = DAY_SHORT[dayIndex].toLowerCase();
+  return workingDays.some((w) => {
+    const val = String(w).trim().toLowerCase();
+    return val === full || val === short || val.startsWith(short);
+  });
 };
 
 /**
@@ -162,21 +191,177 @@ export const createBooking = asyncHandler(async (req, res) => {
   const bookingId = await generateGymBookingId(gym);
   const entryOtp = crypto.randomInt(100000, 1000000).toString();
 
-  const resolvedStartDate = startDate ? new Date(startDate) : (section?.startDate || new Date());
-  const resolvedEndDate = endDate ? new Date(endDate) : (section?.endDate || null);
-  const resolvedDuration = durationDays || section?.durationDays || 1;
+  let resolvedBookingType = bookingType || 'GYM_SESSION';
+  if (section) {
+    resolvedBookingType = bookingType === 'GROUP_CLASS' ? 'GROUP_CLASS' : 'SECTION';
+  } else if (resolvedBookingType === 'GYM_SESSION') {
+    if (gym.singleSessionBookingEnabled === false) {
+      throw ApiError.badRequest('Per-session booking is currently disabled by this gym.');
+    }
+  }
+
+  let sessionTrainer = null;
+  if (allocatedTrainerId) {
+    const isTrainerObjectId = mongoose.Types.ObjectId.isValid(allocatedTrainerId);
+    sessionTrainer = await Employee.findOne(
+      isTrainerObjectId
+        ? { $or: [{ _id: allocatedTrainerId }, { employeeId: allocatedTrainerId }] }
+        : { employeeId: allocatedTrainerId }
+    );
+    if (!sessionTrainer) {
+      throw ApiError.badRequest('Selected personal trainer does not exist.');
+    }
+    if (sessionTrainer.status !== 'Active') {
+      throw ApiError.badRequest('Selected personal trainer is currently inactive.');
+    }
+    const singleSessionFee = Number(sessionTrainer.trainerPricing?.singleSession || 0);
+    if (singleSessionFee <= 0) {
+      throw ApiError.badRequest('Selected personal trainer is not available for day pass or session bookings.');
+    }
+    allocatedTrainerId = sessionTrainer._id;
+  }
+
+  const rawCustomDates = Array.isArray(body.customDates) ? body.customDates : [];
+  const isCustomDates = rawCustomDates.length > 0;
+  let formattedCustomDates = [];
+
+  let resolvedStartDate = startDate ? new Date(startDate) : (section?.startDate || new Date());
+  let resolvedEndDate = endDate ? new Date(endDate) : (section?.endDate || null);
+
+  if (isCustomDates) {
+    const parsedDates = rawCustomDates
+      .map((d) => (d?.date ? new Date(d.date) : new Date(d)))
+      .filter((d) => !Number.isNaN(d.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    if (parsedDates.length > 0) {
+      resolvedStartDate = parsedDates[0];
+      resolvedEndDate = parsedDates[parsedDates.length - 1];
+      formattedCustomDates = parsedDates.map((d) => ({
+        date: d,
+        status: 'Scheduled',
+        dailyOtp: crypto.randomInt(100000, 1000000).toString(),
+      }));
+    }
+  }
+
+  const resolvedDuration = isCustomDates
+    ? formattedCustomDates.length
+    : (durationDays || section?.durationDays || 1);
+  const resolvedSessionsCount = isCustomDates
+    ? formattedCustomDates.length
+    : (sessionsCount || resolvedDuration);
   const resolvedTimeSlot = timeSlot || (section ? `${section.startTime} - ${section.endTime}` : '');
   const resolvedTitle = title || (section ? section.title : 'Gym Session');
   const resolvedCategory = category || section?.category || 'general';
 
-  const subtotalVal = Number(pricing?.subtotal ?? amount ?? section?.cost ?? 0);
+  // Strict Trainer Schedule & Engagement Boundaries Enforcement
+  if (sessionTrainer) {
+    const sched = sessionTrainer.schedule || {};
+
+    // 1. Contract bounds validation (Temporary staff)
+    if (sessionTrainer.type === 'Temporary') {
+      if (sched.startDate) {
+        const contractStart = new Date(sched.startDate);
+        contractStart.setHours(0, 0, 0, 0);
+        if (resolvedStartDate < contractStart) {
+          throw ApiError.badRequest(
+            `Selected trainer engagement starts on ${sched.startDate}. Please select dates within their engagement period.`
+          );
+        }
+      }
+      if (sched.endDate) {
+        const contractEnd = new Date(sched.endDate);
+        contractEnd.setHours(23, 59, 59, 999);
+
+        if (isCustomDates && formattedCustomDates.length > 0) {
+          const hasExceededDate = formattedCustomDates.some((item) => new Date(item.date) > contractEnd);
+          if (hasExceededDate) {
+            throw ApiError.badRequest(
+              `Selected trainer contract ends on ${sched.endDate}. One or more selected dates exceed their engagement period.`
+            );
+          }
+        } else if (resolvedEndDate && resolvedEndDate > contractEnd) {
+          throw ApiError.badRequest(
+            `Selected trainer contract ends on ${sched.endDate}. Please choose dates within their engagement period.`
+          );
+        } else if (resolvedStartDate > contractEnd) {
+          throw ApiError.badRequest(
+            `Selected trainer contract ends on ${sched.endDate}. Please choose dates within their engagement period.`
+          );
+        }
+      }
+    }
+
+    // 2. Working days validation
+    if (Array.isArray(sched.workingDays) && sched.workingDays.length > 0) {
+      if (isCustomDates && formattedCustomDates.length > 0) {
+        for (const item of formattedCustomDates) {
+          const itemDate = new Date(item.date);
+          if (!isDayWorking(itemDate, sched.workingDays)) {
+            const dayName = DAY_NAMES[itemDate.getDay()];
+            throw ApiError.badRequest(
+              `Selected trainer does not work on ${dayName}. Available working days: ${sched.workingDays.join(', ')}.`
+            );
+          }
+        }
+      } else {
+        if (!isDayWorking(resolvedStartDate, sched.workingDays)) {
+          const dayName = DAY_NAMES[resolvedStartDate.getDay()];
+          throw ApiError.badRequest(
+            `Selected trainer does not work on ${dayName}. Available working days: ${sched.workingDays.join(', ')}.`
+          );
+        }
+      }
+    }
+
+    // 3. Working hours / Slot matching validation
+    if (resolvedTimeSlot) {
+      const slotParts = resolvedTimeSlot.split('-').map((s) => s.trim());
+      if (slotParts.length === 2) {
+        const slotStartMins = parseTimeToMinutes(slotParts[0]);
+        const slotEndMins = parseTimeToMinutes(slotParts[1]);
+
+        let startWindowStr = sched.workingTimeStart || '09:00 AM';
+        let endWindowStr = sched.workingTimeEnd || '06:00 PM';
+
+        if (sched.isDifferentDays && Array.isArray(sched.dayWiseHours) && sched.dayWiseHours.length > 0) {
+          const bookingDayFull = DAY_NAMES[resolvedStartDate.getDay()].toLowerCase();
+          const bookingDayShort = DAY_SHORT[resolvedStartDate.getDay()].toLowerCase();
+          const dayHour = sched.dayWiseHours.find((dh) => {
+            const d = (dh.day || '').trim().toLowerCase();
+            return d === bookingDayFull || d === bookingDayShort || d.startsWith(bookingDayShort);
+          });
+          if (dayHour && dayHour.startTime && dayHour.endTime) {
+            startWindowStr = dayHour.startTime;
+            endWindowStr = dayHour.endTime;
+          }
+        }
+
+        const trainerStartMins = parseTimeToMinutes(startWindowStr);
+        const trainerEndMins = parseTimeToMinutes(endWindowStr);
+
+        if (slotStartMins !== null && trainerStartMins !== null && slotStartMins < trainerStartMins) {
+          throw ApiError.badRequest(
+            `Selected time slot (${resolvedTimeSlot}) starts before trainer working hours (${startWindowStr} - ${endWindowStr}).`
+          );
+        }
+        if (slotEndMins !== null && trainerEndMins !== null && slotEndMins > trainerEndMins) {
+          throw ApiError.badRequest(
+            `Selected time slot (${resolvedTimeSlot}) ends after trainer working hours (${startWindowStr} - ${endWindowStr}).`
+          );
+        }
+      }
+    }
+  }
+
+  const baseDayPrice = Number(gym.singleSessionPrice || gym.pricingPlans?.singleSession || 199);
+  const trainerDailyFee = sessionTrainer ? (Number(sessionTrainer.trainerPricing?.singleSession) || 0) : 0;
+  const fallbackSessionSubtotal = (resolvedDuration * baseDayPrice) + (resolvedDuration * trainerDailyFee);
+
+  const subtotalVal = Number(pricing?.subtotal ?? amount ?? (section ? section.cost : fallbackSessionSubtotal));
   const discountVal = Number(pricing?.discount ?? 0);
   const totalVal = Number(pricing?.totalAmount ?? (subtotalVal - discountVal));
-
-  let resolvedBookingType = bookingType || 'GYM_SESSION';
-  if (section) {
-    resolvedBookingType = bookingType === 'GROUP_CLASS' ? 'GROUP_CLASS' : 'SECTION';
-  }
 
   const now = new Date();
   const startDay = new Date(resolvedStartDate);
@@ -204,7 +389,9 @@ export const createBooking = asyncHandler(async (req, res) => {
     endDate: resolvedEndDate,
     timeSlot: resolvedTimeSlot,
     durationDays: resolvedDuration,
-    sessionsCount: sessionsCount || resolvedDuration,
+    sessionsCount: resolvedSessionsCount,
+    isCustomDates,
+    customDates: formattedCustomDates,
     pricing: {
       subtotal: Math.max(0, subtotalVal),
       discount: Math.max(0, discountVal),
@@ -235,11 +422,67 @@ export const createBooking = asyncHandler(async (req, res) => {
   const populated = await Booking.findById(newBooking._id)
     .populate('gymId', 'name partnerId address images imageUrl logo contactPhone location')
     .populate('sectionId', 'title category startTime endTime durationDays activeDays trainerId maxCapacity enrolledCount')
-    .populate('trainerId', 'name specialization avatar employeeId phone')
+    .populate('trainerId', 'name specialty specialization avatar employeeId phone rating trainerPricing')
     .populate('userId', 'fullName name phone email customerId customerProfile');
 
-  return res.status(201).json(ApiResponse.created(populated, 'Booking created successfully'));
+  const enriched = enrichBookingWithCustomSchedule(populated.toObject ? populated.toObject() : populated);
+  return res.status(201).json(ApiResponse.created(enriched, 'Booking created successfully'));
 });
+
+/**
+ * Enrich booking with custom dates daily schedule, next session date, and OTP status
+ */
+export const enrichBookingWithCustomSchedule = (b) => {
+  if (!b) return b;
+  const isCustom = Boolean(b.isCustomDates || (Array.isArray(b.customDates) && b.customDates.length > 0));
+  if (!isCustom) {
+    return { ...b, isTodayValid: true };
+  }
+
+  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  let isTodayValid = false;
+  let activeDailyOtp = null;
+  let nextSession = null;
+
+  const enrichedCustomDates = (b.customDates || []).map((session) => {
+    if (!session || !session.date) return session;
+    const sStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(session.date));
+    let status = session.status || 'Scheduled';
+
+    // If past scheduled date without attendance, mark as Missed
+    if (sStr < todayStr && status === 'Scheduled') {
+      status = 'Missed';
+    }
+
+    if (sStr === todayStr && (status === 'Scheduled' || status === 'Rescheduled')) {
+      isTodayValid = true;
+      activeDailyOtp = session.dailyOtp || b.entryOtp;
+    }
+
+    if (sStr > todayStr && (status === 'Scheduled' || status === 'Rescheduled')) {
+      if (!nextSession || new Date(session.date) < new Date(nextSession.date)) {
+        nextSession = session;
+      }
+    }
+
+    return {
+      ...(session.toObject ? session.toObject() : session),
+      status,
+    };
+  });
+
+  const nextSessionDateFormatted = nextSession
+    ? new Date(nextSession.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+    : null;
+
+  return {
+    ...b,
+    isTodayValid,
+    entryOtp: isTodayValid ? (activeDailyOtp || b.entryOtp) : null,
+    nextSessionDateFormatted,
+    customDates: enrichedCustomDates,
+  };
+};
 
 /**
  * Get all Bookings for Logged-In User
@@ -262,10 +505,10 @@ export const getMyBookings = asyncHandler(async (req, res) => {
       select: 'title category startTime endTime durationDays activeDays trainerId maxCapacity enrolledCount inclusions instructions',
       populate: {
         path: 'trainerId',
-        select: 'name specialization avatar employeeId phone rating',
+        select: 'name specialty specialization avatar employeeId phone rating trainerPricing',
       },
     })
-    .populate('trainerId', 'name specialization avatar employeeId phone')
+    .populate('trainerId', 'name specialty specialization avatar employeeId phone rating trainerPricing')
     .sort({ createdAt: -1 })
     .lean()
     .maxTimeMS(8000);
@@ -278,10 +521,10 @@ export const getMyBookings = asyncHandler(async (req, res) => {
       const eDay = b.endDate ? new Date(b.endDate) : null;
       if (eDay) eDay.setHours(23, 59, 59, 999);
       if (sDay <= now && (!eDay || eDay >= now)) {
-        return { ...b, status: 'Active' };
+        b.status = 'Active';
       }
     }
-    return b;
+    return enrichBookingWithCustomSchedule(b);
   });
 
   return res.status(200).json(ApiResponse.success(resolvedBookings, 'My bookings retrieved successfully'));
@@ -319,7 +562,25 @@ export const getBookingById = asyncHandler(async (req, res) => {
     }
   }
 
-  return res.status(200).json(ApiResponse.success(bObj, 'Booking retrieved successfully'));
+  const enriched = enrichBookingWithCustomSchedule(bObj);
+  return res.status(200).json(ApiResponse.success(enriched, 'Booking retrieved successfully'));
+});
+
+/**
+ * Get all bookings for a gym (Gym Owner portal)
+ * GET /api/v1/bookings/gym/:gymId
+ */
+export const getGymBookings = asyncHandler(async (req, res) => {
+  const { gymId } = req.params;
+  const isObjectId = mongoose.Types.ObjectId.isValid(gymId);
+  const filter = isObjectId ? { gymId } : { gymId };
+
+  const bookings = await Booking.find(filter)
+    .populate('userId', 'name email phone avatar customerId')
+    .sort({ createdAt: -1 });
+
+  const enriched = bookings.map((b) => enrichBookingWithCustomSchedule(b));
+  return res.status(200).json(ApiResponse.success(enriched, 'Gym bookings retrieved successfully'));
 });
 
 /**
@@ -404,4 +665,284 @@ export const getSectionEnrollments = asyncHandler(async (req, res) => {
     },
     enrollments,
   }, 'Section enrollments retrieved successfully'));
+});
+
+/**
+ * Request to reschedule a missed or upcoming session in a custom booking
+ * POST /api/v1/bookings/:id/request-reschedule
+ */
+export const requestReschedule = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { sessionIndex, sessionDate, requestedDate, reason } = req.body;
+  const resolvedUser = await resolveUserId(req);
+
+  const isObjectId = mongoose.Types.ObjectId.isValid(id);
+  const booking = await Booking.findOne(
+    isObjectId ? { $or: [{ _id: id }, { bookingId: id }] } : { bookingId: id }
+  );
+
+  if (!booking) {
+    throw ApiError.notFound('Booking not found.');
+  }
+
+  if (booking.userId.toString() !== resolvedUser.toString()) {
+    throw ApiError.forbidden('You are not authorized to modify this booking.');
+  }
+
+  if (!booking.isCustomDates || !Array.isArray(booking.customDates) || booking.customDates.length === 0) {
+    throw ApiError.badRequest('Rescheduling individual sessions is only available for custom date bookings.');
+  }
+
+  // Find target session
+  let targetSession = null;
+  if (typeof sessionIndex === 'number' && booking.customDates[sessionIndex]) {
+    targetSession = booking.customDates[sessionIndex];
+  } else if (sessionDate) {
+    const targetDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(sessionDate));
+    targetSession = booking.customDates.find((s) => {
+      const sStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(s.date));
+      return sStr === targetDateStr;
+    });
+  }
+
+  if (!targetSession) {
+    throw ApiError.notFound('Selected session not found in this booking.');
+  }
+
+  if (targetSession.status === 'Attended') {
+    throw ApiError.badRequest('Attended sessions cannot be rescheduled.');
+  }
+
+  const reqDateObj = new Date(requestedDate);
+  if (Number.isNaN(reqDateObj.getTime())) {
+    throw ApiError.badRequest('Invalid requested date format.');
+  }
+  const reqDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(reqDateObj);
+
+  // Check if requested date is already in booking
+  const duplicate = booking.customDates.some((s) => {
+    const sStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(s.date));
+    return sStr === reqDateStr;
+  });
+  if (duplicate) {
+    throw ApiError.badRequest('You already have a gym session booked on this requested date.');
+  }
+
+  // Validate requested date against trainer contract and working days if personal trainer is assigned
+  if (booking.trainerId) {
+    const assignedTrainer = await Employee.findById(booking.trainerId);
+    if (assignedTrainer) {
+      const sched = assignedTrainer.schedule || {};
+      if (assignedTrainer.type === 'Temporary' && sched.endDate) {
+        const contractEnd = new Date(sched.endDate);
+        contractEnd.setHours(23, 59, 59, 999);
+        if (reqDateObj > contractEnd) {
+          throw ApiError.badRequest(
+            `Requested reschedule date exceeds assigned trainer engagement period ending on ${sched.endDate}.`
+          );
+        }
+      }
+      if (Array.isArray(sched.workingDays) && sched.workingDays.length > 0) {
+        if (!isDayWorking(reqDateObj, sched.workingDays)) {
+          const dayName = DAY_NAMES[reqDateObj.getDay()];
+          throw ApiError.badRequest(
+            `Assigned trainer does not work on ${dayName}. Available working days: ${sched.workingDays.join(', ')}.`
+          );
+        }
+      }
+    }
+  }
+
+  // Find the next scheduled date after targetSession.date
+  const targetDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(targetSession.date));
+  const laterSessions = booking.customDates
+    .filter((s) => {
+      const sStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(s.date));
+      return sStr > targetDateStr && (s.status === 'Scheduled' || s.status === 'Rescheduled');
+    })
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  if (laterSessions.length > 0) {
+    const nextDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(laterSessions[0].date));
+    if (reqDateStr >= nextDateStr) {
+      throw ApiError.badRequest(
+        `Reschedule must be set to a date before your next booked session on ${new Date(laterSessions[0].date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}.`
+      );
+    }
+  }
+
+  targetSession.status = 'Reschedule_Requested';
+  targetSession.requestedDate = reqDateObj;
+  targetSession.reason = reason || '';
+  booking.markModified('customDates');
+  await booking.save();
+
+  const enriched = enrichBookingWithCustomSchedule(booking.toObject ? booking.toObject() : booking);
+  return res.status(200).json(ApiResponse.success(enriched, 'Reschedule request submitted to gym owner for review.'));
+});
+
+/**
+ * Gym Owner Review Reschedule Request (Approve, Propose different date, or Reject)
+ * POST /api/v1/bookings/:id/review-reschedule
+ */
+export const reviewReschedule = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { sessionIndex, sessionDate, action, proposedDate, ownerNotes } = req.body;
+
+  const isObjectId = mongoose.Types.ObjectId.isValid(id);
+  const booking = await Booking.findOne(
+    isObjectId ? { $or: [{ _id: id }, { bookingId: id }] } : { bookingId: id }
+  );
+
+  if (!booking) {
+    throw ApiError.notFound('Booking not found.');
+  }
+
+  // Find target session
+  let targetSession = null;
+  if (typeof sessionIndex === 'number' && booking.customDates[sessionIndex]) {
+    targetSession = booking.customDates[sessionIndex];
+  } else if (sessionDate) {
+    const targetDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(sessionDate));
+    targetSession = booking.customDates.find((s) => {
+      const sStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(s.date));
+      return sStr === targetDateStr;
+    });
+  }
+
+  if (!targetSession) {
+    throw ApiError.notFound('Selected session not found.');
+  }
+
+  if (action === 'APPROVE') {
+    targetSession.date = targetSession.requestedDate || targetSession.date;
+    targetSession.status = 'Rescheduled';
+    targetSession.rescheduledTo = targetSession.date;
+    targetSession.dailyOtp = crypto.randomInt(100000, 1000000).toString();
+    targetSession.reason = ownerNotes || 'Approved by gym owner';
+    booking.markModified('customDates');
+    await booking.save();
+
+    const enriched = enrichBookingWithCustomSchedule(booking.toObject ? booking.toObject() : booking);
+    return res.status(200).json(ApiResponse.success(enriched, 'Reschedule approved successfully.'));
+  }
+
+  if (action === 'PROPOSE') {
+    if (!proposedDate) {
+      throw ApiError.badRequest('Please specify the proposed date.');
+    }
+    const propDateObj = new Date(proposedDate);
+    if (Number.isNaN(propDateObj.getTime())) {
+      throw ApiError.badRequest('Invalid proposed date format.');
+    }
+
+    if (booking.trainerId) {
+      const assignedTrainer = await Employee.findById(booking.trainerId);
+      if (assignedTrainer) {
+        const sched = assignedTrainer.schedule || {};
+        if (assignedTrainer.type === 'Temporary' && sched.endDate) {
+          const contractEnd = new Date(sched.endDate);
+          contractEnd.setHours(23, 59, 59, 999);
+          if (propDateObj > contractEnd) {
+            throw ApiError.badRequest(
+              `Proposed reschedule date exceeds assigned trainer engagement period ending on ${sched.endDate}.`
+            );
+          }
+        }
+        if (Array.isArray(sched.workingDays) && sched.workingDays.length > 0) {
+          if (!isDayWorking(propDateObj, sched.workingDays)) {
+            const dayName = DAY_NAMES[propDateObj.getDay()];
+            throw ApiError.badRequest(
+              `Assigned trainer does not work on ${dayName}. Available working days: ${sched.workingDays.join(', ')}.`
+            );
+          }
+        }
+      }
+    }
+
+    targetSession.proposedDate = propDateObj;
+    targetSession.status = 'Reschedule_Proposed';
+    targetSession.reason = ownerNotes || '';
+    booking.markModified('customDates');
+    await booking.save();
+
+    const enriched = enrichBookingWithCustomSchedule(booking.toObject ? booking.toObject() : booking);
+    return res.status(200).json(ApiResponse.success(enriched, 'Proposed date sent to member for approval.'));
+  }
+
+  if (action === 'REJECT') {
+    targetSession.status = 'Missed';
+    targetSession.reason = ownerNotes || 'Declined by gym owner';
+    booking.markModified('customDates');
+    await booking.save();
+
+    const enriched = enrichBookingWithCustomSchedule(booking.toObject ? booking.toObject() : booking);
+    return res.status(200).json(ApiResponse.success(enriched, 'Reschedule request declined.'));
+  }
+
+  throw ApiError.badRequest('Invalid review action. Allowed: APPROVE, PROPOSE, REJECT.');
+});
+
+/**
+ * Member response to Gym Owner's proposed date (Accept or Decline)
+ * POST /api/v1/bookings/:id/respond-proposal
+ */
+export const respondRescheduleProposal = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { sessionIndex, sessionDate, decision } = req.body;
+  const resolvedUser = await resolveUserId(req);
+
+  const isObjectId = mongoose.Types.ObjectId.isValid(id);
+  const booking = await Booking.findOne(
+    isObjectId ? { $or: [{ _id: id }, { bookingId: id }] } : { bookingId: id }
+  );
+
+  if (!booking) {
+    throw ApiError.notFound('Booking not found.');
+  }
+
+  if (booking.userId.toString() !== resolvedUser.toString()) {
+    throw ApiError.forbidden('You are not authorized to respond to this booking.');
+  }
+
+  // Find target session
+  let targetSession = null;
+  if (typeof sessionIndex === 'number' && booking.customDates[sessionIndex]) {
+    targetSession = booking.customDates[sessionIndex];
+  } else if (sessionDate) {
+    const targetDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(sessionDate));
+    targetSession = booking.customDates.find((s) => {
+      const sStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(s.date));
+      return sStr === targetDateStr;
+    });
+  }
+
+  if (!targetSession) {
+    throw ApiError.notFound('Selected session not found.');
+  }
+
+  if (decision === 'ACCEPT') {
+    targetSession.date = targetSession.proposedDate || targetSession.date;
+    targetSession.status = 'Rescheduled';
+    targetSession.rescheduledTo = targetSession.date;
+    targetSession.dailyOtp = crypto.randomInt(100000, 1000000).toString();
+    targetSession.proposedDate = null;
+    booking.markModified('customDates');
+    await booking.save();
+
+    const enriched = enrichBookingWithCustomSchedule(booking.toObject ? booking.toObject() : booking);
+    return res.status(200).json(ApiResponse.success(enriched, 'Proposed date accepted and session rescheduled.'));
+  }
+
+  if (decision === 'DECLINE') {
+    targetSession.status = 'Missed';
+    targetSession.proposedDate = null;
+    booking.markModified('customDates');
+    await booking.save();
+
+    const enriched = enrichBookingWithCustomSchedule(booking.toObject ? booking.toObject() : booking);
+    return res.status(200).json(ApiResponse.success(enriched, 'Proposed date declined.'));
+  }
+
+  throw ApiError.badRequest('Invalid decision. Allowed: ACCEPT, DECLINE.');
 });

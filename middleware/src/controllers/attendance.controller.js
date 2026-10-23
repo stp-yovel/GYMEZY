@@ -6,6 +6,7 @@ import Booking from '../models/booking.model.js';
 import MembershipSwitchRequest from '../models/membershipSwitchRequest.model.js';
 import Gym from '../models/gym.model.js';
 import User from '../models/user.model.js';
+import Section from '../models/section.model.js';
 import { autoCheckoutStaleRecords } from '../services/attendanceCron.service.js';
 import { ApiError } from '../utils/apiError.js';
 import { ApiResponse } from '../utils/apiResponse.js';
@@ -43,7 +44,7 @@ const parseCodePayload = (rawCode) => {
       const parsed = JSON.parse(trimmed);
       return {
         otp: parsed.entryOtp || parsed.otp || null,
-        id: parsed.id || parsed.membershipId || parsed._id || null,
+        id: parsed.id || parsed.membershipId || parsed.bookingId || parsed._id || null,
         userId: parsed.userId || null,
         raw: trimmed,
       };
@@ -69,7 +70,7 @@ const findMembershipForEntry = async (gymDbId, parsedInfo) => {
   // 1. If OTP is provided, query by gymId and entryOtp
   if (otp) {
     const mem = await Membership.findOne({ gymId: gymDbId, entryOtp: otp })
-      .populate('userId', 'fullName phone email avatar profilePicture customerProfile customerId')
+      .populate('userId', 'fullName name phone email avatar profilePicture customerProfile customerId')
       .populate('gymId', 'name partnerId address');
     if (mem) return mem;
   }
@@ -77,7 +78,7 @@ const findMembershipForEntry = async (gymDbId, parsedInfo) => {
   // 2. Query by MongoDB _id if valid
   if (id && mongoose.Types.ObjectId.isValid(id)) {
     const mem = await Membership.findOne({ _id: id, gymId: gymDbId })
-      .populate('userId', 'fullName phone email avatar profilePicture customerProfile customerId')
+      .populate('userId', 'fullName name phone email avatar profilePicture customerProfile customerId')
       .populate('gymId', 'name partnerId address');
     if (mem) return mem;
   }
@@ -86,7 +87,7 @@ const findMembershipForEntry = async (gymDbId, parsedInfo) => {
   if (id || raw) {
     const memId = id || raw;
     const mem = await Membership.findOne({ membershipId: memId, gymId: gymDbId })
-      .populate('userId', 'fullName phone email avatar profilePicture customerProfile customerId')
+      .populate('userId', 'fullName name phone email avatar profilePicture customerProfile customerId')
       .populate('gymId', 'name partnerId address');
     if (mem) return mem;
   }
@@ -99,29 +100,33 @@ const findMembershipForEntry = async (gymDbId, parsedInfo) => {
  */
 const findBookingForEntry = async (gymDbId, parsedInfo) => {
   const { otp, id, raw } = parsedInfo;
+  const sectionPopulate = 'title category startTime endTime durationDays activeDays startDate endDate';
 
   if (otp) {
-    const booking = await Booking.findOne({ gymId: gymDbId, entryOtp: otp })
-      .populate('userId', 'fullName phone email avatar profilePicture customerProfile customerId')
+    const booking = await Booking.findOne({
+      gymId: gymDbId,
+      $or: [{ entryOtp: otp }, { 'customDates.dailyOtp': otp }],
+    })
+      .populate('userId', 'fullName name phone email avatar profilePicture customerProfile customerId')
       .populate('gymId', 'name partnerId address')
-      .populate('sectionId', 'title category startTime endTime');
+      .populate('sectionId', sectionPopulate);
     if (booking) return booking;
   }
 
   if (id && mongoose.Types.ObjectId.isValid(id)) {
     const booking = await Booking.findOne({ _id: id, gymId: gymDbId })
-      .populate('userId', 'fullName phone email avatar profilePicture customerProfile customerId')
+      .populate('userId', 'fullName name phone email avatar profilePicture customerProfile customerId')
       .populate('gymId', 'name partnerId address')
-      .populate('sectionId', 'title category startTime endTime');
+      .populate('sectionId', sectionPopulate);
     if (booking) return booking;
   }
 
   if (id || raw) {
     const bId = id || raw;
     const booking = await Booking.findOne({ bookingId: bId, gymId: gymDbId })
-      .populate('userId', 'fullName phone email avatar profilePicture customerProfile customerId')
+      .populate('userId', 'fullName name phone email avatar profilePicture customerProfile customerId')
       .populate('gymId', 'name partnerId address')
-      .populate('sectionId', 'title category startTime endTime');
+      .populate('sectionId', sectionPopulate);
     if (booking) return booking;
   }
 
@@ -129,7 +134,7 @@ const findBookingForEntry = async (gymDbId, parsedInfo) => {
 };
 
 /**
- * Check-In Member
+ * Check-In / Check-Out Member via QR Code or OTP
  * POST /api/v1/attendance/check-in
  */
 export const checkInMember = async (req, res, next) => {
@@ -147,43 +152,246 @@ export const checkInMember = async (req, res, next) => {
       parsedInfo.otp = otp.toString().trim();
     }
 
+    // 1. Identify pass (Membership or Booking)
     const membership = await findMembershipForEntry(gym._id, parsedInfo);
+    let booking = null;
     if (!membership) {
-      const booking = await findBookingForEntry(gym._id, parsedInfo);
-      if (!booking) {
-        throw ApiError.notFound('No active membership or booking pass found matching this Pass/OTP. Please try again or verify your booking code.');
+      booking = await findBookingForEntry(gym._id, parsedInfo);
+    }
+
+    if (!membership && !booking) {
+      throw ApiError.notFound(
+        'No active membership, session, or section pass found matching this Pass/OTP. Please try again or verify your booking code.'
+      );
+    }
+
+    const targetUser = membership ? membership.userId : booking.userId;
+    const targetUserId = targetUser?._id || targetUser;
+    const now = new Date();
+
+    // 2. CHECK FOR ACTIVE CHECK-IN (TAP-OUT / AUTO CHECKOUT ON RESCAN)
+    const existingActive = await Attendance.findOne({
+      userId: targetUserId,
+      gymId: gym._id,
+      status: 'Checked-In',
+    }).sort({ checkInTime: -1 });
+
+    if (existingActive) {
+      const diffMs = now.getTime() - new Date(existingActive.checkInTime).getTime();
+      const minDebounceMs = 2 * 60 * 1000; // 2 minutes debounce
+
+      if (diffMs < minDebounceMs) {
+        const waitSecs = Math.max(1, Math.ceil((minDebounceMs - diffMs) / 1000));
+        throw ApiError.badRequest(
+          `Member was checked in ${Math.floor(diffMs / 1000)} seconds ago. To prevent accidental double-scanning, please wait ${waitSecs} seconds before checking out.`
+        );
       }
 
+      // Record Check-Out
+      existingActive.checkOutTime = now;
+      existingActive.status = 'Completed';
+      await existingActive.save();
+
+      await existingActive.populate('userId', 'fullName name phone email avatar profilePicture customerProfile customerId');
+      if (existingActive.membershipId) {
+        await existingActive.populate('membershipId', 'membershipId membershipTier');
+      }
+      if (existingActive.bookingId) {
+        await existingActive.populate('bookingId', 'bookingId title category sectionId');
+      }
+
+      const diffMins = Math.max(1, Math.round(diffMs / (1000 * 60)));
+      const durationStr = diffMins >= 60 ? `${Math.floor(diffMins / 60)}h ${diffMins % 60}m` : `${diffMins} mins`;
+
+      const responseData = {
+        action: 'CHECK_OUT',
+        attendanceId: existingActive._id,
+        status: 'Checked-Out',
+        attendanceStatus: 'Completed',
+        checkInTime: existingActive.checkInTime,
+        checkOutTime: existingActive.checkOutTime,
+        durationStr,
+        method: method.toUpperCase() === 'OTP' ? 'OTP' : 'QR',
+        area: existingActive.area,
+        member: {
+          id: targetUser?._id,
+          name: targetUser?.fullName || targetUser?.name || 'Gym Member',
+          phone: targetUser?.phone || 'N/A',
+          avatar: targetUser?.avatar || targetUser?.profilePicture || null,
+          membershipId: existingActive.membershipId?.membershipId || null,
+          bookingId: existingActive.bookingId?.bookingId || null,
+          tier: existingActive.membershipId?.membershipTier || null,
+        },
+      };
+
+      return res.status(200).json(
+        ApiResponse.success(
+          responseData,
+          `Check-out recorded successfully for ${targetUser?.fullName || targetUser?.name || 'Member'}! Duration: ${durationStr}`
+        )
+      );
+    }
+
+    // 3. PROCEED WITH CHECK-IN
+
+    // --- CASE A: BOOKING PASS (SECTION / CUSTOM DATES / GYM PASS) ---
+    if (booking) {
       if (booking.status === 'Cancelled') {
         throw ApiError.badRequest('This booking pass has been cancelled. Entry is not permitted.');
       }
 
-      const existingActive = await Attendance.findOne({
-        userId: booking.userId?._id || booking.userId,
-        gymId: gym._id,
-        status: 'Checked-In',
-      });
+      const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
+      let recordedArea = booking.title || area;
 
-      if (existingActive) {
-        throw ApiError.badRequest(
-          `Member is already checked in at ${new Date(existingActive.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. Please check out first.`
-        );
+      // 3.1. SECTION BOOKING SPECIFIC VALIDATION & ATTENDANCE
+      if (booking.bookingType === 'SECTION') {
+        const section = booking.sectionId;
+
+        // Date window validation
+        if (booking.startDate) {
+          const startStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(booking.startDate));
+          if (todayStr < startStr) {
+            const startFmt = new Date(booking.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+            throw ApiError.badRequest(`This section batch starts on ${startFmt}. Entry is not permitted before the batch start date.`);
+          }
+        }
+
+        if (booking.endDate) {
+          const endStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(booking.endDate));
+          if (todayStr > endStr) {
+            const endFmt = new Date(booking.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+            throw ApiError.badRequest(`This section batch has ended on ${endFmt}. Pass is no longer valid.`);
+          }
+        }
+
+        // Active days validation (e.g. Mon, Wed, Fri)
+        const currentWeekday = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'Asia/Kolkata' }).format(now);
+        if (section && Array.isArray(section.activeDays) && section.activeDays.length > 0) {
+          const isDayActive = section.activeDays.some(
+            (d) => d.toLowerCase().slice(0, 3) === currentWeekday.toLowerCase().slice(0, 3)
+          );
+          if (!isDayActive) {
+            throw ApiError.badRequest(
+              `Today (${currentWeekday}) is not an active session day for this section. Scheduled active days: ${section.activeDays.join(', ')}.`
+            );
+          }
+        }
+
+        // Check if member already attended this section batch today
+        const alreadyAttendedToday = (booking.attendanceHistory || []).some((h) => {
+          if (!h.attendedAt) return false;
+          const hStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(h.attendedAt));
+          return hStr === todayStr;
+        });
+
+        if (alreadyAttendedToday) {
+          throw ApiError.badRequest('Member has already attended their scheduled session for this section today.');
+        }
+
+        // Increment attended sessions count and append to attendance history
+        booking.attendedSessionsCount = (booking.attendedSessionsCount || 0) + 1;
+        if (!Array.isArray(booking.attendanceHistory)) {
+          booking.attendanceHistory = [];
+        }
+        booking.attendanceHistory.push({
+          attendedAt: now,
+          method: method.toUpperCase() === 'OTP' ? 'OTP' : 'QR',
+          area: section?.title || booking.title,
+        });
+
+        if (booking.status === 'Upcoming') {
+          booking.status = 'Active';
+        }
+        if (booking.durationDays && booking.attendedSessionsCount >= booking.durationDays) {
+          booking.status = 'Completed';
+        }
+        await booking.save();
+
+        recordedArea = `Section - ${section?.title || booking.title}`;
+      }
+
+      // 3.2. CUSTOM DATES BOOKING VALIDATION & ATTENDANCE
+      else if (booking.isCustomDates || (Array.isArray(booking.customDates) && booking.customDates.length > 0)) {
+        const todaySession = booking.customDates.find((item) => {
+          if (!item.date) return false;
+          const dStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(item.date));
+          return dStr === todayStr;
+        });
+
+        if (!todaySession) {
+          const futureSessions = booking.customDates
+            .filter((item) => {
+              if (!item.date || (item.status !== 'Scheduled' && item.status !== 'Rescheduled')) return false;
+              const dStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(item.date));
+              return dStr > todayStr;
+            })
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+          const nextMsg = futureSessions.length > 0
+            ? ` Your next booked session is on ${new Date(futureSessions[0].date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}.`
+            : ' No further sessions are scheduled on this pass.';
+
+          throw ApiError.badRequest(
+            `This custom booking pass is not valid for today (${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}).${nextMsg}`
+          );
+        }
+
+        if (todaySession.status === 'Attended') {
+          throw ApiError.badRequest('You have already attended your gym session for today.');
+        }
+
+        if (todaySession.status !== 'Scheduled' && todaySession.status !== 'Rescheduled') {
+          throw ApiError.badRequest(
+            `Your session for today is marked as ${todaySession.status}. Entry is not permitted.`
+          );
+        }
+
+        todaySession.status = 'Attended';
+        todaySession.attendedAt = now;
+        booking.attendedSessionsCount = (booking.attendedSessionsCount || 0) + 1;
+        if (!Array.isArray(booking.attendanceHistory)) {
+          booking.attendanceHistory = [];
+        }
+        booking.attendanceHistory.push({
+          attendedAt: now,
+          method: method.toUpperCase() === 'OTP' ? 'OTP' : 'QR',
+          area: booking.title,
+        });
+        booking.markModified('customDates');
+        await booking.save();
+      }
+
+      // 3.3. REGULAR GYM SESSION PASS
+      else {
+        booking.attendedSessionsCount = (booking.attendedSessionsCount || 0) + 1;
+        if (!Array.isArray(booking.attendanceHistory)) {
+          booking.attendanceHistory = [];
+        }
+        booking.attendanceHistory.push({
+          attendedAt: now,
+          method: method.toUpperCase() === 'OTP' ? 'OTP' : 'QR',
+          area: booking.title || area,
+        });
+        if (booking.status === 'Upcoming') {
+          booking.status = 'Active';
+        }
+        await booking.save();
       }
 
       const attendance = await Attendance.create({
-        userId: booking.userId?._id || booking.userId,
+        userId: targetUserId,
         gymId: gym._id,
         bookingId: booking._id,
         membershipId: null,
         method: method.toUpperCase() === 'OTP' ? 'OTP' : 'QR',
-        checkInTime: new Date(),
+        checkInTime: now,
         status: 'Checked-In',
-        area: booking.sectionId?.title || booking.title || area,
+        area: recordedArea,
         verifiedBy,
       });
 
-      const user = booking.userId;
       const responseData = {
+        action: 'CHECK_IN',
         attendanceId: attendance._id,
         status: 'Granted',
         attendanceStatus: attendance.status,
@@ -191,29 +399,28 @@ export const checkInMember = async (req, res, next) => {
         method: attendance.method,
         area: attendance.area,
         member: {
-          id: user?._id,
-          name: user?.fullName || 'Gym Member',
-          phone: user?.phone || 'N/A',
-          avatar: user?.avatar || user?.profilePicture || null,
+          id: targetUser?._id,
+          name: targetUser?.fullName || targetUser?.name || 'Gym Member',
+          phone: targetUser?.phone || 'N/A',
+          avatar: targetUser?.avatar || targetUser?.profilePicture || null,
           bookingId: booking.bookingId,
           bookingType: booking.bookingType,
           title: booking.title,
           status: booking.status,
           entryOtp: booking.entryOtp,
+          attendedSessionsCount: booking.attendedSessionsCount,
+          durationDays: booking.durationDays,
         },
       };
 
       return res.status(201).json(ApiResponse.created(responseData, 'Check-in verified successfully. Access granted.'));
     }
 
-    // Validate Membership Status & Date Window
-    const now = new Date();
-
+    // --- CASE B: MEMBERSHIP PASS ---
     if (membership.status === 'Cancelled') {
       throw ApiError.badRequest('This membership pass has been cancelled. Entry is not permitted.');
     }
 
-    // Check if membership is currently under review for plan switch
     const pendingReview = await MembershipSwitchRequest.findOne({
       membershipId: membership._id,
       status: { $in: ['PENDING_GYM_APPROVAL', 'PENDING_SUPER_ADMIN_APPROVAL'] },
@@ -234,7 +441,6 @@ export const checkInMember = async (req, res, next) => {
       throw ApiError.badRequest('Membership has expired. Renewal required before entry.');
     }
 
-    // Auto-activate if status was previously 'Upcoming' and start date has arrived
     if (membership.status !== 'Active') {
       membership.status = 'Active';
       if (!membership.entryOtp) {
@@ -246,33 +452,20 @@ export const checkInMember = async (req, res, next) => {
       );
     }
 
-    // Check for double entry (already checked in and not checked out)
-    const existingActive = await Attendance.findOne({
-      userId: membership.userId?._id || membership.userId,
-      gymId: gym._id,
-      status: 'Checked-In',
-    });
-
-    if (existingActive) {
-      throw ApiError.badRequest(
-        `Member is already checked in at ${new Date(existingActive.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. Please check out first.`
-      );
-    }
-
-    // Create attendance record
     const attendance = await Attendance.create({
-      userId: membership.userId?._id || membership.userId,
+      userId: targetUserId,
       gymId: gym._id,
       membershipId: membership._id,
+      bookingId: null,
       method: method.toUpperCase() === 'OTP' ? 'OTP' : 'QR',
-      checkInTime: new Date(),
+      checkInTime: now,
       status: 'Checked-In',
       area,
       verifiedBy,
     });
 
-    const user = membership.userId;
     const responseData = {
+      action: 'CHECK_IN',
       attendanceId: attendance._id,
       status: 'Granted',
       attendanceStatus: attendance.status,
@@ -280,10 +473,10 @@ export const checkInMember = async (req, res, next) => {
       method: attendance.method,
       area: attendance.area,
       member: {
-        id: user?._id,
-        name: user?.fullName || 'Gym Member',
-        phone: user?.phone || 'N/A',
-        avatar: user?.avatar || user?.profilePicture || null,
+        id: targetUser?._id,
+        name: targetUser?.fullName || targetUser?.name || 'Gym Member',
+        phone: targetUser?.phone || 'N/A',
+        avatar: targetUser?.avatar || targetUser?.profilePicture || null,
         membershipId: membership.membershipId,
         tier: membership.membershipTier,
         endDate: membership.endDate,
