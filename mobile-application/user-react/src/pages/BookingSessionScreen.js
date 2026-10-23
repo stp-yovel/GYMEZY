@@ -13,11 +13,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
-import { AppColors, AppTheme } from '../theme/appTheme';
 import { MonthlyGridCalendar } from '../widgets/CustomCalendar';
 import { TrainerReviewsPopup } from '../widgets/DetailsPopups';
+import { useBookingRepository } from '../data/BookingContext';
 import apiService from '../services/apiService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -130,6 +130,26 @@ const OTHER_CLASSES = [
 export const BookingSessionScreen = ({ route, navigation }) => {
   const { gym, initialCategory } = route.params;
   const { isDark, colors } = useTheme();
+  const { bookings, refreshBookings } = useBookingRepository();
+
+  useEffect(() => {
+    refreshBookings?.();
+  }, [refreshBookings]);
+
+  const getSectionBooking = (sec) => {
+    if (!sec || !bookings || bookings.length === 0) return null;
+    const secId = (sec._id || sec.id)?.toString();
+    return bookings.find((b) => {
+      const bSecId =
+        (b.sectionId?._id || b.sectionId || b.rawBackendBooking?.sectionId)?._id?.toString?.() ||
+        (b.sectionId?._id || b.sectionId || b.rawBackendBooking?.sectionId)?.toString?.() ||
+        '';
+      const matchesSec = Boolean(bSecId && secId && bSecId === secId);
+      const isActiveOrUpcoming =
+        b.status === 'Active' || b.status === 'Upcoming' || b.status === 'Confirmed';
+      return matchesSec && isActiveOrUpcoming;
+    });
+  };
 
   const gymId = gym?._id || gym?.id;
 
@@ -1307,22 +1327,41 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                           {(sec.category || 'workout').toUpperCase()}
                         </Text>
                       </View>
-                      <View style={styles.sectionCapacityPill}>
-                        <MaterialIcons
-                          name={isFilled ? 'block' : 'person'}
-                          size={13}
-                          color={isFilled ? '#EF4444' : remaining <= 3 ? '#EF4444' : '#00BF62'}
-                          style={{ marginRight: 3 }}
-                        />
-                        <Text
-                          style={[
-                            styles.sectionCapacityText,
-                            { color: isFilled ? '#EF4444' : remaining <= 3 ? '#EF4444' : '#00BF62' },
-                            isFilled && { fontWeight: '700' },
-                          ]}
-                        >
-                          {isFilled ? 'Slot Full' : remaining <= 3 ? `Only ${remaining} left` : `${enrolled}/${capacity} Enrolled`}
-                        </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {Boolean(getSectionBooking(sec)) && (
+                          <View
+                            style={[
+                              styles.sectionCapacityPill,
+                              {
+                                backgroundColor: 'rgba(0, 191, 98, 0.12)',
+                                borderColor: 'rgba(0, 191, 98, 0.3)',
+                                borderWidth: 1,
+                              },
+                            ]}
+                          >
+                            <MaterialIcons name="check-circle" size={13} color="#00BF62" style={{ marginRight: 3 }} />
+                            <Text style={[styles.sectionCapacityText, { color: '#00BF62', fontWeight: '800' }]}>
+                              Enrolled
+                            </Text>
+                          </View>
+                        )}
+                        <View style={styles.sectionCapacityPill}>
+                          <MaterialIcons
+                            name={isFilled ? 'block' : 'person'}
+                            size={13}
+                            color={isFilled ? '#EF4444' : remaining <= 3 ? '#EF4444' : '#00BF62'}
+                            style={{ marginRight: 3 }}
+                          />
+                          <Text
+                            style={[
+                              styles.sectionCapacityText,
+                              { color: isFilled ? '#EF4444' : remaining <= 3 ? '#EF4444' : '#00BF62' },
+                              isFilled && { fontWeight: '700' },
+                            ]}
+                          >
+                            {isFilled ? 'Slot Full' : remaining <= 3 ? `Only ${remaining} left` : `${enrolled}/${capacity} Enrolled`}
+                          </Text>
+                        </View>
                       </View>
                     </View>
 
@@ -1466,7 +1505,9 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.detailSectionHeading, { color: textColor }]}>Batch Capacity</Text>
                   <Text style={[styles.detailSubtext, { color: subtitleColor }]}>
-                    {(selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25)
+                    {Boolean(getSectionBooking(selectedSection))
+                      ? 'You are enrolled in this batch! Tap "View Your Pass" below to view entry details.'
+                      : (selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25)
                       ? 'All slots filled! Admissions are currently closed.'
                       : (selectedSection.maxCapacity || 25) - (selectedSection.enrolledCount || 0) <= 3
                       ? 'Filling fast! Limited seats remaining.'
@@ -1653,53 +1694,86 @@ export const BookingSessionScreen = ({ route, navigation }) => {
             </View>
           </ScrollView>
 
-          {/* Bottom Bar on Detail Screen */}
-          <View
-            style={[
-              styles.bottomBar,
-              {
-                backgroundColor: isDark
-                  ? 'rgba(18, 18, 18, 0.95)'
-                  : 'rgba(255, 255, 255, 0.95)',
-                borderTopColor: isDark
-                  ? 'rgba(255, 255, 255, 0.08)'
-                  : 'rgba(226, 232, 240, 0.8)',
-              },
-            ]}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.bottomPriceLabel, { color: subtitleColor }]}>
-                Total Batch Fee
-              </Text>
-              <Text style={[styles.bottomPriceValue, { color: textColor }]}>
-                ₹{Math.round(Number(selectedSection.cost) || 0)}
-              </Text>
-            </View>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              disabled={(selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25)}
-              onPress={() => goToCheckout(selectedSection)}
-              style={[
-                styles.continueBtn,
-                (selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25) && {
-                  backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.12)',
-                },
-              ]}
-            >
-              <Text
+          {/* Bottom Bar: Price & CTA */}
+          {(() => {
+            const bookedPass = getSectionBooking(selectedSection);
+            const isAlreadyBooked = Boolean(bookedPass);
+            const isSlotFull = (selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25);
+
+            return (
+              <View
                 style={[
-                  styles.continueBtnText,
-                  (selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25) && {
-                    color: '#EF4444',
+                  styles.bottomBar,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(18, 18, 18, 0.95)'
+                      : 'rgba(255, 255, 255, 0.95)',
+                    borderTopColor: isDark
+                      ? 'rgba(255, 255, 255, 0.08)'
+                      : 'rgba(226, 232, 240, 0.8)',
                   },
                 ]}
               >
-                {(selectedSection.enrolledCount || 0) >= (selectedSection.maxCapacity || 25)
-                  ? 'Slot Full'
-                  : 'Continue to Payment'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.bottomPriceLabel, { color: subtitleColor }]}>
+                    {isAlreadyBooked ? 'Enrollment Status' : 'Total Batch Fee'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.bottomPriceValue,
+                      { color: isAlreadyBooked ? '#00BF62' : textColor },
+                    ]}
+                  >
+                    {isAlreadyBooked
+                      ? 'Enrolled'
+                      : `₹${Math.round(Number(selectedSection.cost) || 0)}`}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  disabled={!isAlreadyBooked && isSlotFull}
+                  onPress={() => {
+                    if (isAlreadyBooked) {
+                      navigation.navigate('BookingDetails', { booking: bookedPass });
+                    } else {
+                      goToCheckout(selectedSection);
+                    }
+                  }}
+                  style={[
+                    styles.continueBtn,
+                    isAlreadyBooked && {
+                      backgroundColor: '#00BF62',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                    },
+                    !isAlreadyBooked && isSlotFull && {
+                      backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.12)',
+                    },
+                  ]}
+                >
+                  {isAlreadyBooked && (
+                    <MaterialIcons name="confirmation-number" size={18} color="#FFFFFF" />
+                  )}
+                  <Text
+                    style={[
+                      styles.continueBtnText,
+                      !isAlreadyBooked && isSlotFull && {
+                        color: '#EF4444',
+                      },
+                    ]}
+                  >
+                    {isAlreadyBooked
+                      ? 'View Your Pass'
+                      : isSlotFull
+                      ? 'Slot Full'
+                      : 'Continue to Payment'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })()}
         </View>
       )}
 
