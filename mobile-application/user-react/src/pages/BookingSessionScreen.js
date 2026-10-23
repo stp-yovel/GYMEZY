@@ -1443,18 +1443,20 @@ export const BookingSessionScreen = ({ route, navigation }) => {
                   <MaterialIcons
                     name={getCategoryBadgeStyle(selectedSection.category, isDark).icon}
                     size={14}
-                    color={getCategoryBadgeStyle(selectedSection.category, isDark).text}
+                    color="#FFFFFF"
                     style={{ marginRight: 4 }}
                   />
-                  <Text style={[styles.sectionCatBadgeText, { color: getCategoryBadgeStyle(selectedSection.category, isDark).text }]}>
+                  <Text style={[styles.sectionCatBadgeText, { color: '#FFFFFF', letterSpacing: 0.8 }]}>
                     {(selectedSection.category || 'workout').toUpperCase()}
                   </Text>
                 </View>
-                <Text style={styles.detailHeroTitle}>{selectedSection.title}</Text>
-                <Text style={styles.detailHeroSubtitle}>
-                  {gym.name || 'GYMEZY Fitness'} • {selectedSection.durationDays || 20} Days Batch
-                  {selectedSection.startTime ? ` • ${selectedSection.startTime} - ${selectedSection.endTime}` : ''}
-                </Text>
+                <View style={styles.detailHeroBottomContent}>
+                  <Text style={styles.detailHeroTitle}>{selectedSection.title}</Text>
+                  <Text style={styles.detailHeroSubtitle}>
+                    {gym.name || 'GYMEZY Fitness'} • {selectedSection.durationDays || 20} Days Batch
+                    {selectedSection.startTime ? ` • ${selectedSection.startTime} - ${selectedSection.endTime}` : ''}
+                  </Text>
+                </View>
               </LinearGradient>
             </ImageBackground>
 
@@ -2299,17 +2301,19 @@ const styles = StyleSheet.create({
   },
   detailHeroGradient: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     padding: 16,
+  },
+  detailHeroBottomContent: {
+    justifyContent: 'flex-end',
   },
   detailHeroTitle: {
     color: '#FFFFFF',
     fontSize: 20,
     fontWeight: 'bold',
-    marginTop: 8,
   },
   detailHeroSubtitle: {
-    color: 'rgba(255,255,255,0.8)',
+    color: 'rgba(255,255,255,0.85)',
     fontSize: 12,
     marginTop: 2,
   },
