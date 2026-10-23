@@ -409,6 +409,12 @@ export const BookingSessionScreen = ({ route, navigation }) => {
       discount: 0.0,
       amount: subtotal,
       sectionId: activeSection?._id || null,
+      bookingType: (currentView === 'group_classes' || currentView === 'group_class_detail') ? 'GROUP_CLASS' : 'GYM_SESSION',
+      startDate: activeSection?.startDate || selectedStartDate || new Date(),
+      endDate: activeSection?.endDate || null,
+      durationDays: activeSection?.durationDays || sessions,
+      category: activeSection?.category || 'general',
+      trainerId: activeSection?.trainerId?._id || activeSection?.trainerId || null,
     });
   };
 

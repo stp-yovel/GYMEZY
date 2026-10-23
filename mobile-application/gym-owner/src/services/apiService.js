@@ -555,6 +555,19 @@ class ApiService {
     }
     return result.data;
   }
+
+  async getSectionEnrollments(sectionId) {
+    if (!sectionId) throw new Error('Section ID is required.');
+    const response = await this.executeFetch(`/bookings/section/${sectionId}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || 'Failed to fetch section enrollments.');
+    }
+    return result.data;
+  }
 }
 
 export const apiService = new ApiService();

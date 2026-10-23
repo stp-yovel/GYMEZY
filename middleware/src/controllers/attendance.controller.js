@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import crypto from 'node:crypto';
 import Attendance from '../models/attendance.model.js';
 import Membership from '../models/membership.model.js';
+import Booking from '../models/booking.model.js';
 import MembershipSwitchRequest from '../models/membershipSwitchRequest.model.js';
 import Gym from '../models/gym.model.js';
 import User from '../models/user.model.js';
@@ -94,6 +95,40 @@ const findMembershipForEntry = async (gymDbId, parsedInfo) => {
 };
 
 /**
+ * Find Booking matching code or OTP for a specific gym
+ */
+const findBookingForEntry = async (gymDbId, parsedInfo) => {
+  const { otp, id, raw } = parsedInfo;
+
+  if (otp) {
+    const booking = await Booking.findOne({ gymId: gymDbId, entryOtp: otp })
+      .populate('userId', 'fullName phone email avatar profilePicture customerProfile customerId')
+      .populate('gymId', 'name partnerId address')
+      .populate('sectionId', 'title category startTime endTime');
+    if (booking) return booking;
+  }
+
+  if (id && mongoose.Types.ObjectId.isValid(id)) {
+    const booking = await Booking.findOne({ _id: id, gymId: gymDbId })
+      .populate('userId', 'fullName phone email avatar profilePicture customerProfile customerId')
+      .populate('gymId', 'name partnerId address')
+      .populate('sectionId', 'title category startTime endTime');
+    if (booking) return booking;
+  }
+
+  if (id || raw) {
+    const bId = id || raw;
+    const booking = await Booking.findOne({ bookingId: bId, gymId: gymDbId })
+      .populate('userId', 'fullName phone email avatar profilePicture customerProfile customerId')
+      .populate('gymId', 'name partnerId address')
+      .populate('sectionId', 'title category startTime endTime');
+    if (booking) return booking;
+  }
+
+  return null;
+};
+
+/**
  * Check-In Member
  * POST /api/v1/attendance/check-in
  */
@@ -114,7 +149,61 @@ export const checkInMember = async (req, res, next) => {
 
     const membership = await findMembershipForEntry(gym._id, parsedInfo);
     if (!membership) {
-      throw ApiError.notFound('No active membership found matching this Pass/OTP. Please try again or use another check-in method (Member ID, Phone number, or QR scan).');
+      const booking = await findBookingForEntry(gym._id, parsedInfo);
+      if (!booking) {
+        throw ApiError.notFound('No active membership or booking pass found matching this Pass/OTP. Please try again or verify your booking code.');
+      }
+
+      if (booking.status === 'Cancelled') {
+        throw ApiError.badRequest('This booking pass has been cancelled. Entry is not permitted.');
+      }
+
+      const existingActive = await Attendance.findOne({
+        userId: booking.userId?._id || booking.userId,
+        gymId: gym._id,
+        status: 'Checked-In',
+      });
+
+      if (existingActive) {
+        throw ApiError.badRequest(
+          `Member is already checked in at ${new Date(existingActive.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. Please check out first.`
+        );
+      }
+
+      const attendance = await Attendance.create({
+        userId: booking.userId?._id || booking.userId,
+        gymId: gym._id,
+        bookingId: booking._id,
+        membershipId: null,
+        method: method.toUpperCase() === 'OTP' ? 'OTP' : 'QR',
+        checkInTime: new Date(),
+        status: 'Checked-In',
+        area: booking.sectionId?.title || booking.title || area,
+        verifiedBy,
+      });
+
+      const user = booking.userId;
+      const responseData = {
+        attendanceId: attendance._id,
+        status: 'Granted',
+        attendanceStatus: attendance.status,
+        checkInTime: attendance.checkInTime,
+        method: attendance.method,
+        area: attendance.area,
+        member: {
+          id: user?._id,
+          name: user?.fullName || 'Gym Member',
+          phone: user?.phone || 'N/A',
+          avatar: user?.avatar || user?.profilePicture || null,
+          bookingId: booking.bookingId,
+          bookingType: booking.bookingType,
+          title: booking.title,
+          status: booking.status,
+          entryOtp: booking.entryOtp,
+        },
+      };
+
+      return res.status(201).json(ApiResponse.created(responseData, 'Check-in verified successfully. Access granted.'));
     }
 
     // Validate Membership Status & Date Window

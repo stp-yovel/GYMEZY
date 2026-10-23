@@ -15,6 +15,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { AppColors } from '../../theme/appTheme';
 import { apiService } from '../../services/apiService';
 import { CreateSectionModal, SECTION_CATEGORIES, calculateScheduleEndDate } from '../../widgets/CreateSectionModal';
+import { SectionRosterModal } from '../../widgets/SectionRosterModal';
 
 export const SectionsSubView = ({ topInset, onBack, gymId }) => {
   const { isDark } = useTheme();
@@ -27,6 +28,10 @@ export const SectionsSubView = ({ topInset, onBack, gymId }) => {
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [editingSection, setEditingSection] = useState(null);
+
+  // Roster Modal State
+  const [showRosterModal, setShowRosterModal] = useState(false);
+  const [rosterSection, setRosterSection] = useState(null);
 
   // Fetch sections
   const fetchSectionsList = useCallback(async () => {
@@ -316,6 +321,19 @@ export const SectionsSubView = ({ topInset, onBack, gymId }) => {
                 <View style={[styles.cardFooter, { borderTopColor: borderCol }]}>
                   <TouchableOpacity
                     onPress={() => {
+                      setRosterSection(section);
+                      setShowRosterModal(true);
+                    }}
+                    style={styles.actionBtn}
+                  >
+                    <MaterialIcons name="people-outline" size={16} color="#059669" style={{ marginRight: 4 }} />
+                    <Text style={[styles.actionBtnText, { color: '#059669' }]}>
+                      Roster ({section.enrolledCount || 0})
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
                       setEditingSection(section);
                       setShowModal(true);
                     }}
@@ -348,6 +366,13 @@ export const SectionsSubView = ({ topInset, onBack, gymId }) => {
         }}
         gymId={gymId}
         initialSection={editingSection}
+      />
+
+      {/* Enrolled Members Roster Modal */}
+      <SectionRosterModal
+        visible={showRosterModal}
+        onClose={() => setShowRosterModal(false)}
+        section={rosterSection}
       />
     </View>
   );

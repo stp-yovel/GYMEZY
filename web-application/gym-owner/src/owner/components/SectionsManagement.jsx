@@ -95,6 +95,31 @@ export const SectionsManagement = () => {
   const [editingSection, setEditingSection] = useState(null);
   const [form] = Form.useForm();
 
+  // Roster Modal State
+  const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
+  const [selectedSectionRoster, setSelectedSectionRoster] = useState(null);
+  const [rosterEnrollments, setRosterEnrollments] = useState([]);
+  const [rosterSummary, setRosterSummary] = useState(null);
+  const [isRosterLoading, setIsRosterLoading] = useState(false);
+
+  const handleOpenRoster = async (section) => {
+    setSelectedSectionRoster(section);
+    setIsRosterModalOpen(true);
+    setIsRosterLoading(true);
+    try {
+      const response = await apiClient.get(`/bookings/section/${section._id}`);
+      if (response.data?.success && response.data.data) {
+        setRosterEnrollments(response.data.data.enrollments || []);
+        setRosterSummary(response.data.data.summary || null);
+      }
+    } catch (err) {
+      console.error('Failed to load section roster:', err);
+      message.error(err.message || 'Failed to load enrolled members.');
+    } finally {
+      setIsRosterLoading(false);
+    }
+  };
+
   // Dynamic Watch for Estimated End Date calculation
   const watchedStartDate = Form.useWatch('startDate', form);
   const watchedDurationDays = Form.useWatch('durationDays', form);
@@ -511,15 +536,33 @@ export const SectionsManagement = () => {
     {
       title: 'Capacity',
       key: 'capacity',
-      width: 130,
-      render: (_, record) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <TeamOutlined style={{ color: '#003882' }} />
-          <Text strong style={{ fontSize: 13, color: isDarkMode ? '#e6edf3' : '#1e293b' }}>
-            {record.enrolledCount || 0} / {record.maxCapacity || 25}
-          </Text>
-        </div>
-      ),
+      width: 140,
+      render: (_, record) => {
+        const isFull = (record.enrolledCount || 0) >= (record.maxCapacity || 25);
+        return (
+          <Tooltip title="Click to view enrolled members roster">
+            <div
+              onClick={() => handleOpenRoster(record)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                cursor: 'pointer',
+                padding: '4px 8px',
+                borderRadius: 'var(--radius-base)',
+                backgroundColor: isFull
+                  ? (isDarkMode ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.1)')
+                  : (isDarkMode ? 'rgba(0,56,130,0.15)' : 'rgba(0,56,130,0.08)'),
+              }}
+            >
+              <TeamOutlined style={{ color: isFull ? '#ef4444' : '#003882' }} />
+              <Text strong style={{ fontSize: 13, color: isFull ? '#ef4444' : (isDarkMode ? '#e6edf3' : '#1e293b') }}>
+                {record.enrolledCount || 0} / {record.maxCapacity || 25}
+              </Text>
+            </div>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Status',
@@ -537,11 +580,19 @@ export const SectionsManagement = () => {
     {
       title: 'Action',
       key: 'action',
-      width: 100,
+      width: 120,
       align: 'center',
       fixed: 'right',
       render: (_, record) => (
         <Space size={4}>
+          <Tooltip title="View Enrolled Members">
+            <Button
+              type="text"
+              size="small"
+              icon={<TeamOutlined style={{ color: '#003882' }} />}
+              onClick={() => handleOpenRoster(record)}
+            />
+          </Tooltip>
           <Tooltip title="Edit Section">
             <Button
               type="text"
@@ -945,6 +996,166 @@ export const SectionsManagement = () => {
             </Button>
           </div>
         </Form>
+      </Modal>
+
+      {/* 4. Enrolled Members Roster Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 'var(--radius-base)',
+                backgroundColor: 'rgba(0, 56, 130, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#003882',
+              }}
+            >
+              <TeamOutlined />
+            </div>
+            <div>
+              <span style={{ fontSize: 16, fontWeight: 700 }}>
+                Enrolled Members Roster
+              </span>
+              {selectedSectionRoster?.title && (
+                <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
+                  {selectedSectionRoster.title} ({selectedSectionRoster.category?.toUpperCase()})
+                </Text>
+              )}
+            </div>
+          </div>
+        }
+        open={isRosterModalOpen}
+        onCancel={() => setIsRosterModalOpen(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setIsRosterModalOpen(false)} style={{ backgroundColor: '#003882' }}>
+            Close Roster
+          </Button>,
+        ]}
+        width={840}
+        destroyOnClose
+      >
+        {/* Roster Summary Header */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 12,
+            marginBottom: 20,
+            marginTop: 10,
+          }}
+        >
+          <div
+            style={{
+              padding: '12px 16px',
+              borderRadius: 'var(--radius-base)',
+              backgroundColor: isDarkMode ? '#161b22' : '#f8fafc',
+              border: `1px solid ${isDarkMode ? '#30363d' : '#e2e8f0'}`,
+            }}
+          >
+            <Text type="secondary" style={{ fontSize: 12 }}>Total Enrolled</Text>
+            <div style={{ fontSize: 20, fontWeight: 700, color: '#003882', marginTop: 2 }}>
+              {rosterSummary?.enrolledCount || 0} / {rosterSummary?.maxCapacity || selectedSectionRoster?.maxCapacity || 25}
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: '12px 16px',
+              borderRadius: 'var(--radius-base)',
+              backgroundColor: isDarkMode ? '#161b22' : '#f8fafc',
+              border: `1px solid ${isDarkMode ? '#30363d' : '#e2e8f0'}`,
+            }}
+          >
+            <Text type="secondary" style={{ fontSize: 12 }}>Available Slots</Text>
+            <div style={{ fontSize: 20, fontWeight: 700, color: '#00BF62', marginTop: 2 }}>
+              {rosterSummary?.availableSlots ?? Math.max(0, (selectedSectionRoster?.maxCapacity || 25) - (selectedSectionRoster?.enrolledCount || 0))}
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: '12px 16px',
+              borderRadius: 'var(--radius-base)',
+              backgroundColor: isDarkMode ? '#161b22' : '#f8fafc',
+              border: `1px solid ${isDarkMode ? '#30363d' : '#e2e8f0'}`,
+            }}
+          >
+            <Text type="secondary" style={{ fontSize: 12 }}>Active Bookings</Text>
+            <div style={{ fontSize: 20, fontWeight: 700, color: '#6366f1', marginTop: 2 }}>
+              {rosterSummary?.activeCount || rosterEnrollments.filter((b) => b.status === 'Upcoming' || b.status === 'Active').length}
+            </div>
+          </div>
+        </div>
+
+        {/* Members Roster Table */}
+        <Table
+          loading={isRosterLoading}
+          dataSource={rosterEnrollments}
+          rowKey={(r) => r._id || r.bookingId}
+          pagination={{ pageSize: 6 }}
+          columns={[
+            {
+              title: 'Member',
+              key: 'member',
+              render: (_, record) => {
+                const u = record.userId;
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Avatar src={u?.avatar || u?.profilePicture} icon={<UserOutlined />}>
+                      {(u?.fullName || u?.name || 'M').charAt(0).toUpperCase()}
+                    </Avatar>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{u?.fullName || u?.name || 'Member'}</div>
+                      <Text type="secondary" style={{ fontSize: 11 }}>
+                        {u?.phone || u?.email || record.customerId || '—'}
+                      </Text>
+                    </div>
+                  </div>
+                );
+              },
+            },
+            {
+              title: 'Booking ID',
+              dataIndex: 'bookingId',
+              key: 'bookingId',
+              render: (id) => <Tag color="blue">{id}</Tag>,
+            },
+            {
+              title: 'Enrolled Date',
+              dataIndex: 'createdAt',
+              key: 'createdAt',
+              render: (dt) => dt ? new Date(dt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+            },
+            {
+              title: 'Amount',
+              key: 'amount',
+              render: (_, record) => `₹${record.pricing?.totalAmount || record.amountPaid || 0}`,
+            },
+            {
+              title: 'Status',
+              dataIndex: 'status',
+              key: 'status',
+              render: (status) => {
+                let color = 'green';
+                if (status === 'Cancelled') color = 'red';
+                else if (status === 'Completed') color = 'blue';
+                return <Tag color={color}>{status || 'Upcoming'}</Tag>;
+              },
+            },
+          ]}
+          locale={{
+            emptyText: (
+              <Empty
+                description="No members enrolled in this batch yet."
+                style={{ padding: '24px 0' }}
+              />
+            ),
+          }}
+        />
       </Modal>
     </div>
   );

@@ -455,6 +455,68 @@ class ApiService {
     }
     return json.data || [];
   }
+
+  /**
+   * Create a new Section / Group Class / Session Booking
+   */
+  async createBooking(bookingData) {
+    const response = await this.executeFetch('/bookings', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(bookingData),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to complete booking.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Get all Bookings for the Logged-In User
+   */
+  async getMyBookings() {
+    const response = await this.executeFetch('/bookings/my', {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to fetch bookings.');
+    }
+    return json.data || [];
+  }
+
+  /**
+   * Get Single Booking Details by ID
+   */
+  async getBookingById(bookingId) {
+    const response = await this.executeFetch(`/bookings/${bookingId}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to fetch booking details.');
+    }
+    return json.data;
+  }
+
+  /**
+   * Cancel an active Booking
+   */
+  async cancelBooking(bookingId, reason = 'Cancelled by member') {
+    const response = await this.executeFetch(`/bookings/${bookingId}/cancel`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ reason }),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new Error(json.message || 'Failed to cancel booking.');
+    }
+    return json.data;
+  }
 }
 
 export const apiService = new ApiService();

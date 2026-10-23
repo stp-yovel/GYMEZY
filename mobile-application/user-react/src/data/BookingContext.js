@@ -1,31 +1,106 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react';
+import { apiService } from '../services/apiService';
 
 const BookingContext = createContext();
+
+export const mapBackendBookingToClient = (b) => {
+  if (!b) return null;
+  const startStr = b.startDate
+    ? new Date(b.startDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '';
+  const endStr = b.endDate
+    ? new Date(b.endDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '';
+  const dateSummary = startStr && endStr && startStr !== endStr ? `${startStr} - ${endStr}` : (startStr || b.date || 'Scheduled Batch');
+
+  const durDays = b.durationDays || b.sessionsCount || 1;
+
+  return {
+    ...b,
+    id: b.bookingId || b.id || b._id,
+    _id: b._id,
+    bookingId: b.bookingId || b.id,
+    customerId: b.userId?.customerId || b.customerId || 'CUST789012',
+    gymName: b.gymId?.name || b.gymName || 'GYMEZY Partner Gym',
+    gymLocation: b.gymId?.location || b.gymId?.address?.city || b.gymLocation || '',
+    gymImageUrl: b.gymId?.imageUrl || b.gymId?.images?.[0] || b.gymImageUrl || '',
+    type: b.bookingType === 'GROUP_CLASS'
+      ? 'Group Class'
+      : (b.bookingType === 'SECTION' ? 'Section Batch' : (b.type || 'Gym Access')),
+    sessionSubtitle: b.title || b.sessionSubtitle || 'Workout Session',
+    date: dateSummary,
+    time: b.timeSlot || b.time || 'Scheduled Time',
+    daysBooked: `${durDays} ${durDays > 1 ? 'Days' : 'Day'} Batch`,
+    amountPaid: b.pricing?.totalAmount ?? b.amountPaid ?? 0,
+    paymentMode: b.payment?.method || b.paymentMode || 'UPI',
+    otp: b.entryOtp || b.otp || '',
+    status: b.status || 'Upcoming',
+    iconName: b.category === 'yoga' ? 'self-improvement' : (b.category === 'zumba' ? 'music-note' : 'fitness-center'),
+    accentColor: '#003882',
+    sectionId: b.sectionId?._id || b.sectionId,
+    trainerId: b.trainerId,
+    rawBackendBooking: b,
+  };
+};
 
 export const BookingProvider = ({ children }) => {
   const [bookings, setBookings] = useState([]);
   const [memberships, setMemberships] = useState([]);
+  const [isLoadingBookings, setIsLoadingBookings] = useState(false);
+
+  const refreshBookings = useCallback(async () => {
+    try {
+      setIsLoadingBookings(true);
+      const serverBookings = await apiService.getMyBookings();
+      if (Array.isArray(serverBookings) && serverBookings.length > 0) {
+        const mapped = serverBookings.map(mapBackendBookingToClient);
+        setBookings(mapped);
+      }
+    } catch (err) {
+      console.warn('[BOOKING CONTEXT] Failed to sync bookings from server:', err?.message);
+    } finally {
+      setIsLoadingBookings(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshBookings();
+  }, [refreshBookings]);
 
   const addBooking = (item) => {
-    setBookings((prev) => [item, ...prev]);
+    const normalized = mapBackendBookingToClient(item);
+    setBookings((prev) => [normalized, ...prev.filter((b) => b.id !== normalized.id)]);
   };
 
   const updateBooking = (updated) => {
-    setBookings((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+    const normalized = mapBackendBookingToClient(updated);
+    setBookings((prev) => prev.map((b) => (b.id === normalized.id ? normalized : b)));
   };
 
-  const cancelBooking = (bookingId, reason) => {
+  const cancelBooking = async (bookingId, reason) => {
+    // 1. Optimistic local update
     setBookings((prev) =>
       prev.map((b) =>
-        b.id === bookingId
+        b.id === bookingId || b._id === bookingId || b.bookingId === bookingId
           ? {
               ...b,
               status: 'Cancelled',
               cancellationReason: reason,
+              cancellation: { cancelledAt: new Date(), reason },
             }
           : b
       )
     );
+
+    // 2. Call backend
+    try {
+      const updated = await apiService.cancelBooking(bookingId, reason);
+      if (updated) {
+        updateBooking(updated);
+      }
+    } catch (err) {
+      console.warn('[BOOKING CONTEXT] Server cancel booking failed:', err?.message);
+    }
   };
 
   const addMembership = (item) => {
@@ -63,19 +138,28 @@ export const BookingProvider = ({ children }) => {
     setMemberships(Array.isArray(items) ? items : []);
   };
 
+  const setAllBookings = (items) => {
+    if (Array.isArray(items)) {
+      setBookings(items.map(mapBackendBookingToClient));
+    }
+  };
+
   const contextValue = useMemo(
     () => ({
       bookings,
       memberships,
+      isLoadingBookings,
+      refreshBookings,
       addBooking,
       updateBooking,
       cancelBooking,
+      setAllBookings,
       addMembership,
       setAllMemberships,
       updateMembership,
       cancelMembership,
     }),
-    [bookings, memberships]
+    [bookings, memberships, isLoadingBookings, refreshBookings]
   );
 
   return (

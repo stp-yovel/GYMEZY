@@ -7,12 +7,15 @@ import {
   StyleSheet,
   Modal,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { AppColors, AppTheme } from '../theme/appTheme';
-import { useBookingRepository } from '../data/BookingContext';
+import { useBookingRepository, mapBackendBookingToClient } from '../data/BookingContext';
+import { apiService } from '../services/apiService';
 
 export const PaymentSummaryScreen = ({ route, navigation }) => {
   const {
@@ -31,6 +34,7 @@ export const PaymentSummaryScreen = ({ route, navigation }) => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('UPI');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [createdBooking, setCreatedBooking] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const totalAmount = Math.max(0, subtotal - discount);
 
@@ -40,30 +44,52 @@ export const PaymentSummaryScreen = ({ route, navigation }) => {
   const subtitleColor = isDark ? 'rgba(255, 255, 255, 0.7)' : '#64748B';
   const borderColor = isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0';
 
-  const handleProcessPayment = () => {
-    const bookingId = `GZ-${Date.now().toString().substring(7)}`;
-    const newBooking = {
-      id: bookingId,
-      customerId: 'CUST789012',
-      gymName: gym.name,
-      gymLocation: gym.location,
-      gymImageUrl: gym.imageUrl,
-      type: 'Gym Access',
-      sessionSubtitle: bookingTitle,
-      date: datesSummary,
-      time: timeSlot || '6:00 AM - 7:00 AM',
-      daysBooked: `${sessionsCount} ${sessionsCount > 1 ? 'Sessions' : 'Session'}`,
-      amountPaid: totalAmount,
-      paymentMode: selectedPaymentMethod,
-      otp: Math.floor(100000 + Math.random() * 900000).toString(),
-      status: 'Upcoming',
-      icon: 'fitness-center',
-      accentColor: '#003882',
-    };
+  const handleProcessPayment = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
 
-    addBooking(newBooking);
-    setCreatedBooking(newBooking);
-    setShowConfirmModal(true);
+    try {
+      const payload = {
+        gymId: gym?._id || gym?.id || gym?.partnerId,
+        sectionId: route.params?.sectionId || null,
+        trainerId: route.params?.trainerId || null,
+        bookingType: route.params?.bookingType || (route.params?.sectionId ? 'GROUP_CLASS' : 'GYM_SESSION'),
+        title: bookingTitle,
+        category: route.params?.category || 'general',
+        startDate: route.params?.startDate || null,
+        endDate: route.params?.endDate || null,
+        timeSlot: timeSlot || null,
+        durationDays: route.params?.durationDays || sessionsCount || 1,
+        sessionsCount: sessionsCount || 1,
+        pricing: {
+          subtotal,
+          discount,
+          totalAmount,
+          currency: 'INR',
+        },
+        payment: {
+          method: selectedPaymentMethod,
+          status: 'Completed',
+          transactionId: `TXN-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+          paidAt: new Date().toISOString(),
+        },
+      };
+
+      const serverBooking = await apiService.createBooking(payload);
+      const mapped = mapBackendBookingToClient(serverBooking);
+      addBooking(mapped);
+      setCreatedBooking(mapped);
+      setShowConfirmModal(true);
+    } catch (err) {
+      console.warn('[PAYMENT SUMMARY] Booking creation failed:', err?.message);
+      Alert.alert(
+        'Booking Notice',
+        err.message || 'Unable to complete your booking right now. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleViewPass = () => {
@@ -200,11 +226,18 @@ export const PaymentSummaryScreen = ({ route, navigation }) => {
       <View style={[styles.bottomBar, { backgroundColor: cardColor, borderTopColor: borderColor }]}>
         <TouchableOpacity
           activeOpacity={0.85}
+          disabled={isProcessing}
           onPress={handleProcessPayment}
-          style={styles.payBtn}
+          style={[styles.payBtn, isProcessing && { opacity: 0.75 }]}
         >
-          <MaterialIcons name="lock-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-          <Text style={styles.payBtnText}>Pay ₹{Math.round(totalAmount)}</Text>
+          {isProcessing ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <MaterialIcons name="lock-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.payBtnText}>Pay ₹{Math.round(totalAmount)}</Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
 
