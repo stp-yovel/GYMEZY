@@ -555,6 +555,30 @@ export const GymProfileManagement = () => {
     audioChimeEnabled: true,
     spotWalkInsAllowed: true,
   });
+  const [isSsoActive, setIsSsoActive] = useState(() => user?.isSsoEnabled !== false);
+  const [isTogglingSso, setIsTogglingSso] = useState(false);
+
+  const handleToggleSso = async (newVal) => {
+    setIsTogglingSso(true);
+    try {
+      const res = await apiClient.patch('/auth/toggle-sso', { enabled: newVal });
+      if (res.data?.success) {
+        setIsSsoActive(newVal);
+        message.success(`Google SSO ${newVal ? 'enabled' : 'disabled'} successfully.`);
+        const stored = localStorage.getItem('gymezy_user');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          parsed.isSsoEnabled = newVal;
+          localStorage.setItem('gymezy_user', JSON.stringify(parsed));
+        }
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Failed to update SSO status.');
+    } finally {
+      setIsTogglingSso(false);
+    }
+  };
+
   const [pendingRequests, setPendingRequests] = useState([]);
   const [auditHistory, setAuditHistory] = useState([]);
 
@@ -3835,6 +3859,30 @@ export const GymProfileManagement = () => {
                         const updated = { ...systemSettings, whatsappAlerts: chk };
                         handleSaveSettings(updated);
                       }}
+                    />
+                  </div>
+
+                  <Divider style={{ margin: 0 }} />
+
+                  {/* Setting 5: Google Single Sign-On (SSO) */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#ffffff' : '#0f172a' }}>
+                          Google Single Sign-On (SSO)
+                        </div>
+                        <Tag color={isSsoActive ? 'blue' : 'default'} style={{ margin: 0 }}>
+                          {isSsoActive ? 'Enabled' : 'Disabled'}
+                        </Tag>
+                      </div>
+                      <div style={{ fontSize: 12, color: isDarkMode ? '#888888' : '#64748b', marginTop: 2 }}>
+                        Allow logging into this Gym Owner account using your linked Google account
+                      </div>
+                    </div>
+                    <Switch
+                      checked={isSsoActive}
+                      loading={isTogglingSso}
+                      onChange={handleToggleSso}
                     />
                   </div>
                 </div>

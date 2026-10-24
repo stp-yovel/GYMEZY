@@ -270,8 +270,12 @@ export const onboardGym = asyncHandler(async (req, res) => {
     status,
     approvalStatus,
     initialApprovalStatus,
+    authProvider,
+    googleId,
+    isSsoEnabled,
   } = req.body;
 
+  const isGoogleAuth = authProvider === 'GOOGLE' || Boolean(googleId);
   const finalGymName = (gymName || name || '').trim();
   const finalOwnerName = (ownerName || '').trim();
   const finalEmail = (email || '').trim().toLowerCase();
@@ -292,23 +296,27 @@ export const onboardGym = asyncHandler(async (req, res) => {
   if (!finalPhone) {
     throw ApiError.badRequest('Phone number is required.');
   }
-  if (!password) {
+
+  // Password validation: mandatory for LOCAL accounts, optional for GOOGLE SSO
+  if (!isGoogleAuth && !password) {
     throw ApiError.badRequest('Owner account password is required.');
   }
-  if (password.length < 8 || password.length > 16) {
-    throw ApiError.badRequest('Password must be between 8 and 16 characters.');
-  }
-  if (!/[A-Z]/.test(password)) {
-    throw ApiError.badRequest('Password must contain at least 1 uppercase letter.');
-  }
-  if (!/[0-9]/.test(password)) {
-    throw ApiError.badRequest('Password must contain at least 1 number.');
-  }
-  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password)) {
-    throw ApiError.badRequest('Password must contain at least 1 special character.');
-  }
-  if (/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]|[^\x20-\x7E]/u.test(password)) {
-    throw ApiError.badRequest('Emoji characters and non-standard symbols are not allowed in password.');
+  if (password) {
+    if (password.length < 8 || password.length > 16) {
+      throw ApiError.badRequest('Password must be between 8 and 16 characters.');
+    }
+    if (!/[A-Z]/.test(password)) {
+      throw ApiError.badRequest('Password must contain at least 1 uppercase letter.');
+    }
+    if (!/[0-9]/.test(password)) {
+      throw ApiError.badRequest('Password must contain at least 1 number.');
+    }
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password)) {
+      throw ApiError.badRequest('Password must contain at least 1 special character.');
+    }
+    if (/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]|[^\x20-\x7E]/u.test(password)) {
+      throw ApiError.badRequest('Emoji characters and non-standard symbols are not allowed in password.');
+    }
   }
   if (!finalCity) {
     throw ApiError.badRequest('City is required.');
@@ -535,9 +543,12 @@ export const onboardGym = asyncHandler(async (req, res) => {
     fullName: finalOwnerName,
     email: finalEmail,
     phone: finalPhone,
-    password, // Pre-save hook hashes with bcryptjs
+    password: password || undefined, // Pre-save hook hashes with bcryptjs if present
     role: USER_ROLES.GYM_OWNER,
     gymId: newGym._id,
+    authProvider: isGoogleAuth ? 'GOOGLE' : 'LOCAL',
+    googleId: isGoogleAuth ? (googleId || null) : null,
+    isSsoEnabled: isSsoEnabled !== undefined ? Boolean(isSsoEnabled) : true,
     isActive: true,
     isVerified: true,
   });

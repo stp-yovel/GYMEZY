@@ -923,4 +923,71 @@ flowchart TD
 
 ---
 
+### 9.7 Google Single Sign-On (SSO) & Firebase Cloud Messaging (FCM) Architecture
+
+#### 9.7.1 Unified Firebase Architecture Overview
+GYMEZY utilizes the **Unified Firebase Suite** (`firebase` client SDK and `firebase-admin` server SDK) to orchestrate both Google OAuth Sign-In and cross-platform Push Notifications:
+1. **Google Cloud Console vs Firebase Console Synergy:**
+   - **Google Cloud Console:** Generates OAuth 2.0 Web and Android/iOS Client IDs, manages API quotas, and provisions Service Accounts.
+   - **Firebase Console:** Acts as the centralized developer management plane for Firebase Authentication (Google Identity Provider) and Firebase Cloud Messaging (APNs & Android push notifications).
+   - **Backend Integration:** `firebase-admin` handles token verification (`verifyIdToken`) and bulk notification dispatch (`sendEachForMulticast`) through a single service account credential (`FIREBASE_SERVICE_ACCOUNT_KEY`).
+
+#### 9.7.2 Deferred Onboarding Flow for Gym Owners (Strict DB Cleanliness)
+To preserve the structural integrity of gym partner records, clicking "Sign in with Google" on the Gym Owner portal **never creates a premature user record in MongoDB** if the account is new:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner as Gym Owner
+    participant Client as Gym Owner Web (/login)
+    participant Google as Firebase Auth (Google)
+    participant Server as GYMEZY API (/api/v1/auth)
+    participant DB as MongoDB
+    participant Register as Gym Owner Web (/register)
+
+    Owner->>Client: Clicks "Sign in with Google"
+    Client->>Google: signInWithPopup(GoogleAuthProvider)
+    Google-->>Client: Returns idToken & Profile
+    Client->>Server: POST /google-login { idToken }
+    Server->>Google: verifyIdToken(idToken)
+    Server->>DB: User.findOne({ $or: [{ googleId }, { email }] })
+    alt User Found in DB
+        Server-->>Client: Returns { token, user } (Logged In)
+    else User Not Found (New Owner)
+        Note over Server,DB: NO USER IS CREATED IN DB
+        Server-->>Client: Returns { exists: false, isNewUser: true, profile: { email, name, googleId } }
+        Client->>Register: Redirect to /register with state: { googleProfile }
+        Note over Register: Email auto-filled & locked.<br/>Password fields hidden.<br/>Step 1 validated seamlessly.
+        Owner->>Register: Completes Gym Details, Amenities & Banking (Steps 1–5)
+        Register->>Server: POST /gyms/register { ..., authProvider: 'GOOGLE', googleId, isSsoEnabled: true }
+        Server->>DB: Atomically creates Owner User & Gym documents
+        Server-->>Register: Success: Gym & Owner Created!
+    end
+```
+
+#### 9.7.3 Google SSO Management & Account Lockout Safeguard
+- **Granular Control:** Super Admins (`/admin/settings`) and Gym Owners (`GymProfileManagement.jsx` -> Settings Tab) can independently enable or disable Google SSO login for their accounts via `PATCH /api/v1/auth/toggle-sso`.
+- **Lockout Prevention:** If a user onboarded via Google SSO attempts to disable SSO without setting a local account password, the backend blocks the operation with an error (`400 Bad Request: "Cannot disable SSO without setting an account password first. Set a password to prevent lockout."`).
+
+#### 9.7.4 Firebase Push Notifications (FCM)
+- **Token Registration:** Mobile apps (`mobile-application/user-react` and `mobile-application/gym-owner`) register active device tokens via `POST /api/v1/notifications/device-token`.
+- **Multi-Device Support:** The `User` model stores an array of tokens (`fcmTokens: [{ token, platform, lastUsedAt }]`).
+- **Token Hygiene:** Stale or unregistered tokens reported by FCM errors (`messaging/registration-token-not-registered`) are automatically pruned from MongoDB.
+- **Graceful Fallback:** In development mode without live Firebase credentials, `firebase.service.js` safely operates in mock mode, logging token verifications and notification payloads to the console without crashing.
+
+#### 9.7.5 Production Configuration Checklist
+To deploy Google SSO and FCM live, configure the following environment variables:
+
+| Environment Variable | Service | Description |
+| :--- | :--- | :--- |
+| `FIREBASE_PROJECT_ID` | Backend & Web | Firebase Project ID (e.g. `gymezy-prod`) |
+| `FIREBASE_SERVICE_ACCOUNT_KEY` | Backend (`middleware/.env`) | JSON string or path to Firebase Service Account Key |
+| `VITE_FIREBASE_API_KEY` | Web Portals | Web API Key from Firebase Console Project Settings |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Web Portals | Firebase Auth Domain (e.g. `gymezy-prod.firebaseapp.com`) |
+| `VITE_FIREBASE_PROJECT_ID` | Web Portals | Project ID matching backend |
+| `VITE_FIREBASE_APP_ID` | Web Portals | Web App ID generated in Firebase Console |
+
+---
+
 *Authored for the GYMEZY Platform Engineering & Architecture Team.*
+

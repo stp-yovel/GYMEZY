@@ -5,6 +5,7 @@ import { setAuthCookie, clearAuthCookie } from '../utils/cookieHelper.js';
 import { sanitizeDocument } from '../utils/responseTransformer.js';
 import { User, USER_ROLES } from '../models/user.model.js';
 import Gym from '../models/gym.model.js';
+import { verifyGoogleIdToken } from '../services/firebase.service.js';
 
 /**
  * Helper to determine expected role from body parameters
@@ -192,7 +193,7 @@ export const checkEmailAvailability = asyncHandler(async (req, res) => {
     throw ApiError.badRequest('Email parameter is required.');
   }
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
     throw ApiError.badRequest('Invalid email address format.');
   }
 
@@ -233,7 +234,7 @@ export const registerCustomer = asyncHandler(async (req, res) => {
     throw ApiError.badRequest('Full name is required and must be at least 2 characters.');
   }
 
-  if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+  if (!cleanEmail || !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanEmail)) {
     throw ApiError.badRequest('A valid email address is required.');
   }
 
@@ -324,6 +325,199 @@ export const updateProfile = asyncHandler(async (req, res) => {
   const sanitizedUser = sanitizeDocument(user.toJSON());
   return res.status(200).json(
     ApiResponse.success(sanitizedUser, 'Profile updated successfully.')
+  );
+});
+
+/**
+ * POST /api/v1/auth/google-login
+ * Authenticates user using Firebase Google ID Token
+ * If user exists: checks SSO status & portal role, logs them in with JWT.
+ * If user does NOT exist: returns { exists: false, isNewUser: true, profile: { ... } } WITHOUT saving to DB.
+ */
+export const googleLogin = asyncHandler(async (req, res) => {
+  const { idToken, portal, expectedRole } = req.body;
+
+  if (!idToken) {
+    throw ApiError.badRequest('Google ID token is required.');
+  }
+
+  // 1. Verify Google ID token securely via Firebase Admin
+  const googleProfile = await verifyGoogleIdToken(idToken);
+  const { uid, email, name, picture } = googleProfile;
+
+  if (!email) {
+    throw ApiError.badRequest('Google account must have an associated email address.');
+  }
+
+  // 2. Query DB to check if user already exists (by email or googleId)
+  const user = await User.findOne({
+    $or: [{ email: email.toLowerCase() }, { googleId: uid }],
+  }).select('+password');
+
+  // 3. Case A: User does NOT exist in DB
+  if (!user) {
+    // CRITICAL: DO NOT save user to DB here. Gym owner or customer must complete onboarding first!
+    return res.status(200).json(
+      ApiResponse.success(
+        {
+          exists: false,
+          isNewUser: true,
+          profile: {
+            email: email.toLowerCase(),
+            fullName: name || '',
+            avatar: picture || '',
+            googleUid: uid,
+          },
+        },
+        'Google token verified. User does not exist in the database yet.'
+      )
+    );
+  }
+
+  // 4. Case B: User exists in DB
+  if (!user.isActive) {
+    throw ApiError.forbidden('Your account is inactive or disabled. Please contact GYMEZY support.');
+  }
+
+  // Validate SSO permission toggle
+  if (user.isSsoEnabled === false) {
+    throw ApiError.forbidden(
+      'Google Single Sign-On (SSO) is currently disabled for your account. Please log in with your password or enable SSO in your security settings.'
+    );
+  }
+
+  // Role validation
+  const resolvedRole = resolveExpectedRole({ portal, expectedRole });
+  if (resolvedRole && user.role !== resolvedRole) {
+    throw ApiError.forbidden(`Unauthorized. Access is restricted for ${resolvedRole} role.`);
+  }
+
+  // Link googleId if not yet linked
+  let isModified = false;
+  if (!user.googleId) {
+    user.googleId = uid;
+    isModified = true;
+  }
+  if (!user.avatar && picture) {
+    user.avatar = picture;
+    user.profilePicture = picture;
+    isModified = true;
+  }
+  if (isModified) {
+    await user.save();
+  }
+
+  // Fetch gym details if gym owner
+  const gym = await fetchUserGym(user);
+  validateGymPartnerActiveState(gym);
+
+  const token = user.generateAuthToken();
+  setAuthCookie(res, token);
+
+  const sanitizedUser = sanitizeDocument(user.toJSON());
+  let sanitizedGym = null;
+  if (gym) {
+    const rawGym = typeof gym.toJSON === 'function' ? gym.toJSON() : gym;
+    sanitizedGym = sanitizeDocument(rawGym);
+  }
+
+  return res.status(200).json(
+    ApiResponse.success(
+      {
+        exists: true,
+        isNewUser: false,
+        token,
+        user: {
+          ...sanitizedUser,
+          role: user.role,
+          gym: sanitizedGym,
+        },
+        gym: sanitizedGym,
+      },
+      `Welcome back, ${user.fullName}!`
+    )
+  );
+});
+
+/**
+ * PATCH /api/v1/auth/toggle-sso
+ * Enables or disables Google SSO login for the authenticated user
+ */
+export const toggleSso = asyncHandler(async (req, res) => {
+  const userId = req.user?.userId;
+  const { enabled } = req.body;
+
+  if (typeof enabled !== 'boolean') {
+    throw ApiError.badRequest('The "enabled" boolean field is required.');
+  }
+
+  const user = await User.findById(userId).select('+password');
+  if (!user) {
+    throw ApiError.notFound('User account not found.');
+  }
+
+  // If disabling SSO, verify user has a password so they don't get locked out
+  if (!enabled && !user.password) {
+    throw ApiError.badRequest(
+      'You must set a password for your account before disabling Google SSO to prevent lockout.'
+    );
+  }
+
+  user.isSsoEnabled = enabled;
+  await user.save();
+
+  return res.status(200).json(
+    ApiResponse.success(
+      { isSsoEnabled: user.isSsoEnabled },
+      `Google SSO has been ${enabled ? 'enabled' : 'disabled'} successfully.`
+    )
+  );
+});
+
+/**
+ * POST /api/v1/auth/link-google
+ * Links a Google account to an existing authenticated user
+ */
+export const linkGoogleAccount = asyncHandler(async (req, res) => {
+  const userId = req.user?.userId;
+  const { idToken } = req.body;
+
+  if (!idToken) {
+    throw ApiError.badRequest('Google ID token is required.');
+  }
+
+  const googleProfile = await verifyGoogleIdToken(idToken);
+  const { uid, email, picture } = googleProfile;
+
+  // Check if this googleId is already linked to another account
+  const existingLinked = await User.findOne({ googleId: uid, _id: { $ne: userId } });
+  if (existingLinked) {
+    throw ApiError.conflict('This Google account is already linked to another user.');
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throw ApiError.notFound('User account not found.');
+  }
+
+  user.googleId = uid;
+  user.isSsoEnabled = true;
+  if (!user.avatar && picture) {
+    user.avatar = picture;
+    user.profilePicture = picture;
+  }
+  await user.save();
+
+  return res.status(200).json(
+    ApiResponse.success(
+      {
+        googleId: user.googleId,
+        isSsoEnabled: user.isSsoEnabled,
+        email: user.email,
+        googleEmail: email,
+      },
+      'Google account linked successfully.'
+    )
   );
 });
 

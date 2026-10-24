@@ -38,7 +38,7 @@ import {
   FileTextOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import { useTheme } from '../theme/ThemeContext';
 import { apiClient } from '../services/apiClient';
@@ -224,6 +224,7 @@ const validateField = (field, value, form) => {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) return 'Enter a valid email (e.g. owner@gym.com)';
       return '';
     case 'password': {
+      if (form?.isGoogleSso) return '';
       if (!value) return 'Password is required';
       if (value.length < 8 || value.length > 16) return 'Must be 8 to 16 characters';
       if (!/[A-Z]/.test(value)) return 'Must contain at least 1 uppercase letter';
@@ -232,6 +233,7 @@ const validateField = (field, value, form) => {
       return '';
     }
     case 'confirmPassword':
+      if (form?.isGoogleSso) return '';
       if (!value) return 'Please confirm your password';
       if (value !== form.password) return 'Passwords do not match';
       return '';
@@ -308,7 +310,12 @@ const validateField = (field, value, form) => {
 
 export const Register = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isDarkMode, toggleTheme } = useTheme();
+
+  // Google SSO Onboarding State passed from Login redirect
+  const googleProfile = location.state?.googleProfile || null;
+  const isGoogleSso = Boolean(googleProfile);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -407,6 +414,20 @@ export const Register = () => {
   // Email availability check states
   const [emailCheckStatus, setEmailCheckStatus] = useState('idle'); // 'idle' | 'checking' | 'available' | 'exists'
   const [emailCheckError, setEmailCheckError] = useState('');
+
+  // Auto-fill Google Profile into form if redirected from Google Sign-In
+  useEffect(() => {
+    if (googleProfile) {
+      setFormData((prev) => ({
+        ...prev,
+        email: googleProfile.email || prev.email,
+        ownerName: googleProfile.fullName || prev.ownerName,
+        isGoogleSso: true,
+        googleId: googleProfile.googleUid,
+      }));
+      setEmailCheckStatus('available');
+    }
+  }, [googleProfile]);
 
   // API Call to check email availability
   const checkEmailExistsApi = async (emailToCheck) => {
@@ -574,7 +595,10 @@ export const Register = () => {
   };
 
   const handleNext = async () => {
-    const currentFields = STEP_FIELDS[currentStep] || [];
+    const rawFields = STEP_FIELDS[currentStep] || [];
+    const currentFields = isGoogleSso && currentStep === 1
+      ? rawFields.filter((f) => f !== 'password' && f !== 'confirmPassword')
+      : rawFields;
     const newTouched = { ...touched };
     let hasError = false;
     for (const f of currentFields) {
@@ -710,7 +734,10 @@ export const Register = () => {
         ownerName: formData.ownerName.trim(),
         phone: formData.phone.trim(),
         email: formData.email.trim().toLowerCase(),
-        password: formData.password,
+        password: isGoogleSso ? undefined : formData.password,
+        authProvider: isGoogleSso ? 'GOOGLE' : 'LOCAL',
+        googleId: isGoogleSso ? (googleProfile?.googleUid || '') : null,
+        isSsoEnabled: true,
         businessType: formData.businessType,
         yearEstablished: formData.yearEstablished,
         gstNumber: formData.gstNumber.trim(),
@@ -1471,6 +1498,7 @@ export const Register = () => {
                       ) : null
                     }
                     value={formData.email}
+                    disabled={isGoogleSso}
                     onChange={(e) => updateField('email', e.target.value)}
                     onBlur={() => {
                       markFieldTouched('email');
@@ -1478,81 +1506,161 @@ export const Register = () => {
                         void checkEmailExistsApi(formData.email);
                       }
                     }}
-                    style={getInputStyle('email')}
+                    style={{
+                      ...getInputStyle('email'),
+                      backgroundColor: isGoogleSso
+                        ? isDarkMode
+                          ? '#1e293b'
+                          : '#f1f5f9'
+                        : getInputStyle('email').backgroundColor,
+                      cursor: isGoogleSso ? 'not-allowed' : 'default',
+                    }}
                   />
                   {renderFieldError('email')}
                 </Col>
 
-                <Col xs={24} sm={12}>
-                  <label style={labelStyle}>
-                    Create Account Password <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <Input.Password
-                    prefix={<LockOutlined style={{ color: '#94a3b8' }} />}
-                    value={formData.password}
-                    onChange={(e) => updateField('password', e.target.value)}
-                    onBlur={() => markFieldTouched('password')}
-                    style={getInputStyle('password')}
-                  />
-                  {renderFieldError('password')}
-                </Col>
+                {isGoogleSso ? (
+                  <Col xs={24}>
+                    <div
+                      style={{
+                        padding: '16px 20px',
+                        borderRadius: 10,
+                        backgroundColor: isDarkMode ? '#1e293b' : '#eff6ff',
+                        border: `1px solid ${isDarkMode ? '#334155' : '#bfdbfe'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 14,
+                        marginTop: 8,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 20,
+                          backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24">
+                          <path
+                            fill="#4285F4"
+                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                          />
+                          <path
+                            fill="#34A853"
+                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                          />
+                          <path
+                            fill="#FBBC05"
+                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                          />
+                          <path
+                            fill="#EA4335"
+                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: isDarkMode ? '#f8fafc' : '#1e3a8a' }}>
+                          Verified Google Account Sign-In
+                        </div>
+                        <div style={{ fontSize: 12, color: isDarkMode ? '#94a3b8' : '#475569', marginTop: 2 }}>
+                          No password required. Your partner account will be saved once you finish onboarding.
+                        </div>
+                      </div>
+                    </div>
+                  </Col>
+                ) : (
+                  <>
+                    <Col xs={24} sm={12}>
+                      <label style={labelStyle}>
+                        Create Account Password <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <Input.Password
+                        prefix={<LockOutlined style={{ color: '#94a3b8' }} />}
+                        value={formData.password}
+                        onChange={(e) => updateField('password', e.target.value)}
+                        onBlur={() => markFieldTouched('password')}
+                        style={getInputStyle('password')}
+                      />
+                      {renderFieldError('password')}
+                    </Col>
 
-                <Col xs={24} sm={12}>
-                  <label style={labelStyle}>
-                    Confirm Password <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <Input.Password
-                    prefix={<LockOutlined style={{ color: '#94a3b8' }} />}
-                    value={formData.confirmPassword}
-                    onChange={(e) => updateField('confirmPassword', e.target.value)}
-                    onBlur={() => markFieldTouched('confirmPassword')}
-                    style={getInputStyle('confirmPassword')}
-                  />
-                  {renderFieldError('confirmPassword')}
-                </Col>
+                    <Col xs={24} sm={12}>
+                      <label style={labelStyle}>
+                        Confirm Password <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <Input.Password
+                        prefix={<LockOutlined style={{ color: '#94a3b8' }} />}
+                        value={formData.confirmPassword}
+                        onChange={(e) => updateField('confirmPassword', e.target.value)}
+                        onBlur={() => markFieldTouched('confirmPassword')}
+                        style={getInputStyle('confirmPassword')}
+                      />
+                      {renderFieldError('confirmPassword')}
+                    </Col>
+
+                    {/* Minimal Live Password Requirements Checklist */}
+                    <Col xs={24}>
+                      <div
+                        style={{
+                          marginTop: 16,
+                          padding: '12px 14px',
+                          borderRadius: 8,
+                          backgroundColor: isDarkMode ? '#18181b' : '#f8fafc',
+                          border: `1px solid ${isDarkMode ? '#27272a' : '#f1f5f9'}`,
+                          display: 'flex',
+                          gap: 12,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        {[
+                          { label: '8-16 Chars', valid: passwordChecks.length },
+                          { label: '1 Uppercase', valid: passwordChecks.hasUpper },
+                          { label: '1 Number', valid: passwordChecks.hasNumber },
+                          { label: '1 Special Symbol', valid: passwordChecks.hasSpecial },
+                          { label: 'Passwords Match', valid: passwordChecks.match },
+                        ].map((item, idx) => (
+                          <span
+                            key={idx}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              fontSize: 12,
+                              fontWeight: 500,
+                              color: item.valid
+                                ? '#10b981'
+                                : isDarkMode
+                                ? '#71717a'
+                                : '#94a3b8',
+                            }}
+                          >
+                            {item.valid ? (
+                              <CheckCircleFilled style={{ color: '#10b981', fontSize: 13 }} />
+                            ) : (
+                              <span
+                                style={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: '50%',
+                                  backgroundColor: isDarkMode ? '#3f3f46' : '#cbd5e1',
+                                }}
+                              />
+                            )}
+                            {item.label}
+                          </span>
+                        ))}
+                      </div>
+                    </Col>
+                  </>
+                )}
               </Row>
-
-              {/* Minimal Live Password Requirements Checklist */}
-              <div
-                style={{
-                  marginTop: 16,
-                  padding: '12px 14px',
-                  borderRadius: 8,
-                  backgroundColor: isDarkMode ? '#18181b' : '#f8fafc',
-                  border: `1px solid ${isDarkMode ? '#27272a' : '#f1f5f9'}`,
-                  display: 'flex',
-                  gap: 12,
-                  flexWrap: 'wrap',
-                }}
-              >
-                {[
-                  { label: '8-16 Chars', valid: passwordChecks.length },
-                  { label: '1 Uppercase', valid: passwordChecks.hasUpper },
-                  { label: '1 Number', valid: passwordChecks.hasNumber },
-                  { label: '1 Special Symbol', valid: passwordChecks.hasSpecial },
-                  { label: 'Passwords Match', valid: passwordChecks.match },
-                ].map((item, idx) => (
-                  <span
-                    key={idx}
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: item.valid ? '#16a34a' : '#94a3b8',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      transition: 'color 0.2s ease',
-                    }}
-                  >
-                    {item.valid ? (
-                      <CheckOutlined style={{ color: '#16a34a', fontWeight: 800 }} />
-                    ) : (
-                      '•'
-                    )}
-                    {item.label}
-                  </span>
-                ))}
-              </div>
             </div>
           )}
 

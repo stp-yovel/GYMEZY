@@ -26,6 +26,9 @@ yarn-error.log*
 !.env.example
 dist/
 .cache/
+*firebase-service-account*.json
+*serviceAccountKey*.json
+google-services.json
 
 # Flutter & Dart (Mobile Application)
 .dart_tool/
