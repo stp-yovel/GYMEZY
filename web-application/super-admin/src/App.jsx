@@ -11,6 +11,7 @@ import SubscriptionsManagement from './admin/SubscriptionsManagement';
 import GymOnboarding from './admin/GymOnboarding';
 import ReportsManagement from './admin/ReportsManagement';
 import BannerManagement from './admin/BannerManagement';
+import SettingsManagement from './admin/SettingsManagement';
 
 export function App() {
   return (
@@ -37,7 +38,7 @@ export function App() {
         <Route path="subscriptions" element={<SubscriptionsManagement />} />
         <Route path="reports" element={<ReportsManagement />} />
         <Route path="audit" element={<Dashboard />} />
-        <Route path="settings" element={<Dashboard />} />
+        <Route path="settings" element={<SettingsManagement />} />
         <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Route>
 

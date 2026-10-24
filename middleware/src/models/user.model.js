@@ -11,6 +11,11 @@ export const USER_ROLES = {
   CUSTOMER: 'CUSTOMER',
 };
 
+export const AUTH_PROVIDERS = {
+  LOCAL: 'LOCAL',
+  GOOGLE: 'GOOGLE',
+};
+
 export const GENDER_ENUM = ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'];
 
 const customerProfileSchema = new mongoose.Schema(
@@ -60,22 +65,55 @@ const userSchema = new mongoose.Schema(
       trim: true,
       index: true,
       match: [
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
         'Please provide a valid email address',
       ],
     },
     phone: {
       type: String,
-      required: [true, 'Phone number is required'],
+      required: [
+        function () {
+          return this.authProvider === 'LOCAL';
+        },
+        'Phone number is required',
+      ],
       trim: true,
       index: true,
+      default: '',
     },
     password: {
       type: String,
-      required: [true, 'Password is required'],
+      required: [
+        function () {
+          return this.authProvider === 'LOCAL' || !this.authProvider;
+        },
+        'Password is required for local accounts',
+      ],
       minlength: [6, 'Password must be at least 6 characters long'],
       select: false, // Never return password in standard queries
     },
+    authProvider: {
+      type: String,
+      enum: Object.values(AUTH_PROVIDERS),
+      default: AUTH_PROVIDERS.LOCAL,
+      index: true,
+    },
+    googleId: {
+      type: String,
+      sparse: true,
+      index: true,
+      default: null,
+    },
+    isSsoEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    fcmTokens: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
     role: {
       type: String,
       enum: Object.values(USER_ROLES),
@@ -161,7 +199,7 @@ userSchema.pre('save', async function () {
     this.customerId = await mongoose.model('User').generateCustomerId();
   }
 
-  if (!this.isModified('password')) {
+  if (!this.password || !this.isModified('password')) {
     return;
   }
 

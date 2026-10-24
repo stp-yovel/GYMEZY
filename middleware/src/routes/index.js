@@ -10,6 +10,7 @@ import walletRoutes from './wallet.routes.js';
 import sectionRoutes from './section.routes.js';
 import bookingRoutes from './booking.routes.js';
 import bannerRoutes from './banner.routes.js';
+import notificationRoutes from './notification.routes.js';
 
 const apiRouter = Router();
 
@@ -24,5 +25,6 @@ apiRouter.use('/wallet', walletRoutes);
 apiRouter.use('/sections', sectionRoutes);
 apiRouter.use('/bookings', bookingRoutes);
 apiRouter.use('/banners', bannerRoutes);
+apiRouter.use('/notifications', notificationRoutes);
 
 export default apiRouter;
